@@ -1,0 +1,352 @@
+// Sentinel Supplier Assurance Platform — Prisma Schema
+// Day 2 — Full schema; IDs: SUP-, AUD-, TYP-, FIN-, CAR-
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== Auth & Users ==============
+model Role {
+  id        String    @id @default(cuid())
+  name      String    @unique // Admin, Viewer, QualityEngineer, Auditor, Buyer, Supplier
+  userRoles UserRole[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  userRoles    UserRole[]
+  buyerSuppliers BuyerSupplier[]  @relation("BuyerAssignments")
+  supplier     Supplier?          @relation("SupplierUser")
+  recordsUploaded Record[]
+  findingsCreated Finding[]
+  carsCreated  CorrectiveAction[]
+  opportunitiesCreated Opportunity[]
+  alerts       Alert[]
+  alertPrefs   UserAlertPreference[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  @@id([userId, roleId])
+}
+
+// ============== Suppliers & Buyers ==============
+model CommodityType {
+  id        String    @id @default(cuid())
+  name      String
+  suppliers Supplier[]
+}
+
+model Supplier {
+  id              String    @id @default(cuid())
+  code            String    @unique // SUP-00001
+  name            String
+  city            String?
+  country         String?
+  commodityTypeId String?
+  commodityType   CommodityType? @relation(fields: [commodityTypeId], references: [id])
+  userId          String?   @unique // for Supplier role login
+  user            User?     @relation("SupplierUser", fields: [userId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  buyerSuppliers  BuyerSupplier[]
+  audits          Audit[]
+  findings        Finding[]
+  correctiveActions CorrectiveAction[]
+  shipments       Shipment[]
+  records         Record[]
+  riskSnapshots   RiskSnapshot[]
+  opportunities   Opportunity[]
+  shipmentSchedules ShipmentSchedule[]
+}
+
+model BuyerSupplier {
+  buyerId    String
+  supplierId String
+  buyer      User     @relation("BuyerAssignments", fields: [buyerId], references: [id], onDelete: Cascade)
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  @@id([buyerId, supplierId])
+}
+
+// ============== Audits & Findings & CARs ==============
+model AuditType {
+  id     String  @id @default(cuid())
+  code   String  @unique // TYP-00
+  name   String?
+  audits Audit[]
+}
+
+model Audit {
+  id           String    @id @default(cuid())
+  code         String    @unique // AUD-00001
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  auditTypeId  String?
+  auditType    AuditType? @relation(fields: [auditTypeId], references: [id])
+  auditDate    DateTime  @db.Date
+  result       AuditResult? // Passed, Failed, Cancelled
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  findings     Finding[]
+  correctiveActions CorrectiveAction[]
+}
+
+enum AuditResult {
+  Passed
+  Failed
+  Cancelled
+}
+
+model Finding {
+  id                      String        @id @default(cuid())
+  code                    String        @unique // FIN-00001
+  auditId                 String
+  audit                   Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  supplierId              String
+  supplier                Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  status                  FindingStatus @default(DRAFT)
+  severity                FindingSeverity
+  summary                 String
+  discrepancy             String
+  defectCode              String?
+  containment             String?
+  occurrenceRootCause     String?
+  escapeRootCause         String?
+  correctiveAction        String?
+  verificationOfEffectiveness String?
+  closingComments         String?
+  createdById             String?
+  createdBy               User?         @relation(fields: [createdById], references: [id])
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  correctiveActions       CorrectiveAction[]
+}
+
+enum FindingStatus {
+  DRAFT
+  WaitingDisposition
+  WaitingApproval
+  Closed
+}
+
+enum FindingSeverity {
+  Critical
+  Major
+  Minor
+}
+
+model CorrectiveAction {
+  id                          String    @id @default(cuid())
+  code                        String    @unique // CAR-00001
+  findingId                   String
+  finding                     Finding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  auditId                     String
+  audit                       Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  supplierId                  String
+  supplier                    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  status                      CARStatus @default(DRAFT)
+  severity                    FindingSeverity
+  carOwner                    String?
+  targetCompletionDate        DateTime? @db.Date
+  summary                     String
+  discrepancy                 String
+  defectCode                  String?
+  containment                 String?
+  occurrenceRootCause         String?
+  escapeRootCause             String?
+  correctiveAction            String?
+  verificationOfEffectiveness  String?
+  closingComments             String?
+  createdById                 String?
+  createdBy                   User?     @relation(fields: [createdById], references: [id])
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+}
+
+enum CARStatus {
+  DRAFT
+  RCCA
+  WaitingApproval
+  FollowUp
+  Closed
+}
+
+// ============== Shipments ==============
+model Shipment {
+  id              String          @id @default(cuid())
+  supplierId      String
+  supplier        Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchaseOrder   String?
+  partNumber      String?
+  qty             Int?
+  inspectionDate  DateTime?       @db.Date
+  status          ShipmentStatus @default(WaitingInspection)
+  result          ShipmentResult? // Passed, Failed (set by Admin/QE)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+enum ShipmentStatus {
+  WaitingInspection
+  Passed
+  Failed
+}
+
+enum ShipmentResult {
+  Passed
+  Failed
+}
+
+model ShipmentSchedule {
+  id             String   @id @default(cuid())
+  supplierId     String?
+  supplier       Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchaseOrder  String?
+  partNumber     String?
+  qty            Int?
+  scheduledDate  DateTime? @db.Date
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ============== Records & Documents ==============
+model Record {
+  id               String      @id @default(cuid())
+  name             String
+  internalOrSupplier RecordSource
+  supplierId       String
+  supplier         Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  status          RecordStatus @default(PENDING)
+  filePath        String?
+  uploadedById    String?
+  uploadedBy      User?        @relation(fields: [uploadedById], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum RecordSource {
+  internal
+  supplier
+}
+
+enum RecordStatus {
+  PENDING
+  Approved
+  Rejected
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  documentNumber String
+  name           String
+  category       String?
+  documentType   DocumentType
+  filePath       String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum DocumentType {
+  Procedure
+  Policy
+  StandardOperatingProcedure
+  WorkInstruction
+  Form
+}
+
+model InternalDoc {
+  id        String   @id @default(cuid())
+  name      String
+  category  String?
+  filePath  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============== Risk ==============
+model RiskWeightConfig {
+  id                  String @id @default(cuid())
+  qualityPercent      Float  @default(20)
+  auditPercent        Float  @default(20)
+  deliveryPercent     Float  @default(20)
+  carClosurePercent   Float  @default(20)
+  documentationPercent Float @default(20)
+  updatedAt           DateTime @updatedAt
+}
+
+model RiskSnapshot {
+  id         String    @id @default(cuid())
+  supplierId String
+  supplier   Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  score      Float?
+  level      RiskLevel
+  createdAt  DateTime  @default(now())
+}
+
+enum RiskLevel {
+  Low
+  Medium
+  High
+}
+
+model Opportunity {
+  id          String   @id @default(cuid())
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  description String?
+  type        String   // risk | opportunity
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============== Alerts ==============
+model Alert {
+  id         String       @id @default(cuid())
+  category   AlertCategory
+  entityType String?      // e.g. Audit, Finding, CAR, Shipment
+  entityId   String?
+  message    String?
+  userId     String?      // if user-specific
+  user       User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+}
+
+enum AlertCategory {
+  overdueAudit
+  majorCriticalFinding
+  overdueCAR
+  shipmentInspectionRequest
+  rejectedShipmentDocument
+  lateShipment
+}
+
+model UserAlertPreference {
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertCategory AlertCategory
+  enabled      Boolean @default(true)
+  @@id([userId, alertCategory])
+}
+
+// For application-level code generation (SUP-00001, AUD-00001, etc.)
+model IdSequence {
+  prefix    String @id // SUP, AUD, TYP, FIN, CAR
+  lastValue Int    @default(0)
+}

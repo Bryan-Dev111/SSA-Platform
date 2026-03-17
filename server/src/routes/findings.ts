@@ -1,0 +1,498 @@
+/**
+ * Findings API: CRUD; status flow DRAFT → Waiting Disposition → Waiting Approval → Closed.
+ * Required for Save (DRAFT → Waiting Disposition): Supplier, Audit #, Severity, Summary, Discrepancy.
+ * Process/Reverse; Approve/Reject (Waiting Approval, Admin/QE only). Only Admin can delete.
+ */
+import { Router, Request, Response } from 'express';
+import { PrismaClient, FindingSeverity } from '@prisma/client';
+import { FindingStatus } from '@prisma/client';
+import { authMiddleware } from '../middleware/auth';
+import { requireRole } from '../middleware/rbac';
+import { getAllowedSupplierIds } from '../services/scope';
+import { getNextCode } from '../services/idGenerator';
+import { asyncHandler } from '../middleware/asyncHandler';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+const FINDING_STATUS_ORDER: FindingStatus[] = ['DRAFT', 'WaitingDisposition', 'WaitingApproval', 'Closed'];
+
+function nextStatus(s: FindingStatus): FindingStatus | null {
+  const i = FINDING_STATUS_ORDER.indexOf(s);
+  return i < 0 || i >= FINDING_STATUS_ORDER.length - 1 ? null : FINDING_STATUS_ORDER[i + 1];
+}
+
+function prevStatus(s: FindingStatus): FindingStatus | null {
+  const i = FINDING_STATUS_ORDER.indexOf(s);
+  return i <= 0 ? null : FINDING_STATUS_ORDER[i - 1];
+}
+
+router.use(authMiddleware);
+router.use(requireRole(['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer']));
+
+router.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
+    const where: { supplierId?: { in: string[] } | string; status?: { not: FindingStatus } } = { status: { not: 'DRAFT' } };
+    if (allowedIds !== null) {
+      where.supplierId = { in: allowedIds };
+      if (allowedIds.length === 0) {
+        res.json({ list: [], stats: { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 }, defectCodeCounts: [] });
+        return;
+      }
+    }
+    if (supplierId) {
+      if (allowedIds !== null && !allowedIds.includes(supplierId)) {
+        res.json({ list: [], stats: { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 }, defectCodeCounts: [] });
+        return;
+      }
+      where.supplierId = supplierId;
+    }
+    // List shows only findings that have left DRAFT (per requirements)
+    where.status = { not: 'DRAFT' };
+    const statsWhere = { ...where };
+    const [list, allForStats] = await Promise.all([
+      prisma.finding.findMany({
+        where,
+        include: {
+          supplier: { select: { id: true, code: true, name: true } },
+          audit: { select: { id: true, code: true, auditDate: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.finding.findMany({
+        where: statsWhere,
+        select: { severity: true, status: true, defectCode: true },
+      }),
+    ]);
+    const totalCriticalMajor = allForStats.filter((f) => f.severity === 'Critical' || f.severity === 'Major').length;
+    const openCriticalMajor = allForStats.filter(
+      (f) => (f.severity === 'Critical' || f.severity === 'Major') && f.status !== 'Closed'
+    ).length;
+    const waitingApproval = allForStats.filter((f) => f.status === 'WaitingApproval').length;
+    const defectCodeCounts = allForStats
+      .filter((f) => f.defectCode)
+      .reduce((acc: Record<string, number>, f) => {
+        const c = (f.defectCode as string).trim();
+        if (c) acc[c] = (acc[c] || 0) + 1;
+        return acc;
+      }, {});
+    const defectCodeArray = Object.entries(defectCodeCounts)
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    res.json({
+      list,
+      stats: { totalCriticalMajor, openCriticalMajor, waitingApproval },
+      defectCodeCounts: defectCodeArray,
+    });
+  })
+);
+
+router.get(
+  '/by-code/:code',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const finding = await prisma.finding.findUnique({
+      where: { code: req.params.code },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+        createdBy: { select: { id: true, email: true, name: true } },
+      },
+    });
+    if (!finding) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(finding.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    res.json(finding);
+  })
+);
+
+router.get(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const finding = await prisma.finding.findUnique({
+      where: { id: req.params.id },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+        createdBy: { select: { id: true, email: true, name: true } },
+      },
+    });
+    if (!finding) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(finding.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    res.json(finding);
+  })
+);
+
+router.post(
+  '/',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canInitiate = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+    if (!canInitiate) {
+      res.status(403).json({ error: 'Only Admin, Quality Engineer, or Auditor can create a finding' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const { supplierId, auditId, severity, summary, discrepancy, defectCode, containment, occurrenceRootCause, escapeRootCause, correctiveAction, verificationOfEffectiveness, closingComments } = req.body as Record<string, unknown>;
+    if (!supplierId || !auditId || !severity || !summary || discrepancy === undefined) {
+      res.status(400).json({ error: 'supplierId, auditId, severity, summary, and discrepancy are required' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(supplierId as string)) {
+      res.status(403).json({ error: 'Supplier not in scope' });
+      return;
+    }
+    const audit = await prisma.audit.findUnique({ where: { id: auditId as string }, select: { supplierId: true } });
+    if (!audit || audit.supplierId !== supplierId) {
+      res.status(400).json({ error: 'Audit not found or does not belong to supplier' });
+      return;
+    }
+    if (!['Critical', 'Major', 'Minor'].includes(severity as string)) {
+      res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });
+      return;
+    }
+    const code = `FIN-DRAFT-${Date.now()}`;
+    const finding = await prisma.finding.create({
+      data: {
+        code,
+        auditId: auditId as string,
+        supplierId: supplierId as string,
+        status: 'DRAFT',
+        severity: severity as 'Critical' | 'Major' | 'Minor',
+        summary: String(summary).trim(),
+        discrepancy: String(discrepancy).trim(),
+        defectCode: defectCode ? String(defectCode).trim() : null,
+        containment: containment ? String(containment).trim() : null,
+        occurrenceRootCause: occurrenceRootCause ? String(occurrenceRootCause).trim() : null,
+        escapeRootCause: escapeRootCause ? String(escapeRootCause).trim() : null,
+        correctiveAction: correctiveAction ? String(correctiveAction).trim() : null,
+        verificationOfEffectiveness: verificationOfEffectiveness ? String(verificationOfEffectiveness).trim() : null,
+        closingComments: closingComments ? String(closingComments).trim() : null,
+        createdById: req.user.id,
+      },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.status(201).json(finding);
+  })
+);
+
+router.patch(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canEditDraft = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+    if (!canEditDraft) {
+      res.status(403).json({ error: 'Viewer and other roles cannot edit findings' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (existing.status !== 'DRAFT') {
+      res.status(400).json({ error: 'Only draft findings can be updated via PATCH' });
+      return;
+    }
+    const body = req.body as Record<string, unknown>;
+    const data: {
+      severity?: FindingSeverity;
+      summary?: string;
+      discrepancy?: string;
+      defectCode?: string | null;
+      containment?: string | null;
+      occurrenceRootCause?: string | null;
+      escapeRootCause?: string | null;
+      correctiveAction?: string | null;
+      verificationOfEffectiveness?: string | null;
+      closingComments?: string | null;
+    } = {};
+    const allowed = ['summary', 'discrepancy', 'defectCode', 'containment', 'occurrenceRootCause', 'escapeRootCause', 'correctiveAction', 'verificationOfEffectiveness', 'closingComments'] as const;
+    for (const k of allowed) {
+      if (body[k] !== undefined) (data as Record<string, unknown>)[k] = typeof body[k] === 'string' ? body[k].trim() : body[k];
+    }
+    if (body.severity !== undefined) {
+      if (!['Critical', 'Major', 'Minor'].includes(body.severity as string)) {
+        res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });
+        return;
+      }
+      data.severity = body.severity as FindingSeverity;
+    }
+    const finding = await prisma.finding.update({
+      where: { id: req.params.id },
+      data,
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.json(finding);
+  })
+);
+
+router.post(
+  '/:id/save',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canEditDraft = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+    if (!canEditDraft) {
+      res.status(403).json({ error: 'Viewer and other roles cannot save findings' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (existing.status !== 'DRAFT') {
+      res.status(400).json({ error: 'Only draft findings can be saved' });
+      return;
+    }
+    if (!existing.summary?.trim() || !existing.discrepancy?.trim()) {
+      res.status(400).json({ error: 'Required fields for Save: Supplier, Audit #, Severity, Summary, Discrepancy' });
+      return;
+    }
+    const code = await getNextCode('FIN');
+    const finding = await prisma.finding.update({
+      where: { id: req.params.id },
+      data: { code, status: 'WaitingDisposition' },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.json(finding);
+  })
+);
+
+router.post(
+  '/:id/process',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canProcess = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+    if (!canProcess) {
+      res.status(403).json({ error: 'Viewer and other roles cannot process findings' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    const next = nextStatus(existing.status);
+    if (!next || existing.status === 'WaitingApproval') {
+      res.status(400).json({ error: 'Process not available for current status' });
+      return;
+    }
+    const finding = await prisma.finding.update({
+      where: { id: req.params.id },
+      data: { status: next },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.json(finding);
+  })
+);
+
+router.post(
+  '/:id/reverse',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canReverse = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+    if (!canReverse) {
+      res.status(403).json({ error: 'Viewer and other roles cannot reverse findings' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    const prev = prevStatus(existing.status);
+    if (!prev || prev === 'DRAFT') {
+      res.status(400).json({ error: 'Cannot reverse to DRAFT' });
+      return;
+    }
+    const finding = await prisma.finding.update({
+      where: { id: req.params.id },
+      data: { status: prev },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.json(finding);
+  })
+);
+
+router.post(
+  '/:id/approve',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canApprove = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+    if (!canApprove) {
+      res.status(403).json({ error: 'Only Admin or Quality Engineer can approve findings' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (existing.status !== 'WaitingApproval') {
+      res.status(400).json({ error: 'Only findings in Waiting Approval can be approved' });
+      return;
+    }
+    const finding = await prisma.finding.update({
+      where: { id: req.params.id },
+      data: { status: 'Closed' },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.json(finding);
+  })
+);
+
+router.post(
+  '/:id/reject',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canReject = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+    if (!canReject) {
+      res.status(403).json({ error: 'Only Admin or Quality Engineer can reject findings' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (existing.status !== 'WaitingApproval') {
+      res.status(400).json({ error: 'Only findings in Waiting Approval can be rejected' });
+      return;
+    }
+    const finding = await prisma.finding.update({
+      where: { id: req.params.id },
+      data: { status: 'WaitingDisposition' },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true, auditDate: true } },
+      },
+    });
+    res.json(finding);
+  })
+);
+
+router.delete(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (!req.user.roleNames.includes('Admin')) {
+      res.status(403).json({ error: 'Only Admin can delete a finding' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const existing = await prisma.finding.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Finding not found' });
+      return;
+    }
+    await prisma.finding.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  })
+);
+
+export default router;
