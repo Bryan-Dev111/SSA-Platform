@@ -4,7 +4,7 @@
  * approval/status history; workflow buttons Save, Process, Reverse, Approve, Reject.
  */
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiJson } from '../api/client';
 
@@ -80,6 +80,7 @@ export function FindingsRecord() {
   const canProcess = finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingApproval' && finding.status !== 'Closed';
   const canReverse = finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
   const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+  const canCreateNew = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
 
   useEffect(() => {
     if (!token) return;
@@ -267,6 +268,11 @@ export function FindingsRecord() {
   }
 
   const isNew = !finding && !idParam && !codeParam;
+
+  // Viewer/Buyer are read-only: do not show the "New finding" create form (redirect to list)
+  if (!loading && isNew && !canCreateNew) {
+    return <Navigate to="/findings" replace />;
+  }
 
   return (
     <div className="page">

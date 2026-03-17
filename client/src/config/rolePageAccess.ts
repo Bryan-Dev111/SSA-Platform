@@ -7,7 +7,7 @@ export const PATH_ROLES: Record<string, string[]> = {
   '/risk': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   '/corrective-actions': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   '/car-record': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
-  '/findings': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
+  '/findings': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   '/findings-record': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   '/audits': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   '/supplier-profile': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer', 'Supplier'],
