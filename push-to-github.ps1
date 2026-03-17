@@ -25,4 +25,4 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "Done. Code is on https://github.com/bryandev91/Sentinel-Supplier-Assurance-Platform" -ForegroundColor Green
+Write-Host "Done. Code is on https://github.com/bryandev91/SSA-Platform" -ForegroundColor Green
