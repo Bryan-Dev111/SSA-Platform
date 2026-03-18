@@ -2,9 +2,7 @@
  * Buyer/Supplier scope helpers for data access
  * Buyer: only assigned suppliers; Supplier: only own data
  */
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 /** For Buyer: return list of supplier IDs assigned to this user. Empty array = no assignments. */
 export async function getAssignedSupplierIds(userId: string): Promise<string[]> {

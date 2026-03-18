@@ -2,13 +2,12 @@
  * Users API: list users (Admin only). Link to Buyer/Supplier where applicable.
  */
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.use(authMiddleware);
 router.use(requireRole(['Admin']));

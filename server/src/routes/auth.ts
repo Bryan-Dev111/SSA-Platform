@@ -3,12 +3,11 @@
  */
 import { Router, Request, Response } from 'express';
 import * as bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
 import { signToken } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.post(
   '/login',

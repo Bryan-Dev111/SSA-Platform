@@ -5,8 +5,9 @@
 import path from 'path';
 import { config } from 'dotenv';
 
-// Load .env from project root (parent of server/) so DATABASE_URL is available to Prisma
+// Load .env: root first, then server/ so DATABASE_URL (Supabase) is set when running from server/
 config({ path: path.resolve(process.cwd(), '..', '.env') });
+config({ path: path.resolve(process.cwd(), '.env') });
 
 import express from 'express';
 import cors from 'cors';

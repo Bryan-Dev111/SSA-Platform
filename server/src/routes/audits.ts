@@ -4,7 +4,7 @@
  * Only Admin/QE can set result; only Admin can delete.
  */
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
@@ -12,7 +12,6 @@ import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 type AuditResult = 'Passed' | 'Failed' | 'Cancelled';
 type DerivedStatus = 'Scheduled' | 'In-Process' | 'Overdue' | 'Complete' | 'Cancelled';

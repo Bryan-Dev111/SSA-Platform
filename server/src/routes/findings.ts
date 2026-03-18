@@ -4,8 +4,8 @@
  * Process/Reverse; Approve/Reject (Waiting Approval, Admin/QE only). Only Admin can delete.
  */
 import { Router, Request, Response } from 'express';
-import { PrismaClient, FindingSeverity } from '@prisma/client';
-import { FindingStatus } from '@prisma/client';
+import { FindingSeverity, FindingStatus } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
@@ -13,7 +13,6 @@ import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const FINDING_STATUS_ORDER: FindingStatus[] = ['DRAFT', 'WaitingDisposition', 'WaitingApproval', 'Closed'];
 

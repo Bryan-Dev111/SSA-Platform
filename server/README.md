@@ -1,20 +1,22 @@
 # Sentinel API (Server)
 
+The app uses **Supabase** as the database. See **docs/SUPABASE_SETUP.md** for full setup and migration from local PostgreSQL.
+
 ## Setup
 
-1. Copy `../.env.example` to `../.env` (or create `.env` in project root) and set `DATABASE_URL` to your PostgreSQL connection string.
+1. Copy `../.env.example` to `../.env` and `server/.env.example` to `server/.env`. Set **`DATABASE_URL`** in both to your **Supabase** connection string (Project Settings → Database → Connection string → Session; add `?sslmode=require&connect_timeout=30`).
 2. Install and generate Prisma client:
    ```bash
    npm install
    npx prisma generate
    ```
-3. Apply the database migration (when PostgreSQL is running):
+3. Apply the database schema on Supabase:
    ```bash
    npx prisma migrate deploy
    ```
-   Or for development with a new DB:
+4. Seed roles and test users (if the DB is empty):
    ```bash
-   npx prisma migrate dev --name init
+   npm run db:seed
    ```
 
 ## Scripts

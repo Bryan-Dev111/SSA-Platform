@@ -2,13 +2,12 @@
  * Suppliers API: list and get one. Scope: Admin all; Buyer assigned; Supplier own.
  */
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { getAllowedSupplierIds } from '../services/scope';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.use(authMiddleware);
 

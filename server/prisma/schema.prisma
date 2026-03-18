@@ -1,5 +1,6 @@
 // Sentinel Supplier Assurance Platform — Prisma Schema
 // Day 2 — Full schema; IDs: SUP-, AUD-, TYP-, FIN-, CAR-
+// Database: Supabase (set DATABASE_URL in server/.env and root .env).
 
 generator client {
   provider = "prisma-client-js"
