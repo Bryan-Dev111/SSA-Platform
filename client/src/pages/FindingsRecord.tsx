@@ -81,8 +81,8 @@ export function FindingsRecord() {
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
   const canEdit = finding?.status === 'DRAFT' && canEditDraft;
   const canSave = finding?.status === 'DRAFT' && canEditDraft;
-  const canProcess = finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingApproval' && finding.status !== 'Closed';
-  const canReverse = finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
+  const canProcess = canEditDraft && !!finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingApproval' && finding.status !== 'Closed';
+  const canReverse = canEditDraft && !!finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
   const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
   // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
   const canCreateNew = canEditDraft;
@@ -299,11 +299,9 @@ export function FindingsRecord() {
         <p className="page-description">
           {finding ? `Status: ${finding.status}` : isNew ? 'Create a draft finding (Admin, QE, or Auditor).' : 'Finding not found.'}
         </p>
-        {finding && (
-          <p style={{ marginTop: 4 }}>
-            <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
-          </p>
-        )}
+        <p style={{ marginTop: 4 }}>
+          <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
+        </p>
       </header>
 
       {error && (
@@ -371,7 +369,7 @@ export function FindingsRecord() {
                 <label className="input-label">Defect Code</label>
                 <input className="input" value={form.defectCode} onChange={(e) => setForm((p) => ({ ...p, defectCode: e.target.value }))} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create draft'}</button>
             </form>
           </div>
         </div>
@@ -388,7 +386,9 @@ export function FindingsRecord() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Audit #</label>
-                  <input className="input" value={finding.audit?.code ?? ''} readOnly disabled />
+                  <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
+                    {finding.audit?.code ?? ''}
+                  </Link>
                 </div>
                 <div className="input-group">
                   <label className="input-label">Severity</label>

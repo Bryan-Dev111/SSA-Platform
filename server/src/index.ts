@@ -17,6 +17,7 @@ import usersRoutes from './routes/users';
 import suppliersRoutes from './routes/suppliers';
 import auditsRoutes from './routes/audits';
 import findingsRoutes from './routes/findings';
+import carsRoutes from './routes/cars';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/users', usersRoutes);
 app.use('/suppliers', suppliersRoutes);
 app.use('/audits', auditsRoutes);
 app.use('/findings', findingsRoutes);
+app.use('/cars', carsRoutes);
 
 app.use(errorHandler);
 

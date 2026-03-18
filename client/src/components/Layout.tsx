@@ -81,7 +81,7 @@ export function Layout() {
       return ['/supplier-profile', '/records', '/shipments'].includes(item.path);
     }
     if (!canAccessPath(item.path, roleNames)) return false;
-    // Findings Record: hidden from sidebar for now; open findings via Findings page (modal or direct URL)
+    // Findings Record: hidden from sidebar; open via Findings page (New finding or click finding code)
     if (item.path === '/findings-record') return false;
     return true;
   });

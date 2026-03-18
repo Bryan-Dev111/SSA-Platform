@@ -1,13 +1,12 @@
 /**
  * Findings page: stats, chart, table, supplier filter.
- * "New finding" and opening a finding from the list use a modal (no redirect to Finding Record).
+ * "New finding" and opening a finding navigate to Findings Record page (no sidebar tab for Record).
  */
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
-import { FindingModal } from '../components/FindingModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Supplier {
@@ -51,8 +50,6 @@ export function Findings() {
   const canApproveReject = roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
   const isAdmin = roleNames.includes('Admin');
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalFindingId, setModalFindingId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -127,10 +124,6 @@ export function Findings() {
       await apiJson(`/findings/${findingId}`, { token, method: 'DELETE' });
       setRefreshKey((k) => k + 1);
       toast.warning('Finding deleted');
-      if (modalFindingId === findingId) {
-        setModalOpen(false);
-        setModalFindingId(null);
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
@@ -193,16 +186,9 @@ export function Findings() {
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         {canCreateFinding && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setModalFindingId(null);
-              setModalOpen(true);
-            }}
-          >
+          <Link to="/findings-record" className="btn btn-primary">
             New finding
-          </button>
+          </Link>
         )}
         <label>
           <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
@@ -274,14 +260,14 @@ export function Findings() {
                 <th>Status</th>
                 <th>Summary</th>
                 <th>Updated</th>
-                <th>Change status</th>
+                {canChangeStatus && <th>Change status</th>}
                 {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} className="table-empty">
+                  <td colSpan={6 + (canChangeStatus ? 1 : 0) + (isAdmin ? 1 : 0)} className="table-empty">
                     No findings in scope (or none past DRAFT yet).
                   </td>
                 </tr>
@@ -289,16 +275,9 @@ export function Findings() {
                 paginatedList.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <button
-                        type="button"
-                        className="finding-code-link"
-                        onClick={() => {
-                          setModalFindingId(f.id);
-                          setModalOpen(true);
-                        }}
-                      >
+                      <Link to={`/findings-record?id=${encodeURIComponent(f.id)}`} className="finding-code-link">
                         {f.code}
-                      </button>
+                      </Link>
                     </td>
                     <td>{f.supplier.code} — {f.supplier.name}</td>
                     <td>{f.audit.code}</td>
@@ -312,25 +291,27 @@ export function Findings() {
                       {f.summary}
                     </td>
                     <td>{new Date(f.updatedAt).toLocaleDateString()}</td>
-                    <td>
-                      <select
-                        className="input"
-                        value=""
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (v) handleStatusChange(f.id, f.status, v);
-                          e.target.value = '';
-                        }}
-                        disabled={actioningId !== null}
-                        style={{ minWidth: 120, fontSize: 'var(--text-sm)' }}
-                        title="Change status"
-                      >
-                        {getStatusOptions(f.status).map((o) => (
-                          <option key={o.value || 'current'} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                      {actioningId === f.id && <span style={{ marginLeft: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>…</span>}
-                    </td>
+                    {canChangeStatus && (
+                      <td>
+                        <select
+                          className="input"
+                          value=""
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v) handleStatusChange(f.id, f.status, v);
+                            e.target.value = '';
+                          }}
+                          disabled={actioningId !== null}
+                          style={{ minWidth: 120, fontSize: 'var(--text-sm)' }}
+                          title="Change status"
+                        >
+                          {getStatusOptions(f.status).map((o) => (
+                            <option key={o.value || 'current'} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                        {actioningId === f.id && <span style={{ marginLeft: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>…</span>}
+                      </td>
+                    )}
                     {isAdmin && (
                       <td>
                         <button
@@ -398,12 +379,6 @@ export function Findings() {
         )}
       </div>
 
-      <FindingModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        findingId={modalFindingId}
-        onSuccess={() => setRefreshKey((k) => k + 1)}
-      />
       <ConfirmDialog
         open={deleteConfirmId !== null}
         title="Delete finding"
