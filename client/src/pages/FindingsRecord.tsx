@@ -148,7 +148,7 @@ export function FindingsRecord() {
       });
       setFinding(updated);
       setError(null);
-      toast.success('Draft updated');
+      toast.info('Draft updated');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update');
     } finally {
@@ -163,7 +163,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
-      toast.success('Finding saved');
+      toast.info('Finding saved');
       // Ensure the record is addressable and reloadable after save/refresh.
       navigate(`/findings-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
     } catch (e) {
@@ -180,7 +180,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/process`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
-      toast.success('Process successful');
+      toast.info('Process successful');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Process failed');
     } finally {
@@ -195,7 +195,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reverse`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
-      toast.success('Reverse successful');
+      toast.info('Reverse successful');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reverse failed');
     } finally {
@@ -210,7 +210,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/approve`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
-      toast.success('Approved');
+      toast.info('Approved');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Approve failed');
     } finally {
@@ -225,7 +225,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reject`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
-      toast.success('Rejected');
+      toast.info('Rejected');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reject failed');
     } finally {

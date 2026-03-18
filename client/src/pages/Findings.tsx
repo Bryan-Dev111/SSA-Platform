@@ -103,7 +103,7 @@ export function Findings() {
       const path = action === 'save' ? `/findings/${findingId}/save` : `/findings/${findingId}/${action}`;
       await apiJson(path, { token, method: 'POST' });
       setRefreshKey((k) => k + 1);
-      toast.success('Status updated');
+      toast.info('Status updated');
     } catch (e) {
       setError(e instanceof Error ? e.message : `Action failed`);
     } finally {
@@ -126,7 +126,7 @@ export function Findings() {
     try {
       await apiJson(`/findings/${findingId}`, { token, method: 'DELETE' });
       setRefreshKey((k) => k + 1);
-      toast.success('Finding deleted');
+      toast.warning('Finding deleted');
       if (modalFindingId === findingId) {
         setModalOpen(false);
         setModalFindingId(null);

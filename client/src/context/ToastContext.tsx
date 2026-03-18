@@ -4,7 +4,7 @@
  */
 import React, { createContext, useCallback, useContext, useState } from 'react';
 
-export type ToastVariant = 'success' | 'error' | 'info';
+export type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
 export interface ToastItem {
   id: string;
@@ -18,6 +18,7 @@ interface ToastContextValue {
   success: (message: string) => void;
   error: (message: string) => void;
   info: (message: string) => void;
+  warning: (message: string) => void;
   dismiss: (id: string) => void;
 }
 
@@ -40,12 +41,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const success = useCallback((message: string) => addToast(message, 'success'), [addToast]);
   const error = useCallback((message: string) => addToast(message, 'error'), [addToast]);
   const info = useCallback((message: string) => addToast(message, 'info'), [addToast]);
+  const warning = useCallback((message: string) => addToast(message, 'warning'), [addToast]);
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const value: ToastContextValue = { toasts, success, error, info, dismiss };
+  const value: ToastContextValue = { toasts, success, error, info, warning, dismiss };
 
   return (
     <ToastContext.Provider value={value}>

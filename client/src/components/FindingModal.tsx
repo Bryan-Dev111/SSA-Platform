@@ -221,7 +221,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
       });
       setFinding(updated);
       applyFindingToForm(updated);
-      toast.success('Draft updated');
+      toast.info('Draft updated');
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update');
@@ -238,7 +238,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
       const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
       setFinding(updated);
       applyFindingToForm(updated);
-      toast.success('Finding saved');
+      toast.info('Finding saved');
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
@@ -255,7 +255,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
       const updated = await apiJson<Finding>(path, { token, method: 'POST' });
       setFinding(updated);
       applyFindingToForm(updated);
-      toast.success(`${label} successful`);
+      toast.info(`${label} successful`);
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : `${label} failed`);
