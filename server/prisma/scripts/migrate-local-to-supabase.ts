@@ -62,14 +62,26 @@ function quoteId(name: string): string {
   return `"${name}"`;
 }
 
-async function main() {
-  const local = new Client({ connectionString: LOCAL_URL });
+/** Strip sslmode from URL so we can force SSL options in code (avoid verify-full / cert chain errors). */
+function urlWithoutSslMode(url: string): string {
+  return url
+    .replace(/[?&]sslmode=[^&]+/g, '')
+    .replace(/[?&]uselibpqcompat=[^&]+/g, '')
+    .replace(/\?&/, '?')
+    .replace(/\?$/, '');
+}
 
-  // Supabase: allow SSL for pooler/direct (no-verify if needed for cert chain)
-  const supabaseUrl =
-    SUPABASE_URL.includes('?')
-      ? `${SUPABASE_URL}&sslmode=no-verify`
-      : `${SUPABASE_URL}?sslmode=no-verify`;
+async function main() {
+  // Source: for Supabase, use SSL but do not verify cert (avoids "self-signed certificate in certificate chain")
+  const isSupabaseSource = LOCAL_URL.includes('supabase.co') || LOCAL_URL.includes('pooler.supabase.com');
+  const localUrl = isSupabaseSource ? urlWithoutSslMode(LOCAL_URL) : LOCAL_URL;
+  const local = new Client({
+    connectionString: localUrl,
+    ...(isSupabaseSource && { ssl: { rejectUnauthorized: false } }),
+  });
+
+  // Target: same — SSL without cert verification for Supabase pooler
+  const supabaseUrl = urlWithoutSslMode(SUPABASE_URL);
   const supabase = new Client({
     connectionString: supabaseUrl,
     ssl: { rejectUnauthorized: false },
@@ -133,8 +145,9 @@ async function main() {
     console.log('Migration completed. Local data is now in Supabase.');
   } catch (e) {
     const err = e as Error & { message?: string };
-    console.error('Migration failed:', err.message ?? e);
-    if (String(err.message).includes('Tenant or user not found')) {
+    const msg = String(err.message ?? e);
+    console.error('Migration failed:', msg);
+    if (msg.includes('Tenant or user not found')) {
       console.error('');
       console.error('Fix: Use the EXACT Session URI from Supabase:');
       console.error('  1. Dashboard → your project → Project Settings (gear) → Database');
@@ -142,6 +155,14 @@ async function main() {
       console.error('  3. Replace [YOUR-PASSWORD] with your database password');
       console.error('  4. In server/.env set: SUPABASE_MIGRATION_URL="<that full URI>"');
       console.error('  5. Add ?sslmode=require at the end if not present. Run npm run db:migrate-data again.');
+    }
+    if (msg.includes('ENOTFOUND') && LOCAL_URL.includes('db.') && LOCAL_URL.includes('supabase.co')) {
+      console.error('');
+      console.error('Fix: The Direct connection (db.xxx.supabase.co) cannot be resolved. Use Session pooler instead:');
+      console.error('  1. Dashboard → your project (source) → Project Settings → Database');
+      console.error('  2. Connection string → Session mode → copy URI (host: aws-0-<region>.pooler.supabase.com)');
+      console.error('  3. In server/.env set LOCAL_DATABASE_URL="<that URI>" with your password and ?sslmode=require');
+      console.error('  4. If the project is paused, restore it first from the Dashboard.');
     }
     process.exit(1);
   } finally {
