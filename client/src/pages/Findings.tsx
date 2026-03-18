@@ -5,8 +5,10 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { FindingModal } from '../components/FindingModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Supplier {
   id: string;
@@ -36,6 +38,7 @@ interface FindingsResponse {
 
 export function Findings() {
   const { token, user } = useAuth();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [data, setData] = useState<FindingsResponse | null>(null);
@@ -55,6 +58,7 @@ export function Findings() {
   const [pageSize, setPageSize] = useState(10);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const list = data?.list ?? [];
   const stats = data?.stats ?? { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 };
@@ -99,6 +103,7 @@ export function Findings() {
       const path = action === 'save' ? `/findings/${findingId}/save` : `/findings/${findingId}/${action}`;
       await apiJson(path, { token, method: 'POST' });
       setRefreshKey((k) => k + 1);
+      toast.success('Status updated');
     } catch (e) {
       setError(e instanceof Error ? e.message : `Action failed`);
     } finally {
@@ -106,7 +111,7 @@ export function Findings() {
     }
   };
 
-  const handleStatusChange = (findingId: string, findingStatus: string, value: string) => {
+  const handleStatusChange = (findingId: string, _findingStatus: string, value: string) => {
     if (!value) return;
     if (value === 'process') runStatusAction(findingId, 'process');
     else if (value === 'reverse') runStatusAction(findingId, 'reverse');
@@ -116,11 +121,12 @@ export function Findings() {
 
   const handleDelete = async (findingId: string) => {
     if (!token || !isAdmin) return;
-    if (!window.confirm('Delete this finding? This cannot be undone.')) return;
+    setDeleteConfirmId(null);
     setDeletingId(findingId);
     try {
       await apiJson(`/findings/${findingId}`, { token, method: 'DELETE' });
       setRefreshKey((k) => k + 1);
+      toast.success('Finding deleted');
       if (modalFindingId === findingId) {
         setModalOpen(false);
         setModalFindingId(null);
@@ -130,6 +136,16 @@ export function Findings() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  /** Maps API status to a slug for status-badge CSS (readable, color-coded). */
+  const getStatusBadgeSlug = (status: string) => {
+    const s = status.replace(/\s+/g, '-').toLowerCase();
+    if (s === 'draft') return 'draft';
+    if (s === 'waitingdisposition') return 'waiting-disposition';
+    if (s === 'waitingapproval') return 'waiting-approval';
+    if (s === 'closed') return 'closed';
+    return s || 'unknown';
   };
 
   const getStatusOptions = (status: string) => {
@@ -287,7 +303,11 @@ export function Findings() {
                     <td>{f.supplier.code} — {f.supplier.name}</td>
                     <td>{f.audit.code}</td>
                     <td>{f.severity}</td>
-                    <td>{f.status}</td>
+                    <td>
+                      <span className={`finding-status-badge finding-status-badge--${getStatusBadgeSlug(f.status)}`}>
+                        {f.status}
+                      </span>
+                    </td>
                     <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.summary}>
                       {f.summary}
                     </td>
@@ -317,7 +337,7 @@ export function Findings() {
                           type="button"
                           className="btn btn-ghost"
                           style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
-                          onClick={() => handleDelete(f.id)}
+                          onClick={() => setDeleteConfirmId(f.id)}
                           disabled={deletingId !== null}
                           title="Delete finding (Admin only)"
                         >
@@ -383,6 +403,15 @@ export function Findings() {
         onClose={() => setModalOpen(false)}
         findingId={modalFindingId}
         onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        title="Delete finding"
+        message="Delete this finding? This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+        onCancel={() => setDeleteConfirmId(null)}
       />
     </div>
   );

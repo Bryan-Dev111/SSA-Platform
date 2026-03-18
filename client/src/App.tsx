@@ -3,6 +3,7 @@
  * Day 4: Router, layout, protected routes, placeholder pages, login
  */
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
@@ -33,8 +34,9 @@ function RedirectToDefault() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
+      <ToastProvider>
+        <AuthProvider>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route
             path="/"
@@ -63,7 +65,8 @@ function App() {
           </Route>
           <Route path="*" element={<RedirectToDefault />} />
         </Routes>
-      </AuthProvider>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

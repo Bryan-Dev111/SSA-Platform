@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 
 interface Supplier {
@@ -56,6 +57,7 @@ export interface FindingModalProps {
 
 export function FindingModal({ open, onClose, findingId, onSuccess }: FindingModalProps) {
   const { token, user } = useAuth();
+  const toast = useToast();
   const [createdId, setCreatedId] = useState<string | null>(null);
   const viewId = findingId ?? createdId;
 
@@ -219,6 +221,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
       });
       setFinding(updated);
       applyFindingToForm(updated);
+      toast.success('Draft updated');
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update');
@@ -235,6 +238,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
       const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
       setFinding(updated);
       applyFindingToForm(updated);
+      toast.success('Finding saved');
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
@@ -251,6 +255,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
       const updated = await apiJson<Finding>(path, { token, method: 'POST' });
       setFinding(updated);
       applyFindingToForm(updated);
+      toast.success(`${label} successful`);
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : `${label} failed`);
@@ -300,6 +305,7 @@ export function FindingModal({ open, onClose, findingId, onSuccess }: FindingMod
         verificationOfEffectiveness: created.verificationOfEffectiveness ?? '',
         closingComments: created.closingComments ?? '',
       });
+      toast.success('Finding created');
       onSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed');

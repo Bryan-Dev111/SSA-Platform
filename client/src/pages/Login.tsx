@@ -4,11 +4,13 @@
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
 import { SentinelSymbol } from '../components/SentinelSymbol';
 
 export function Login() {
   const { user, token, login, loading } = useAuth();
+  const toast = useToast();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,6 +47,7 @@ export function Login() {
     setSubmitting(true);
     try {
       await login(email.trim().toLowerCase(), password);
+      toast.success('Login successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

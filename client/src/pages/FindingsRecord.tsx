@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 
 interface Supplier {
@@ -50,6 +51,7 @@ const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
 
 export function FindingsRecord() {
   const { token, user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const idParam = searchParams.get('id');
@@ -146,6 +148,7 @@ export function FindingsRecord() {
       });
       setFinding(updated);
       setError(null);
+      toast.success('Draft updated');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update');
     } finally {
@@ -160,6 +163,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
+      toast.success('Finding saved');
       // Ensure the record is addressable and reloadable after save/refresh.
       navigate(`/findings-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
     } catch (e) {
@@ -176,6 +180,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/process`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
+      toast.success('Process successful');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Process failed');
     } finally {
@@ -190,6 +195,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reverse`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
+      toast.success('Reverse successful');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reverse failed');
     } finally {
@@ -204,6 +210,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/approve`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
+      toast.success('Approved');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Approve failed');
     } finally {
@@ -218,6 +225,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reject`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
+      toast.success('Rejected');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reject failed');
     } finally {
@@ -251,6 +259,7 @@ export function FindingsRecord() {
       setFinding(created);
       setForm((p) => ({ ...p, summary: '', discrepancy: '', defectCode: '', containment: '', occurrenceRootCause: '', escapeRootCause: '', correctiveAction: '', verificationOfEffectiveness: '', closingComments: '' }));
       setError(null);
+      toast.success('Finding created');
       // Move to a stable URL so refresh/navigation keeps showing the saved record.
       navigate(`/findings-record?id=${encodeURIComponent(created.id)}`, { replace: true });
     } catch (e) {

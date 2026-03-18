@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ConfirmDialog } from './ConfirmDialog';
 import { canAccessPath, getDefaultPath, SUPPLIER_PATHS } from '../config/rolePageAccess';
 
 const MENU_ITEMS: { path: string; label: string }[] = [
@@ -49,6 +50,7 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const roleNames = user?.roleNames ?? [];
   const isSupplier = roleNames.includes('Supplier');
   const pathname = location.pathname;
@@ -140,10 +142,7 @@ export function Layout() {
             </span>
             <button
               type="button"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
+              onClick={() => setShowLogoutConfirm(true)}
               className="btn btn-ghost"
             >
               Log out
@@ -154,6 +153,19 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Log out"
+        message="Are you sure you want to log out?"
+        confirmLabel="Log out"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          logout();
+          navigate('/login');
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }
