@@ -369,7 +369,7 @@ export function FindingsRecord() {
                 <label className="input-label">Defect Code</label>
                 <input className="input" value={form.defectCode} onChange={(e) => setForm((p) => ({ ...p, defectCode: e.target.value }))} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create draft'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
         </div>

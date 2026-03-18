@@ -93,8 +93,8 @@ export function CARRecord() {
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canEdit = car?.status === 'DRAFT' && canEditDraft;
   const canSave = car?.status === 'DRAFT' && canEditDraft;
-  const canProcess = car && car.status !== 'DRAFT' && car.status !== 'WaitingApproval' && car.status !== 'Closed';
-  const canReverse = car && car.status !== 'DRAFT' && car.status !== 'RCCA' && car.status !== 'Closed';
+  const canProcess = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'WaitingApproval' && car.status !== 'Closed';
+  const canReverse = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'RCCA' && car.status !== 'Closed';
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
 
@@ -297,7 +297,8 @@ export function CARRecord() {
   const isNew = !car && !idParam && !codeParam;
 
   if (!loading && isNew && !canCreateNew) {
-    return <Navigate to="/findings" replace />;
+    // Viewer/Auditor cannot create CARs, so redirect to the list page.
+    return <Navigate to="/corrective-actions" replace />;
   }
 
   return (
@@ -309,11 +310,9 @@ export function CARRecord() {
         <p className="page-description">
           {car ? `Status: ${car.status}` : isNew ? 'Create a draft CAR (Admin, QE, or Buyer).' : 'CAR not found.'}
         </p>
-        {car && (
-          <p style={{ marginTop: 4 }}>
-            <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions</Link>
-          </p>
-        )}
+        <p style={{ marginTop: 4 }}>
+          <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions</Link>
+        </p>
       </header>
 
       {error && (
@@ -383,7 +382,7 @@ export function CARRecord() {
                 <label className="input-label">Defect Code</label>
                 <input className="input" value={form.defectCode} onChange={(e) => setForm((p) => ({ ...p, defectCode: e.target.value }))} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create draft'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
         </div>

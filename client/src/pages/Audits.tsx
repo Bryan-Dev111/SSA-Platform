@@ -1,11 +1,13 @@
 /**
  * Audits page: table (schedule, results, notes); only Admin/QE set result;
- * column with finding #s (clickable → Findings Record).
+ * column with finding #s (clickable → Findings Record). Only Admin can delete.
  */
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Supplier {
   id: string;
@@ -40,8 +42,20 @@ function formatCalendarDate(isoOrDateStr: string): string {
   return new Date(ymd + 'T12:00:00').toLocaleDateString();
 }
 
+/** Slug for audit row CSS by derivedStatus */
+function getAuditStatusSlug(status: string): string {
+  const s = status.replace(/\s+/g, '-').toLowerCase();
+  if (s === 'scheduled') return 'scheduled';
+  if (s === 'in-process') return 'in-process';
+  if (s === 'overdue') return 'overdue';
+  if (s === 'complete') return 'complete';
+  if (s === 'cancelled') return 'cancelled';
+  return s || 'unknown';
+}
+
 export function Audits() {
   const { token, user } = useAuth();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [audits, setAudits] = useState<Audit[]>([]);
@@ -53,9 +67,24 @@ export function Audits() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [newAudit, setNewAudit] = useState({ supplierId: '', auditDate: '', auditTypeId: '', notes: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const roleNames = user?.roleNames ?? [];
+  const isAdmin = roleNames.includes('Admin');
   const canSetResult = roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
   const canCreateAudit = roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(audits.length / pageSize));
+    if (page > maxPage) setPage(maxPage);
+  }, [audits.length, pageSize, page]);
+
+  const totalCount = audits.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageSafe = Math.min(page, totalPages) || 1;
+  const paginatedAudits = audits.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   useEffect(() => {
     if (!token) return;
@@ -73,6 +102,29 @@ export function Audits() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
   }, [token, supplierFilter]);
+
+  const refetchAudits = () => {
+    if (!token) return;
+    const q = supplierFilter ? `?supplierId=${encodeURIComponent(supplierFilter)}` : '';
+    apiJson<Audit[]>(`/audits${q}`, { token })
+      .then(setAudits)
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'));
+  };
+
+  const handleDelete = async (auditId: string) => {
+    if (!token || !isAdmin) return;
+    setDeleteConfirmId(null);
+    setDeletingId(auditId);
+    try {
+      await apiJson(`/audits/${auditId}`, { token, method: 'DELETE' });
+      refetchAudits();
+      toast.success('Audit deleted');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleSetResult = async (auditId: string, result: 'Passed' | 'Failed' | 'Cancelled') => {
     if (!token) return;
@@ -226,7 +278,7 @@ export function Audits() {
                 />
               </div>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Creating…' : 'Create audit'}
+                {submitting ? 'Creating…' : 'Save'}
               </button>
             </form>
           </div>
@@ -246,18 +298,19 @@ export function Audits() {
                 <th>Result</th>
                 <th>Notes</th>
                 <th>Findings</th>
+                {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {audits.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={8 + (isAdmin ? 1 : 0)} className="table-empty">
                     No audits in scope.
                   </td>
                 </tr>
               ) : (
-                audits.map((a) => (
-                  <tr key={a.id}>
+                paginatedAudits.map((a) => (
+                  <tr key={a.id} className={`audit-row audit-row--${getAuditStatusSlug(a.derivedStatus)}`}>
                     <td><strong>{a.code}</strong></td>
                     <td>{a.supplier.code} — {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate)}</td>
@@ -300,13 +353,82 @@ export function Audits() {
                             </Link>
                           ))}
                     </td>
+                    {isAdmin && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
+                          onClick={() => setDeleteConfirmId(a.id)}
+                          disabled={deletingId !== null}
+                          title="Delete audit (Admin only)"
+                        >
+                          {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+        {audits.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+            </span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
+              Rows per page:
+              <select
+                className="input"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                style={{ width: 'auto' }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pageSafe <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
+                Page {pageSafe} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pageSafe >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        title="Delete audit"
+        message="Delete this audit? This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 }

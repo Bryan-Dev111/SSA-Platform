@@ -5,7 +5,7 @@
 export const PATH_ROLES: Record<string, string[]> = {
   '/dashboard': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   '/risk': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
-  '/corrective-actions': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
+  '/corrective-actions': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer', 'Auditor'],
   '/car-record': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   '/findings': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   '/findings-record': ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
@@ -24,7 +24,7 @@ export const PATH_ROLES: Record<string, string[]> = {
 export const SUPPLIER_PATHS = ['/supplier-profile', '/records', '/shipments'];
 
 /** Fallback when user has no Dashboard access (e.g. Auditor-only) */
-const FALLBACK_DEFAULT_PATH = '/car-record';
+const FALLBACK_DEFAULT_PATH = '/corrective-actions';
 
 /**
  * Default landing path for the current user (so refresh and index route work for all roles)

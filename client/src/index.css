@@ -409,6 +409,66 @@ a.btn:focus {
   border: 1px solid var(--color-border);
 }
 
+/* CAR table: row background by status for quick scanning */
+.car-row--draft {
+  background: #f8fafc;
+}
+.car-row--waiting-disposition {
+  background: #fffbeb;
+}
+.car-row--waiting-approval {
+  background: #eff6ff;
+}
+.car-row--closed {
+  background: #f0fdf4;
+}
+.car-row--follow-up {
+  background: #f5f3ff;
+}
+.car-row--unknown {
+  background: var(--color-bg-subtle);
+}
+
+/* Findings table: row background by status (same as CAR for consistency) */
+.finding-row--draft {
+  background: #f8fafc;
+}
+.finding-row--waiting-disposition {
+  background: #fffbeb;
+}
+.finding-row--waiting-approval {
+  background: #eff6ff;
+}
+.finding-row--closed {
+  background: #f0fdf4;
+}
+.finding-row--follow-up {
+  background: #f5f3ff;
+}
+.finding-row--unknown {
+  background: var(--color-bg-subtle);
+}
+
+/* Audits table: row background by derived status */
+.audit-row--scheduled {
+  background: #eff6ff;
+}
+.audit-row--in-process {
+  background: #fffbeb;
+}
+.audit-row--overdue {
+  background: #fef2f2;
+}
+.audit-row--complete {
+  background: #f0fdf4;
+}
+.audit-row--cancelled {
+  background: #f8fafc;
+}
+.audit-row--unknown {
+  background: var(--color-bg-subtle);
+}
+
 /* ----- Alerts & states ----- */
 .alert-error {
   padding: var(--space-3) var(--space-4);

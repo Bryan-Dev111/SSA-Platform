@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction } from 'express';
 const PAGE_ROLES: Record<string, string[]> = {
   Dashboard: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   Risk: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
-  CorrectiveActions: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
+  CorrectiveActions: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer', 'Auditor'],
   CARRecord: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   Findings: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   FindingsRecord: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],

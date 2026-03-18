@@ -1,11 +1,14 @@
 /**
  * Corrective Actions page: stats (Open, Overdue, Waiting Approval, AVG Closure Time),
  * table of CARs, supplier filter. Click CAR code → CAR Record.
+ * Pagination, Admin-only delete, status-based row colors.
  */
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Supplier {
   id: string;
@@ -35,6 +38,7 @@ interface CARsResponse {
 
 export function CorrectiveActions() {
   const { token, user } = useAuth();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [data, setData] = useState<CARsResponse | null>(null);
@@ -44,8 +48,26 @@ export function CorrectiveActions() {
 
   const roleNames = user?.roleNames ?? [];
   const canCreateCAR = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+  const canChangeCarStatus = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+  const isAdmin = roleNames.includes('Admin');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const list = data?.list ?? [];
   const stats = data?.stats ?? { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 };
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
+    if (page > maxPage) setPage(maxPage);
+  }, [list.length, pageSize, page]);
+
+  const totalCount = list.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageSafe = Math.min(page, totalPages) || 1;
+  const paginatedList = list.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const fetchData = () => {
     if (!token) return;
@@ -67,6 +89,64 @@ export function CorrectiveActions() {
     setLoading(true);
     fetchData();
   }, [token, supplierFilter]);
+
+  const runCarStatusAction = async (carId: string, action: 'process' | 'reverse' | 'approve' | 'reject') => {
+    if (!token) return;
+    setActioningId(carId);
+    try {
+      await apiJson(`/cars/${carId}/${action}`, { token, method: 'POST' });
+      fetchData();
+      toast.info('Status updated');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Status update failed');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const getCarStatusOptions = (status: string) => {
+    const opts: { value: string; label: string }[] = [{ value: '', label: status }];
+    if (!canChangeCarStatus) return opts;
+    if (status === 'RCCA') {
+      opts.push({ value: 'process', label: '→ Process' });
+    }
+    if (status === 'WaitingApproval') {
+      opts.push({ value: 'approve', label: '→ Approve' });
+      opts.push({ value: 'reject', label: '→ Reject' });
+      opts.push({ value: 'reverse', label: '→ Reverse' });
+    }
+    if (status === 'FollowUp') {
+      opts.push({ value: 'process', label: '→ Process' });
+      opts.push({ value: 'reverse', label: '→ Reverse' });
+    }
+    if (status === 'Closed') {
+      opts.push({ value: 'reverse', label: '→ Reverse' });
+    }
+    return opts;
+  };
+
+  const handleCarStatusChange = (carId: string, value: string) => {
+    if (!value) return;
+    if (value === 'process') runCarStatusAction(carId, 'process');
+    else if (value === 'reverse') runCarStatusAction(carId, 'reverse');
+    else if (value === 'approve') runCarStatusAction(carId, 'approve');
+    else if (value === 'reject') runCarStatusAction(carId, 'reject');
+  };
+
+  const handleDelete = async (carId: string) => {
+    if (!token || !isAdmin) return;
+    setDeleteConfirmId(null);
+    setDeletingId(carId);
+    try {
+      await apiJson(`/cars/${carId}`, { token, method: 'DELETE' });
+      fetchData();
+      toast.success('CAR deleted');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (loading && data === null) {
     return (
@@ -153,18 +233,20 @@ export function CorrectiveActions() {
                 <th>Status</th>
                 <th>Summary</th>
                 <th>Updated</th>
+                {canChangeCarStatus && <th>Change status</th>}
+                {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={8 + (canChangeCarStatus ? 1 : 0) + (isAdmin ? 1 : 0)} className="table-empty">
                     No CARs in scope (or none past DRAFT yet).
                   </td>
                 </tr>
               ) : (
-                list.map((c) => (
-                  <tr key={c.id}>
+                paginatedList.map((c) => (
+                  <tr key={c.id} className={`car-row car-row--${getCarStatusSlug(c.status)}`}>
                     <td>
                       <Link to={`/car-record?id=${encodeURIComponent(c.id)}`} className="finding-code-link">
                         {c.code}
@@ -187,13 +269,103 @@ export function CorrectiveActions() {
                       {c.summary}
                     </td>
                     <td>{new Date(c.updatedAt).toLocaleDateString()}</td>
+                    {canChangeCarStatus && (
+                      <td>
+                        <select
+                          className="input"
+                          value=""
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v) handleCarStatusChange(c.id, v);
+                            e.target.value = '';
+                          }}
+                          disabled={actioningId !== null}
+                          style={{ minWidth: 120, fontSize: 'var(--text-sm)' }}
+                          title="Change status"
+                        >
+                          {getCarStatusOptions(c.status).map((o) => (
+                            <option key={o.value || 'current'} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                        {actioningId === c.id && <span style={{ marginLeft: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>…</span>}
+                      </td>
+                    )}
+                    {isAdmin && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
+                          onClick={() => setDeleteConfirmId(c.id)}
+                          disabled={deletingId !== null}
+                          title="Delete CAR (Admin only)"
+                        >
+                          {deletingId === c.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+        {list.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+            </span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
+              Rows per page:
+              <select
+                className="input"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                style={{ width: 'auto' }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pageSafe <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
+                Page {pageSafe} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pageSafe >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        title="Delete CAR"
+        message="Delete this CAR? This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   );
 }
