@@ -74,15 +74,13 @@ export function Layout() {
     }
   }
 
-  const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
-
   const visibleItems = MENU_ITEMS.filter((item) => {
     if (isSupplier) {
       return ['/supplier-profile', '/records', '/shipments'].includes(item.path);
     }
     if (!canAccessPath(item.path, roleNames)) return false;
-    // Viewer/Buyer: hide "Findings Record" in sidebar — they open records only from the Findings list
-    if (item.path === '/findings-record' && !canCreateFinding) return false;
+    // Findings Record: hidden from sidebar for now; open findings via Findings page (modal or direct URL)
+    if (item.path === '/findings-record') return false;
     return true;
   });
 

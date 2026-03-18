@@ -1,11 +1,12 @@
 /**
- * Findings page: stats (total Critical/Major, open, Waiting Approval),
- * chart (top defect codes), table, supplier filter.
+ * Findings page: stats, chart, table, supplier filter.
+ * "New finding" and opening a finding from the list use a modal (no redirect to Finding Record).
  */
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiJson } from '../api/client';
+import { FindingModal } from '../components/FindingModal';
 
 interface Supplier {
   id: string;
@@ -43,8 +44,23 @@ export function Findings() {
   const [error, setError] = useState<string | null>(null);
   const roleNames = user?.roleNames ?? [];
   const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  const canChangeStatus = canCreateFinding; // Admin, QE, Auditor can Process/Reverse; Approve/Reject is Admin, QE only (handled per action)
+  const canApproveReject = roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+  const isAdmin = roleNames.includes('Admin');
 
-  useEffect(() => {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalFindingId, setModalFindingId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const list = data?.list ?? [];
+  const stats = data?.stats ?? { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 };
+  const defectCodeCounts = data?.defectCodeCounts ?? [];
+
+  const fetchData = () => {
     if (!token) return;
     const q = supplierFilter ? `?supplierId=${encodeURIComponent(supplierFilter)}` : '';
     Promise.all([
@@ -57,9 +73,82 @@ export function Findings() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
-  }, [token, supplierFilter]);
+  };
 
-  if (loading) {
+  useEffect(() => {
+    if (!token) return;
+    const isRefreshingList = refreshKey > 0;
+    if (!isRefreshingList) setLoading(true);
+    fetchData();
+  }, [token, supplierFilter, refreshKey]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
+    if (page > maxPage) setPage(maxPage);
+  }, [list.length, pageSize, page]);
+
+  const totalCount = list.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageSafe = Math.min(page, totalPages) || 1;
+  const paginatedList = list.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+
+  const runStatusAction = async (findingId: string, action: 'save' | 'process' | 'reverse' | 'approve' | 'reject') => {
+    if (!token) return;
+    setActioningId(findingId);
+    try {
+      const path = action === 'save' ? `/findings/${findingId}/save` : `/findings/${findingId}/${action}`;
+      await apiJson(path, { token, method: 'POST' });
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Action failed`);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleStatusChange = (findingId: string, findingStatus: string, value: string) => {
+    if (!value) return;
+    if (value === 'process') runStatusAction(findingId, 'process');
+    else if (value === 'reverse') runStatusAction(findingId, 'reverse');
+    else if (value === 'approve') runStatusAction(findingId, 'approve');
+    else if (value === 'reject') runStatusAction(findingId, 'reject');
+  };
+
+  const handleDelete = async (findingId: string) => {
+    if (!token || !isAdmin) return;
+    if (!window.confirm('Delete this finding? This cannot be undone.')) return;
+    setDeletingId(findingId);
+    try {
+      await apiJson(`/findings/${findingId}`, { token, method: 'DELETE' });
+      setRefreshKey((k) => k + 1);
+      if (modalFindingId === findingId) {
+        setModalOpen(false);
+        setModalFindingId(null);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const getStatusOptions = (status: string) => {
+    const opts: { value: string; label: string }[] = [{ value: '', label: status }];
+    if (!canChangeStatus) return opts;
+    if (status === 'WaitingDisposition') {
+      opts.push({ value: 'process', label: '→ Process' });
+    }
+    if (status === 'WaitingApproval') {
+      if (canApproveReject) {
+        opts.push({ value: 'approve', label: '→ Approve' });
+        opts.push({ value: 'reject', label: '→ Reject' });
+      }
+      opts.push({ value: 'reverse', label: '→ Reverse' });
+    }
+    return opts;
+  };
+
+  if (loading && data === null) {
     return (
       <div className="page">
         <header className="page-header">
@@ -72,10 +161,6 @@ export function Findings() {
       </div>
     );
   }
-
-  const list = data?.list ?? [];
-  const stats = data?.stats ?? { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 };
-  const defectCodeCounts = data?.defectCodeCounts ?? [];
 
   return (
     <div className="page">
@@ -92,9 +177,16 @@ export function Findings() {
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         {canCreateFinding && (
-          <Link to="/findings-record" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setModalFindingId(null);
+              setModalOpen(true);
+            }}
+          >
             New finding
-          </Link>
+          </button>
         )}
         <label>
           <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
@@ -166,20 +258,31 @@ export function Findings() {
                 <th>Status</th>
                 <th>Summary</th>
                 <th>Updated</th>
+                <th>Change status</th>
+                {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table-empty">
+                  <td colSpan={isAdmin ? 9 : 8} className="table-empty">
                     No findings in scope (or none past DRAFT yet).
                   </td>
                 </tr>
               ) : (
-                list.map((f) => (
+                paginatedList.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <Link to={`/findings-record?id=${f.id}`}>{f.code}</Link>
+                      <button
+                        type="button"
+                        className="finding-code-link"
+                        onClick={() => {
+                          setModalFindingId(f.id);
+                          setModalOpen(true);
+                        }}
+                      >
+                        {f.code}
+                      </button>
                     </td>
                     <td>{f.supplier.code} — {f.supplier.name}</td>
                     <td>{f.audit.code}</td>
@@ -189,13 +292,98 @@ export function Findings() {
                       {f.summary}
                     </td>
                     <td>{new Date(f.updatedAt).toLocaleDateString()}</td>
+                    <td>
+                      <select
+                        className="input"
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v) handleStatusChange(f.id, f.status, v);
+                          e.target.value = '';
+                        }}
+                        disabled={actioningId !== null}
+                        style={{ minWidth: 120, fontSize: 'var(--text-sm)' }}
+                        title="Change status"
+                      >
+                        {getStatusOptions(f.status).map((o) => (
+                          <option key={o.value || 'current'} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                      {actioningId === f.id && <span style={{ marginLeft: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>…</span>}
+                    </td>
+                    {isAdmin && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
+                          onClick={() => handleDelete(f.id)}
+                          disabled={deletingId !== null}
+                          title="Delete finding (Admin only)"
+                        >
+                          {deletingId === f.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+        {list.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+            </span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
+              Rows per page:
+              <select
+                className="input"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                style={{ width: 'auto' }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <div style={{ display: 'flex', gap: '0.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pageSafe <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
+                Page {pageSafe} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={pageSafe >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      <FindingModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        findingId={modalFindingId}
+        onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
     </div>
   );
 }

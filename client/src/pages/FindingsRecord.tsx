@@ -4,7 +4,7 @@
  * approval/status history; workflow buttons Save, Process, Reverse, Approve, Reject.
  */
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link, Navigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiJson } from '../api/client';
 
@@ -50,6 +50,7 @@ const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
 
 export function FindingsRecord() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const idParam = searchParams.get('id');
   const codeParam = searchParams.get('findingId');
@@ -75,12 +76,14 @@ export function FindingsRecord() {
   const [saving, setSaving] = useState(false);
   const [actioning, setActioning] = useState(false);
   const roleNames = user?.roleNames ?? [];
-  const canEdit = finding?.status === 'DRAFT';
-  const canSave = finding?.status === 'DRAFT' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  const canEdit = finding?.status === 'DRAFT' && canEditDraft;
+  const canSave = finding?.status === 'DRAFT' && canEditDraft;
   const canProcess = finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingApproval' && finding.status !== 'Closed';
   const canReverse = finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
   const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
-  const canCreateNew = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
+  const canCreateNew = canEditDraft;
 
   useEffect(() => {
     if (!token) return;
@@ -157,6 +160,8 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
+      // Ensure the record is addressable and reloadable after save/refresh.
+      navigate(`/findings-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
     } finally {
@@ -246,6 +251,8 @@ export function FindingsRecord() {
       setFinding(created);
       setForm((p) => ({ ...p, summary: '', discrepancy: '', defectCode: '', containment: '', occurrenceRootCause: '', escapeRootCause: '', correctiveAction: '', verificationOfEffectiveness: '', closingComments: '' }));
       setError(null);
+      // Move to a stable URL so refresh/navigation keeps showing the saved record.
+      navigate(`/findings-record?id=${encodeURIComponent(created.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed');
     } finally {
@@ -355,7 +362,7 @@ export function FindingsRecord() {
                 <label className="input-label">Defect Code</label>
                 <input className="input" value={form.defectCode} onChange={(e) => setForm((p) => ({ ...p, defectCode: e.target.value }))} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Creating…' : 'Save'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
         </div>
