@@ -46,13 +46,28 @@ router.get(
         res.json({
           list: [],
           stats: { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 },
+          defectCodeCounts: [],
+          severityCounts: [
+            { severity: 'Critical', count: 0 },
+            { severity: 'Major', count: 0 },
+            { severity: 'Minor', count: 0 },
+          ],
         });
         return;
       }
     }
     if (supplierId) {
       if (allowedIds !== null && !allowedIds.includes(supplierId)) {
-        res.json({ list: [], stats: { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 } });
+        res.json({
+          list: [],
+          stats: { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 },
+          defectCodeCounts: [],
+          severityCounts: [
+            { severity: 'Critical', count: 0 },
+            { severity: 'Major', count: 0 },
+            { severity: 'Minor', count: 0 },
+          ],
+        });
         return;
       }
       where.supplierId = supplierId;
@@ -88,9 +103,26 @@ router.get(
       }, 0);
       avgClosureDays = Math.round((totalDays / closed.length) * 10) / 10;
     }
+    const defectCodeMap = list
+      .filter((c) => c.defectCode?.trim())
+      .reduce((acc: Record<string, number>, c) => {
+        const code = (c.defectCode as string).trim();
+        if (code) acc[code] = (acc[code] || 0) + 1;
+        return acc;
+      }, {});
+    const defectCodeCounts = Object.entries(defectCodeMap)
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    const severityCounts = (['Critical', 'Major', 'Minor'] as const).map((severity) => ({
+      severity,
+      count: list.filter((c) => c.severity === severity).length,
+    }));
     res.json({
       list,
       stats: { open, overdue, waitingApproval, avgClosureDays },
+      defectCodeCounts,
+      severityCounts,
     });
   })
 );

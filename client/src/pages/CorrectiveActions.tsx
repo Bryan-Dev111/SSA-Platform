@@ -34,6 +34,8 @@ interface CAR {
 interface CARsResponse {
   list: CAR[];
   stats: { open: number; overdue: number; waitingApproval: number; avgClosureDays: number };
+  defectCodeCounts: { code: string; count: number }[];
+  severityCounts: { severity: string; count: number }[];
 }
 
 export function CorrectiveActions() {
@@ -58,6 +60,13 @@ export function CorrectiveActions() {
 
   const list = data?.list ?? [];
   const stats = data?.stats ?? { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 };
+  const defectCodeCounts = data?.defectCodeCounts ?? [];
+  const severityCounts = data?.severityCounts ?? [
+    { severity: 'Critical', count: 0 },
+    { severity: 'Major', count: 0 },
+    { severity: 'Minor', count: 0 },
+  ];
+  const maxSeverityCount = Math.max(1, ...severityCounts.map((s) => s.count));
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
@@ -219,6 +228,81 @@ export function CorrectiveActions() {
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.avgClosureDays}</div>
         </div>
       </div>
+
+      {(defectCodeCounts.length > 0 || list.length > 0) && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '1rem',
+            marginBottom: '1.5rem',
+          }}
+        >
+          {defectCodeCounts.length > 0 && (
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Top defect codes (CARs)</h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {defectCodeCounts.map(({ code, count }) => (
+                    <span
+                      key={code}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: 'var(--color-border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 'var(--text-sm)',
+                      }}
+                    >
+                      {code}: {count}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {list.length > 0 && (
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by severity</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {severityCounts.map(({ severity, count }) => (
+                    <div key={severity}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4 }}>
+                        <span>{severity}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{count}</span>
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          background: 'var(--color-border-subtle)',
+                          borderRadius: 4,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${(count / maxSeverityCount) * 100}%`,
+                            height: '100%',
+                            background:
+                              severity === 'Critical'
+                                ? '#dc2626'
+                                : severity === 'Major'
+                                  ? '#ea580c'
+                                  : '#ca8a04',
+                            borderRadius: 4,
+                            minWidth: count > 0 ? 4 : 0,
+                            transition: 'width 0.2s ease',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="table-wrap">

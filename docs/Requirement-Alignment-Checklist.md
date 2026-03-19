@@ -22,6 +22,7 @@ All three: only Admin can delete; server rejects non-Admin; UI shows Delete only
 - Status dropdown: Process / Reverse / Approve / Reject by status; only Admin, QE, Buyer (`canChangeCarStatus`).
 - Delete: Admin only; ConfirmDialog; calls `DELETE /cars/:id`.
 - Row color by status: `car-row--draft`, `waiting-disposition`, `waiting-approval`, `closed`, `follow-up`, `unknown`.
+- **Day 7.4 charts:** Top defect codes (from `GET /cars` `defectCodeCounts`); **CARs by severity** horizontal bar chart (`severityCounts`).
 - CAR Record / Findings Record: not in sidebar (removed from `MENU_ITEMS`); access via Corrective Actions (New CAR, CAR code link) and Findings (New finding, finding code link).
 
 ---
