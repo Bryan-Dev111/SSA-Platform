@@ -205,6 +205,7 @@ export function SupplierProfile() {
   }
 
   const { supplier, metrics } = data;
+  const latestRisk = data.riskSnapshots[0];
 
   return (
     <div className="page">
@@ -259,6 +260,14 @@ export function SupplierProfile() {
           <div className="card-body" style={{ padding: '0.75rem' }}>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Shipment requests</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.shipmentCount}</div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body" style={{ padding: '0.75rem' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Current risk</div>
+            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>
+              {latestRisk ? `${latestRisk.level} (${latestRisk.score ?? '—'})` : '—'}
+            </div>
           </div>
         </div>
       </div>

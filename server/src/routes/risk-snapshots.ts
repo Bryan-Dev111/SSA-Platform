@@ -7,6 +7,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { computeAndStoreRiskSnapshot, computeSupplierRisk } from '../services/riskScoring';
 
 const router = Router();
 
@@ -32,6 +33,97 @@ router.get(
       orderBy: { createdAt: 'desc' },
     });
     res.json(list);
+  })
+);
+
+router.get(
+  '/current',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && allowedIds.length === 0) {
+      res.json([]);
+      return;
+    }
+    const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
+    if (supplierId && allowedIds !== null && !allowedIds.includes(supplierId)) {
+      res.status(404).json({ error: 'Supplier not found' });
+      return;
+    }
+    const suppliers = await prisma.supplier.findMany({
+      where: supplierId
+        ? { id: supplierId }
+        : allowedIds === null
+          ? {}
+          : { id: { in: allowedIds } },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: 'asc' },
+    });
+    // Compute sequentially to avoid DB-connection spikes when many suppliers are in scope.
+    const list: Array<{
+      supplier: { id: string; code: string; name: string };
+      score: number;
+      level: 'Low' | 'Medium' | 'High';
+      factors: {
+        quality: number;
+        audit: number;
+        delivery: number;
+        carClosure: number;
+        documentation: number;
+      };
+    }> = [];
+    for (const s of suppliers) {
+      const summary = await computeSupplierRisk(s.id);
+      list.push({
+        supplier: s,
+        score: summary.score,
+        level: summary.level,
+        factors: summary.factors,
+      });
+    }
+    res.json(list);
+  })
+);
+
+router.post(
+  '/recalculate',
+  requireRole(['Admin', 'QualityEngineer', 'Buyer']),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && allowedIds.length === 0) {
+      res.json({ created: [] });
+      return;
+    }
+    const supplierId = typeof req.body?.supplierId === 'string' ? req.body.supplierId : undefined;
+    if (supplierId && allowedIds !== null && !allowedIds.includes(supplierId)) {
+      res.status(403).json({ error: 'Supplier not in scope' });
+      return;
+    }
+    const suppliers = await prisma.supplier.findMany({
+      where: supplierId
+        ? { id: supplierId }
+        : allowedIds === null
+          ? {}
+          : { id: { in: allowedIds } },
+      select: { id: true },
+    });
+    // Compute/store sequentially to keep Prisma DB load predictable.
+    const created: Array<{
+      snapshot: Awaited<ReturnType<typeof computeAndStoreRiskSnapshot>>['snapshot'];
+      summary: Awaited<ReturnType<typeof computeAndStoreRiskSnapshot>>['summary'];
+    }> = [];
+    for (const s of suppliers) {
+      const { snapshot, summary } = await computeAndStoreRiskSnapshot(s.id);
+      created.push({ snapshot, summary });
+    }
+    res.status(201).json({ created });
   })
 );
 

@@ -22,6 +22,12 @@ interface Supplier {
   commodityType: { id: string; name: string } | null;
 }
 
+interface RiskCurrentRow {
+  supplier: { id: string };
+  level: 'Low' | 'Medium' | 'High';
+  score: number;
+}
+
 export function SupplierList() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -30,6 +36,7 @@ export function SupplierList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [riskBySupplierId, setRiskBySupplierId] = useState<Record<string, { level: string; score: number }>>({});
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
   useEffect(() => {
@@ -46,6 +53,19 @@ export function SupplierList() {
       .then((r) => setCommodityTypes(r.list))
       .catch(() => setCommodityTypes([]));
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiJson<RiskCurrentRow[]>('/risk-snapshots/current', { token })
+      .then((rows) => {
+        const map: Record<string, { level: string; score: number }> = {};
+        for (const row of rows) {
+          map[row.supplier.id] = { level: row.level, score: row.score };
+        }
+        setRiskBySupplierId(map);
+      })
+      .catch(() => setRiskBySupplierId({}));
+  }, [token]);
 
   const setCommodity = async (supplierId: string, commodityTypeId: string | null) => {
     if (!token || !isAdmin) return;
@@ -109,13 +129,14 @@ export function SupplierList() {
                 <th>Name</th>
                 <th>City</th>
                 <th>Country</th>
+                <th>Risk level</th>
                 {isAdmin && <th>Commodity type</th>}
               </tr>
             </thead>
             <tbody>
               {suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 5 : 4} className="table-empty">
+                  <td colSpan={isAdmin ? 6 : 5} className="table-empty">
                     No suppliers in scope.
                   </td>
                 </tr>
@@ -126,6 +147,11 @@ export function SupplierList() {
                     <td>{s.name}</td>
                     <td>{s.city ?? '—'}</td>
                     <td>{s.country ?? '—'}</td>
+                    <td>
+                      {riskBySupplierId[s.id]
+                        ? `${riskBySupplierId[s.id].level} (${riskBySupplierId[s.id].score})`
+                        : '—'}
+                    </td>
                     {isAdmin && (
                       <td>
                         <select

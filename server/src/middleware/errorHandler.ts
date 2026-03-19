@@ -9,11 +9,21 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  const status = (err as { status?: number }).status ?? 500;
-  const message =
-    err instanceof Error ? err.message : 'Internal server error';
-  if (status >= 500) {
+  const errObj = err as { status?: number; code?: string; message?: string };
+  let status = errObj.status ?? 500;
+  let message = err instanceof Error ? err.message : 'Internal server error';
+
+  // Prisma DB connectivity failures (e.g., P1001) should be surfaced as service unavailable.
+  if (errObj.code === 'P1001' || /Can't reach database server/i.test(message)) {
+    status = 503;
+    message = 'Database is temporarily unavailable. Please try again shortly.';
+  }
+
+  // Avoid noisy stack traces when DB is temporarily unreachable.
+  if (status >= 500 && status !== 503) {
     console.error('API error:', err);
+  } else if (status === 503) {
+    console.warn('API warning:', message);
   }
   res.status(status).json({ error: message });
 }
