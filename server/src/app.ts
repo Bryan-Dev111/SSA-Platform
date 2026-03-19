@@ -18,6 +18,9 @@ import suppliersRoutes from './routes/suppliers';
 import auditsRoutes from './routes/audits';
 import findingsRoutes from './routes/findings';
 import carsRoutes from './routes/cars';
+import commodityTypesRoutes from './routes/commodity-types';
+import defectCodesRoutes from './routes/defect-codes';
+import dispositionCodesRoutes from './routes/disposition-codes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -36,6 +39,9 @@ app.use('/suppliers', suppliersRoutes);
 app.use('/audits', auditsRoutes);
 app.use('/findings', findingsRoutes);
 app.use('/cars', carsRoutes);
+app.use('/commodity-types', commodityTypesRoutes);
+app.use('/defect-codes', defectCodesRoutes);
+app.use('/disposition-codes', dispositionCodesRoutes);
 
 app.use(errorHandler);
 

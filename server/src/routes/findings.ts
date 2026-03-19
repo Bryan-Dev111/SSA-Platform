@@ -163,7 +163,21 @@ router.post(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const { supplierId, auditId, severity, summary, discrepancy, defectCode, containment, occurrenceRootCause, escapeRootCause, correctiveAction, verificationOfEffectiveness, closingComments } = req.body as Record<string, unknown>;
+    const {
+      supplierId,
+      auditId,
+      severity,
+      summary,
+      discrepancy,
+      defectCode,
+      dispositionCode,
+      containment,
+      occurrenceRootCause,
+      escapeRootCause,
+      correctiveAction,
+      verificationOfEffectiveness,
+      closingComments,
+    } = req.body as Record<string, unknown>;
     if (!supplierId || !auditId || !severity || !summary || discrepancy === undefined) {
       res.status(400).json({ error: 'supplierId, auditId, severity, summary, and discrepancy are required' });
       return;
@@ -192,6 +206,7 @@ router.post(
         summary: String(summary).trim(),
         discrepancy: String(discrepancy).trim(),
         defectCode: defectCode ? String(defectCode).trim() : null,
+        dispositionCode: dispositionCode ? String(dispositionCode).trim() : null,
         containment: containment ? String(containment).trim() : null,
         occurrenceRootCause: occurrenceRootCause ? String(occurrenceRootCause).trim() : null,
         escapeRootCause: escapeRootCause ? String(escapeRootCause).trim() : null,
@@ -241,6 +256,7 @@ router.patch(
       summary?: string;
       discrepancy?: string;
       defectCode?: string | null;
+      dispositionCode?: string | null;
       containment?: string | null;
       occurrenceRootCause?: string | null;
       escapeRootCause?: string | null;
@@ -248,10 +264,23 @@ router.patch(
       verificationOfEffectiveness?: string | null;
       closingComments?: string | null;
     } = {};
-    const allowed = ['summary', 'discrepancy', 'defectCode', 'containment', 'occurrenceRootCause', 'escapeRootCause', 'correctiveAction', 'verificationOfEffectiveness', 'closingComments'] as const;
+    const allowed = [
+      'summary',
+      'discrepancy',
+      'defectCode',
+      'dispositionCode',
+      'containment',
+      'occurrenceRootCause',
+      'escapeRootCause',
+      'correctiveAction',
+      'verificationOfEffectiveness',
+      'closingComments',
+    ] as const;
     for (const k of allowed) {
       if (body[k] !== undefined) (data as Record<string, unknown>)[k] = typeof body[k] === 'string' ? body[k].trim() : body[k];
     }
+    if (data.defectCode === '') data.defectCode = null;
+    if (data.dispositionCode === '') data.dispositionCode = null;
     if (body.severity !== undefined) {
       if (!['Critical', 'Major', 'Minor'].includes(body.severity as string)) {
         res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });

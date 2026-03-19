@@ -39,6 +39,8 @@ const TABLE_ORDER = [
   'User',
   'UserRole',
   'CommodityType',
+  'DefectCode',
+  'DispositionCode',
   'Supplier',
   'BuyerSupplier',
   'AuditType',

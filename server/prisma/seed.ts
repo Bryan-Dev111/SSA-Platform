@@ -119,6 +119,49 @@ async function main() {
   }
   console.log('Mock suppliers seeded (3): SUP-TEST01, SUP-TEST02, SUP-TEST03.');
 
+  // Day 8: Commodity types, defect codes, disposition codes (Admin reference data)
+  const ctElectronics = await prisma.commodityType.upsert({
+    where: { id: 'seed-commodity-electronics' },
+    update: { name: 'Electronics' },
+    create: { id: 'seed-commodity-electronics', name: 'Electronics' },
+  });
+  await prisma.commodityType.upsert({
+    where: { id: 'seed-commodity-mechanical' },
+    update: { name: 'Mechanical' },
+    create: { id: 'seed-commodity-mechanical', name: 'Mechanical' },
+  });
+  await prisma.supplier.updateMany({
+    where: { code: 'SUP-TEST01' },
+    data: { commodityTypeId: ctElectronics.id },
+  });
+  console.log('Commodity types seeded; SUP-TEST01 → Electronics.');
+
+  for (const row of [
+    { code: 'DC-DIM', name: 'Dimensional non-conformance', id: 'seed-defect-dim' },
+    { code: 'DC-MAT', name: 'Material / specification', id: 'seed-defect-mat' },
+    { code: 'DC-DOC', name: 'Documentation', id: 'seed-defect-doc' },
+  ]) {
+    await prisma.defectCode.upsert({
+      where: { code: row.code },
+      update: { name: row.name, active: true },
+      create: { id: row.id, code: row.code, name: row.name, active: true },
+    });
+  }
+  console.log('Defect codes seeded (3).');
+
+  for (const row of [
+    { code: 'DSP-USE', name: 'Use as-is', id: 'seed-disp-use' },
+    { code: 'DSP-SRT', name: 'Sort / rework', id: 'seed-disp-srt' },
+    { code: 'DSP-RTV', name: 'Return to vendor', id: 'seed-disp-rtv' },
+  ]) {
+    await prisma.dispositionCode.upsert({
+      where: { code: row.code },
+      update: { name: row.name, active: true },
+      create: { id: row.id, code: row.code, name: row.name, active: true },
+    });
+  }
+  console.log('Disposition codes seeded (3).');
+
   // Day 5: Assign buyer to test supplier so Buyer scope can be tested on Supplier List
   const buyer = await prisma.user.findUnique({ where: { email: 'buyer@sentinel.local' } });
   const testSupplier = await prisma.supplier.findUnique({ where: { code: 'SUP-TEST01' } });
