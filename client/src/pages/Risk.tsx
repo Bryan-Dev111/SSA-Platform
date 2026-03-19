@@ -120,6 +120,8 @@ export function Risk() {
           type: newType,
         }),
       });
+      setNewSupplierId('');
+      setNewType('risk');
       setNewDescription('');
       toast.success('Risk/opportunity item added');
       await load();
