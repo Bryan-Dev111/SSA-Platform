@@ -120,7 +120,9 @@ export function Audits() {
       refetchAudits();
       toast.success('Audit deleted');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      const msg = e instanceof Error ? e.message : 'Delete failed';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setDeletingId(null);
     }
@@ -136,8 +138,11 @@ export function Audits() {
         body: JSON.stringify({ result }),
       });
       setAudits((prev) => prev.map((a) => (a.id === auditId ? updated : a)));
+      toast.success(`Audit ${updated.code} marked ${result}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update');
+      const msg = e instanceof Error ? e.message : 'Failed to update';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setUpdatingId(null);
     }
@@ -161,8 +166,11 @@ export function Audits() {
       setAudits((prev) => [created, ...prev]);
       setNewAudit({ supplierId: '', auditDate: '', auditTypeId: '', notes: '' });
       setShowNewForm(false);
+      toast.success(`Audit ${created.code} created`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create audit');
+      const msg = err instanceof Error ? err.message : 'Failed to create audit';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }

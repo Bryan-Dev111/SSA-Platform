@@ -65,7 +65,6 @@ export function Records() {
         setSuppliers(list);
         if (isSupplier && list.length === 1) {
           setSupplierId(list[0].id);
-          setFilterSupplierId(list[0].id);
         }
       })
       .catch(() => setSuppliers([]));
