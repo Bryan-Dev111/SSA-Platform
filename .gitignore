@@ -27,5 +27,8 @@ npm-debug.log*
 # Prisma
 server/prisma/migrations/**/migration_lock.toml
 
+# Local uploads (records, documents, internal — Day 10)
+server/uploads/
+
 # Misc
 *.tsbuildinfo

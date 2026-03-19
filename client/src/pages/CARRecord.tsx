@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
+import { ReferenceCodeSelect, type ReferenceCodeOption } from '../components/ReferenceCodeSelect';
 
 interface Supplier {
   id: string;
@@ -89,6 +90,7 @@ export function CARRecord() {
   });
   const [saving, setSaving] = useState(false);
   const [actioning, setActioning] = useState(false);
+  const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canEdit = car?.status === 'DRAFT' && canEditDraft;
@@ -137,6 +139,13 @@ export function CARRecord() {
     apiJson<{ list: unknown[] }>('/findings', { token }).then((r) => setFindings(r.list as FindingOption[])).catch(() => setFindings([]));
     apiJson<AuditOption[]>('/audits', { token }).then(setAudits).catch(() => setAudits([]));
   }, [token, idParam, codeParam]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiJson<{ list: ReferenceCodeOption[] }>('/defect-codes', { token })
+      .then((r) => setDefectCodeOptions(r.list))
+      .catch(() => setDefectCodeOptions([]));
+  }, [token]);
 
   const handlePatch = async () => {
     if (!token || !car || car.status !== 'DRAFT') return;
@@ -378,10 +387,12 @@ export function CARRecord() {
                 <label className="input-label">Discrepancy *</label>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} required />
               </div>
-              <div className="input-group">
-                <label className="input-label">Defect Code</label>
-                <input className="input" value={form.defectCode} onChange={(e) => setForm((p) => ({ ...p, defectCode: e.target.value }))} />
-              </div>
+              <ReferenceCodeSelect
+                label="Defect Code"
+                value={form.defectCode}
+                onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
+                options={defectCodeOptions}
+              />
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
@@ -431,10 +442,13 @@ export function CARRecord() {
                 <label className="input-label">Summary</label>
                 <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} disabled={!canEdit} />
               </div>
-              <div className="input-group">
-                <label className="input-label">Defect Code</label>
-                <input className="input" value={form.defectCode} onChange={(e) => setForm((p) => ({ ...p, defectCode: e.target.value }))} disabled={!canEdit} />
-              </div>
+              <ReferenceCodeSelect
+                label="Defect Code"
+                value={form.defectCode}
+                onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
+                options={defectCodeOptions}
+                disabled={!canEdit}
+              />
               <div className="input-group">
                 <label className="input-label">Discrepancy</label>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} disabled={!canEdit} />

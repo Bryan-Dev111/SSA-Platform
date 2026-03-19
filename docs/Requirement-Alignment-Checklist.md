@@ -8,11 +8,14 @@ Quick verification that the current codebase matches the stated requirements (Se
 
 | Entity   | Server enforcement | Client (UI) |
 |----------|--------------------|------------|
-| Finding  | `audits.ts`: 403 if not Admin | Findings table: Delete column only when `isAdmin` |
+| Finding  | `findings.ts`: 403 if not Admin | Findings table: Delete column only when `isAdmin` |
 | Audit    | `audits.ts`: 403 if not Admin | Audits table: Delete column only when `isAdmin` |
 | CAR      | `cars.ts`: 403 if not Admin   | Corrective Actions table: Delete column only when `isAdmin` |
+| Supplier | `suppliers.ts` `DELETE`: Admin only | Admin → Buyers & suppliers: Delete supplier |
+| Opportunity | `opportunities.ts` `DELETE`: Admin only | (Risk UI placeholder; API ready) |
+| Risk snapshot | `risk-snapshots.ts` `DELETE`: Admin only | (Risk UI placeholder; API ready) |
 
-All three: only Admin can delete; server rejects non-Admin; UI shows Delete only for Admin.
+Only Admin can delete these entities where implemented; server rejects non-Admin; list UIs show Delete only for Admin where applicable.
 
 ---
 
@@ -63,6 +66,59 @@ All three: only Admin can delete; server rejects non-Admin; UI shows Delete only
 
 ---
 
+## Day 8 — Admin reference data & codes
+
+| Area | Requirement | Implementation |
+|------|-------------|----------------|
+| 8.1 CAR workflow | Save DRAFT→RCCA; Process/Reverse; Approve/Reject; **no reverse to DRAFT** | `server/src/routes/cars.ts` (reverse rejects `prev === 'DRAFT'`); UI disables Reverse from RCCA |
+| 8.2 CAR Record | Fields, link to Finding, status history, open by CAR # | `CARRecord.tsx`; Finding link; single-row status history |
+| 8.3 Commodity types | CRUD; used for supplier classification | `GET/POST/PATCH/DELETE /commodity-types`; Admin UI; **Supplier List** (Admin) assigns `commodityTypeId` via `PATCH /suppliers/:id` |
+| 8.4 Defect codes | CRUD; used in Findings and CARs | `defect-codes` routes; seed + Admin UI; `ReferenceCodeSelect` on Findings Record and CAR Record |
+| 8.5 Disposition codes | CRUD; used in Findings workflow | `disposition-codes` routes; `Finding.dispositionCode`; dropdown on Findings Record |
+
+- **GET** lists for codes: active only by default; **Admin** may use `?all=1` for inactive rows on Admin page.
+- **Data migration:** `prisma/migrations/20260325000000_day8_defect_disposition_codes`.
+
+---
+
+## Day 9 — Permissions & delete (9.4)
+
+| Topic | Implementation |
+|-------|----------------|
+| Who sees which pages (client) | `client/src/config/rolePageAccess.ts` (`PATH_ROLES`); **Admin → Permissions** shows this table. |
+| Who sees which API routes (server) | `server/src/middleware/rbac.ts` **`API_PAGE_ROLES`**; **Findings** use `requirePageAccess('Findings')` (includes **Auditor**, matches client `/findings`). |
+| Live matrix for Admins | **`GET /users/permission-matrix`** returns `apiPageRoles` + **`adminOnlyDeletes`** list. |
+| Admin-only delete | **Finding** `DELETE /findings/:id`; **Audit** `DELETE /audits/:id`; **CAR** `DELETE /cars/:id`; **Risk snapshot** `DELETE /risk-snapshots/:id`; **Opportunity** `DELETE /opportunities/:id`; **Supplier** `DELETE /suppliers/:idOrCode` — all return **403** if not Admin (plus scope checks where applicable). |
+| Client delete UI | Findings / Audits / CARs: Delete column only when `isAdmin`; Supplier delete in Admin → Buyers & suppliers. |
+
+---
+
+## Day 9.5 — Supplier Profile (supplier view)
+
+| Topic | Implementation |
+|-------|----------------|
+| Portal data | **`GET /me/supplier-portal`** (Supplier only): supplier info, assigned buyers, audits, findings (non-DRAFT), CARs (non-DRAFT), risk snapshots, records, shipments, metrics. |
+| Client | **`SupplierProfile.tsx`**: metric tiles (buyers, open CARs, audits, findings, **records**, **shipments**); tables; **Upload record** (name + optional file via `fileBase64`); **Request shipment inspection** (PO, Part #, Qty, inspection date → `POST /shipments`). |
+| Record files | **`POST /records`**: optional `fileBase64` + `fileName`; saved under `server/uploads/records/`; `filePath` stored (relative `records/...`). **Supplier** cannot set arbitrary `filePath` (staff may pass `filePath` for internal metadata). |
+| Unlinked Supplier user | Portal **404**; **`getAllowedSupplierIds`** returns **`[]`** for Supplier role without linked supplier (no global supplier list). |
+
+---
+
+## Day 10 — Shipments, Records, Documents, Internal Management
+
+| Topic | Implementation |
+|-------|----------------|
+| Shipments API | **`GET/PATCH /shipments`**, **`GET /shipments/metrics`** (OTD vs schedule, FPY, counts); **`PATCH /shipments/:id`** with `{ result: Passed \| Failed }` — **Admin, QE** only. |
+| Shipment schedule | **`/shipment-schedule`**: **GET** (scoped); **POST/PATCH/DELETE** — **Admin** only. |
+| Shipments UI | **`Shipments.tsx`**: metrics, inspection requests table, schedule table, Pass/Fail, admin add/delete schedule. |
+| Records API | **`PATCH /records/:id`** approve/reject (**Admin, QE**); **`GET /records/:id/download`** (scoped). |
+| Records UI | **`Records.tsx`**: filter, upload (role-gated), table, Approve/Reject, Download. |
+| Documents | **`/documents`**: full CRUD (**POST/PATCH/DELETE** — **Admin, QE**); **GET** + download for **Documents** roles; types match Prisma **`DocumentType`**. |
+| Internal Management | **`/internal-docs`**: **Admin** only; list, upload, download, delete. |
+| Files | **`server/src/lib/uploads.ts`** — `uploads/records`, `uploads/documents`, `uploads/internal` under `server/uploads/`. |
+
+---
+
 ## Database
 
 - App and Prisma use `DATABASE_URL` from `server/.env` (and root `.env` when loaded). Configured to client’s Supabase when provided.
@@ -70,4 +126,4 @@ All three: only Admin can delete; server rejects non-Admin; UI shows Delete only
 
 ---
 
-**Summary:** Delete (Audit, CAR, Finding) is Admin-only on server and UI; pagination, status colors, and status dropdowns are in place for CAR, Findings, and Audits; sidebar and back links match requirements; DB URL is set for client’s Supabase.
+**Summary:** Through **Day 10**, Shipments (requests + schedule + metrics), Records (review + download), Documents, and Internal Management are implemented per plan; Risk **page** UI remains for **Day 11** while weights/snapshots APIs exist.

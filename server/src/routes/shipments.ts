@@ -6,12 +6,50 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
+import { computeShipmentMetrics } from '../services/shipmentMetrics';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { ShipmentResult, ShipmentStatus } from '@prisma/client';
 
 const router = Router();
 
 router.use(authMiddleware);
 router.use(requirePageAccess('Shipments'));
+
+function canRecordInspectionResult(roleNames: string[]): boolean {
+  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
+}
+
+router.get(
+  '/metrics',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
+    let scope: string[] | null = allowedIds;
+    if (supplierId) {
+      if (allowedIds !== null && !allowedIds.includes(supplierId)) {
+        res.json({
+          totalInspectionRequests: 0,
+          waitingInspection: 0,
+          passed: 0,
+          failed: 0,
+          overdueWaiting: 0,
+          lateVsSchedule: 0,
+          otdPercent: null,
+          fpyPercent: null,
+          scheduleRowCount: 0,
+        });
+        return;
+      }
+      scope = [supplierId];
+    }
+    const metrics = await computeShipmentMetrics(scope);
+    res.json(metrics);
+  })
+);
 
 router.get(
   '/',
@@ -104,6 +142,45 @@ router.post(
       include: { supplier: { select: { id: true, code: true, name: true } } },
     });
     res.status(201).json(shipment);
+  })
+);
+
+/** Admin / QE: record inspection Passed or Failed (Day 10). */
+router.patch(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (!canRecordInspectionResult(req.user.roleNames)) {
+      res.status(403).json({ error: 'Only Admin or Quality Engineer can record inspection results' });
+      return;
+    }
+    const id = req.params.id;
+    const resultRaw = req.body?.result;
+    if (resultRaw !== 'Passed' && resultRaw !== 'Failed') {
+      res.status(400).json({ error: 'result must be Passed or Failed' });
+      return;
+    }
+    const existing = await prisma.shipment.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(403).json({ error: 'Supplier not in scope' });
+      return;
+    }
+    const result = resultRaw as ShipmentResult;
+    const status: ShipmentStatus = result === 'Passed' ? 'Passed' : 'Failed';
+    const updated = await prisma.shipment.update({
+      where: { id },
+      data: { result, status },
+      include: { supplier: { select: { id: true, code: true, name: true } } },
+    });
+    res.json(updated);
   })
 );
 

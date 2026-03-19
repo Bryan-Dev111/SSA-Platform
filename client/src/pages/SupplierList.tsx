@@ -1,9 +1,16 @@
 /**
- * Supplier List: fetches GET /suppliers (scope: Admin all; Buyer assigned; Supplier own)
+ * Supplier List: GET /suppliers (scope: Admin all; Buyer assigned; Supplier own).
+ * Admin: assign commodity type (classification) via PATCH /suppliers/:id.
  */
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
+
+interface CommodityType {
+  id: string;
+  name: string;
+}
 
 interface Supplier {
   id: string;
@@ -11,13 +18,19 @@ interface Supplier {
   name: string;
   city: string | null;
   country: string | null;
+  commodityTypeId: string | null;
+  commodityType: { id: string; name: string } | null;
 }
 
 export function SupplierList() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const toast = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [commodityTypes, setCommodityTypes] = useState<CommodityType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
   useEffect(() => {
     if (!token) return;
@@ -26,6 +39,31 @@ export function SupplierList() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !isAdmin) return;
+    apiJson<{ list: CommodityType[] }>('/commodity-types', { token })
+      .then((r) => setCommodityTypes(r.list))
+      .catch(() => setCommodityTypes([]));
+  }, [token, isAdmin]);
+
+  const setCommodity = async (supplierId: string, commodityTypeId: string | null) => {
+    if (!token || !isAdmin) return;
+    setSavingId(supplierId);
+    try {
+      const updated = await apiJson<Supplier>(`/suppliers/${supplierId}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ commodityTypeId }),
+      });
+      setSuppliers((rows) => rows.map((s) => (s.id === supplierId ? { ...s, ...updated } : s)));
+      toast.success('Commodity type updated');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -59,6 +97,7 @@ export function SupplierList() {
         <h1 className="page-title">Supplier List</h1>
         <p className="page-description">
           Admin sees all; Buyer sees assigned suppliers; Supplier sees own record.
+          {isAdmin && ' Admins set commodity type for classification (Admin → Commodity types).'}
         </p>
       </header>
       <div className="card">
@@ -70,12 +109,13 @@ export function SupplierList() {
                 <th>Name</th>
                 <th>City</th>
                 <th>Country</th>
+                {isAdmin && <th>Commodity type</th>}
               </tr>
             </thead>
             <tbody>
               {suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="table-empty">
+                  <td colSpan={isAdmin ? 5 : 4} className="table-empty">
                     No suppliers in scope.
                   </td>
                 </tr>
@@ -86,6 +126,25 @@ export function SupplierList() {
                     <td>{s.name}</td>
                     <td>{s.city ?? '—'}</td>
                     <td>{s.country ?? '—'}</td>
+                    {isAdmin && (
+                      <td>
+                        <select
+                          className="input"
+                          style={{ minWidth: 160 }}
+                          value={s.commodityTypeId ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            void setCommodity(s.id, v === '' ? null : v);
+                          }}
+                          disabled={savingId === s.id}
+                        >
+                          <option value="">— None —</option>
+                          {commodityTypes.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

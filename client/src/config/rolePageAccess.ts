@@ -1,6 +1,8 @@
 /**
  * Role–page access: which roles can view each path (from Day 1 matrix)
- * Used for menu visibility and route guards
+ * Used for menu visibility and route guards.
+ *
+ * Keep aligned with server `API_PAGE_ROLES` in `server/src/middleware/rbac.ts` (same roles per feature).
  */
 export const PATH_ROLES: Record<string, string[]> = {
   '/dashboard': ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],

@@ -1,0 +1,827 @@
+/**
+ * Day 9 Admin: Audit types, Risk weights, Buyers & suppliers, Permissions matrix.
+ */
+import { useCallback, useEffect, useState } from 'react';
+import { apiJson } from '../../api/client';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { PATH_ROLES } from '../../config/rolePageAccess';
+
+interface ToastApi {
+  success: (message: string) => void;
+  error: (message: string) => void;
+  info: (message: string) => void;
+}
+
+interface AuditTypeRow {
+  id: string;
+  code: string;
+  name: string | null;
+}
+
+export function AdminAuditTypesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const [list, setList] = useState<AuditTypeRow[]>([]);
+  const [newCode, setNewCode] = useState('');
+  const [newName, setNewName] = useState('');
+  const [edit, setEdit] = useState<AuditTypeRow | null>(null);
+  const [del, setDel] = useState<AuditTypeRow | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const r = await apiJson<{ list: AuditTypeRow[] }>('/audit-types', { token });
+      setList(r.list);
+    } catch {
+      setList([]);
+      toast.error('Failed to load audit types');
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const add = async () => {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await apiJson('/audit-types', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          code: newCode.trim() || undefined,
+          name: newName.trim() || null,
+        }),
+      });
+      setNewCode('');
+      setNewName('');
+      toast.success('Audit type added');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Add failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!token || !edit) return;
+    setBusy(true);
+    try {
+      await apiJson(`/audit-types/${edit.id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ code: edit.code.trim(), name: edit.name?.trim() || null }),
+      });
+      setEdit(null);
+      toast.success('Updated');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    if (!token || !del) return;
+    setBusy(true);
+    try {
+      await apiJson(`/audit-types/${del.id}`, { token, method: 'DELETE' });
+      toast.success('Deleted');
+      setDel(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-body">
+        <h2 style={{ marginTop: 0 }}>Audit types (TYP-xx)</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>Used when scheduling audits. Leave code blank to auto-generate.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Code (optional)</label>
+            <input className="input" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Auto" />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Name</label>
+            <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button type="button" className="btn btn-primary" onClick={add} disabled={busy}>
+              Add
+            </button>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th style={{ width: 200 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="table-empty">
+                    No audit types.
+                  </td>
+                </tr>
+              ) : (
+                list.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      {edit?.id === row.id ? (
+                        <input className="input" value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value })} />
+                      ) : (
+                        row.code
+                      )}
+                    </td>
+                    <td>
+                      {edit?.id === row.id ? (
+                        <input className="input" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+                      ) : (
+                        row.name ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {edit?.id === row.id ? (
+                        <>
+                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveEdit} disabled={busy}>
+                            Save
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setEdit(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => setEdit({ ...row })}>
+                            Edit
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setDel(row)}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <ConfirmDialog
+        open={!!del}
+        title="Delete audit type?"
+        message={del ? `Remove ${del.code}? Audits referencing it must be reassigned first.` : ''}
+        confirmLabel="Delete"
+        variant="danger"
+        onCancel={() => setDel(null)}
+        onConfirm={doDelete}
+      />
+    </div>
+  );
+}
+
+interface RiskWeights {
+  id: string;
+  qualityPercent: number;
+  auditPercent: number;
+  deliveryPercent: number;
+  carClosurePercent: number;
+  documentationPercent: number;
+}
+
+export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const [w, setW] = useState<RiskWeights | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const r = await apiJson<RiskWeights>('/risk-weights', { token });
+      setW(r);
+    } catch {
+      setW(null);
+      toast.error('Failed to load risk weights');
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const save = async () => {
+    if (!token || !w) return;
+    setBusy(true);
+    try {
+      const updated = await apiJson<RiskWeights>('/risk-weights', {
+        token,
+        method: 'PUT',
+        body: JSON.stringify({
+          qualityPercent: w.qualityPercent,
+          auditPercent: w.auditPercent,
+          deliveryPercent: w.deliveryPercent,
+          carClosurePercent: w.carClosurePercent,
+          documentationPercent: w.documentationPercent,
+        }),
+      });
+      setW(updated);
+      toast.success('Risk weights saved (must sum to 100%)');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!w) {
+    return (
+      <div className="card">
+        <div className="card-body">Loading risk weights…</div>
+      </div>
+    );
+  }
+
+  const sum =
+    w.qualityPercent + w.auditPercent + w.deliveryPercent + w.carClosurePercent + w.documentationPercent;
+  const sumOk = Math.abs(sum - 100) < 0.02;
+
+  const field = (key: keyof RiskWeights, label: string) => {
+    if (key === 'id') return null;
+    return (
+      <div className="input-group" key={key}>
+        <label className="input-label">{label} (%)</label>
+        <input
+          className="input"
+          type="number"
+          min={0}
+          max={100}
+          step={0.1}
+          value={w[key] as number}
+          onChange={(e) => setW({ ...w, [key]: Number(e.target.value) })}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <div className="card">
+      <div className="card-body">
+        <h2 style={{ marginTop: 0 }}>Risk category weights</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>Used for risk calculation (Day 11). All five must sum to exactly 100%.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
+          {field('qualityPercent', 'Quality')}
+          {field('auditPercent', 'Audit')}
+          {field('deliveryPercent', 'Delivery')}
+          {field('carClosurePercent', 'CAR closure')}
+          {field('documentationPercent', 'Documentation')}
+        </div>
+        <p style={{ marginTop: '0.75rem', fontWeight: sumOk ? 400 : 600, color: sumOk ? 'inherit' : 'var(--color-danger)' }}>
+          Current sum: {sum.toFixed(2)}%{sumOk ? ' ✓' : ' — must be 100'}
+        </p>
+        <button type="button" className="btn btn-primary" onClick={save} disabled={busy || !sumOk}>
+          {busy ? 'Saving…' : 'Save weights'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface UserRow {
+  id: string;
+  email: string;
+  name: string | null;
+  roleNames: string[];
+  assignedSupplierIds: string[];
+}
+
+interface SupplierRow {
+  id: string;
+  code: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+}
+
+export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [buyerId, setBuyerId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserBuyer, setNewUserBuyer] = useState(false);
+  const [newSupName, setNewSupName] = useState('');
+  const [newSupCity, setNewSupCity] = useState('');
+  const [newSupCountry, setNewSupCountry] = useState('');
+  const [editSup, setEditSup] = useState<SupplierRow | null>(null);
+  const [delSup, setDelSup] = useState<SupplierRow | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [u, s] = await Promise.all([
+        apiJson<UserRow[]>('/users', { token }),
+        apiJson<SupplierRow[]>('/suppliers', { token }),
+      ]);
+      setUsers(u);
+      setSuppliers(s);
+    } catch {
+      toast.error('Failed to load users/suppliers');
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
+
+  const assign = async () => {
+    if (!token || !buyerId || !supplierId) return;
+    setBusy(true);
+    try {
+      await apiJson('/buyer-suppliers', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ buyerId, supplierId }),
+      });
+      toast.success('Assignment created');
+      setSupplierId('');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Assign failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unassign = async (bId: string, sId: string) => {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await apiJson(`/buyer-suppliers/${bId}/${sId}`, { token, method: 'DELETE' });
+      toast.info('Unassigned');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createUser = async () => {
+    if (!token || !newUserEmail.trim() || !newUserPassword) return;
+    const roleNames = newUserBuyer ? ['Buyer'] : ['Viewer'];
+    setBusy(true);
+    try {
+      await apiJson('/users', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          email: newUserEmail.trim(),
+          password: newUserPassword,
+          name: newUserName.trim() || null,
+          roleNames,
+        }),
+      });
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserName('');
+      setNewUserBuyer(false);
+      toast.success('User created');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Create user failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createSupplier = async () => {
+    if (!token || !newSupName.trim()) return;
+    setBusy(true);
+    try {
+      await apiJson('/suppliers', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          name: newSupName.trim(),
+          city: newSupCity.trim() || null,
+          country: newSupCountry.trim() || null,
+        }),
+      });
+      setNewSupName('');
+      setNewSupCity('');
+      setNewSupCountry('');
+      toast.success('Supplier created');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Create failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveSupplierEdit = async () => {
+    if (!token || !editSup) return;
+    setBusy(true);
+    try {
+      await apiJson(`/suppliers/${editSup.id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editSup.name.trim(),
+          city: editSup.city?.trim() || null,
+          country: editSup.country?.trim() || null,
+        }),
+      });
+      setEditSup(null);
+      toast.success('Supplier updated');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDeleteSupplier = async () => {
+    if (!token || !delSup) return;
+    setBusy(true);
+    try {
+      await apiJson(`/suppliers/${delSup.id}`, { token, method: 'DELETE' });
+      toast.success('Supplier deleted');
+      setDelSup(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Create user (Buyer or Viewer)</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            For other roles, use database seed or future role editor. New users get Buyer (if checked) or Viewer.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
+            <div className="input-group">
+              <label className="input-label">Email *</label>
+              <input className="input" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Password *</label>
+              <input className="input" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Display name</label>
+              <input className="input" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 24 }}>
+              <input type="checkbox" checked={newUserBuyer} onChange={(e) => setNewUserBuyer(e.target.checked)} />
+              Buyer role
+            </label>
+          </div>
+          <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createUser} disabled={busy}>
+            Create user
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Create supplier</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
+            <div className="input-group">
+              <label className="input-label">Name *</label>
+              <input className="input" value={newSupName} onChange={(e) => setNewSupName(e.target.value)} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">City</label>
+              <input className="input" value={newSupCity} onChange={(e) => setNewSupCity(e.target.value)} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Country</label>
+              <input className="input" value={newSupCountry} onChange={(e) => setNewSupCountry(e.target.value)} />
+            </div>
+          </div>
+          <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
+            Create supplier (auto code)
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Assign supplier → buyer</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Buyer</label>
+              <select className="input" value={buyerId} onChange={(e) => setBuyerId(e.target.value)} style={{ minWidth: 200 }}>
+                <option value="">Select buyer</option>
+                {buyers.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Supplier</label>
+              <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={{ minWidth: 200 }}>
+                <option value="">Select supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} — {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={assign} disabled={busy || !buyerId || !supplierId}>
+              Assign
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Buyer assignments</h2>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Buyer</th>
+                  <th>Assigned suppliers</th>
+                  <th style={{ width: 100 }}>Unassign</th>
+                </tr>
+              </thead>
+              <tbody>
+                {buyers.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="table-empty">
+                      No buyers. Create a user with Buyer role.
+                    </td>
+                  </tr>
+                ) : (
+                  buyers.flatMap((b) =>
+                    b.assignedSupplierIds.length === 0
+                      ? [
+                          <tr key={b.id}>
+                            <td>{b.email}</td>
+                            <td colSpan={2} className="table-empty">
+                              None
+                            </td>
+                          </tr>,
+                        ]
+                      : b.assignedSupplierIds.map((sid) => {
+                          const sup = suppliers.find((x) => x.id === sid);
+                          return (
+                            <tr key={`${b.id}-${sid}`}>
+                              <td>{b.email}</td>
+                              <td>{sup ? `${sup.code} — ${sup.name}` : sid}</td>
+                              <td>
+                                <button type="button" className="btn btn-ghost" onClick={() => unassign(b.id, sid)} disabled={busy}>
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Suppliers (edit / delete)</h2>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>City</th>
+                  <th>Country</th>
+                  <th style={{ width: 220 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.code}</td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input className="input" value={editSup.name} onChange={(e) => setEditSup({ ...editSup, name: e.target.value })} />
+                      ) : (
+                        s.name
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input className="input" value={editSup.city ?? ''} onChange={(e) => setEditSup({ ...editSup, city: e.target.value })} />
+                      ) : (
+                        s.city ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input
+                          className="input"
+                          value={editSup.country ?? ''}
+                          onChange={(e) => setEditSup({ ...editSup, country: e.target.value })}
+                        />
+                      ) : (
+                        s.country ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <>
+                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveSupplierEdit} disabled={busy}>
+                            Save
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setEditSup(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => setEditSup({ ...s })}>
+                            Edit
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setDelSup(s)}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={!!delSup}
+        title="Delete supplier?"
+        message={delSup ? `Permanently delete ${delSup.code}? Cascades related data.` : ''}
+        confirmLabel="Delete"
+        variant="danger"
+        onCancel={() => setDelSup(null)}
+        onConfirm={doDeleteSupplier}
+      />
+    </div>
+  );
+}
+
+interface PermissionMatrixResponse {
+  apiPageRoles: Record<string, string[]>;
+  adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
+}
+
+/**
+ * Day 9.4: Client routes (menu/guards) + live server matrix from GET /users/permission-matrix.
+ */
+export function AdminPermissionsPanel({ token }: { token: string | null }) {
+  const [serverData, setServerData] = useState<PermissionMatrixResponse | null>(null);
+  const [matrixError, setMatrixError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token })
+      .then((d) => {
+        setServerData(d);
+        setMatrixError(null);
+      })
+      .catch((e) => {
+        setServerData(null);
+        setMatrixError(e instanceof Error ? e.message : 'Failed to load server permission matrix');
+      });
+  }, [token]);
+
+  const clientPaths = Object.keys(PATH_ROLES).sort();
+  const serverKeys = serverData ? Object.keys(serverData.apiPageRoles).sort() : [];
+
+  return (
+    <div className="card">
+      <div className="card-body">
+        <h2 style={{ marginTop: 0 }}>Permissions & delete rules (Day 9.4)</h2>
+        <p style={{ color: 'var(--color-text-muted)' }}>
+          <strong>Client</strong> table drives the sidebar and <code>ProtectedRoute</code> (
+          <code>rolePageAccess.ts</code>). <strong>Server</strong> table drives <code>requirePageAccess(...)</code> on API
+          routes (<code>rbac.ts</code> → <code>API_PAGE_ROLES</code>). Both should stay aligned; server is enforced for
+          API calls.
+        </p>
+
+        <h3 style={{ marginTop: '1rem' }}>Client — routes (menu / route guard)</h3>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Roles</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientPaths.map((p) => (
+                <tr key={p}>
+                  <td>
+                    <code>{p}</code>
+                  </td>
+                  <td>{(PATH_ROLES[p] ?? []).join(', ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style={{ marginTop: '1.5rem' }}>Server — API page keys (<code>requirePageAccess</code>)</h3>
+        {matrixError && (
+          <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
+            {matrixError}
+          </div>
+        )}
+        {!serverData && !matrixError && token && <p>Loading server matrix…</p>}
+        {serverData && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Page key</th>
+                  <th>Roles</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serverKeys.map((key) => (
+                  <tr key={key}>
+                    <td>
+                      <code>{key}</code>
+                    </td>
+                    <td>{(serverData.apiPageRoles[key] ?? []).join(', ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <h3 style={{ marginTop: '1.5rem' }}>Admin-only delete (server-enforced)</h3>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+          Only <strong>Admin</strong> may call these deletes. UI shows Delete on Findings, Audits, and CARs only for Admin;
+          Supplier delete is on Admin → Buyers & suppliers. Risk snapshot / Opportunity deletes are API-ready for future Risk
+          UI.
+        </p>
+        {serverData?.adminOnlyDeletes && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Entity</th>
+                  <th>Method</th>
+                  <th>Path</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serverData.adminOnlyDeletes.map((row) => (
+                  <tr key={`${row.entity}-${row.path}`}>
+                    <td>{row.entity}</td>
+                    <td>
+                      <code>{row.method}</code>
+                    </td>
+                    <td>
+                      <code>{row.path}</code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
