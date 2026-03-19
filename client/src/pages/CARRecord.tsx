@@ -66,6 +66,7 @@ export function CARRecord() {
   const [searchParams] = useSearchParams();
   const idParam = searchParams.get('id');
   const codeParam = searchParams.get('carId');
+  const findingIdFromUrl = searchParams.get('findingId');
   const [car, setCar] = useState<CAR | null>(null);
   const [findings, setFindings] = useState<FindingOption[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
@@ -146,6 +147,31 @@ export function CARRecord() {
       .then((r) => setDefectCodeOptions(r.list))
       .catch(() => setDefectCodeOptions([]));
   }, [token]);
+
+  /** Deep-link from Findings / Findings Record: prefill Finding # (works for DRAFT findings not on GET /findings list). */
+  useEffect(() => {
+    if (!token || idParam || codeParam || !findingIdFromUrl) return;
+    apiJson<{ id: string; code: string; auditId: string; supplierId: string; severity: string }>(
+      `/findings/${findingIdFromUrl}`,
+      { token }
+    )
+      .then((f) => {
+        setForm((p) => ({
+          ...p,
+          findingId: f.id,
+          auditId: f.auditId,
+          supplierId: f.supplierId,
+          severity: f.severity,
+        }));
+        setFindings((prev) =>
+          prev.some((x) => x.id === f.id)
+            ? prev
+            : [...prev, { id: f.id, code: f.code, auditId: f.auditId, supplierId: f.supplierId, severity: f.severity }]
+        );
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load finding for new CAR'));
+  }, [token, idParam, codeParam, findingIdFromUrl]);
 
   const handlePatch = async () => {
     if (!token || !car || car.status !== 'DRAFT') return;

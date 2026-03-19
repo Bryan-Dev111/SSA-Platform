@@ -27,6 +27,7 @@ interface Finding {
   discrepancy: string;
   defectCode: string | null;
   updatedAt: string;
+  correctiveActions?: { id: string; code: string; status: string }[];
 }
 
 interface FindingsResponse {
@@ -46,14 +47,13 @@ export function Findings() {
   const [error, setError] = useState<string | null>(null);
   const roleNames = user?.roleNames ?? [];
   const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
-  const canChangeStatus = canCreateFinding; // Admin, QE, Auditor can Process/Reverse; Approve/Reject is Admin, QE only (handled per action)
-  const canApproveReject = roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+  /** Admin, QE, Buyer can create CARs (matches server POST /cars). */
+  const canCreateCar = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const isAdmin = roleNames.includes('Admin');
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [actioningId, setActioningId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -93,29 +93,6 @@ export function Findings() {
   const pageSafe = Math.min(page, totalPages) || 1;
   const paginatedList = list.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
-  const runStatusAction = async (findingId: string, action: 'save' | 'process' | 'reverse' | 'approve' | 'reject') => {
-    if (!token) return;
-    setActioningId(findingId);
-    try {
-      const path = action === 'save' ? `/findings/${findingId}/save` : `/findings/${findingId}/${action}`;
-      await apiJson(path, { token, method: 'POST' });
-      setRefreshKey((k) => k + 1);
-      toast.info('Status updated');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : `Action failed`);
-    } finally {
-      setActioningId(null);
-    }
-  };
-
-  const handleStatusChange = (findingId: string, _findingStatus: string, value: string) => {
-    if (!value) return;
-    if (value === 'process') runStatusAction(findingId, 'process');
-    else if (value === 'reverse') runStatusAction(findingId, 'reverse');
-    else if (value === 'approve') runStatusAction(findingId, 'approve');
-    else if (value === 'reject') runStatusAction(findingId, 'reject');
-  };
-
   const handleDelete = async (findingId: string) => {
     if (!token || !isAdmin) return;
     setDeleteConfirmId(null);
@@ -141,22 +118,6 @@ export function Findings() {
     return s || 'unknown';
   };
 
-  const getStatusOptions = (status: string) => {
-    const opts: { value: string; label: string }[] = [{ value: '', label: status }];
-    if (!canChangeStatus) return opts;
-    if (status === 'WaitingDisposition') {
-      opts.push({ value: 'process', label: '→ Process' });
-    }
-    if (status === 'WaitingApproval') {
-      if (canApproveReject) {
-        opts.push({ value: 'approve', label: '→ Approve' });
-        opts.push({ value: 'reject', label: '→ Reject' });
-      }
-      opts.push({ value: 'reverse', label: '→ Reverse' });
-    }
-    return opts;
-  };
-
   if (loading && data === null) {
     return (
       <div className="page">
@@ -175,7 +136,9 @@ export function Findings() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Findings</h1>
-        <p className="page-description">Findings (Waiting Disposition and beyond). Supplier filter for Buyers.</p>
+        <p className="page-description">
+          Findings (past DRAFT). Use the finding code to open the record for status workflow. Supplier filter for Buyers.
+        </p>
       </header>
 
       {error && (
@@ -260,14 +223,14 @@ export function Findings() {
                 <th>Status</th>
                 <th>Summary</th>
                 <th>Updated</th>
-                {canChangeStatus && <th>Change status</th>}
+                <th>CAR</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={6 + (canChangeStatus ? 1 : 0) + (isAdmin ? 1 : 0)} className="table-empty">
+                  <td colSpan={8 + (isAdmin ? 1 : 0)} className="table-empty">
                     No findings in scope (or none past DRAFT yet).
                   </td>
                 </tr>
@@ -291,27 +254,34 @@ export function Findings() {
                       {f.summary}
                     </td>
                     <td>{new Date(f.updatedAt).toLocaleDateString()}</td>
-                    {canChangeStatus && (
-                      <td>
-                        <select
-                          className="input"
-                          value=""
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (v) handleStatusChange(f.id, f.status, v);
-                            e.target.value = '';
-                          }}
-                          disabled={actioningId !== null}
-                          style={{ minWidth: 120, fontSize: 'var(--text-sm)' }}
-                          title="Change status"
-                        >
-                          {getStatusOptions(f.status).map((o) => (
-                            <option key={o.value || 'current'} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                        {actioningId === f.id && <span style={{ marginLeft: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>…</span>}
-                      </td>
-                    )}
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                        {(f.correctiveActions ?? []).length === 0 ? (
+                          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>—</span>
+                        ) : (
+                          (f.correctiveActions ?? []).map((c) => (
+                            <Link
+                              key={c.id}
+                              to={`/car-record?id=${encodeURIComponent(c.id)}`}
+                              className="finding-code-link"
+                              style={{ fontSize: 'var(--text-sm)' }}
+                            >
+                              {c.code}
+                              <span style={{ color: 'var(--color-text-muted)', marginLeft: 4 }}>({c.status})</span>
+                            </Link>
+                          ))
+                        )}
+                        {canCreateCar && (
+                          <Link
+                            to={`/car-record?findingId=${encodeURIComponent(f.id)}`}
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                          >
+                            + New CAR
+                          </Link>
+                        )}
+                      </div>
+                    </td>
                     {isAdmin && (
                       <td>
                         <button

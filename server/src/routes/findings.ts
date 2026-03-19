@@ -62,6 +62,10 @@ router.get(
         include: {
           supplier: { select: { id: true, code: true, name: true } },
           audit: { select: { id: true, code: true, auditDate: true } },
+          correctiveActions: {
+            select: { id: true, code: true, status: true },
+            orderBy: { updatedAt: 'desc' },
+          },
         },
         orderBy: { updatedAt: 'desc' },
       }),
@@ -108,6 +112,10 @@ router.get(
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
         createdBy: { select: { id: true, email: true, name: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     if (!finding) {
@@ -136,6 +144,10 @@ router.get(
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
         createdBy: { select: { id: true, email: true, name: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     if (!finding) {
@@ -218,6 +230,7 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: { select: { id: true, code: true, status: true }, orderBy: { updatedAt: 'desc' } },
       },
     });
     res.status(201).json(finding);
@@ -294,6 +307,10 @@ router.patch(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     res.json(finding);
@@ -337,6 +354,10 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     res.json(finding);
@@ -376,6 +397,10 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     res.json(finding);
@@ -415,6 +440,10 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     res.json(finding);
@@ -453,6 +482,10 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     res.json(finding);
@@ -491,6 +524,10 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
+        correctiveActions: {
+          select: { id: true, code: true, status: true },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
     res.json(finding);

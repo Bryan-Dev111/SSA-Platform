@@ -47,9 +47,17 @@ interface Finding {
   closingComments: string | null;
   createdAt: string;
   updatedAt: string;
+  correctiveActions?: { id: string; code: string; status: string }[];
 }
 
 const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
+
+/** Human-readable labels for Prisma enum-style status strings */
+function formatFindingStatus(status: string): string {
+  if (status === 'WaitingDisposition') return 'Waiting Disposition';
+  if (status === 'WaitingApproval') return 'Waiting Approval';
+  return status;
+}
 
 export function FindingsRecord() {
   const { token, user } = useAuth();
@@ -91,6 +99,7 @@ export function FindingsRecord() {
   const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
   // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
   const canCreateNew = canEditDraft;
+  const canCreateCar = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
 
   useEffect(() => {
     if (!token) return;
@@ -327,7 +336,11 @@ export function FindingsRecord() {
           {finding ? `${finding.code} — Finding` : isNew ? 'New Finding' : 'Findings Record'}
         </h1>
         <p className="page-description">
-          {finding ? `Status: ${finding.status}` : isNew ? 'Create a draft finding (Admin, QE, or Auditor).' : 'Finding not found.'}
+          {finding
+            ? `Status: ${formatFindingStatus(finding.status)} — open this record to use Save, Process, Reverse, Approve, or Reject.`
+            : isNew
+              ? 'Create a draft finding (Admin, QE, or Auditor).'
+              : 'Finding not found.'}
         </p>
         <p style={{ marginTop: 4 }}>
           <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
@@ -417,10 +430,47 @@ export function FindingsRecord() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Corrective actions (CAR)</h2>
+              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                CARs linked to this finding. Create or open a CAR from here or from the Findings list.
+              </p>
+              {(finding.correctiveActions ?? []).length === 0 ? (
+                <p style={{ margin: '0 0 0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>No CARs yet.</p>
+              ) : (
+                <ul style={{ margin: '0 0 0.75rem', paddingLeft: '1.25rem' }}>
+                  {(finding.correctiveActions ?? []).map((c) => (
+                    <li key={c.id} style={{ marginBottom: 4 }}>
+                      <Link to={`/car-record?id=${encodeURIComponent(c.id)}`} className="finding-code-link">
+                        {c.code}
+                      </Link>
+                      <span style={{ color: 'var(--color-text-muted)', marginLeft: 8, fontSize: 'var(--text-sm)' }}>{c.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canCreateCar && (
+                <Link
+                  to={`/car-record?findingId=${encodeURIComponent(finding.id)}`}
+                  className="btn btn-primary"
+                  style={{ display: 'inline-block' }}
+                >
+                  + New CAR for this finding
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div className="input-group">
                   <label className="input-label">Supplier</label>
-                  <input className="input" value={finding.supplier?.code ?? ''} readOnly disabled />
+                  <input
+                    className="input"
+                    value={finding.supplier ? `${finding.supplier.code} — ${finding.supplier.name}` : ''}
+                    readOnly
+                    disabled
+                  />
                 </div>
                 <div className="input-group">
                   <label className="input-label">Audit #</label>
@@ -526,7 +576,10 @@ export function FindingsRecord() {
 
           <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Status history</h2>
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Record snapshot</h2>
+              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Current status and timestamps (full approval history can be added in a later iteration).
+              </p>
               <table className="table">
                 <thead>
                   <tr>
@@ -537,7 +590,7 @@ export function FindingsRecord() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{finding.status}</td>
+                    <td>{formatFindingStatus(finding.status)}</td>
                     <td>{new Date(finding.createdAt).toLocaleString()}</td>
                     <td>{new Date(finding.updatedAt).toLocaleString()}</td>
                   </tr>
