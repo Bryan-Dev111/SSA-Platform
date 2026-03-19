@@ -203,13 +203,14 @@ router.patch(
       res.status(404).json({ error: 'Audit not found' });
       return;
     }
-    const { auditDate, notes, result } = req.body as {
+    const { auditDate, notes, result, auditTypeId } = req.body as {
       auditDate?: string;
       notes?: string | null;
       result?: AuditResult | null;
+      auditTypeId?: string | null;
     };
     const canSetResult = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
-    const update: { auditDate?: Date; notes?: string | null; result?: AuditResult | null } = {};
+    const update: { auditDate?: Date; notes?: string | null; result?: AuditResult | null; auditTypeId?: string | null } = {};
     if (auditDate !== undefined) {
       update.auditDate = new Date(auditDate.trim().slice(0, 10) + 'T12:00:00.000Z');
     }
@@ -224,6 +225,18 @@ router.patch(
         return;
       }
       update.result = result;
+    }
+    if (auditTypeId !== undefined) {
+      if (auditTypeId === null || auditTypeId === '') {
+        update.auditTypeId = null;
+      } else {
+        const typ = await prisma.auditType.findUnique({ where: { id: auditTypeId } });
+        if (!typ) {
+          res.status(400).json({ error: 'Invalid audit type id' });
+          return;
+        }
+        update.auditTypeId = auditTypeId;
+      }
     }
     const audit = await prisma.audit.update({
       where: { id: req.params.id },

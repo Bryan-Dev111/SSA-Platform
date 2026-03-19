@@ -21,12 +21,20 @@ import carsRoutes from './routes/cars';
 import commodityTypesRoutes from './routes/commodity-types';
 import defectCodesRoutes from './routes/defect-codes';
 import dispositionCodesRoutes from './routes/disposition-codes';
+import auditTypesRoutes from './routes/audit-types';
+import riskWeightsRoutes from './routes/risk-weights';
+import buyerSuppliersRoutes from './routes/buyer-suppliers';
+import recordsRoutes from './routes/records';
+import shipmentsRoutes from './routes/shipments';
+import opportunitiesRoutes from './routes/opportunities';
+import riskSnapshotsRoutes from './routes/risk-snapshots';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// Allow optional base64 file payloads on POST /records (supplier uploads; local disk in dev)
+app.use(express.json({ limit: '12mb' }));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'sentinel-api' });
@@ -42,6 +50,13 @@ app.use('/cars', carsRoutes);
 app.use('/commodity-types', commodityTypesRoutes);
 app.use('/defect-codes', defectCodesRoutes);
 app.use('/disposition-codes', dispositionCodesRoutes);
+app.use('/audit-types', auditTypesRoutes);
+app.use('/risk-weights', riskWeightsRoutes);
+app.use('/buyer-suppliers', buyerSuppliersRoutes);
+app.use('/records', recordsRoutes);
+app.use('/shipments', shipmentsRoutes);
+app.use('/opportunities', opportunitiesRoutes);
+app.use('/risk-snapshots', riskSnapshotsRoutes);
 
 app.use(errorHandler);
 

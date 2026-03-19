@@ -162,6 +162,13 @@ async function main() {
   }
   console.log('Disposition codes seeded (3).');
 
+  // Day 9: default risk weight row (single config)
+  const rwCount = await prisma.riskWeightConfig.count();
+  if (rwCount === 0) {
+    await prisma.riskWeightConfig.create({ data: {} });
+    console.log('RiskWeightConfig default row created (20% each category).');
+  }
+
   // Day 5: Assign buyer to test supplier so Buyer scope can be tested on Supplier List
   const buyer = await prisma.user.findUnique({ where: { email: 'buyer@sentinel.local' } });
   const testSupplier = await prisma.supplier.findUnique({ where: { code: 'SUP-TEST01' } });

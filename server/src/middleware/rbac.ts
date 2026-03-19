@@ -4,13 +4,16 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 
-/** Role names that can access a page (view). From Day 1 role–page matrix (final). */
-const PAGE_ROLES: Record<string, string[]> = {
+/**
+ * Role names that can access API routes using `requirePageAccess(pageKey)`.
+ * Keep aligned with `client/src/config/rolePageAccess.ts` (paths) for the same features.
+ */
+export const API_PAGE_ROLES: Record<string, string[]> = {
   Dashboard: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   Risk: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
   CorrectiveActions: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer', 'Auditor'],
   CARRecord: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
-  Findings: ['Admin', 'Viewer', 'QualityEngineer', 'Buyer'],
+  Findings: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   FindingsRecord: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   Audits: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer'],
   SupplierProfile: ['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer', 'Supplier'],
@@ -40,7 +43,7 @@ export function requireRole(allowedRoles: string[]) {
 }
 
 export function requirePageAccess(pageName: string) {
-  const allowedRoles = PAGE_ROLES[pageName];
+  const allowedRoles = API_PAGE_ROLES[pageName];
   if (!allowedRoles) {
     return (_req: Request, res: Response, _next: NextFunction): void => {
       res.status(403).json({ error: 'Unknown page' });

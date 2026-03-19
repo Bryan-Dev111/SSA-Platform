@@ -22,14 +22,16 @@ export async function getSupplierIdForUser(userId: string): Promise<string | nul
   return supplier?.id ?? null;
 }
 
-/** Return allowed supplier IDs: Buyer = assigned only; Supplier = [own]; else null = all (Admin, Viewer, QE, Auditor). */
+/** Return allowed supplier IDs: Buyer = assigned only; Supplier = [own] or [] if unlinked; else null = all (Admin, Viewer, QE, Auditor). */
 export async function getAllowedSupplierIds(user: {
   roleNames: string[];
   id: string;
   supplierId?: string | null;
 }): Promise<string[] | null> {
-  if (user.roleNames.includes('Supplier') && user.supplierId) {
-    return [user.supplierId];
+  if (user.roleNames.includes('Supplier')) {
+    if (user.supplierId) return [user.supplierId];
+    // Supplier role but no Supplier row linked to user — must not see all suppliers (Day 9.5 / security)
+    return [];
   }
   if (user.roleNames.includes('Buyer')) {
     const ids = await getAssignedSupplierIds(user.id);

@@ -7,7 +7,7 @@ import { Router, Request, Response } from 'express';
 import { FindingSeverity, FindingStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
@@ -27,7 +27,7 @@ function prevStatus(s: FindingStatus): FindingStatus | null {
 }
 
 router.use(authMiddleware);
-router.use(requireRole(['Admin', 'Viewer', 'QualityEngineer', 'Auditor', 'Buyer']));
+router.use(requirePageAccess('Findings'));
 
 router.get(
   '/',
