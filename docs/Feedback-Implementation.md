@@ -171,6 +171,49 @@
 - Lint diagnostics on changed files -> PASS
 - Note: `npm run db:generate` hit a Windows file-lock `EPERM` on Prisma engine rename (existing environment issue); code compile checks still pass.
 
+## 2026-03-20 - Internal Management file/download UI parity
+
+### Requirement summary
+- Make Internal Management `File (optional)` form UI/behavior match Documents page.
+- Make Internal Management table `Download` button UI/behavior match Documents page.
+
+### Implemented changes
+- Updated `client/src/pages/InternalManagement.tsx`:
+  - Form `File (optional)` now uses the same pattern as Documents:
+    - hidden native file input + `Choose File` button (`file-picker-btn`)
+    - selected file name display
+    - size and extension hint line
+    - upload progress indicator (`<progress>` + percentage) shown during active upload
+  - Kept existing upload logic (base64 JSON flow) and added file-read progress tracking via `FileReader.onprogress`.
+  - Table `Download` button now matches Documents:
+    - disabled while active
+    - in-button progress bar + percentage during download
+    - restores to `Download` after completion
+    - success toast shown on completion
+  - Download now uses `downloadWithAuthProgress` for real-time progress behavior consistent with Documents.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Internal Management delete confirmation modal
+
+### Requirement summary
+- In Internal Management table, clicking `Delete` must show a confirmation modal before deleting.
+
+### Implemented changes
+- Updated `client/src/pages/InternalManagement.tsx`:
+  - Added `ConfirmDialog` integration for delete confirmation.
+  - Replaced inline browser `confirm(...)` flow with modal-based flow:
+    - click `Delete` -> open modal
+    - confirm -> execute delete API
+    - cancel -> close modal, no delete
+  - Preserved existing delete behavior and button disable state while deleting.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
 ## 2026-03-20 - Fix stuck download progress (Records/Documents)
 
 ### Issue
