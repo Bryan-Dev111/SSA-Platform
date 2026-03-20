@@ -231,3 +231,24 @@
 
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+
+## 2026-03-20 - CAR analytics: status pie + age distribution
+
+### Requirement summary
+- Add a **pie chart** for CAR status distribution using statuses:
+  - `RCCA`, `WaitingApproval`, `FollowUp`, `Closed`
+- Add a **bar chart** for CAR age distribution with buckets:
+  - `0-30 days`, `31-60 days`, `61-90 days`, `90+ days`
+- Place both charts in the top analytics section.
+- Do not change table/workflow logic.
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx`:
+  - Added status counts from existing CAR list and rendered a pie chart using `conic-gradient`.
+  - Added age calculation (`today - createdAt`) and bucketed counts for the four required age ranges.
+  - Rendered age distribution as horizontal bars in a new analytics card.
+  - Added both new cards alongside the existing top analytics cards/charts section.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS

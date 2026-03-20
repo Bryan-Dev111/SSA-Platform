@@ -66,6 +66,53 @@ export function CorrectiveActions() {
     { severity: 'Minor', count: 0 },
   ];
   const maxSeverityCount = Math.max(1, ...severityCounts.map((s) => s.count));
+  const statusLabels = ['RCCA', 'WaitingApproval', 'FollowUp', 'Closed'] as const;
+  const statusColorMap: Record<(typeof statusLabels)[number], string> = {
+    RCCA: '#0ea5e9',
+    WaitingApproval: '#f59e0b',
+    FollowUp: '#8b5cf6',
+    Closed: '#22c55e',
+  };
+  const statusCounts = statusLabels.map((status) => ({
+    status,
+    count: list.filter((c) => c.status === status).length,
+    color: statusColorMap[status],
+  }));
+  const totalStatusCount = statusCounts.reduce((sum, s) => sum + s.count, 0);
+  const pieSegments = statusCounts.reduce<{ color: string; start: number; end: number; count: number; status: string }[]>(
+    (acc, item) => {
+      const start = acc.length > 0 ? acc[acc.length - 1].end : 0;
+      const pct = totalStatusCount > 0 ? (item.count / totalStatusCount) * 100 : 0;
+      const end = start + pct;
+      acc.push({ color: item.color, start, end, count: item.count, status: item.status });
+      return acc;
+    },
+    []
+  );
+  const pieBackground =
+    totalStatusCount === 0
+      ? 'conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg)'
+      : `conic-gradient(${pieSegments
+          .map((s) => `${s.color} ${s.start}% ${s.end}%`)
+          .join(', ')})`;
+
+  const ageBucketDefs = [
+    { label: '0-30 days', min: 0, max: 30 },
+    { label: '31-60 days', min: 31, max: 60 },
+    { label: '61-90 days', min: 61, max: 90 },
+    { label: '90+ days', min: 91, max: Number.POSITIVE_INFINITY },
+  ] as const;
+  const nowMs = Date.now();
+  const ageBuckets = ageBucketDefs.map((bucket) => ({
+    label: bucket.label,
+    count: list.filter((c) => {
+      const createdMs = new Date(c.createdAt).getTime();
+      if (Number.isNaN(createdMs)) return false;
+      const ageDays = Math.floor((nowMs - createdMs) / (1000 * 60 * 60 * 24));
+      return ageDays >= bucket.min && ageDays <= bucket.max;
+    }).length,
+  }));
+  const maxAgeBucketCount = Math.max(1, ...ageBuckets.map((b) => b.count));
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
@@ -247,6 +294,73 @@ export function CorrectiveActions() {
                                   : '#ca8a04',
                             borderRadius: 4,
                             minWidth: count > 0 ? 4 : 0,
+                            transition: 'width 0.2s ease',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {list.length > 0 && (
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by status</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div
+                    aria-label="CAR status distribution pie chart"
+                    style={{
+                      width: 140,
+                      height: 140,
+                      borderRadius: '50%',
+                      background: pieBackground,
+                      border: '1px solid var(--color-border)',
+                      flex: '0 0 auto',
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 160 }}>
+                    {statusCounts.map((s) => (
+                      <div key={s.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
+                          {s.status}
+                        </span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{s.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {list.length > 0 && (
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {ageBuckets.map((bucket) => (
+                    <div key={bucket.label}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4 }}>
+                        <span>{bucket.label}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{bucket.count}</span>
+                      </div>
+                      <div
+                        style={{
+                          height: 10,
+                          background: 'var(--color-border-subtle)',
+                          borderRadius: 4,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${(bucket.count / maxAgeBucketCount) * 100}%`,
+                            height: '100%',
+                            background: '#0284c7',
+                            borderRadius: 4,
+                            minWidth: bucket.count > 0 ? 4 : 0,
                             transition: 'width 0.2s ease',
                           }}
                         />
