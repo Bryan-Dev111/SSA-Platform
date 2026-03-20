@@ -453,13 +453,13 @@ a.btn:focus {
   background: #fffbeb;
 }
 .car-row--waiting-approval {
-  background: #eff6ff;
+  background: #fef2f2;
 }
 .car-row--closed {
-  background: #f0fdf4;
+  background: #f3f4f6;
 }
 .car-row--follow-up {
-  background: #f5f3ff;
+  background: #f0fdf4;
 }
 .car-row--unknown {
   background: var(--color-bg-subtle);

@@ -136,8 +136,8 @@ enum AuditResult {
 model Finding {
   id                      String        @id @default(cuid())
   code                    String        @unique // FIN-00001
-  auditId                 String
-  audit                   Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  auditId                 String?
+  audit                   Audit?        @relation(fields: [auditId], references: [id], onDelete: SetNull)
   supplierId              String
   supplier                Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   status                  FindingStatus @default(DRAFT)

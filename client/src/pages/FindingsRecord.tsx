@@ -29,10 +29,10 @@ interface AuditOption extends Audit {
 interface Finding {
   id: string;
   code: string;
-  auditId: string;
+  auditId: string | null;
   supplierId: string;
   supplier: Supplier;
-  audit: Audit;
+  audit: Audit | null;
   status: string;
   severity: string;
   summary: string;
@@ -114,7 +114,7 @@ export function FindingsRecord() {
         setFinding(f);
         setForm({
           supplierId: f.supplierId,
-          auditId: f.auditId,
+          auditId: f.auditId ?? '',
           severity: f.severity,
           summary: f.summary,
           discrepancy: f.discrepancy,
@@ -261,7 +261,7 @@ export function FindingsRecord() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !form.supplierId || !form.auditId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
+    if (!token || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
     setSaving(true);
     try {
       const created = await apiJson<Finding>('/findings', {
@@ -269,7 +269,7 @@ export function FindingsRecord() {
         method: 'POST',
         body: JSON.stringify({
           supplierId: form.supplierId,
-          auditId: form.auditId,
+          auditId: form.auditId || null,
           severity: form.severity,
           summary: form.summary.trim(),
           discrepancy: form.discrepancy.trim(),
@@ -356,7 +356,7 @@ export function FindingsRecord() {
       {isNew && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Create draft finding</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Create finding</h2>
             <form onSubmit={handleCreate}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
                 <div className="input-group">
@@ -374,14 +374,13 @@ export function FindingsRecord() {
                   </select>
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Audit *</label>
+                  <label className="input-label">Audit</label>
                   <select
                     className="input"
                     value={form.auditId}
                     onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}
-                    required
                   >
-                    <option value="">Select</option>
+                    <option value="">None / N/A</option>
                     {audits.filter((a) => a.supplierId === form.supplierId).map((a) => (
                       <option key={a.id} value={a.id}>{a.code}</option>
                     ))}
@@ -474,9 +473,13 @@ export function FindingsRecord() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Audit #</label>
-                  <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
-                    {finding.audit?.code ?? ''}
-                  </Link>
+                  {finding.audit?.code ? (
+                    <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
+                      {finding.audit.code}
+                    </Link>
+                  ) : (
+                    <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
+                  )}
                 </div>
                 <div className="input-group">
                   <label className="input-label">Severity</label>

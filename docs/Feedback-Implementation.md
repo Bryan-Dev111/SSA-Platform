@@ -540,3 +540,62 @@
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - CAR table row colors mapped by status
+
+### Requirement summary
+- In CAR table, set row colors by status:
+  - `Closed` -> gray
+  - `WaitingApproval` -> red
+  - `RCCA` -> yellow
+  - `FollowUp` -> green
+
+### Implemented changes
+- Updated `client/src/index.css` CAR row classes:
+  - `.car-row--waiting-disposition` (RCCA slug) -> yellow tint
+  - `.car-row--waiting-approval` -> red tint
+  - `.car-row--follow-up` -> green tint
+  - `.car-row--closed` -> gray tint
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Findings create: optional Audit (`None / N/A`)
+
+### Requirement summary
+- Add `None / N/A` option to Findings `Audit` field.
+- Make `Audit` optional for create.
+- Store `auditId = null` when no audit selected.
+- Keep `Supplier` required.
+- Display `Audit = None` when missing.
+
+### Implemented changes
+- **Database**
+  - Updated `server/prisma/schema.prisma`:
+    - `Finding.auditId` -> nullable (`String?`)
+    - `Finding.audit` -> optional relation (`onDelete: SetNull`)
+  - Added migration:
+    - `server/prisma/migrations/20260331004000_finding_optional_audit/migration.sql`
+
+- **Server API**
+  - Updated `server/src/routes/findings.ts` (`POST /findings`):
+    - `auditId` is no longer required.
+    - If provided, validates audit belongs to selected supplier.
+    - If omitted/None, finding is created with null audit link.
+  - Updated Save validation message text to remove required `Audit #`.
+
+- **Client UI**
+  - Updated `client/src/pages/FindingsRecord.tsx`:
+    - New finding form `Audit` field now includes `None / N/A`.
+    - Audit is optional (removed required flag).
+    - Submit sends `auditId: null` when none selected.
+    - Supplier remains required (unchanged).
+    - In existing finding detail, audit displays `None` when missing.
+  - Updated `client/src/pages/Findings.tsx`:
+    - Audit column shows `None` when a finding has no audit.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS

@@ -20,7 +20,7 @@ interface Finding {
   code: string;
   supplierId: string;
   supplier: Supplier;
-  audit: { id: string; code: string; auditDate: string };
+  audit: { id: string; code: string; auditDate: string } | null;
   status: string;
   severity: string;
   summary: string;
@@ -266,7 +266,7 @@ export function Findings() {
                       </Link>
                     </td>
                     <td>{f.supplier.code} — {f.supplier.name}</td>
-                    <td>{f.audit.code}</td>
+                    <td>{f.audit?.code ?? 'None'}</td>
                     <td>{f.severity}</td>
                     <td>
                       <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>
