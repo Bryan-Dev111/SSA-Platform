@@ -60,6 +60,8 @@ export function Findings() {
   const list = data?.list ?? [];
   const stats = data?.stats ?? { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 };
   const defectCodeCounts = data?.defectCodeCounts ?? [];
+  const topDefectCodes = defectCodeCounts.slice(0, 10);
+  const maxDefectCount = Math.max(1, ...defectCodeCounts.map((d) => d.count));
 
   const fetchData = () => {
     if (!token) return;
@@ -192,19 +194,40 @@ export function Findings() {
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Top defect codes</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {defectCodeCounts.slice(0, 10).map(({ code, count }) => (
-                <span
-                  key={code}
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    background: 'var(--color-border-subtle)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: 'var(--text-sm)',
-                  }}
-                >
-                  {code}: {count}
-                </span>
+            <div
+              aria-label="Top defect codes bar chart"
+              style={{
+                minHeight: 210,
+                borderLeft: '1px solid var(--color-border)',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'grid',
+                gridTemplateColumns: `repeat(${topDefectCodes.length}, minmax(0, 1fr))`,
+                alignItems: 'flex-end',
+                gap: '0.75rem',
+                padding: '0.5rem 0.5rem 0 0.5rem',
+                background:
+                  'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
+              }}
+            >
+              {topDefectCodes.map(({ code, count }) => (
+                <div key={code} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>
+                    {count}
+                  </span>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: `${Math.max(8, (count / maxDefectCount) * 140)}px`,
+                      background: '#4f46e5',
+                      borderRadius: '4px 4px 0 0',
+                      transition: 'height 0.2s ease',
+                    }}
+                    title={`${code}: ${count}`}
+                  />
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                    {code}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
@@ -246,7 +269,7 @@ export function Findings() {
                     <td>{f.audit.code}</td>
                     <td>{f.severity}</td>
                     <td>
-                      <span className={`finding-status-badge finding-status-badge--${getStatusBadgeSlug(f.status)}`}>
+                      <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>
                         {f.status}
                       </span>
                     </td>

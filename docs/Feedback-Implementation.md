@@ -480,3 +480,63 @@
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Findings page: defect-code bar chart + status color mapping
+
+### Requirement summary
+- Convert `Top defect codes` into a bar chart in the same section.
+- Update Findings status colors only:
+  - `Closed` -> Gray
+  - `Waiting Approval` -> Red
+  - `Waiting Disposition` -> Yellow
+- Apply these colors in Findings table status column badges.
+
+### Implemented changes
+- Updated `client/src/pages/Findings.tsx`:
+  - Replaced top defect-code chips with a bar chart:
+    - X-axis = defect codes
+    - Y-axis = finding count (bar height)
+  - Kept chart in the same `Top defect codes` card area.
+  - Switched Findings table status badge class to page-specific class:
+    - `findings-status-badge ...`
+- Updated `client/src/index.css`:
+  - Added Findings-only badge styles:
+    - `.findings-status-badge--closed` -> gray
+    - `.findings-status-badge--waiting-approval` -> red
+    - `.findings-status-badge--waiting-disposition` -> yellow
+  - Added default fallback styles for other Findings states.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Findings table row colors aligned to status
+
+### Requirement summary
+- Apply row colors based on Findings status (not only status badge colors).
+
+### Implemented changes
+- Updated `client/src/index.css` row classes for Findings:
+  - `.finding-row--waiting-disposition` -> yellow tint (kept)
+  - `.finding-row--waiting-approval` -> red tint
+  - `.finding-row--closed` -> gray tint
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Findings top defect chart: non-splitting responsive layout
+
+### Requirement summary
+- Top defect codes bar chart must not split by screen/window size and should remain flexible.
+
+### Implemented changes
+- Updated `client/src/pages/Findings.tsx`:
+  - Switched bar chart layout from flexible row widths to a fixed single chart grid.
+  - Uses `gridTemplateColumns: repeat(n, minmax(0, 1fr))` for top defect codes.
+  - Removed fixed/min bar widths that caused split/overflow behavior.
+  - Keeps labels truncated safely within each column.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
