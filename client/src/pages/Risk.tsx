@@ -26,8 +26,12 @@ interface OpportunityRow {
   id: string;
   supplierId: string;
   supplier: Supplier;
-  description: string | null;
-  type: string;
+  type: 'risk' | 'opportunity';
+  description: string;
+  likelihood: 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely' | null;
+  severity: 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe' | null;
+  riskLevel: 'Low' | 'Medium' | 'High' | null;
+  status: 'Open' | 'Mitigated' | 'Closed';
   createdAt: string;
 }
 
@@ -42,54 +46,65 @@ export function Risk() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [recalcLoading, setRecalcLoading] = useState(false);
-  const [newType, setNewType] = useState<'risk' | 'opportunity' | 'mitigated'>('risk');
+  const [newType, setNewType] = useState<'risk' | 'opportunity'>('risk');
   const [newSupplierId, setNewSupplierId] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newLikelihood, setNewLikelihood] = useState<'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely'>('Possible');
+  const [newSeverity, setNewSeverity] = useState<'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe'>('Moderate');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editType, setEditType] = useState<'risk' | 'opportunity' | 'mitigated'>('risk');
+  const [editType, setEditType] = useState<'risk' | 'opportunity'>('risk');
   const [editDescription, setEditDescription] = useState('');
+  const [editLikelihood, setEditLikelihood] = useState<'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely'>('Possible');
+  const [editSeverity, setEditSeverity] = useState<'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe'>('Moderate');
+  const [editStatus, setEditStatus] = useState<'Open' | 'Mitigated' | 'Closed'>('Open');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterRiskLevel, setFilterRiskLevel] = useState('');
 
   const roleNames = user?.roleNames ?? [];
   const isBuyer = roleNames.includes('Buyer');
   const canEditRiskItems =
     roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('Buyer');
 
-  const load = async () => {
+  const load = async (showLoader = true) => {
     if (!token) return;
-    setLoading(true);
+    if (showLoader) setLoading(true);
     setError(null);
     try {
-      const q = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
-      const [supplierList, currentList, riskList, oppList] = await Promise.all([
+      const currentQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
+      const listParams = new URLSearchParams();
+      if (filterSupplierId) listParams.set('supplierId', filterSupplierId);
+      if (filterStatus) listParams.set('status', filterStatus);
+      if (filterRiskLevel) listParams.set('riskLevel', filterRiskLevel);
+      const listQ = listParams.toString() ? `?${listParams.toString()}` : '';
+      const [supplierList, currentList, allItems] = await Promise.all([
         apiJson<Supplier[]>('/suppliers', { token }),
-        apiJson<RiskCurrent[]>(`/risk-snapshots/current${q}`, { token }),
-        apiJson<OpportunityRow[]>(`/opportunities?type=risk${q ? `&supplierId=${encodeURIComponent(filterSupplierId)}` : ''}`, { token }),
-        apiJson<OpportunityRow[]>(`/opportunities?type=opportunity${q ? `&supplierId=${encodeURIComponent(filterSupplierId)}` : ''}`, { token }),
+        apiJson<RiskCurrent[]>(`/risk-snapshots/current${currentQ}`, { token }),
+        apiJson<OpportunityRow[]>(`/opportunities${listQ}`, { token }),
       ]);
       setSuppliers(supplierList);
       setCurrents(currentList);
-      setItems([...riskList, ...oppList].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
+      setItems(allItems.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
       if (!newSupplierId && supplierList.length === 1) {
         setNewSupplierId(supplierList[0].id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load risk data');
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   useEffect(() => {
-    void load();
+    void load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, filterSupplierId]);
+  }, [token, filterSupplierId, filterStatus, filterRiskLevel]);
 
   const stats = useMemo(() => {
     const rows = currents;
     const avgScore =
       rows.length === 0 ? 0 : Math.round((rows.reduce((sum, r) => sum + r.score, 0) / rows.length) * 100) / 100;
-    const openRisks = items.filter((x) => x.type === 'risk').length;
-    const mitigatedRisks = items.filter((x) => x.type === 'mitigated').length;
+    const openRisks = items.filter((x) => x.type === 'risk' && x.status === 'Open').length;
+    const mitigatedRisks = items.filter((x) => x.type === 'risk' && x.status === 'Mitigated').length;
     const opportunities = items.filter((x) => x.type === 'opportunity').length;
     return { avgScore, openRisks, mitigatedRisks, opportunities };
   }, [currents, items]);
@@ -106,25 +121,39 @@ export function Risk() {
     [currents]
   );
 
+  const matchesActiveFilters = (row: OpportunityRow): boolean => {
+    if (filterSupplierId && row.supplierId !== filterSupplierId) return false;
+    if (filterStatus && row.status !== filterStatus) return false;
+    if (filterRiskLevel && (row.riskLevel ?? '') !== filterRiskLevel) return false;
+    return true;
+  };
+
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !newSupplierId || !newDescription.trim()) return;
     setSaving(true);
     try {
-      await apiJson('/opportunities', {
+      const created = await apiJson<OpportunityRow>('/opportunities', {
         token,
         method: 'POST',
         body: JSON.stringify({
           supplierId: newSupplierId,
           description: newDescription.trim(),
           type: newType,
+          ...(newType === 'risk' ? { likelihood: newLikelihood, severity: newSeverity } : {}),
         }),
       });
       setNewSupplierId('');
       setNewType('risk');
       setNewDescription('');
+      setNewLikelihood('Possible');
+      setNewSeverity('Moderate');
       toast.success('Risk/opportunity item added');
-      await load();
+      if (matchesActiveFilters(created)) {
+        setItems((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
+      } else {
+        await load(false);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create item');
     } finally {
@@ -136,22 +165,33 @@ export function Risk() {
     if (!token || !editingId || !editDescription.trim()) return;
     setSaving(true);
     try {
-      await apiJson(`/opportunities/${editingId}`, {
+      const updated = await apiJson<OpportunityRow>(`/opportunities/${editingId}`, {
         token,
         method: 'PATCH',
         body: JSON.stringify({
           description: editDescription.trim(),
           type: editType,
+          status: editStatus,
+          ...(editType === 'risk' ? { likelihood: editLikelihood, severity: editSeverity } : {}),
         }),
       });
       setEditingId(null);
       toast.success('Risk/opportunity item updated');
-      await load();
+      if (matchesActiveFilters(updated)) {
+        setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      } else {
+        setItems((prev) => prev.filter((row) => row.id !== updated.id));
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update item');
     } finally {
       setSaving(false);
     }
+  };
+
+  const closeEditModal = () => {
+    if (saving) return;
+    setEditingId(null);
   };
 
   const recalculate = async () => {
@@ -164,7 +204,7 @@ export function Risk() {
         body: JSON.stringify(filterSupplierId ? { supplierId: filterSupplierId } : {}),
       });
       toast.success('Risk snapshots recalculated');
-      await load();
+      await load(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to recalculate');
     } finally {
@@ -212,6 +252,24 @@ export function Risk() {
                 {s.code} — {s.name}
               </option>
             ))}
+          </select>
+        </label>
+        <label>
+          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Status:</span>
+          <select className="input" style={{ width: 'auto' }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">All</option>
+            <option value="Open">Open</option>
+            <option value="Mitigated">Mitigated</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </label>
+        <label>
+          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Risk level:</span>
+          <select className="input" style={{ width: 'auto' }} value={filterRiskLevel} onChange={(e) => setFilterRiskLevel(e.target.value)}>
+            <option value="">All</option>
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
           </select>
         </label>
         {!isBuyer && (
@@ -269,11 +327,72 @@ export function Risk() {
         </div>
       </div>
 
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
+          <div className="table-wrap">
+            {items.length === 0 ? (
+              <p className="table-empty">No rows.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Likelihood</th>
+                    <th>Severity</th>
+                    <th>Risk level</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    {canEditRiskItems ? <th>Action</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        {row.supplier.code} — {row.supplier.name}
+                      </td>
+                      <td>{row.type}</td>
+                      <td>{row.description}</td>
+                      <td>{row.likelihood ?? '—'}</td>
+                      <td>{row.severity ?? '—'}</td>
+                      <td>{row.riskLevel ?? '—'}</td>
+                      <td>{row.status}</td>
+                      <td>{new Date(row.createdAt).toLocaleString()}</td>
+                      {canEditRiskItems ? (
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setEditingId(row.id);
+                              setEditType(row.type === 'opportunity' ? 'opportunity' : 'risk');
+                              setEditDescription(row.description);
+                              setEditStatus(row.status);
+                              setEditLikelihood(row.likelihood ?? 'Possible');
+                              setEditSeverity(row.severity ?? 'Moderate');
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
       {canEditRiskItems && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Add risk/opportunity</h2>
-            <form onSubmit={createItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr auto', gap: '0.75rem' }}>
+            <form onSubmit={createItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr auto', gap: '0.75rem' }}>
               <select className="input" value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)} required>
                 <option value="">Supplier</option>
                 {suppliers.map((s) => (
@@ -282,9 +401,8 @@ export function Risk() {
                   </option>
                 ))}
               </select>
-              <select className="input" value={newType} onChange={(e) => setNewType(e.target.value as 'risk' | 'opportunity' | 'mitigated')}>
+              <select className="input" value={newType} onChange={(e) => setNewType(e.target.value as 'risk' | 'opportunity')}>
                 <option value="risk">Risk</option>
-                <option value="mitigated">Mitigated risk</option>
                 <option value="opportunity">Opportunity</option>
               </select>
               <input
@@ -294,6 +412,29 @@ export function Risk() {
                 onChange={(e) => setNewDescription(e.target.value)}
                 required
               />
+              {newType === 'risk' ? (
+                <>
+                  <select className="input" value={newLikelihood} onChange={(e) => setNewLikelihood(e.target.value as 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely')}>
+                    <option value="VeryUnlikely">Very Unlikely</option>
+                    <option value="Unlikely">Unlikely</option>
+                    <option value="Possible">Possible</option>
+                    <option value="Likely">Likely</option>
+                    <option value="VeryLikely">Very Likely</option>
+                  </select>
+                  <select className="input" value={newSeverity} onChange={(e) => setNewSeverity(e.target.value as 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe')}>
+                    <option value="Negligible">Negligible</option>
+                    <option value="Minor">Minor</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Significant">Significant</option>
+                    <option value="Severe">Severe</option>
+                  </select>
+                </>
+              ) : (
+                <>
+                  <div />
+                  <div />
+                </>
+              )}
               <button className="btn btn-primary" type="submit" disabled={saving}>
                 {saving ? 'Saving…' : 'Add'}
               </button>
@@ -344,73 +485,51 @@ export function Risk() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
-          <div className="table-wrap">
-            {items.length === 0 ? (
-              <p className="table-empty">No rows.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Supplier</th>
-                    <th>Type</th>
-                    <th>Description</th>
-                    <th>Created</th>
-                    {canEditRiskItems ? <th>Action</th> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        {row.supplier.code} — {row.supplier.name}
-                      </td>
-                      <td>{row.type}</td>
-                      <td>{row.description ?? '—'}</td>
-                      <td>{new Date(row.createdAt).toLocaleString()}</td>
-                      {canEditRiskItems ? (
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setEditType(
-                                row.type === 'mitigated' ? 'mitigated' : row.type === 'opportunity' ? 'opportunity' : 'risk'
-                              );
-                              setEditDescription(row.description ?? '');
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
 
       {editingId && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Edit item</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto auto', gap: '0.75rem' }}>
-              <select className="input" value={editType} onChange={(e) => setEditType(e.target.value as 'risk' | 'opportunity' | 'mitigated')}>
+        <div className="confirm-dialog-overlay" onClick={closeEditModal} role="dialog" aria-modal="true" aria-labelledby="risk-edit-title">
+          <div className="confirm-dialog" style={{ maxWidth: 920 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="risk-edit-title" className="confirm-dialog-title">Edit risk/opportunity</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <select className="input" value={editType} onChange={(e) => setEditType(e.target.value as 'risk' | 'opportunity')}>
                 <option value="risk">Risk</option>
-                <option value="mitigated">Mitigated risk</option>
                 <option value="opportunity">Opportunity</option>
               </select>
               <input className="input" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+              {editType === 'risk' ? (
+                <>
+                  <select className="input" value={editLikelihood} onChange={(e) => setEditLikelihood(e.target.value as 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely')}>
+                    <option value="VeryUnlikely">Very Unlikely</option>
+                    <option value="Unlikely">Unlikely</option>
+                    <option value="Possible">Possible</option>
+                    <option value="Likely">Likely</option>
+                    <option value="VeryLikely">Very Likely</option>
+                  </select>
+                  <select className="input" value={editSeverity} onChange={(e) => setEditSeverity(e.target.value as 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe')}>
+                    <option value="Negligible">Negligible</option>
+                    <option value="Minor">Minor</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Significant">Significant</option>
+                    <option value="Severe">Severe</option>
+                  </select>
+                </>
+              ) : (
+                <>
+                  <div />
+                  <div />
+                </>
+              )}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0.75rem' }}>
+              <select className="input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'Open' | 'Mitigated' | 'Closed')}>
+                <option value="Open">Open</option>
+                <option value="Mitigated">Mitigated</option>
+                <option value="Closed">Closed</option>
+              </select>
               <button className="btn btn-primary" type="button" onClick={saveEdit} disabled={saving}>
-                Save
+                {saving ? 'Saving…' : 'Save'}
               </button>
-              <button className="btn btn-ghost" type="button" onClick={() => setEditingId(null)} disabled={saving}>
+              <button className="btn btn-ghost" type="button" onClick={closeEditModal} disabled={saving}>
                 Cancel
               </button>
             </div>
