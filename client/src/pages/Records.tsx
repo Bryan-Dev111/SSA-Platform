@@ -1,7 +1,7 @@
 /**
  * Day 10: Records list (scoped); upload Supplier/Auditor/Buyer/Admin/QE; Admin/QE approve-reject; download.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -85,6 +85,9 @@ export function Records() {
   const [submitting, setSubmitting] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
@@ -96,6 +99,11 @@ export function Records() {
     isSupplier ||
     user?.roleNames?.includes('Auditor') ||
     user?.roleNames?.includes('Buyer');
+
+  const totalCount = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageSafe = Math.min(page, totalPages) || 1;
+  const paginatedRows = rows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const load = () => {
     if (!token) return;
@@ -125,6 +133,11 @@ export function Records() {
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token, filterSupplierId]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(rows.length / pageSize));
+    if (page > maxPage) setPage(maxPage);
+  }, [rows.length, page, pageSize]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +214,7 @@ export function Records() {
     if (!token || !r.filePath) return;
     try {
       await downloadWithAuth(`/records/${r.id}/download`, token, `${r.name}-file`);
+      toast.success('Download completed');
     } catch (e) {
       toast.error(parseApiError(e));
     }
@@ -247,12 +261,15 @@ export function Records() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gridTemplateColumns: isSupplier
+                    ? 'minmax(180px, 1fr) minmax(220px, 1fr) auto'
+                    : 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr) auto',
                   gap: '0.75rem',
                   alignItems: 'flex-end',
+                  paddingBottom: 22,
                 }}
               >
-                <div className="input-group" style={{ marginBottom: 0 }}>
+                <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
                   <label className="input-label">Name *</label>
                   <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
@@ -287,16 +304,64 @@ export function Records() {
                   </div>
                 )}
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <span>File (optional)</span>
-                    {uploadProgress !== null && file && (
+                  <label className="input-label">File (optional)</label>
+                  <input
+                    ref={fileInputRef}
+                    className="input"
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      Choose File
+                    </button>
+                    <span
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-block',
+                        maxWidth: 170,
+                      }}
+                      title={file?.name || 'No file chosen'}
+                    >
+                      {file?.name || 'No file chosen'}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: 4,
+                      minHeight: 18,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    <span>{file ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB` : ''}</span>
+                    {uploadProgress !== null && file ? (
                       <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{uploadProgress}%</span>
+                        <span>{uploadProgress}%</span>
                       </span>
+                    ) : (
+                      <span />
                     )}
-                  </label>
-                  <input className="input" type="file" onChange={(e) => onFileChange(e.target.files?.[0] ?? null)} />
+                  </div>
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? '…' : 'Submit'}
@@ -330,7 +395,7 @@ export function Records() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {paginatedRows.map((r) => (
                     <tr key={r.id}>
                       <td>{r.name}</td>
                       <td>{r.supplier?.code ?? 'None'}</td>
@@ -363,7 +428,8 @@ export function Records() {
                             <button
                               type="button"
                               className="btn btn-danger"
-                              disabled={reviewingId === r.id}
+                              disabled={reviewingId === r.id || r.status === 'Rejected'}
+                              title={r.status === 'Rejected' ? 'Already rejected' : 'Reject'}
                               onClick={() => setRejectConfirmId(r.id)}
                             >
                               Reject
@@ -377,6 +443,51 @@ export function Records() {
               </table>
             )}
           </div>
+          {rows.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', paddingTop: '0.75rem' }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+              </span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
+                Rows per page:
+                <select
+                  className="input"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  style={{ width: 'auto' }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={pageSafe <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
+                  Page {pageSafe} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={pageSafe >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <ConfirmDialog

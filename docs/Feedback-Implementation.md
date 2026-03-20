@@ -89,6 +89,77 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Records form row alignment + reject disable on rejected
+
+### Requirement summary
+- Keep `File (optional)` on the same horizontal row as Name/Source/Supplier/Submit.
+- Disable `Reject` button when the row is already rejected (including after successful reject).
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx`:
+  - Upload grid columns changed to explicit per-role layouts so controls remain aligned on one row:
+    - Non-supplier: Name | Source | Supplier | File | Submit
+    - Supplier: Name | File | Submit
+  - `Reject` button now disables when status is already `Rejected`.
+  - Added tooltip/title for disabled rejected state.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Records form: stable file chooser layout
+
+### Requirement summary
+- Keep Records upload form layout fixed when clicking/choosing file.
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx`:
+  - Replaced visible native file input (which can resize/shift layout with long file names).
+  - Added hidden file input + fixed `Choose File` button trigger.
+  - Added fixed-width/truncated filename display beside the button.
+  - Kept existing size/progress helper row below input area.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Records upload form layout stability (file select)
+
+### Requirement summary
+- Keep upload form layout stable when selecting a file (no jump/shift).
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx` file input block:
+  - Moved progress + size display into a fixed helper row below the file input.
+  - Added reserved helper height (`minHeight`) so selecting a file does not change row alignment.
+  - Kept size + progress visibility behavior intact.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Records UX improvements (download toast, file size display, pagination)
+
+### Requirement summary
+- Show notification when file download finishes.
+- In Upload form, show selected file size with upload progress area.
+- Add pagination in Records table for comfortable viewing.
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx`:
+  - `Download` flow now shows success toast after completion (`Download completed`).
+  - Upload form now shows selected file size (`MB`) under `File (optional)` input while file is selected.
+  - Added table pagination:
+    - page state + page size state
+    - paged row rendering
+    - range summary (`x–y of total`)
+    - rows-per-page selector
+    - Previous/Next controls
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
 ## 2026-03-20 - Records large-upload best approach (storage-based binary upload)
 
 ### Requirement summary
