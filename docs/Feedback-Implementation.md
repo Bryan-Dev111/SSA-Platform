@@ -216,3 +216,18 @@
 
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+
+## 2026-03-20 - Add "Creation Date" column to CAR table
+
+### Requirement summary
+- Add one new column in CAR table: **Creation Date**.
+- Place it immediately before **Updated**.
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx`:
+  - Added `createdAt` to the `CAR` interface.
+  - Added table header `Creation Date` before `Updated`.
+  - Rendered each row's creation date using `new Date(c.createdAt).toLocaleDateString()`.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS

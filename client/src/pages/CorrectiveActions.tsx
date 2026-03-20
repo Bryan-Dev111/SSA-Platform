@@ -28,6 +28,7 @@ interface CAR {
   summary: string;
   carOwner: string | null;
   targetCompletionDate: string | null;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -271,6 +272,7 @@ export function CorrectiveActions() {
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Summary</th>
+                <th>Created</th>
                 <th>Updated</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
@@ -313,6 +315,7 @@ export function CorrectiveActions() {
                     <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.summary}>
                       {c.summary}
                     </td>
+                    <td>{new Date(c.createdAt).toLocaleDateString()}</td>
                     <td>{new Date(c.updatedAt).toLocaleDateString()}</td>
                     {isAdmin && (
                       <td>
