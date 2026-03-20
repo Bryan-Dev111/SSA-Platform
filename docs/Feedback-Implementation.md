@@ -462,3 +462,21 @@
 
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+
+## 2026-03-20 - Add Owner column in Corrective Actions table
+
+### Requirement summary
+- Add `Owner` column in CAR table.
+- Place it after `Summary`.
+- Keep `Updated` and all existing columns.
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx`:
+  - Added table header `Owner` immediately after `Summary`.
+  - Rendered owner value from `carOwner`.
+  - Shows `—` when owner is empty/null.
+  - Updated empty-row `colSpan` to match the new column count.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS

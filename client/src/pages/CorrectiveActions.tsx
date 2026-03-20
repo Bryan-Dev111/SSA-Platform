@@ -420,6 +420,7 @@ export function CorrectiveActions() {
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Summary</th>
+                <th>Owner</th>
                 <th>Created</th>
                 <th>Updated</th>
                 {isAdmin && <th>Delete</th>}
@@ -428,7 +429,7 @@ export function CorrectiveActions() {
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={9 + (isAdmin ? 1 : 0)} className="table-empty">
+                  <td colSpan={10 + (isAdmin ? 1 : 0)} className="table-empty">
                     No CARs in scope (or none past DRAFT yet).
                   </td>
                 </tr>
@@ -467,6 +468,7 @@ export function CorrectiveActions() {
                     <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.summary}>
                       {c.summary}
                     </td>
+                    <td>{c.carOwner?.trim() ? c.carOwner : '—'}</td>
                     <td>{new Date(c.createdAt).toLocaleDateString()}</td>
                     <td>{new Date(c.updatedAt).toLocaleDateString()}</td>
                     {isAdmin && (
