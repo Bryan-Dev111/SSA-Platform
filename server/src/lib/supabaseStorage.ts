@@ -34,6 +34,23 @@ export async function uploadRecordToStorage(args: {
   return { storagePath: key };
 }
 
+export async function uploadDocumentToStorage(args: {
+  documentId: string;
+  fileName: string;
+  fileMime: string | null;
+  fileBuffer: Buffer;
+}): Promise<{ storagePath: string }> {
+  const supabase = requireStorageClient();
+  const safeName = args.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 140) || 'document.bin';
+  const key = `documents/${args.documentId}/${Date.now()}-${randomBytes(6).toString('hex')}-${safeName}`;
+  const { error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).upload(key, args.fileBuffer, {
+    upsert: false,
+    contentType: args.fileMime || 'application/octet-stream',
+  });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return { storagePath: key };
+}
+
 export async function createRecordDownloadSignedUrl(storagePath: string): Promise<string> {
   const supabase = requireStorageClient();
   const { data, error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).createSignedUrl(storagePath, 60);

@@ -89,6 +89,188 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Download button progress in Records/Documents + Documents download toast
+
+### Requirement summary
+- In Records and Documents tables:
+  - While downloading, show progress bar inside the `Download` button (instead of text).
+  - After finish, button returns to `Download`.
+- In Documents page:
+  - show success notification when download completes.
+
+### Implemented changes
+- Updated `client/src/utils/apiHelpers.ts`:
+  - added `downloadWithAuthProgress(...)` helper using `XMLHttpRequest` download progress.
+
+- Updated `client/src/pages/Records.tsx`:
+  - added per-row downloading progress state.
+  - download button now shows inline progress bar + percentage while active.
+  - button disables during active download.
+  - on completion, state clears and label returns to `Download`.
+
+- Updated `client/src/pages/Documents.tsx`:
+  - added per-row downloading progress state.
+  - download button now shows inline progress bar + percentage while active.
+  - button disables during active download.
+  - added success toast: `Download completed`.
+  - on completion, state clears and label returns to `Download`.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Documents table pagination
+
+### Requirement summary
+- Add pagination in Documents table for comfortable viewing.
+
+### Implemented changes
+- Updated `client/src/pages/Documents.tsx`:
+  - Added pagination state: `page`, `pageSize`
+  - Added computed paging values and paginated row slice
+  - Added auto-clamp when row count/page size changes
+  - Added pagination footer with:
+    - record range summary (`x–y of total`)
+    - rows-per-page selector (`5/10/20/50`)
+    - `Previous` / `Next` controls
+    - page indicator (`Page X of Y`)
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Fix stuck download progress (Records/Documents)
+
+### Issue
+- Download operation succeeds, but progress may appear stuck and not increase in some environments.
+
+### Root cause
+- Some browser/server combinations do not provide computable `onprogress` metadata (or emit sparse events), so pure event-driven percentage updates can stall visually.
+
+### Implemented fix
+- Updated `client/src/utils/apiHelpers.ts` (`downloadWithAuthProgress`):
+  - Start fallback progress timer immediately when download begins.
+  - Keep pulsing progress up to 95% if no computable progress is available.
+  - If computable progress is available, use real byte-based percent.
+  - Always set to 100% on successful completion.
+  - Clear timers on completion/error.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on related files -> PASS
+
+## 2026-03-20 - Download button progress style aligned with upload progress UI
+
+### Requirement summary
+- In Records/Documents tables, download progress bar shown inside `Download` button should match upload progress style used in forms.
+
+### Implemented changes
+- Updated:
+  - `client/src/pages/Records.tsx`
+  - `client/src/pages/Documents.tsx`
+- Standardized in-button download progress UI to match form upload style:
+  - progress bar width `90`
+  - same compact height
+  - percentage text beside bar
+  - consistent container width/spacing
+  - button width reserved while active
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Real-time download progress reliability (Records/Documents)
+
+### Requirement summary
+- Ensure download button progress in Records/Documents updates in real-time.
+
+### Implemented changes
+- Updated `client/src/utils/apiHelpers.ts` (`downloadWithAuthProgress`):
+  - Keeps normal percentage progress when `Content-Length` is available.
+  - Added fallback real-time progress pulse for responses without computable length:
+    - increments progress periodically up to 95% until completion.
+  - Clears fallback timer on completion/error and sets 100% on success.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Records progress behavior aligned with Documents form
+
+### Requirement summary
+- Ensure Records form progress bar behavior matches Documents form.
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx`:
+  - On file selection, progress is no longer forced to `0%`.
+  - Progress now appears/updates only during active upload (same lifecycle as Documents).
+  - File info display remains visible on selection.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Documents form upload progress bar (same behavior as Records)
+
+### Requirement summary
+- In Documents page form, show upload progress bar when selecting/uploading file, like Records page.
+
+### Implemented changes
+- Updated `client/src/pages/Documents.tsx`:
+  - Added `uploadProgress` state.
+  - Added `postDocumentWithProgress(...)` using `XMLHttpRequest` upload progress events.
+  - Create submit now uses XHR multipart upload with real-time progress updates.
+  - File helper row now shows:
+    - file size + extension
+    - progress bar + percentage while uploading.
+  - Progress resets after success/failure.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Documents file picker style parity + clearer picker buttons
+
+### Requirement summary
+- Make Documents `File (optional)` form style same as Records.
+- Show file name, size, extension in file area.
+- Improve visual clarity of file picker button shape/color in both pages.
+- Ensure Documents form clears current values after successful create.
+
+### Implemented changes
+- Updated `client/src/pages/Documents.tsx`:
+  - Replaced native visible file input with hidden input + custom `Choose File` button (same interaction pattern as Records).
+  - Added file info display (`name`, `size`, `extension`) under picker area.
+  - On successful create, form now resets:
+    - `documentNumber`, `name`, `type`, `revision`, selected file, and native file input value.
+- Updated `client/src/pages/Records.tsx`:
+  - Improved helper text to include file extension with size.
+  - Switched chooser button to shared clearer file-picker button style.
+- Updated `client/src/index.css`:
+  - Added reusable `.file-picker-btn` style for stronger visibility (clear border/shape/color on light backgrounds).
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Documents form row alignment with Records
+
+### Requirement summary
+- Ensure `File (optional)` aligns on the same horizontal row as:
+  - `Document Number`, `Name`, `Type`, `Revision`, and `Create`
+- Match alignment behavior of Records form.
+
+### Implemented changes
+- Updated `client/src/pages/Documents.tsx`:
+  - Replaced auto-fill grid with explicit one-row column layout matching Records-style behavior.
+  - Added bottom helper space to the row (`paddingBottom`) for file meta text.
+  - File field container now uses `position: relative`.
+  - File info helper row is absolutely positioned below the main row to avoid vertical row shift.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
 ## 2026-03-20 - Documents page terminology/order alignment (Number + Revision)
 
 ### Requirement summary
@@ -122,6 +304,52 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Documents upload/download aligned to Records flow
+
+### Requirement summary
+- Make Documents page upload/download function complete like Records page.
+
+### Implemented changes
+- **Server (`server/src/routes/documents.ts`)**
+  - Added multipart upload handling with `multer` memory storage.
+  - `POST /documents` now accepts `multipart/form-data` file uploads.
+  - `PATCH /documents/:id` now also accepts multipart file updates.
+  - Uploads document binary to Supabase Storage via signed SDK upload helper.
+  - `GET /documents/:id/download` now first tries storage signed-url download flow.
+  - Legacy local-file path download remains as fallback for old document rows.
+
+- **Storage helper (`server/src/lib/supabaseStorage.ts`)**
+  - Added `uploadDocumentToStorage(...)` for document bucket/object upload.
+
+- **Client (`client/src/pages/Documents.tsx`)**
+  - Switched create upload from base64 JSON to `FormData` multipart upload.
+  - Increased client-side file size check to `150MB`.
+  - Kept existing download button behavior (`/documents/:id/download`).
+
+- **API client helper (`client/src/api/client.ts`)**
+  - `apiFetch` no longer forces JSON content-type when body is `FormData`.
+
+### Verification
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Documents delete confirmation modal
+
+### Requirement summary
+- On Documents page, clicking `Delete` must open a decision modal before deletion.
+
+### Implemented changes
+- Updated `client/src/pages/Documents.tsx`:
+  - Added `ConfirmDialog` integration for delete action.
+  - `Delete` button now opens modal (`Delete document`).
+  - Actual delete runs only after confirm.
+  - Cancel closes modal without action.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
 
 ## 2026-03-20 - Records form row alignment + reject disable on rejected
 

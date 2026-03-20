@@ -279,6 +279,18 @@ a.btn:focus {
   background: #b91c1c;
 }
 
+/* File picker action button (clear shape/color on pale forms) */
+.file-picker-btn {
+  background: #fff;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.file-picker-btn:hover:not(:disabled) {
+  background: var(--color-border-subtle);
+  border-color: var(--color-text-subtle);
+}
+
 /* ----- Forms ----- */
 .input-group {
   margin-bottom: var(--space-4);

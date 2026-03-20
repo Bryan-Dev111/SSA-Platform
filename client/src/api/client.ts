@@ -10,7 +10,7 @@ export async function apiFetch(
   const { token, ...init } = options;
   const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!(init.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const url = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
   const res = await fetch(url, { ...init, headers });
   if (res.status === 401 && typeof window !== 'undefined') {

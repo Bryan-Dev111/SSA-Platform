@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
-import { parseApiError, downloadWithAuth } from '../utils/apiHelpers';
+import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const MAX_UPLOAD_BYTES = 75 * 1024 * 1024;
@@ -85,6 +85,7 @@ export function Records() {
   const [submitting, setSubmitting] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -188,7 +189,7 @@ export function Records() {
       return;
     }
     setFile(f);
-    setUploadProgress(0);
+    setUploadProgress(null);
   };
 
 
@@ -213,10 +214,19 @@ export function Records() {
   const download = async (r: RecordRow) => {
     if (!token || !r.filePath) return;
     try {
-      await downloadWithAuth(`/records/${r.id}/download`, token, `${r.name}-file`);
+      setDownloading((prev) => ({ ...prev, [r.id]: 0 }));
+      await downloadWithAuthProgress(`/records/${r.id}/download`, token, `${r.name}-file`, (p) => {
+        setDownloading((prev) => ({ ...prev, [r.id]: p }));
+      });
       toast.success('Download completed');
     } catch (e) {
       toast.error(parseApiError(e));
+    } finally {
+      setDownloading((prev) => {
+        const next = { ...prev };
+        delete next[r.id];
+        return next;
+      });
     }
   };
 
@@ -303,7 +313,7 @@ export function Records() {
                     </select>
                   </div>
                 )}
-                <div className="input-group" style={{ marginBottom: 0 }}>
+                <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
                   <label className="input-label">File (optional)</label>
                   <input
                     ref={fileInputRef}
@@ -315,7 +325,7 @@ export function Records() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
                       type="button"
-                      className="btn btn-ghost"
+                      className="btn file-picker-btn"
                       onClick={() => fileInputRef.current?.click()}
                       style={{ whiteSpace: 'nowrap' }}
                     >
@@ -352,7 +362,11 @@ export function Records() {
                       color: 'var(--color-text-muted)',
                     }}
                   >
-                    <span>{file ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB` : ''}</span>
+                    <span>
+                      {file
+                        ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'}`
+                        : ''}
+                    </span>
                     {uploadProgress !== null && file ? (
                       <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
@@ -403,8 +417,21 @@ export function Records() {
                       <td>{r.status}</td>
                       <td>
                         {r.filePath ? (
-                          <button type="button" className="btn" onClick={() => download(r)}>
-                            Download
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => download(r)}
+                            disabled={downloading[r.id] !== undefined}
+                            style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
+                          >
+                            {downloading[r.id] !== undefined ? (
+                              <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
+                                <span>{downloading[r.id]}%</span>
+                              </span>
+                            ) : (
+                              'Download'
+                            )}
                           </button>
                         ) : (
                           '—'
