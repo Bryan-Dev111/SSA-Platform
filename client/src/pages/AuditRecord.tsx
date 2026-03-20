@@ -58,7 +58,7 @@ export function AuditRecord() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Audit</h1>
+          <h1 className="page-title">Audit Record</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -71,7 +71,9 @@ export function AuditRecord() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">{audit ? audit.code : 'Audit Record'}</h1>
+        <h1 className="page-title">
+          {audit ? `${audit.code} (${audit.supplier.name})` : 'Audit Record'}
+        </h1>
         <p className="page-description">
           {audit ? `Status: ${audit.derivedStatus}` : 'Audit not found or missing id.'}
         </p>
