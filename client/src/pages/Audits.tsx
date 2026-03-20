@@ -29,6 +29,7 @@ interface Audit {
   auditTypeId: string | null;
   auditType: AuditType | null;
   auditDate: string;
+  auditor: string | null;
   result: 'Passed' | 'Failed' | 'Cancelled' | null;
   notes: string | null;
   derivedStatus: string;
@@ -46,7 +47,7 @@ function formatCalendarDate(isoOrDateStr: string): string {
 function getAuditStatusSlug(status: string): string {
   const s = status.replace(/\s+/g, '-').toLowerCase();
   if (s === 'scheduled') return 'scheduled';
-  if (s === 'in-process') return 'in-process';
+  if (s === 'in-process' || s === 'inprocess') return 'in-process';
   if (s === 'overdue') return 'overdue';
   if (s === 'complete') return 'complete';
   if (s === 'cancelled') return 'cancelled';
@@ -65,7 +66,7 @@ export function Audits() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [newAudit, setNewAudit] = useState({ supplierId: '', auditDate: '', auditTypeId: '', notes: '' });
+  const [newAudit, setNewAudit] = useState({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
   const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -160,11 +161,12 @@ export function Audits() {
           supplierId: newAudit.supplierId,
           auditDate: newAudit.auditDate,
           auditTypeId: newAudit.auditTypeId || null,
+          auditor: newAudit.auditor || null,
           notes: newAudit.notes || null,
         }),
       });
       setAudits((prev) => [created, ...prev]);
-      setNewAudit({ supplierId: '', auditDate: '', auditTypeId: '', notes: '' });
+      setNewAudit({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
       setShowNewForm(false);
       toast.success(`Audit ${created.code} created`);
     } catch (err) {
@@ -276,6 +278,16 @@ export function Audits() {
                 </div>
               </div>
               <div className="input-group" style={{ marginBottom: '1rem' }}>
+                <label className="input-label">Auditor</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={newAudit.auditor}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
+                  placeholder="e.g. Brian"
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: '1rem' }}>
                 <label className="input-label">Notes</label>
                 <input
                   type="text"
@@ -302,6 +314,7 @@ export function Audits() {
                 <th>Supplier</th>
                 <th>Date</th>
                 <th>Type</th>
+                <th>Auditor</th>
                 <th>Status</th>
                 <th>Result</th>
                 <th>Notes</th>
@@ -312,7 +325,7 @@ export function Audits() {
             <tbody>
               {audits.length === 0 ? (
                 <tr>
-                  <td colSpan={8 + (isAdmin ? 1 : 0)} className="table-empty">
+                  <td colSpan={9 + (isAdmin ? 1 : 0)} className="table-empty">
                     No audits in scope.
                   </td>
                 </tr>
@@ -323,7 +336,12 @@ export function Audits() {
                     <td>{a.supplier.code} — {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate)}</td>
                     <td>{a.auditType ? `${a.auditType.code}${a.auditType.name ? ` ${a.auditType.name}` : ''}` : '—'}</td>
-                    <td>{a.derivedStatus}</td>
+                    <td>{a.auditor?.trim() ? a.auditor : '—'}</td>
+                    <td>
+                      <span className={`audit-status-badge audit-status-badge--${getAuditStatusSlug(a.derivedStatus)}`}>
+                        {a.derivedStatus}
+                      </span>
+                    </td>
                     <td>
                       {canSetResult && a.derivedStatus !== 'Cancelled' && a.derivedStatus !== 'Complete' ? (
                         <select

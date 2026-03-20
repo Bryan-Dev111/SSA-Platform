@@ -89,6 +89,78 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Audits page: add Auditor + status badge color mapping
+
+### Requirement summary
+- Add `Auditor` input field in `Schedule new audit` form.
+- Save auditor value to DB and display it in Audits table.
+- Add `Auditor` table column with placement:
+  - `Code | Supplier | Date | Type | Auditor | Status | Result | Notes | Findings | Delete`
+- Update audit status colors:
+  - Scheduled = Blue
+  - Complete = Gray
+  - In Process = Yellow
+  - Overdue = Red
+
+### Implemented changes
+- **Database**
+  - Updated `server/prisma/schema.prisma`:
+    - Added `Audit.auditor String?`
+  - Added migration:
+    - `server/prisma/migrations/20260331008000_audit_add_auditor/migration.sql`
+
+- **Server API (`server/src/routes/audits.ts`)**
+  - Added `auditor` handling in `POST /audits` (create).
+  - Added `auditor` handling in `PATCH /audits/:id` (update payload support).
+  - Included `auditor` in list response mapping.
+  - Updated derived status display text from `In-Process` to `In Process` (display label only; workflow unchanged).
+
+- **Client UI (`client/src/pages/Audits.tsx`)**
+  - Extended `Audit` type with `auditor`.
+  - Extended create form state with `auditor`.
+  - Added `Auditor` text input in `Schedule new audit` form (same style as Notes).
+  - Submit payload now sends `auditor`.
+  - Added `Auditor` column before `Status`.
+  - Status cell now renders badge element with status-specific class.
+  - Updated empty-table `colSpan` for new column.
+
+- **Client styling (`client/src/index.css`)**
+  - Added `audit-status-badge` styles and status variants:
+    - `--scheduled` (blue)
+    - `--in-process` (yellow)
+    - `--overdue` (red)
+    - `--complete` (gray)
+  - Kept cancelled/unknown with neutral mapping.
+  - Updated complete row background to gray tint for consistency.
+
+### Verification
+- DB migration deploy: `npx prisma migrate deploy` -> PASS
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+- Note: `npx prisma generate` still intermittently reports Windows `EBUSY` lock in this environment.
+
+## 2026-03-20 - Unify status badge shape across product
+
+### Requirement summary
+- Make all current product status badges use the same shape as the Findings table status badge.
+
+### Implemented changes
+- Updated `client/src/index.css` to use one shared base style for:
+  - `.finding-status-badge` (CAR table status badges)
+  - `.findings-status-badge` (Findings table status badges)
+  - `.audit-status-badge` (Audits table status badges)
+- Standardized badge shape properties to Findings-table style:
+  - `display: inline-block`
+  - `padding: var(--space-1) var(--space-3)`
+  - `border-radius: var(--radius-md)`
+  - same text sizing/weight and nowrap behavior
+- Kept existing per-status color mappings unchanged.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on affected files -> PASS
+
 ## 2026-03-19 - Cancellation applied (layout adjustment reverted)
 
 ### Requirement update

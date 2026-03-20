@@ -119,6 +119,7 @@ model Audit {
   auditTypeId  String?
   auditType    AuditType? @relation(fields: [auditTypeId], references: [id])
   auditDate    DateTime  @db.Date
+  auditor      String?
   result       AuditResult? // Passed, Failed, Cancelled
   notes        String?
   createdAt    DateTime  @default(now())

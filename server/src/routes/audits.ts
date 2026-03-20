@@ -14,7 +14,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 const router = Router();
 
 type AuditResult = 'Passed' | 'Failed' | 'Cancelled';
-type DerivedStatus = 'Scheduled' | 'In-Process' | 'Overdue' | 'Complete' | 'Cancelled';
+type DerivedStatus = 'Scheduled' | 'In Process' | 'Overdue' | 'Complete' | 'Cancelled';
 
 /** Compare calendar dates in UTC so status is correct regardless of server timezone. */
 function getDerivedStatus(result: AuditResult | null, auditDate: Date): DerivedStatus {
@@ -28,7 +28,7 @@ function getDerivedStatus(result: AuditResult | null, auditDate: Date): DerivedS
     auditDate.getUTCDate()
   );
   if (auditUTC > todayUTC) return 'Scheduled';
-  if (auditUTC === todayUTC) return 'In-Process';
+  if (auditUTC === todayUTC) return 'In Process';
   return 'Overdue';
 }
 
@@ -87,6 +87,7 @@ router.get(
       auditTypeId: a.auditTypeId,
       auditType: a.auditType,
       auditDate: a.auditDate,
+      auditor: a.auditor,
       result: a.result,
       notes: a.notes,
       createdAt: a.createdAt,
@@ -142,10 +143,11 @@ router.post(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const { supplierId, auditTypeId, auditDate, notes } = req.body as {
+    const { supplierId, auditTypeId, auditDate, auditor, notes } = req.body as {
       supplierId?: string;
       auditTypeId?: string | null;
       auditDate?: string;
+      auditor?: string | null;
       notes?: string | null;
     };
     if (!supplierId || !auditDate) {
@@ -165,6 +167,7 @@ router.post(
         supplierId,
         auditTypeId: auditTypeId || null,
         auditDate: dateOnly,
+        auditor: auditor ? String(auditor).trim() : null,
         notes: notes || null,
       },
       include: {
@@ -203,18 +206,26 @@ router.patch(
       res.status(404).json({ error: 'Audit not found' });
       return;
     }
-    const { auditDate, notes, result, auditTypeId } = req.body as {
+    const { auditDate, notes, result, auditTypeId, auditor } = req.body as {
       auditDate?: string;
       notes?: string | null;
       result?: AuditResult | null;
       auditTypeId?: string | null;
+      auditor?: string | null;
     };
     const canSetResult = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
-    const update: { auditDate?: Date; notes?: string | null; result?: AuditResult | null; auditTypeId?: string | null } = {};
+    const update: {
+      auditDate?: Date;
+      notes?: string | null;
+      result?: AuditResult | null;
+      auditTypeId?: string | null;
+      auditor?: string | null;
+    } = {};
     if (auditDate !== undefined) {
       update.auditDate = new Date(auditDate.trim().slice(0, 10) + 'T12:00:00.000Z');
     }
     if (notes !== undefined) update.notes = notes;
+    if (auditor !== undefined) update.auditor = auditor ? String(auditor).trim() : null;
     if (result !== undefined) {
       if (!canSetResult) {
         res.status(403).json({ error: 'Only Admin or Quality Engineer can set audit result' });
