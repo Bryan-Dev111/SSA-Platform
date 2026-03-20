@@ -201,3 +201,18 @@
 
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+
+## 2026-03-20 - Remove "Change status" column from CAR list
+
+### Requirement summary
+- Remove the **Change Status** column from the Corrective Actions (CAR) table.
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx`:
+  - Removed the `Change status` header.
+  - Removed the per-row status-change `<select>` cell.
+  - Adjusted the empty-state `colSpan` to match the new column count.
+  - Removed now-unused status-action handler code to keep TypeScript strict mode clean.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
