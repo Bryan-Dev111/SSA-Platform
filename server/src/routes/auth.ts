@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { signToken } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { prisma } from '../lib/prisma';
+import { getPathRolesMatrix } from '../lib/permissions';
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.post(
     return;
   }
   const roleNames = user.userRoles.map((ur) => ur.role.name);
+  const pathRoles = await getPathRolesMatrix();
   const supplierId = user.supplier?.id ?? null;
   const buyerId = user.buyerSuppliers.length ? user.id : null;
   const token = signToken({ userId: user.id, email: user.email });
@@ -45,6 +47,7 @@ router.post(
       email: user.email,
       name: user.name,
       roleNames,
+      pathRoles,
       supplierId,
       buyerId: buyerId ?? undefined,
     },
@@ -80,6 +83,7 @@ router.post(
     },
   });
   const roleNames = user.userRoles.map((ur) => ur.role.name);
+  const pathRoles = await getPathRolesMatrix();
   const token = signToken({ userId: user.id, email: user.email });
   res.status(201).json({
     token,
@@ -88,6 +92,7 @@ router.post(
       email: user.email,
       name: user.name,
       roleNames,
+      pathRoles,
       supplierId: user.supplier?.id ?? undefined,
       buyerId: user.buyerSuppliers.length ? user.id : undefined,
     },

@@ -313,6 +313,22 @@ interface SupplierRow {
   country: string | null;
 }
 
+const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'Auditor'] as const;
+
+interface PermissionPageDef {
+  key: string;
+  label: string;
+  path: string;
+}
+
+interface PermissionMatrixResponse {
+  apiPageRoles: Record<string, string[]>;
+  pages: PermissionPageDef[];
+  roles: string[];
+  matrix: Record<string, Record<string, boolean>>;
+  adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
+}
+
 export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -320,8 +336,11 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
   const [supplierId, setSupplierId] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserBuyer, setNewUserBuyer] = useState(false);
+  const [newUserFirstName, setNewUserFirstName] = useState('');
+  const [newUserLastName, setNewUserLastName] = useState('');
+  const [newUserRole, setNewUserRole] = useState<string>('Viewer');
+  const [permissions, setPermissions] = useState<PermissionMatrixResponse | null>(null);
+  const [newRoleName, setNewRoleName] = useState('');
   const [newSupName, setNewSupName] = useState('');
   const [newSupCity, setNewSupCity] = useState('');
   const [newSupCountry, setNewSupCountry] = useState('');
@@ -338,6 +357,8 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
       ]);
       setUsers(u);
       setSuppliers(s);
+      const p = await apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token });
+      setPermissions(p);
     } catch {
       toast.error('Failed to load users/suppliers');
     }
@@ -348,6 +369,7 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
   }, [load]);
 
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
+  const availableRoleOptions = permissions?.roles?.length ? permissions.roles : [...USER_ROLE_OPTIONS];
 
   const assign = async () => {
     if (!token || !buyerId || !supplierId) return;
@@ -384,27 +406,82 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
 
   const createUser = async () => {
     if (!token || !newUserEmail.trim() || !newUserPassword) return;
-    const roleNames = newUserBuyer ? ['Buyer'] : ['Viewer'];
+    const roleNames = [newUserRole];
     setBusy(true);
     try {
       await apiJson('/users', {
         token,
         method: 'POST',
         body: JSON.stringify({
+          firstName: newUserFirstName.trim(),
+          lastName: newUserLastName.trim(),
           email: newUserEmail.trim(),
           password: newUserPassword,
-          name: newUserName.trim() || null,
           roleNames,
         }),
       });
       setNewUserEmail('');
       setNewUserPassword('');
-      setNewUserName('');
-      setNewUserBuyer(false);
+      setNewUserFirstName('');
+      setNewUserLastName('');
+      setNewUserRole('Viewer');
       toast.success('User created');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Create user failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePermission = (roleName: string, pageKey: string, checked: boolean) => {
+    setPermissions((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        matrix: {
+          ...prev.matrix,
+          [roleName]: {
+            ...(prev.matrix[roleName] ?? {}),
+            [pageKey]: checked,
+          },
+        },
+      };
+    });
+  };
+
+  const addRole = async () => {
+    if (!token || !newRoleName.trim()) return;
+    setBusy(true);
+    try {
+      await apiJson('/users/roles', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ name: newRoleName.trim() }),
+      });
+      setNewRoleName('');
+      toast.success('Role added');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Add role failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePermissions = async () => {
+    if (!token || !permissions) return;
+    setBusy(true);
+    try {
+      await apiJson('/users/permission-matrix', {
+        token,
+        method: 'PUT',
+        body: JSON.stringify({ matrix: permissions.matrix }),
+      });
+      toast.success('Permissions saved');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Save permissions failed');
     } finally {
       setBusy(false);
     }
@@ -477,11 +554,16 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
     <div>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Create user (Buyer or Viewer)</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            For other roles, use database seed or future role editor. New users get Buyer (if checked) or Viewer.
-          </p>
+          <h2 style={{ marginTop: 0 }}>Create user</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
+            <div className="input-group">
+              <label className="input-label">First Name</label>
+              <input className="input" value={newUserFirstName} onChange={(e) => setNewUserFirstName(e.target.value)} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Last Name</label>
+              <input className="input" value={newUserLastName} onChange={(e) => setNewUserLastName(e.target.value)} />
+            </div>
             <div className="input-group">
               <label className="input-label">Email *</label>
               <input className="input" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
@@ -491,17 +573,69 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
               <input className="input" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} />
             </div>
             <div className="input-group">
-              <label className="input-label">Display name</label>
-              <input className="input" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} />
+              <label className="input-label">Role</label>
+              <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
+                {availableRoleOptions.map((r) => (
+                  <option key={r} value={r}>
+                    {r === 'QualityEngineer' ? 'Quality Engineer' : r}
+                  </option>
+                ))}
+              </select>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 24 }}>
-              <input type="checkbox" checked={newUserBuyer} onChange={(e) => setNewUserBuyer(e.target.checked)} />
-              Buyer role
-            </label>
           </div>
           <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createUser} disabled={busy}>
             Create user
           </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Permissions</h2>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">New Role Name</label>
+              <input className="input" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="e.g. Planner" />
+            </div>
+            <button type="button" className="btn btn-ghost" onClick={addRole} disabled={busy || !newRoleName.trim()}>
+              Add Role
+            </button>
+            <button type="button" className="btn btn-primary" onClick={savePermissions} disabled={busy || !permissions}>
+              Save Permissions
+            </button>
+          </div>
+          {!permissions ? (
+            <p className="table-empty">Loading permissions…</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    {permissions.pages.map((p) => (
+                      <th key={p.key}>{p.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {permissions.roles.map((roleName) => (
+                    <tr key={roleName}>
+                      <td>{roleName === 'QualityEngineer' ? 'Quality Engineer' : roleName}</td>
+                      {permissions.pages.map((p) => (
+                        <td key={`${roleName}-${p.key}`}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(permissions.matrix[roleName]?.[p.key])}
+                            onChange={(e) => togglePermission(roleName, p.key, e.target.checked)}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -696,11 +830,6 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
       />
     </div>
   );
-}
-
-interface PermissionMatrixResponse {
-  apiPageRoles: Record<string, string[]>;
-  adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
 }
 
 /**

@@ -214,6 +214,49 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Admin Buyers & Suppliers: role dropdown + dynamic permission matrix
+
+### Requirement summary
+- Replace Create User buyer checkbox with role dropdown.
+- Replace display name with first/last name fields.
+- Add dynamic role permission matrix with add-role + save.
+- Apply saved permissions to sidebar and route protection system-wide.
+- Keep existing supplier creation and buyer assignment features.
+
+### Implemented changes
+- Updated `client/src/pages/admin/AdminDay9Panels.tsx` (Buyers & Suppliers tab):
+  - Create User form fields changed to:
+    - `First Name`, `Last Name`, `Email`, `Password`, `Role` (dropdown)
+  - Removed old `Display name` and `Buyer role` checkbox behavior.
+  - Added dynamic role options support (uses server roles when available).
+  - Added new `Permissions` section in the same tab:
+    - Role-permission matrix table (roles as rows, modules as columns)
+    - Checkbox per permission cell
+    - `New Role Name` + `Add Role`
+    - `Save Permissions` button
+- Added DB-backed role permission model:
+  - `server/prisma/schema.prisma`: new `RolePagePermission` model
+  - `Role` now has `pagePermissions` relation
+  - Migration added: `server/prisma/migrations/20260331011000_role_page_permissions/migration.sql`
+- Added permission helper:
+  - `server/src/lib/permissions.ts`
+  - central page definitions, default matrices, and live DB matrix resolvers
+- Extended admin users API:
+  - `GET /users/permission-matrix` now returns roles/pages/matrix for editing
+  - `POST /users/roles` creates new roles dynamically
+  - `PUT /users/permission-matrix` saves role-page mappings to DB
+  - `POST /users` now accepts `firstName` + `lastName` (composed into `name`)
+- Applied permissions system-wide:
+  - `server/src/middleware/rbac.ts` now resolves allowed roles from DB matrix for `requirePageAccess(...)`
+  - `server/src/routes/auth.ts` and `server/src/routes/me.ts` now include `pathRoles` in user payload
+  - `client/src/context/AuthContext.tsx` now loads runtime path-role matrix from auth payload
+  - `client/src/config/rolePageAccess.ts` now supports runtime matrix override for menu + guards
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+- Server build currently blocked by local Prisma client lock (`EPERM` during `npm run db:generate`), so server compile verification requires releasing that lock first.
+
 ## 2026-03-20 - Fix stuck download progress (Records/Documents)
 
 ### Issue

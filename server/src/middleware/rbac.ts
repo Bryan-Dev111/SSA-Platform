@@ -3,6 +3,7 @@
  * Use after authMiddleware so req.user is set.
  */
 import type { Request, Response, NextFunction } from 'express';
+import { getApiPageRolesMatrix } from '../lib/permissions';
 
 /**
  * Role names that can access API routes using `requirePageAccess(pageKey)`.
@@ -43,12 +44,31 @@ export function requireRole(allowedRoles: string[]) {
 }
 
 export function requirePageAccess(pageName: string) {
-  const allowedRoles = API_PAGE_ROLES[pageName];
-  if (!allowedRoles) {
+  if (!API_PAGE_ROLES[pageName]) {
     return (_req: Request, res: Response, _next: NextFunction): void => {
       res.status(403).json({ error: 'Unknown page' });
     };
   }
-  if (allowedRoles.length === 0) return (_req: Request, _res: Response, next: NextFunction): void => next();
-  return requireRole(allowedRoles);
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const liveMap = await getApiPageRolesMatrix();
+      const allowedRoles = liveMap[pageName] ?? [];
+      if (allowedRoles.length === 0) {
+        res.status(403).json({ error: 'Insufficient permissions' });
+        return;
+      }
+      const hasRole = req.user.roleNames.some((r) => allowedRoles.includes(r));
+      if (!hasRole) {
+        res.status(403).json({ error: 'Insufficient permissions' });
+        return;
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
 }

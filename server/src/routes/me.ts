@@ -5,6 +5,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { prisma } from '../lib/prisma';
+import { getPathRolesMatrix } from '../lib/permissions';
 
 const router = Router();
 
@@ -139,6 +140,7 @@ router.get(
     return;
   }
   res.json({
+    pathRoles: await getPathRolesMatrix(),
     id: user.id,
     email: user.email,
     name: user.name,

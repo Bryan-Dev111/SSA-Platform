@@ -23,6 +23,12 @@ export const PATH_ROLES: Record<string, string[]> = {
   '/admin': ['Admin'],
 };
 
+let runtimePathRoles: Record<string, string[]> = PATH_ROLES;
+
+export function setRuntimePathRoles(next?: Record<string, string[]> | null): void {
+  runtimePathRoles = next && Object.keys(next).length > 0 ? next : PATH_ROLES;
+}
+
 /** Paths that Supplier can access (own data only) */
 export const SUPPLIER_PATHS = ['/supplier-profile', '/records', '/shipments'];
 
@@ -41,7 +47,7 @@ export function getDefaultPath(roleNames: string[]): string {
 export function canAccessPath(pathname: string, roleNames: string[]): boolean {
   const path = pathname.replace(/\/$/, '') || '/';
   const pathBase = path.split('/').slice(0, 2).join('/') || path;
-  const allowed = PATH_ROLES[pathBase] ?? PATH_ROLES[path];
+  const allowed = runtimePathRoles[pathBase] ?? runtimePathRoles[path];
   if (!allowed) return false;
   return roleNames.some((r) => allowed.includes(r));
 }

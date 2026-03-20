@@ -2,12 +2,14 @@
  * Auth context: user, token, login, logout
  */
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { setRuntimePathRoles } from '../config/rolePageAccess';
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
   roleNames: string[];
+  pathRoles?: Record<string, string[]>;
   supplierId?: string;
   buyerId?: string;
 }
@@ -48,11 +50,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const setAuth = useCallback((user: AuthUser, token: string) => {
+    setRuntimePathRoles(user.pathRoles ?? null);
     setState({ user, token, loading: false });
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ user, token }));
   }, []);
 
   const logout = useCallback(() => {
+    setRuntimePathRoles(null);
     setState({ user: null, token: null, loading: false });
     localStorage.removeItem(STORAGE_KEY);
   }, []);
@@ -74,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const stored = loadStored();
     if (stored) {
+      setRuntimePathRoles(stored.user.pathRoles ?? null);
       setState((s) => ({ ...s, user: stored.user, token: stored.token, loading: false }));
     } else {
       setState((s) => ({ ...s, loading: false }));

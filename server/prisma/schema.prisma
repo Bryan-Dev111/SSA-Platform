@@ -16,6 +16,19 @@ model Role {
   id        String    @id @default(cuid())
   name      String    @unique // Admin, Viewer, QualityEngineer, Auditor, Buyer, Supplier
   userRoles UserRole[]
+  pagePermissions RolePagePermission[]
+}
+
+model RolePagePermission {
+  id        String   @id @default(cuid())
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  pageKey   String
+  canAccess Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([roleId, pageKey])
 }
 
 model User {
