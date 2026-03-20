@@ -174,8 +174,8 @@ enum FindingSeverity {
 model CorrectiveAction {
   id                          String    @id @default(cuid())
   code                        String    @unique // CAR-00001
-  findingId                   String
-  finding                     Finding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId                   String?
+  finding                     Finding?  @relation(fields: [findingId], references: [id], onDelete: SetNull)
   auditId                     String
   audit                       Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
   supplierId                  String

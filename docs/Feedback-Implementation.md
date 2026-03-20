@@ -302,3 +302,49 @@
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - CAR optional Finding (`None / N/A`)
+
+### Requirement summary
+- In New CAR form, add `None / N/A` option for Finding.
+- Allow creating CAR without linking a finding.
+- Store no-finding as `NULL`.
+- Show `None` in CAR table when finding is not linked.
+
+### Implemented changes
+- **Database model**
+  - Updated `server/prisma/schema.prisma`:
+    - `CorrectiveAction.findingId` -> nullable (`String?`)
+    - `CorrectiveAction.finding` -> optional relation with `onDelete: SetNull`
+  - Added migration:
+    - `server/prisma/migrations/20260331000000_car_optional_finding/migration.sql`
+    - Drops NOT NULL on `findingId` and recreates FK as `ON DELETE SET NULL`.
+
+- **Server API**
+  - Updated `server/src/routes/cars.ts` (`POST /cars`):
+    - Finding is no longer required.
+    - `auditId`, `supplierId`, `severity`, `summary`, `discrepancy` remain required.
+    - If finding is provided, validates it matches audit/supplier.
+    - If finding is omitted/None, CAR is created without `findingId` (DB stores NULL).
+  - Updated save-required-fields message to remove `Finding #`.
+
+- **New CAR UI**
+  - Updated `client/src/pages/CARRecord.tsx`:
+    - Added `None / N/A` option in Finding dropdown.
+    - Removed required validation for finding.
+    - Added Supplier and Audit selectors in New CAR form so user can create CAR when no finding is selected.
+    - Auto-fill from finding still works when a real finding is selected.
+    - Existing CAR view now shows `None` for finding when no linked finding exists.
+
+- **CAR list table**
+  - Updated `client/src/pages/CorrectiveActions.tsx`:
+    - Finding column now displays `None` when CAR has no linked finding.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+### Environment note
+- `npx prisma generate` hit Windows file-lock (`EPERM` on `query_engine-windows.dll.node`).
+- If needed for local runtime schema sync, stop active Node processes and rerun Prisma generate/migrate.

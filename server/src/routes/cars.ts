@@ -218,48 +218,61 @@ router.post(
       verificationOfEffectiveness,
       closingComments,
     } = req.body as Record<string, unknown>;
-    if (!findingId || !auditId || !supplierId || !severity || !summary || discrepancy === undefined) {
-      res.status(400).json({ error: 'findingId, auditId, supplierId, severity, summary, and discrepancy are required' });
+    if (!auditId || !supplierId || !severity || !summary || discrepancy === undefined) {
+      res.status(400).json({ error: 'auditId, supplierId, severity, summary, and discrepancy are required' });
       return;
     }
     if (allowedIds !== null && !allowedIds.includes(supplierId as string)) {
       res.status(403).json({ error: 'Supplier not in scope' });
       return;
     }
-    const finding = await prisma.finding.findUnique({
-      where: { id: findingId as string },
-      select: { id: true, auditId: true, supplierId: true, severity: true },
+    const audit = await prisma.audit.findUnique({
+      where: { id: auditId as string },
+      select: { id: true, supplierId: true },
     });
-    if (!finding || finding.supplierId !== supplierId || finding.auditId !== auditId) {
-      res.status(400).json({ error: 'Finding not found or does not match audit/supplier' });
+    if (!audit || audit.supplierId !== supplierId) {
+      res.status(400).json({ error: 'Audit not found or does not match supplier' });
       return;
+    }
+    let normalizedFindingId: string | undefined;
+    if (findingId !== null && findingId !== undefined && String(findingId).trim() !== '') {
+      const finding = await prisma.finding.findUnique({
+        where: { id: findingId as string },
+        select: { id: true, auditId: true, supplierId: true, severity: true },
+      });
+      if (!finding || finding.supplierId !== supplierId || finding.auditId !== auditId) {
+        res.status(400).json({ error: 'Finding not found or does not match audit/supplier' });
+        return;
+      }
+      normalizedFindingId = finding.id;
     }
     if (!['Critical', 'Major', 'Minor'].includes(severity as string)) {
       res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });
       return;
     }
     const code = `CAR-DRAFT-${Date.now()}`;
+    const createData = {
+      code,
+      ...(normalizedFindingId ? { findingId: normalizedFindingId } : {}),
+      auditId: auditId as string,
+      supplierId: supplierId as string,
+      status: 'DRAFT',
+      severity: severity as FindingSeverity,
+      summary: String(summary).trim(),
+      discrepancy: String(discrepancy).trim(),
+      carOwner: carOwner ? String(carOwner).trim() : null,
+      targetCompletionDate: targetCompletionDate ? new Date(targetCompletionDate as string) : null,
+      defectCode: defectCode ? String(defectCode).trim() : null,
+      containment: containment ? String(containment).trim() : null,
+      occurrenceRootCause: occurrenceRootCause ? String(occurrenceRootCause).trim() : null,
+      escapeRootCause: escapeRootCause ? String(escapeRootCause).trim() : null,
+      correctiveAction: correctiveAction ? String(correctiveAction).trim() : null,
+      verificationOfEffectiveness: verificationOfEffectiveness ? String(verificationOfEffectiveness).trim() : null,
+      closingComments: closingComments ? String(closingComments).trim() : null,
+      createdById: req.user.id,
+    };
     const car = await prisma.correctiveAction.create({
-      data: {
-        code,
-        findingId: findingId as string,
-        auditId: auditId as string,
-        supplierId: supplierId as string,
-        status: 'DRAFT',
-        severity: severity as FindingSeverity,
-        summary: String(summary).trim(),
-        discrepancy: String(discrepancy).trim(),
-        carOwner: carOwner ? String(carOwner).trim() : null,
-        targetCompletionDate: targetCompletionDate ? new Date(targetCompletionDate as string) : null,
-        defectCode: defectCode ? String(defectCode).trim() : null,
-        containment: containment ? String(containment).trim() : null,
-        occurrenceRootCause: occurrenceRootCause ? String(occurrenceRootCause).trim() : null,
-        escapeRootCause: escapeRootCause ? String(escapeRootCause).trim() : null,
-        correctiveAction: correctiveAction ? String(correctiveAction).trim() : null,
-        verificationOfEffectiveness: verificationOfEffectiveness ? String(verificationOfEffectiveness).trim() : null,
-        closingComments: closingComments ? String(closingComments).trim() : null,
-        createdById: req.user.id,
-      },
+      data: createData as any,
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
@@ -366,7 +379,7 @@ router.post(
       return;
     }
     if (!existing.summary?.trim() || !existing.discrepancy?.trim()) {
-      res.status(400).json({ error: 'Required fields for Save: Supplier, Audit #, Finding #, Severity, Summary, Discrepancy' });
+      res.status(400).json({ error: 'Required fields for Save: Supplier, Audit #, Severity, Summary, Discrepancy' });
       return;
     }
     const code = await getNextCode('CAR');

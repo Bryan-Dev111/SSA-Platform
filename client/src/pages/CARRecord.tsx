@@ -34,12 +34,12 @@ interface FindingOption {
 interface CAR {
   id: string;
   code: string;
-  findingId: string;
+  findingId: string | null;
   auditId: string;
   supplierId: string;
   supplier: Supplier;
   audit: { id: string; code: string; auditDate: string };
-  finding: { id: string; code: string; severity: string };
+  finding: { id: string; code: string; severity: string } | null;
   status: string;
   severity: string;
   carOwner: string | null;
@@ -68,6 +68,7 @@ export function CARRecord() {
   const codeParam = searchParams.get('carId');
   const findingIdFromUrl = searchParams.get('findingId');
   const [car, setCar] = useState<CAR | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [findings, setFindings] = useState<FindingOption[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,7 +106,7 @@ export function CARRecord() {
     if (!token) return;
     if (!idParam && !codeParam) {
       setLoading(false);
-      apiJson<Supplier[]>('/suppliers', { token }).then(() => {}).catch(() => {});
+      apiJson<Supplier[]>('/suppliers', { token }).then(setSuppliers).catch(() => setSuppliers([]));
       apiJson<{ list: Array<{ id: string; code: string; auditId: string; supplierId: string; severity: string }> }>('/findings', { token })
         .then((r) => setFindings(r.list.map((f) => ({ id: f.id, code: f.code, auditId: f.auditId, supplierId: f.supplierId, severity: f.severity }))))
         .catch(() => setFindings([]));
@@ -117,7 +118,7 @@ export function CARRecord() {
       .then((c) => {
         setCar(c);
         setForm({
-          findingId: c.findingId,
+          findingId: c.findingId ?? '',
           auditId: c.auditId,
           supplierId: c.supplierId,
           severity: c.severity,
@@ -137,6 +138,7 @@ export function CARRecord() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
 
+    apiJson<Supplier[]>('/suppliers', { token }).then(setSuppliers).catch(() => setSuppliers([]));
     apiJson<{ list: unknown[] }>('/findings', { token }).then((r) => setFindings(r.list as FindingOption[])).catch(() => setFindings([]));
     apiJson<AuditOption[]>('/audits', { token }).then(setAudits).catch(() => setAudits([]));
   }, [token, idParam, codeParam]);
@@ -250,7 +252,7 @@ export function CARRecord() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !form.findingId || !form.auditId || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
+    if (!token || !form.auditId || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
     setSaving(true);
     setError(null);
     try {
@@ -258,7 +260,7 @@ export function CARRecord() {
         token,
         method: 'POST',
         body: JSON.stringify({
-          findingId: form.findingId,
+          findingId: form.findingId || null,
           auditId: form.auditId,
           supplierId: form.supplierId,
           severity: form.severity,
@@ -303,6 +305,10 @@ export function CARRecord() {
   };
 
   const onFindingSelect = (findingId: string) => {
+    if (!findingId) {
+      setForm((p) => ({ ...p, findingId }));
+      return;
+    }
     const f = findings.find((x) => x.id === findingId);
     if (f) {
       setForm((p) => ({
@@ -363,26 +369,50 @@ export function CARRecord() {
             <form onSubmit={handleCreate}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
                 <div className="input-group">
-                  <label className="input-label">Finding # *</label>
+                  <label className="input-label">Finding #</label>
                   <select
                     className="input"
                     value={form.findingId}
                     onChange={(e) => {
                       const v = e.target.value;
-                      setForm((p) => ({ ...p, findingId: v }));
                       onFindingSelect(v);
                     }}
-                    required
                   >
-                    <option value="">Select</option>
+                    <option value="">None / N/A</option>
                     {findings.map((f) => (
                       <option key={f.id} value={f.id}>{f.code}</option>
                     ))}
                   </select>
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Audit #</label>
-                  <input className="input" value={audits.find((a) => a.id === form.auditId)?.code ?? ''} readOnly disabled />
+                  <label className="input-label">Supplier *</label>
+                  <select
+                    className="input"
+                    value={form.supplierId}
+                    onChange={(e) => setForm((p) => ({ ...p, supplierId: e.target.value, auditId: '' }))}
+                    required
+                    disabled={!!form.findingId}
+                  >
+                    <option value="">Select</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Audit # *</label>
+                  <select
+                    className="input"
+                    value={form.auditId}
+                    onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}
+                    required
+                    disabled={!form.supplierId || !!form.findingId}
+                  >
+                    <option value="">Select</option>
+                    {audits.filter((a) => a.supplierId === form.supplierId).map((a) => (
+                      <option key={a.id} value={a.id}>{a.code}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="input-group">
                   <label className="input-label">Severity *</label>
@@ -440,7 +470,13 @@ export function CARRecord() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Finding #</label>
-                  <Link to={`/findings-record?id=${car.finding?.id}`} className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>{car.finding?.code ?? ''}</Link>
+                  {car.finding ? (
+                    <Link to={`/findings-record?id=${car.finding.id}`} className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
+                      {car.finding.code}
+                    </Link>
+                  ) : (
+                    <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
+                  )}
                 </div>
                 <div className="input-group">
                   <label className="input-label">Severity</label>

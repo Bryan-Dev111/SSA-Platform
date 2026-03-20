@@ -22,7 +22,7 @@ interface CAR {
   supplierId: string;
   supplier: Supplier;
   audit: { id: string; code: string; auditDate: string };
-  finding: { id: string; code: string };
+  finding: { id: string; code: string } | null;
   status: string;
   severity: string;
   summary: string;
@@ -450,9 +450,13 @@ export function CorrectiveActions() {
                       </Link>
                     </td>
                     <td>
-                      <Link to={`/findings-record?findingId=${encodeURIComponent(c.finding.code)}`} className="finding-code-link" style={{ fontSize: 'var(--text-sm)' }}>
-                        {c.finding.code}
-                      </Link>
+                      {c.finding ? (
+                        <Link to={`/findings-record?findingId=${encodeURIComponent(c.finding.code)}`} className="finding-code-link" style={{ fontSize: 'var(--text-sm)' }}>
+                          {c.finding.code}
+                        </Link>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>None</span>
+                      )}
                     </td>
                     <td>{c.severity}</td>
                     <td>
