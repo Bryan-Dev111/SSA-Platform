@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { PATH_ROLES } from '../../config/rolePageAccess';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -837,80 +836,126 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
  */
 export function AdminPermissionsPanel({ token }: { token: string | null }) {
   const [serverData, setServerData] = useState<PermissionMatrixResponse | null>(null);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [busy, setBusy] = useState(false);
   const [matrixError, setMatrixError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!token) return;
-    apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token })
-      .then((d) => {
-        setServerData(d);
-        setMatrixError(null);
-      })
-      .catch((e) => {
-        setServerData(null);
-        setMatrixError(e instanceof Error ? e.message : 'Failed to load server permission matrix');
-      });
+    try {
+      const d = await apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token });
+      setServerData(d);
+      setMatrixError(null);
+    } catch (e) {
+      setServerData(null);
+      setMatrixError(e instanceof Error ? e.message : 'Failed to load server permission matrix');
+    }
   }, [token]);
 
-  const clientPaths = Object.keys(PATH_ROLES).sort();
-  const serverKeys = serverData ? Object.keys(serverData.apiPageRoles).sort() : [];
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const togglePermission = (roleName: string, pageKey: string, checked: boolean) => {
+    setServerData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        matrix: {
+          ...prev.matrix,
+          [roleName]: {
+            ...(prev.matrix[roleName] ?? {}),
+            [pageKey]: checked,
+          },
+        },
+      };
+    });
+  };
+
+  const addRole = async () => {
+    if (!token || !newRoleName.trim()) return;
+    setBusy(true);
+    try {
+      await apiJson('/users/roles', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ name: newRoleName.trim() }),
+      });
+      setNewRoleName('');
+      await load();
+    } catch (e) {
+      setMatrixError(e instanceof Error ? e.message : 'Failed to add role');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePermissions = async () => {
+    if (!token || !serverData) return;
+    setBusy(true);
+    try {
+      await apiJson('/users/permission-matrix', {
+        token,
+        method: 'PUT',
+        body: JSON.stringify({ matrix: serverData.matrix }),
+      });
+      await load();
+    } catch (e) {
+      setMatrixError(e instanceof Error ? e.message : 'Failed to save permissions');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Permissions & delete rules (Day 9.4)</h2>
+        <h2 style={{ marginTop: 0 }}>Permissions</h2>
         <p style={{ color: 'var(--color-text-muted)' }}>
-          <strong>Client</strong> table drives the sidebar and <code>ProtectedRoute</code> (
-          <code>rolePageAccess.ts</code>). <strong>Server</strong> table drives <code>requirePageAccess(...)</code> on API
-          routes (<code>rbac.ts</code> → <code>API_PAGE_ROLES</code>). Both should stay aligned; server is enforced for
-          API calls.
+          Manage role access by page/module. Changes apply to sidebar visibility, route guards, and API page protection.
         </p>
-
-        <h3 style={{ marginTop: '1rem' }}>Client — routes (menu / route guard)</h3>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Path</th>
-                <th>Roles</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientPaths.map((p) => (
-                <tr key={p}>
-                  <td>
-                    <code>{p}</code>
-                  </td>
-                  <td>{(PATH_ROLES[p] ?? []).join(', ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <h3 style={{ marginTop: '1.5rem' }}>Server — API page keys (<code>requirePageAccess</code>)</h3>
         {matrixError && (
           <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
             {matrixError}
           </div>
         )}
-        {!serverData && !matrixError && token && <p>Loading server matrix…</p>}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">New Role</label>
+            <input className="input" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="Role name" />
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={addRole} disabled={busy || !newRoleName.trim()}>
+            Add
+          </button>
+          <button type="button" className="btn btn-primary" onClick={savePermissions} disabled={busy || !serverData}>
+            Save Permissions
+          </button>
+        </div>
+        {!serverData && !matrixError && token && <p>Loading permissions…</p>}
         {serverData && (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Page key</th>
-                  <th>Roles</th>
+                  <th>Role</th>
+                  {serverData.pages.map((p) => (
+                    <th key={p.key}>{p.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {serverKeys.map((key) => (
-                  <tr key={key}>
-                    <td>
-                      <code>{key}</code>
-                    </td>
-                    <td>{(serverData.apiPageRoles[key] ?? []).join(', ') || '—'}</td>
+                {serverData.roles.map((roleName) => (
+                  <tr key={roleName}>
+                    <td>{roleName === 'QualityEngineer' ? 'Quality Engineer' : roleName}</td>
+                    {serverData.pages.map((p) => (
+                      <td key={`${roleName}-${p.key}`}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(serverData.matrix[roleName]?.[p.key])}
+                          onChange={(e) => togglePermission(roleName, p.key, e.target.checked)}
+                        />
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

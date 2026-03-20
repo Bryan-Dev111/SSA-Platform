@@ -257,6 +257,34 @@
 - Lint diagnostics on changed files -> PASS
 - Server build currently blocked by local Prisma client lock (`EPERM` during `npm run db:generate`), so server compile verification requires releasing that lock first.
 
+## 2026-03-20 - Admin Permissions tab matrix UI replacement
+
+### Requirement summary
+- Replace static permissions view in Admin -> Permissions with one editable matrix table.
+- Keep Admin-only delete rules section.
+- Add `New Role + Add` and `Save Permissions` actions in Permissions tab.
+
+### Implemented changes
+- Updated `client/src/pages/admin/AdminDay9Panels.tsx` (`AdminPermissionsPanel`):
+  - Removed old static sections:
+    - Client routes table
+    - Server API page keys table
+  - Replaced with unified matrix table:
+    - Rows: roles
+    - Columns: page/modules
+    - Cell control: checkbox (allow/deny)
+  - Added `New Role` input + `Add` button.
+  - Added `Save Permissions` button.
+  - Reused existing backend endpoints:
+    - `GET /users/permission-matrix`
+    - `POST /users/roles`
+    - `PUT /users/permission-matrix`
+  - Kept Admin-only delete rules section visible below matrix.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
 ## 2026-03-20 - Fix stuck download progress (Records/Documents)
 
 ### Issue
