@@ -13,6 +13,7 @@ interface InternalRow {
   id: string;
   name: string;
   category: string | null;
+  note: string | null;
   filePath: string | null;
   createdAt: string;
   updatedAt: string;
@@ -27,6 +28,7 @@ export function InternalManagement() {
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
+  const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -75,11 +77,13 @@ export function InternalManagement() {
         body: JSON.stringify({
           name: name.trim(),
           category: category.trim() || null,
+          note: note.trim() || null,
           ...(fileBase64 ? { fileBase64, fileName } : {}),
         }),
       });
       setName('');
       setCategory('');
+      setNote('');
       setFile(null);
       toast.success('Saved');
       load();
@@ -142,8 +146,12 @@ export function InternalManagement() {
                 <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Category</label>
+                <label className="input-label">Type</label>
                 <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Note</label>
+                <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">File (optional)</label>
@@ -170,7 +178,8 @@ export function InternalManagement() {
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Note</th>
                     <th>View</th>
                     <th>Updated</th>
                     <th />
@@ -181,6 +190,7 @@ export function InternalManagement() {
                     <tr key={r.id}>
                       <td>{r.name}</td>
                       <td>{r.category ?? '—'}</td>
+                      <td>{r.note ?? '—'}</td>
                       <td>
                         {r.filePath ? (
                           <button type="button" className="btn" onClick={() => download(r)}>

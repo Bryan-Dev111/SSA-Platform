@@ -139,6 +139,38 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Internal Management: Type + Note
+
+### Requirement summary
+- Rename `Category` -> `Type` in Internal Management form/table.
+- Add optional `Note` field in form.
+- Save and display note in table.
+- Keep upload logic, file handling, and permissions unchanged.
+
+### Implemented changes
+- Updated `client/src/pages/InternalManagement.tsx`:
+  - Added `note` to `InternalRow` type and form state.
+  - Form labels/fields updated:
+    - `Category` label renamed to `Type` (backed by existing `category` value for compatibility).
+    - Added optional `Note` input under `Type`.
+  - Create payload now sends `note` and resets it after successful save.
+  - Table headers updated to:
+    - `Name | Type | Note | View | Updated | Delete`
+  - Table body now displays note value (`—` when empty).
+- Updated `server/src/routes/internal-docs.ts`:
+  - `POST /internal-docs` now accepts and stores `note`.
+  - `PATCH /internal-docs/:id` now accepts and updates `note`.
+  - No changes to upload or download file behavior.
+- Updated schema and migration:
+  - `server/prisma/schema.prisma`: added `InternalDoc.note String?`
+  - Added migration `server/prisma/migrations/20260331010000_internal_doc_add_note/migration.sql`
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server build: `npm run build` -> PASS
+- Lint diagnostics on changed files -> PASS
+- Note: `npm run db:generate` hit a Windows file-lock `EPERM` on Prisma engine rename (existing environment issue); code compile checks still pass.
+
 ## 2026-03-20 - Fix stuck download progress (Records/Documents)
 
 ### Issue

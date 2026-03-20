@@ -1,0 +1,2 @@
+ALTER TABLE "InternalDoc"
+ADD COLUMN IF NOT EXISTS "note" TEXT;

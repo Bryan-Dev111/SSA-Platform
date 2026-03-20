@@ -47,6 +47,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const category = typeof req.body?.category === 'string' ? req.body.category.trim() || null : null;
+    const note = typeof req.body?.note === 'string' ? req.body.note.trim() || null : null;
     const fileBase64Raw =
       typeof req.body?.fileBase64 === 'string' && req.body.fileBase64.trim() !== ''
         ? req.body.fileBase64.trim()
@@ -67,7 +68,7 @@ router.post(
       }
     }
     const created = await prisma.internalDoc.create({
-      data: { name, category, filePath },
+      data: { name, category, note, filePath },
     });
     res.status(201).json(created);
   })
@@ -82,9 +83,10 @@ router.patch(
       res.status(404).json({ error: 'Not found' });
       return;
     }
-    const data: { name?: string; category?: string | null; filePath?: string | null } = {};
+    const data: { name?: string; category?: string | null; note?: string | null; filePath?: string | null } = {};
     if (typeof req.body?.name === 'string') data.name = req.body.name.trim();
     if (typeof req.body?.category === 'string') data.category = req.body.category.trim() || null;
+    if (typeof req.body?.note === 'string') data.note = req.body.note.trim() || null;
     const fileBase64Raw =
       typeof req.body?.fileBase64 === 'string' && req.body.fileBase64.trim() !== ''
         ? req.body.fileBase64.trim()
