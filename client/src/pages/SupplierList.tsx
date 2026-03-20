@@ -89,7 +89,7 @@ export function SupplierList() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Supplier List</h1>
+          <h1 className="page-title">Approved Supplier List</h1>
           <p className="page-description">Suppliers in your scope.</p>
         </header>
         <div className="loading-message">
@@ -104,7 +104,7 @@ export function SupplierList() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Supplier List</h1>
+          <h1 className="page-title">Approved Supplier List</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -114,7 +114,7 @@ export function SupplierList() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Supplier List</h1>
+        <h1 className="page-title">Approved Supplier List</h1>
         <p className="page-description">
           Admin sees all; Buyer sees assigned suppliers; Supplier sees own record.
           {isAdmin && ' Admins set commodity type for classification (Admin → Commodity types).'}

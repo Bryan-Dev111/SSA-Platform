@@ -15,7 +15,7 @@ const MENU_ITEMS: { path: string; label: string }[] = [
   { path: '/findings', label: 'Findings' },
   { path: '/audits', label: 'Audits' },
   { path: '/supplier-profile', label: 'Supplier Profile' },
-  { path: '/supplier-list', label: 'Supplier List' },
+  { path: '/supplier-list', label: 'Approved Supplier List' },
   { path: '/suppliers-map', label: 'Suppliers Map' },
   { path: '/records', label: 'Records' },
   { path: '/shipments', label: 'Shipments' },

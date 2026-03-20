@@ -15,6 +15,12 @@ interface Buyer {
   name: string | null;
 }
 
+interface SupplierOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
 interface PortalData {
   supplier: {
     id: string;
@@ -65,6 +71,8 @@ export function SupplierProfile() {
   const { token, user } = useAuth();
   const toast = useToast();
   const [data, setData] = useState<PortalData | null>(null);
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recordName, setRecordName] = useState('');
@@ -76,21 +84,60 @@ export function SupplierProfile() {
   const [submitting, setSubmitting] = useState(false);
 
   const isSupplier = user?.roleNames?.includes('Supplier');
+  const roleNames = user?.roleNames ?? [];
+  const canSelectSupplier = !isSupplier && roleNames.some((r) => ['Admin', 'Buyer', 'QualityEngineer'].includes(r));
 
   useEffect(() => {
-    if (!token || !isSupplier) {
+    if (!token) {
       setLoading(false);
       return;
     }
-    apiJson<PortalData>('/me/supplier-portal', { token })
-      .then(setData)
-      .catch((e: unknown) => setError(parseApiError(e)))
-      .finally(() => setLoading(false));
-  }, [token, isSupplier]);
+    if (!canSelectSupplier) return;
+    apiJson<SupplierOption[]>('/suppliers', { token })
+      .then((list) => setSupplierOptions(list))
+      .catch(() => setSupplierOptions([]));
+  }, [token, canSelectSupplier]);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    if (isSupplier) {
+      apiJson<PortalData>('/me/supplier-portal', { token })
+        .then(setData)
+        .catch((e: unknown) => {
+          setData(null);
+          setError(parseApiError(e));
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+    if (canSelectSupplier && selectedSupplierId) {
+      apiJson<PortalData>(`/suppliers/${encodeURIComponent(selectedSupplierId)}/profile`, { token })
+        .then(setData)
+        .catch((e: unknown) => {
+          setData(null);
+          setError(parseApiError(e));
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+    setData(null);
+    setLoading(false);
+  }, [token, isSupplier, canSelectSupplier, selectedSupplierId]);
 
   const refresh = () => {
-    if (!token || !isSupplier) return;
-    apiJson<PortalData>('/me/supplier-portal', { token }).then(setData).catch(() => {});
+    if (!token) return;
+    const url = isSupplier
+      ? '/me/supplier-portal'
+      : selectedSupplierId
+        ? `/suppliers/${encodeURIComponent(selectedSupplierId)}/profile`
+        : '';
+    if (!url) return;
+    apiJson<PortalData>(url, { token }).then(setData).catch(() => {});
   };
 
   const submitRecord = async (e: React.FormEvent) => {
@@ -158,14 +205,13 @@ export function SupplierProfile() {
     }
   };
 
-  if (!isSupplier) {
+  if (!isSupplier && !canSelectSupplier) {
     return (
       <div className="page">
         <header className="page-header">
           <h1 className="page-title">Supplier Profile</h1>
           <p className="page-description">
-            This dashboard is for users with the <strong>Supplier</strong> role. Buyers and staff can use{' '}
-            <Link to="/supplier-list">Supplier List</Link> and related pages.
+            You do not have permission to view supplier profiles from this page.
           </p>
         </header>
       </div>
@@ -186,14 +232,27 @@ export function SupplierProfile() {
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <div className="page">
         <header className="page-header">
           <h1 className="page-title">Supplier Profile</h1>
+          {canSelectSupplier && (
+            <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+              <select className="input" style={{ width: 'auto', minWidth: 260 }} value={selectedSupplierId} onChange={(e) => setSelectedSupplierId(e.target.value)}>
+                <option value="">Select supplier</option>
+                {supplierOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} - {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </header>
         <div className="alert-error" role="alert">
-          {error || 'No data'}
+          {error}
           {error?.includes('No supplier linked') ? (
             <p style={{ marginTop: '0.75rem', marginBottom: 0, fontWeight: 400 }}>
               Ask an administrator to link your user account to a supplier record.
@@ -204,20 +263,48 @@ export function SupplierProfile() {
     );
   }
 
-  const { supplier, metrics } = data;
-  const latestRisk = data.riskSnapshots[0];
+  const supplier = data?.supplier;
+  const metrics = data?.metrics;
+  const latestRisk = data?.riskSnapshots[0];
 
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">
-          {supplier.code} — {supplier.name}
-        </h1>
+        <h1 className="page-title">Supplier Profile</h1>
         <p className="page-description">
-          Your portal: assigned buyers, quality data, records, and shipment inspection requests.
+          {isSupplier
+            ? 'Your portal: assigned buyers, quality data, records, and shipment inspection requests.'
+            : 'Select a supplier to view profile details and related quality records.'}
         </p>
+        {canSelectSupplier && (
+          <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+            <select className="input" style={{ width: 'auto', minWidth: 280 }} value={selectedSupplierId} onChange={(e) => setSelectedSupplierId(e.target.value)}>
+              <option value="">Select supplier</option>
+              {supplierOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} - {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </header>
 
+      {!data && canSelectSupplier ? (
+        <div className="placeholder-empty">
+          <strong>No supplier selected</strong>
+          <div style={{ marginTop: '0.5rem' }}>Choose a supplier from the filter to load profile data.</div>
+        </div>
+      ) : null}
+
+      {!data || !supplier || !metrics ? null : (
+        <>
+      <div style={{ marginBottom: '0.75rem' }}>
+        <strong>
+          {supplier.code} — {supplier.name}
+        </strong>
+      </div>
       <div
         style={{
           display: 'grid',
@@ -292,6 +379,7 @@ export function SupplierProfile() {
         </div>
       </div>
 
+      {isSupplier && (
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Upload record (supplier)</h2>
@@ -317,7 +405,9 @@ export function SupplierProfile() {
           </form>
         </div>
       </div>
+      )}
 
+      {isSupplier && (
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Request shipment inspection</h2>
@@ -346,6 +436,7 @@ export function SupplierProfile() {
           </form>
         </div>
       </div>
+      )}
 
       <SectionTable title="Audits" empty="No audits." rowCount={data.audits.length}>
         <table className="table">
@@ -488,6 +579,8 @@ export function SupplierProfile() {
           </tbody>
         </table>
       </SectionTable>
+      </>
+      )}
     </div>
   );
 }

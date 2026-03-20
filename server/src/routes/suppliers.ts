@@ -175,6 +175,113 @@ router.delete(
   })
 );
 
+/** GET /suppliers/:id/profile — supplier profile dashboard data by supplier id (scoped by role) */
+router.get(
+  '/:id/profile',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    const supplierId = req.params.id;
+    if (allowedIds !== null && !allowedIds.includes(supplierId)) {
+      res.status(404).json({ error: 'Supplier not found' });
+      return;
+    }
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: supplierId },
+      include: {
+        commodityType: { select: { id: true, name: true } },
+      },
+    });
+    if (!supplier) {
+      res.status(404).json({ error: 'Supplier not found' });
+      return;
+    }
+    const [buyerLinks, audits, findings, cars, riskSnapshots, records, shipments] = await Promise.all([
+      prisma.buyerSupplier.findMany({
+        where: { supplierId },
+        include: { buyer: { select: { id: true, email: true, name: true } } },
+      }),
+      prisma.audit.findMany({
+        where: { supplierId },
+        include: { auditType: { select: { id: true, code: true, name: true } } },
+        orderBy: { auditDate: 'desc' },
+        take: 100,
+      }),
+      prisma.finding.findMany({
+        where: { supplierId, status: { notIn: ['New', 'DRAFT'] } },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          severity: true,
+          summary: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.correctiveAction.findMany({
+        where: { supplierId, status: { not: 'DRAFT' } },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          severity: true,
+          summary: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.riskSnapshot.findMany({
+        where: { supplierId },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.record.findMany({
+        where: { supplierId },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: { uploadedBy: { select: { id: true, email: true, name: true } } },
+      }),
+      prisma.shipment.findMany({
+        where: { supplierId },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+    const openCars = cars.filter((c) => c.status !== 'Closed').length;
+    res.json({
+      supplier: {
+        id: supplier.id,
+        code: supplier.code,
+        name: supplier.name,
+        city: supplier.city,
+        country: supplier.country,
+        commodityType: supplier.commodityType,
+      },
+      assignedBuyers: buyerLinks.map((b) => b.buyer),
+      audits,
+      findings,
+      cars,
+      riskSnapshots,
+      records,
+      shipments,
+      metrics: {
+        assignedBuyerCount: buyerLinks.length,
+        openCarCount: openCars,
+        auditCount: audits.length,
+        findingCount: findings.length,
+        recordCount: records.length,
+        shipmentCount: shipments.length,
+      },
+    });
+  })
+);
+
 router.get(
   '/:idOrCode',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {

@@ -89,6 +89,20 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Supplier List page title rename
+
+### Requirement summary
+- Change Supplier List page title from `Supplier List` to `Approved Supplier List`.
+
+### Implemented changes
+- Updated `client/src/pages/SupplierList.tsx`:
+  - Replaced all page-title occurrences in loading/error/main states:
+    - `Supplier List` -> `Approved Supplier List`
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
 ## 2026-03-20 - Audits page: add Auditor + status badge color mapping
 
 ### Requirement summary
@@ -160,6 +174,60 @@
 ### Verification
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on affected files -> PASS
+
+## 2026-03-20 - Supplier Profile: supplier filter for Admin/Buyer/QE
+
+### Requirement summary
+- Add a supplier filter dropdown on Supplier Profile page.
+- Supplier role: no dropdown, always own profile.
+- Admin/Buyer/QualityEngineer: dropdown visible, can pick supplier and view full profile data.
+- Replace non-supplier empty notice with selectable profile viewing.
+- Backend should provide selected-supplier profile data.
+
+### Implemented changes
+- **Backend**
+  - Added endpoint: `GET /suppliers/:id/profile` in `server/src/routes/suppliers.ts`.
+  - Endpoint returns supplier profile payload with related:
+    - supplier details
+    - assigned buyers
+    - audits
+    - findings
+    - CARs
+    - risk snapshots
+    - records
+    - shipments
+    - metrics summary
+  - Scope enforced through existing `getAllowedSupplierIds` (Admin all, Buyer assigned, Supplier own).
+
+- **Client (`client/src/pages/SupplierProfile.tsx`)**
+  - Added supplier dropdown state + options for non-supplier roles.
+  - For `Admin` / `Buyer` / `QualityEngineer`:
+    - show `Supplier filter` at top
+    - load selected supplier profile via `GET /suppliers/:id/profile`
+    - show default empty message when no supplier selected
+  - For `Supplier` role:
+    - hide dropdown
+    - continue loading own profile via `GET /me/supplier-portal`
+  - Preserved existing profile layout/tables and data presentation.
+  - Kept supplier-only submission forms (`Upload record`, `Request shipment inspection`) visible only for Supplier role.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Sidebar label update
+
+### Requirement summary
+- Change sidebar menu label from `Supplier List` to `Approved Supplier List`.
+
+### Implemented changes
+- Updated `client/src/components/Layout.tsx`:
+  - `MENU_ITEMS` entry label for `/supplier-list` changed to `Approved Supplier List`.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
 
 ## 2026-03-19 - Cancellation applied (layout adjustment reverted)
 
