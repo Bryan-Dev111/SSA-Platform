@@ -5,7 +5,11 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
-import { parseApiError, readFileAsBase64, downloadWithAuth } from '../utils/apiHelpers';
+import { parseApiError, downloadWithAuth } from '../utils/apiHelpers';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+
+const MAX_UPLOAD_BYTES = 75 * 1024 * 1024;
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface Supplier {
   id: string;
@@ -19,10 +23,49 @@ interface RecordRow {
   internalOrSupplier: string;
   status: string;
   filePath: string | null;
-  supplierId: string;
-  supplier: { id: string; code: string; name: string };
+  supplierId: string | null;
+  supplier: { id: string; code: string; name: string } | null;
   uploadedBy: { id: string; email: string; name: string | null } | null;
   createdAt: string;
+}
+
+function postRecordWithProgress(
+  payload: { name: string; supplierId: string | null; internalOrSupplier: 'supplier' | 'internal'; file: File | null },
+  token: string,
+  onProgress: (percent: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    console.log('[Records Upload] Request started');
+    xhr.open('POST', `${API_BASE}/records`);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = (evt) => {
+      if (!evt.lengthComputable) return;
+      const percent = Math.max(0, Math.min(100, Math.round((evt.loaded / evt.total) * 100)));
+      console.log(`[Records Upload] Progress: ${percent}% (${evt.loaded}/${evt.total} bytes)`);
+      onProgress(percent);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        console.log('[Records Upload] Completed successfully');
+        onProgress(100);
+        resolve();
+      } else {
+        console.log(`[Records Upload] Failed: HTTP ${xhr.status}`, xhr.responseText);
+        reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => {
+      console.log('[Records Upload] Network error');
+      reject(new Error('Network error while uploading file'));
+    };
+    const form = new FormData();
+    form.append('name', payload.name);
+    form.append('internalOrSupplier', payload.internalOrSupplier);
+    form.append('supplierId', payload.supplierId ?? '');
+    if (payload.file) form.append('file', payload.file);
+    xhr.send(form);
+  });
 }
 
 export function Records() {
@@ -38,8 +81,10 @@ export function Records() {
   const [supplierId, setSupplierId] = useState('');
   const [source, setSource] = useState<'supplier' | 'internal'>('supplier');
   const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
@@ -83,43 +128,56 @@ export function Records() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !name.trim() || !supplierId) return;
+    if (!token || !name.trim()) return;
     if (isSupplier && source !== 'supplier') {
       toast.error('Suppliers may only submit supplier-sourced records');
       return;
     }
-    if (file && file.size > 8 * 1024 * 1024) {
-      toast.error('File must be 8MB or smaller');
+    if (file && file.size > MAX_UPLOAD_BYTES) {
+      toast.error('File exceeds current upload limit (75MB)');
       return;
     }
     setSubmitting(true);
+    setUploadProgress(file ? 0 : null);
     try {
-      let fileBase64: string | undefined;
-      let fileName: string | undefined;
-      if (file) {
-        fileBase64 = await readFileAsBase64(file);
-        fileName = file.name;
-      }
-      await apiJson('/records', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({
-          name: name.trim(),
-          supplierId,
-          internalOrSupplier: source,
-          ...(fileBase64 ? { fileBase64, fileName } : {}),
-        }),
-      });
+      const payload = {
+        name: name.trim(),
+        supplierId: supplierId || null,
+        internalOrSupplier: source,
+        file: file ?? null,
+      };
+      await postRecordWithProgress(payload, token, (p) => setUploadProgress(p));
       setName('');
       setFile(null);
+      setUploadProgress(null);
       toast.success('Record submitted');
       load();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   };
+  const onFileChange = (f: File | null) => {
+    if (!f) {
+      console.log('[Records Upload] File cleared');
+      setFile(null);
+      setUploadProgress(null);
+      return;
+    }
+    console.log(`[Records Upload] File selected: ${f.name} (${f.size} bytes)`);
+    if (f.size > MAX_UPLOAD_BYTES) {
+      console.log(`[Records Upload] File rejected: exceeds ${MAX_UPLOAD_BYTES} bytes`);
+      setFile(null);
+      setUploadProgress(null);
+      toast.error('Selected file is too large. Maximum is 75MB.');
+      return;
+    }
+    setFile(f);
+    setUploadProgress(0);
+  };
+
 
   const review = async (id: string, status: 'Approved' | 'Rejected') => {
     if (!token) return;
@@ -194,24 +252,10 @@ export function Records() {
                   alignItems: 'flex-end',
                 }}
               >
-                {!isSupplier && (
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Supplier *</label>
-                    <select
-                      className="input"
-                      required
-                      value={supplierId}
-                      onChange={(e) => setSupplierId(e.target.value)}
-                    >
-                      <option value="">Select…</option>
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Name *</label>
+                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
                 {!isSupplier && (
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Source</label>
@@ -225,13 +269,34 @@ export function Records() {
                     </select>
                   </div>
                 )}
+                {!isSupplier && (
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Supplier</label>
+                    <select
+                      className="input"
+                      value={supplierId}
+                      onChange={(e) => setSupplierId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Name *</label>
-                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">File (optional)</label>
-                  <input className="input" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span>File (optional)</span>
+                    {uploadProgress !== null && file && (
+                      <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{uploadProgress}%</span>
+                      </span>
+                    )}
+                  </label>
+                  <input className="input" type="file" onChange={(e) => onFileChange(e.target.files?.[0] ?? null)} />
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? '…' : 'Submit'}
@@ -268,7 +333,7 @@ export function Records() {
                   {rows.map((r) => (
                     <tr key={r.id}>
                       <td>{r.name}</td>
-                      <td>{r.supplier?.code ?? '—'}</td>
+                      <td>{r.supplier?.code ?? 'None'}</td>
                       <td>{r.internalOrSupplier}</td>
                       <td>{r.status}</td>
                       <td>
@@ -280,33 +345,30 @@ export function Records() {
                           '—'
                         )}
                       </td>
-                      <td>{r.uploadedBy?.email ?? '—'}</td>
+                      <td>{r.uploadedBy?.name?.trim() || '—'}</td>
                       <td>{new Date(r.createdAt).toLocaleString()}</td>
                       {canReview ? (
                         <td>
-                          {r.status === 'PENDING' ? (
-                            <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                className="btn"
-                                style={{ background: 'var(--color-success)', color: '#fff' }}
-                                disabled={reviewingId === r.id}
-                                onClick={() => review(r.id, 'Approved')}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                disabled={reviewingId === r.id}
-                                onClick={() => review(r.id, 'Rejected')}
-                              >
-                                Reject
-                              </button>
-                            </span>
-                          ) : (
-                            '—'
-                          )}
+                          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ background: 'var(--color-success)', color: '#fff' }}
+                              disabled={reviewingId === r.id || r.status === 'Approved'}
+                              title={r.status === 'Approved' ? 'Already approved' : 'Approve'}
+                              onClick={() => review(r.id, 'Approved')}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              disabled={reviewingId === r.id}
+                              onClick={() => setRejectConfirmId(r.id)}
+                            >
+                              Reject
+                            </button>
+                          </span>
                         </td>
                       ) : null}
                     </tr>
@@ -317,6 +379,19 @@ export function Records() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={rejectConfirmId !== null}
+        title="Reject record"
+        message="Are you sure you want to reject this record?"
+        confirmLabel="Reject"
+        variant="danger"
+        onConfirm={() => {
+          if (!rejectConfirmId) return;
+          void review(rejectConfirmId, 'Rejected');
+          setRejectConfirmId(null);
+        }}
+        onCancel={() => setRejectConfirmId(null)}
+      />
     </div>
   );
 }

@@ -36,8 +36,8 @@ import { errorHandler } from './middleware/errorHandler';
 const app = express();
 
 app.use(cors());
-// Allow optional base64 file payloads on POST /records (supplier uploads; local disk in dev)
-app.use(express.json({ limit: '12mb' }));
+// Allow larger optional base64 file payloads on uploads.
+app.use(express.json({ limit: '100mb' }));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'sentinel-api' });

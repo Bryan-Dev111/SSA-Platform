@@ -89,6 +89,137 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Records large-upload best approach (storage-based binary upload)
+
+### Requirement summary
+- Implement best large-file approach for Records uploads (avoid base64 JSON bottleneck).
+
+### Implemented changes
+- **Server dependencies**
+  - Added `@supabase/supabase-js` and `multer` (+ `@types/multer`).
+
+- **Supabase storage helper**
+  - Added `server/src/lib/supabaseStorage.ts`:
+    - storage client init from env:
+      - `SUPABASE_URL`
+      - `SUPABASE_SERVICE_ROLE_KEY`
+      - `SUPABASE_STORAGE_BUCKET` (default: `records`)
+    - upload helper for record files
+    - signed URL helper for downloads
+    - large file max constant (`150MB`)
+
+- **Records upload path updated**
+  - Updated `server/src/routes/records.ts`:
+    - `POST /records` now accepts `multipart/form-data` (`multer` memory upload)
+    - uploads binary file to Supabase Storage bucket
+    - stores storage object path in `Record.filePath`
+    - stores metadata (`fileName`, `fileMime`)
+    - fallback: if storage config/upload fails, keeps DB-byte fallback (`fileData`) to avoid blocking uploads
+
+- **Records download updated**
+  - `GET /records/:id/download` now:
+    - uses signed URL from storage for filePath-backed records
+    - streams bytes back as downloadable response
+    - falls back to DB-bytes / legacy local path when needed
+
+- **Client upload path updated**
+  - Updated `client/src/pages/Records.tsx`:
+    - switched upload transport from base64 JSON to `FormData` binary upload
+    - keeps real-time progress bar using `XMLHttpRequest` upload progress
+    - keeps immediate file-size validation and toast behavior
+
+### Verification
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Records review UX: reject confirm + disable approve when approved
+
+### Requirement summary
+- On Records page, clicking `Reject` must show a decision confirmation modal.
+- If a record is already `Approved`, `Approve` button should be inactive.
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx`:
+  - Added `ConfirmDialog` for reject action.
+  - `Reject` click now opens modal; action runs only after confirm.
+  - `Approve` button now disables when row status is already `Approved`.
+  - Added tooltip/title for inactive approve state.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Records page workflow/data fixes (optional supplier, cloud-safe download, override)
+
+### Requirement summary
+- Supplier in upload form should be optional (`None` allowed).
+- Reorder upload fields to `Name -> Source -> Supplier`.
+- Show uploader full name (not email) in `Uploaded by`.
+- Increase upload limit for large files.
+- Fix file download reliability (no local-only dependency).
+- Allow Admin/QE to override status any time (`Approve`/`Reject` always visible).
+
+### Implemented changes
+- **Database**
+  - Updated `server/prisma/schema.prisma` (`Record` model):
+    - `supplierId` changed to nullable (`String?`)
+    - relation changed to optional `supplier Supplier?` with `onDelete: SetNull`
+    - added `fileName String?`, `fileMime String?`, `fileData Bytes?`
+  - Added migration:
+    - `server/prisma/migrations/20260331009000_records_optional_supplier_cloud_file/migration.sql`
+
+- **Backend API**
+  - Updated `server/src/app.ts`:
+    - JSON body limit increased to `100mb`.
+  - Updated `server/src/routes/records.ts`:
+    - create now allows `supplierId = null` (except Supplier role, which still requires own supplier)
+    - upload size cap raised to `100MB`
+    - stores uploaded file bytes in DB (`fileData`) with metadata (`fileName`, `fileMime`)
+    - download endpoint now serves DB-stored file bytes first (cloud DB-backed, no local path dependency)
+    - legacy `filePath` download kept as fallback for old records
+    - review patch remains status update and supports repeated overrides
+    - list/filter supports `supplierId=none` for null-supplier rows in admin scope
+
+- **Client UI**
+  - Updated `client/src/pages/Records.tsx`:
+    - form order changed to `Name -> Source -> Supplier`
+    - supplier field no longer required; includes `None` option
+    - submit sends `supplierId: null` when `None` selected
+    - upload size check raised to `100MB`
+    - sends `fileMime` with upload payload
+    - `Uploaded by` column now shows full name (`uploadedBy.name`) only
+    - review actions `Approve` and `Reject` are always visible for Admin/QE rows (status override enabled anytime)
+
+### Verification
+- DB migration deploy: `npx prisma migrate deploy` -> PASS
+- Prisma client generate: `npx prisma generate` -> PASS
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Records upload UX: progress + immediate file-size validation
+
+### Requirement summary
+- Show upload progress bar next to `File (optional)` while uploading.
+- On file selection, immediately alert when file exceeds current limit.
+
+### Implemented changes
+- Updated `client/src/pages/Records.tsx`:
+  - Added upload limit constant for current practical transport limit:
+    - `MAX_UPLOAD_BYTES = 75MB`
+  - Added immediate file selection validation:
+    - if selected file exceeds 75MB, toast error shown and file is not accepted
+  - Added upload progress state (`uploadProgress`)
+  - Added progress UI next to `File (optional)` label:
+    - HTML `<progress>` bar + percent text
+  - Implemented `postRecordWithProgress(...)` using `XMLHttpRequest` upload progress events for `/records` POST.
+  - Existing submission flow and backend payload are preserved.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
 ## 2026-03-20 - Supplier List page title rename
 
 ### Requirement summary

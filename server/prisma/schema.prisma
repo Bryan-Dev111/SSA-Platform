@@ -266,10 +266,13 @@ model Record {
   id               String      @id @default(cuid())
   name             String
   internalOrSupplier RecordSource
-  supplierId       String
-  supplier         Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierId       String?
+  supplier         Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   status          RecordStatus @default(PENDING)
   filePath        String?
+  fileName        String?
+  fileMime        String?
+  fileData        Bytes?
   uploadedById    String?
   uploadedBy      User?        @relation(fields: [uploadedById], references: [id])
   createdAt       DateTime    @default(now())
