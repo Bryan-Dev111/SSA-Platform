@@ -599,3 +599,139 @@
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Fix runtime P2011 (`Finding.auditId` null constraint)
+
+### Issue
+- Runtime error when creating finding with `None / N/A` audit:
+  - `P2011 Null constraint violation on fields: (auditId)`
+
+### Root cause
+- Database migration for optional `Finding.auditId` had not been applied yet.
+
+### Implemented fix
+- Applied migrations to database:
+  - `npx prisma migrate deploy`
+  - Included migration: `20260331004000_finding_optional_audit`
+- Also fixed an older migration script to be idempotent in shadow DB:
+  - `20260320114846_/migration.sql`
+  - `DROP INDEX` -> `DROP INDEX IF EXISTS`
+
+### Verification
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Prisma schema validation: `npx prisma validate` -> PASS
+
+## 2026-03-20 - Findings Record workflow/status rewrite (remove CAR block)
+
+### Requirement summary
+- Remove CAR management section from Finding Record detail page.
+- Make `Disposition Code` the focus in finding detail.
+- Remove `Update Draft`, keep `Save`, add `Process` as primary top actions.
+- Replace Draft concept with statuses: `New`, `WaitingDisposition`, `WaitingApproval`, `Closed`.
+- Ensure save result stays `New` and Process moves to `WaitingApproval`.
+- Ensure finding code format is `FIN-12345` (no `FIN-DRAFT-*`).
+
+### Implemented changes
+- **Finding detail page (`client/src/pages/FindingsRecord.tsx`)**
+  - Removed the full `Corrective actions (CAR)` block, including:
+    - `+ New CAR for this finding`
+    - linked CAR list in this page
+  - Updated top header actions:
+    - kept `Save`
+    - added/kept `Process`
+    - removed `Update draft` action from the form body
+  - `Save` now persists edited form content (PATCH) and then calls `/findings/:id/save`.
+  - Status label now renders `DRAFT` legacy records as `New` in UI.
+
+- **Finding statuses and transitions (server)**
+  - Updated `server/prisma/schema.prisma`:
+    - `Finding.status` default changed to `New`
+    - `FindingStatus` enum now includes `New` (legacy `DRAFT` retained for compatibility)
+  - Added migration:
+    - `server/prisma/migrations/20260331006000_findings_new_status/migration.sql`
+    - adds enum value `New`
+    - sets DB default to `New`
+    - normalizes legacy rows `DRAFT -> New`
+  - Updated `server/src/routes/findings.ts`:
+    - Create now generates real code with `getNextCode('FIN')` and status `New`.
+    - PATCH/Save now allow `New` (and legacy `DRAFT`) editing.
+    - Save keeps status as `New` and ensures code is normalized to `FIN-#####`.
+    - Process now routes `New`/`WaitingDisposition` -> `WaitingApproval`.
+    - Findings list filters exclude `New` (and legacy `DRAFT`) records.
+
+- **Findings list styling/text**
+  - Updated `client/src/pages/Findings.tsx`:
+    - text changed from `past DRAFT` -> `past New`
+    - status slug mapping treats `new`/`draft` as `new`
+  - Updated `client/src/index.css`:
+    - added `.findings-status-badge--new` style mapping
+    - added `.finding-row--new` row style mapping
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on edited files -> PASS
+- Note: `npx prisma generate` still intermittently fails with Windows `EBUSY` lock due active file handle; code/type checks pass.
+
+## 2026-03-20 - Fix Prisma P3018 enum migration (`FindingStatus.New`)
+
+### Issue
+- `npx prisma migrate deploy` failed on migration `20260331006000_findings_new_status`.
+- PostgreSQL error `55P04`: `unsafe use of new value "New" of enum type "FindingStatus"`.
+
+### Root cause
+- The migration both added enum value `New` and used it (default/update) in the same migration transaction.
+- PostgreSQL requires the new enum value to be committed before it can be used.
+
+### Implemented fix
+- Updated `server/prisma/migrations/20260331006000_findings_new_status/migration.sql`
+  - Kept only enum value creation (`ALTER TYPE ... ADD VALUE 'New'`).
+- Added new migration:
+  - `server/prisma/migrations/20260331007000_findings_new_status_finalize/migration.sql`
+  - Sets `Finding.status` default to `New`
+  - Converts legacy `DRAFT` rows to `New`
+- Recovered failed migration state and redeployed:
+  - `npx prisma migrate resolve --rolled-back 20260331006000_findings_new_status`
+  - `npx prisma migrate deploy`
+
+### Verification
+- Migration deploy: PASS (both migrations applied successfully)
+- Prisma schema validation: `npx prisma validate` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+
+## 2026-03-20 - Findings workflow alignment: restore approval actions
+
+### Requirement summary
+- Keep previous Finding workflow capability (including approval stage) while preserving newly applied client feedback changes.
+- Specifically, bring back approval actions so workflow is complete after `Process`.
+
+### Implemented changes
+- Updated `client/src/pages/FindingsRecord.tsx`:
+  - Restored `Reverse` action handler and top action button.
+  - Restored `Approve` and `Reject` handlers and top action buttons.
+  - `Approve/Reject` are shown only when status is `WaitingApproval` and role is `Admin` or `QualityEngineer`.
+  - `Reverse` is available for permitted editable states via existing backend endpoint.
+- Kept previously delivered feedback changes intact:
+  - CAR section remains removed from Finding Record detail.
+  - `Save` and `Process` remain in top action area.
+  - No `Update draft` button.
+  - New-style status baseline (`New`) and non-draft code format remain unchanged.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Findings Record back link style alignment
+
+### Requirement summary
+- In New Finding / Finding Record page, make `← Back to Findings` match the visual style used in the related workflow pages (same link look/color behavior instead of ghost button style).
+
+### Implemented changes
+- Updated `client/src/pages/FindingsRecord.tsx`:
+  - Replaced the header back control from a `btn btn-ghost` button to a plain `<Link>` with `textDecoration: 'none'`.
+  - This aligns visual behavior with the existing page-link pattern used in record pages.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS

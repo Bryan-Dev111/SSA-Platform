@@ -113,7 +113,7 @@ export function Findings() {
   /** Maps API status to a slug for status-badge CSS (readable, color-coded). */
   const getStatusBadgeSlug = (status: string) => {
     const s = status.replace(/\s+/g, '-').toLowerCase();
-    if (s === 'draft') return 'draft';
+    if (s === 'new' || s === 'draft') return 'new';
     if (s === 'waitingdisposition') return 'waiting-disposition';
     if (s === 'waitingapproval') return 'waiting-approval';
     if (s === 'closed') return 'closed';
@@ -139,7 +139,7 @@ export function Findings() {
       <header className="page-header">
         <h1 className="page-title">Findings</h1>
         <p className="page-description">
-          Findings (past DRAFT). Use the finding code to open the record for status workflow. Supplier filter for Buyers.
+          Findings (past New). Use the finding code to open the record for status workflow. Supplier filter for Buyers.
         </p>
       </header>
 
@@ -254,7 +254,7 @@ export function Findings() {
               {list.length === 0 ? (
                 <tr>
                   <td colSpan={8 + (isAdmin ? 1 : 0)} className="table-empty">
-                    No findings in scope (or none past DRAFT yet).
+                    No findings in scope (or none past New yet).
                   </td>
                 </tr>
               ) : (

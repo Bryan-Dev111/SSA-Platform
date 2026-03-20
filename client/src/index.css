@@ -437,6 +437,7 @@ a.btn:focus {
   border: 1px solid #d1d5db;
 }
 
+.findings-status-badge--new,
 .findings-status-badge--draft,
 .findings-status-badge--follow-up,
 .findings-status-badge--unknown {
@@ -466,6 +467,7 @@ a.btn:focus {
 }
 
 /* Findings table: row background by status (same as CAR for consistency) */
+.finding-row--new,
 .finding-row--draft {
   background: #f8fafc;
 }

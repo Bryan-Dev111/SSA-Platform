@@ -1,6 +1,6 @@
 /**
- * Findings API: CRUD; status flow DRAFT → Waiting Disposition → Waiting Approval → Closed.
- * Required for Save (DRAFT → Waiting Disposition): Supplier, Audit #, Severity, Summary, Discrepancy.
+ * Findings API: CRUD; status flow New → Waiting Disposition → Waiting Approval → Closed.
+ * Required for Save (New): Supplier, Severity, Summary, Discrepancy.
  * Process/Reverse; Approve/Reject (Waiting Approval, Admin/QE only). Only Admin can delete.
  */
 import { Router, Request, Response } from 'express';
@@ -14,7 +14,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
-const FINDING_STATUS_ORDER: FindingStatus[] = ['DRAFT', 'WaitingDisposition', 'WaitingApproval', 'Closed'];
+const FINDING_STATUS_ORDER: FindingStatus[] = ['New', 'WaitingDisposition', 'WaitingApproval', 'Closed'];
 
 function nextStatus(s: FindingStatus): FindingStatus | null {
   const i = FINDING_STATUS_ORDER.indexOf(s);
@@ -38,7 +38,9 @@ router.get(
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
     const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
-    const where: { supplierId?: { in: string[] } | string; status?: { not: FindingStatus } } = { status: { not: 'DRAFT' } };
+    const where: { supplierId?: { in: string[] } | string; status?: { notIn: FindingStatus[] } } = {
+      status: { notIn: ['New', 'DRAFT'] },
+    };
     if (allowedIds !== null) {
       where.supplierId = { in: allowedIds };
       if (allowedIds.length === 0) {
@@ -53,8 +55,8 @@ router.get(
       }
       where.supplierId = supplierId;
     }
-    // List shows only findings that have left DRAFT (per requirements)
-    where.status = { not: 'DRAFT' };
+    // List shows only findings that have left New (and legacy DRAFT).
+    where.status = { notIn: ['New', 'DRAFT'] };
     const statsWhere = { ...where };
     const [list, allForStats] = await Promise.all([
       prisma.finding.findMany({
@@ -211,12 +213,12 @@ router.post(
       res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });
       return;
     }
-    const code = `FIN-DRAFT-${Date.now()}`;
+    const code = await getNextCode('FIN');
     const createData = {
       code,
       ...(normalizedAuditId ? { auditId: normalizedAuditId } : {}),
       supplierId: supplierId as string,
-      status: 'DRAFT',
+      status: 'New',
       severity: severity as 'Critical' | 'Major' | 'Minor',
       summary: String(summary).trim(),
       discrepancy: String(discrepancy).trim(),
@@ -264,8 +266,8 @@ router.patch(
       res.status(404).json({ error: 'Finding not found' });
       return;
     }
-    if (existing.status !== 'DRAFT') {
-      res.status(400).json({ error: 'Only draft findings can be updated via PATCH' });
+    if (!['New', 'DRAFT'].includes(existing.status)) {
+      res.status(400).json({ error: 'Only New findings can be updated via PATCH' });
       return;
     }
     const body = req.body as Record<string, unknown>;
@@ -344,18 +346,18 @@ router.post(
       res.status(404).json({ error: 'Finding not found' });
       return;
     }
-    if (existing.status !== 'DRAFT') {
-      res.status(400).json({ error: 'Only draft findings can be saved' });
+    if (!['New', 'DRAFT'].includes(existing.status)) {
+      res.status(400).json({ error: 'Only New findings can be saved' });
       return;
     }
     if (!existing.summary?.trim() || !existing.discrepancy?.trim()) {
       res.status(400).json({ error: 'Required fields for Save: Supplier, Severity, Summary, Discrepancy' });
       return;
     }
-    const code = await getNextCode('FIN');
+    const code = /^FIN-\d{5}$/.test(existing.code) ? existing.code : await getNextCode('FIN');
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
-      data: { code, status: 'WaitingDisposition' },
+      data: { code, status: 'New' },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
@@ -391,8 +393,11 @@ router.post(
       res.status(404).json({ error: 'Finding not found' });
       return;
     }
-    const next = nextStatus(existing.status);
-    if (!next || existing.status === 'WaitingApproval') {
+    let next: FindingStatus | null = null;
+    if (existing.status === 'New' || existing.status === 'DRAFT' || existing.status === 'WaitingDisposition') {
+      next = 'WaitingApproval';
+    }
+    if (!next) {
       res.status(400).json({ error: 'Process not available for current status' });
       return;
     }
@@ -435,8 +440,8 @@ router.post(
       return;
     }
     const prev = prevStatus(existing.status);
-    if (!prev || prev === 'DRAFT') {
-      res.status(400).json({ error: 'Cannot reverse to DRAFT' });
+    if (!prev || prev === 'DRAFT' || prev === 'New') {
+      res.status(400).json({ error: 'Cannot reverse to New' });
       return;
     }
     const finding = await prisma.finding.update({

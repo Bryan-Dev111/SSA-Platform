@@ -1,10 +1,10 @@
 /**
  * Findings Record: form (Supplier, Audit #, Severity, Summary, Defect Code, Discrepancy,
  * Containment, Occurrence/Escape Root Cause, Corrective Action, VOE, Closing Comments);
- * approval/status history; workflow buttons Save, Process, Reverse, Approve, Reject.
+ * approval/status history; workflow buttons Save and Process.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -54,6 +54,7 @@ const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
 
 /** Human-readable labels for Prisma enum-style status strings */
 function formatFindingStatus(status: string): string {
+  if (status === 'New' || status === 'DRAFT') return 'New';
   if (status === 'WaitingDisposition') return 'Waiting Disposition';
   if (status === 'WaitingApproval') return 'Waiting Approval';
   return status;
@@ -92,14 +93,14 @@ export function FindingsRecord() {
   const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
-  const canEdit = finding?.status === 'DRAFT' && canEditDraft;
-  const canSave = finding?.status === 'DRAFT' && canEditDraft;
-  const canProcess = canEditDraft && !!finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingApproval' && finding.status !== 'Closed';
-  const canReverse = canEditDraft && !!finding && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
+  const isNewLike = finding?.status === 'New' || finding?.status === 'DRAFT';
+  const canEdit = !!finding && isNewLike && canEditDraft;
+  const canSave = !!finding && isNewLike && canEditDraft;
+  const canProcess = canEditDraft && !!finding && (finding.status === 'New' || finding.status === 'DRAFT' || finding.status === 'WaitingDisposition');
+  const canReverse = canEditDraft && !!finding && finding.status !== 'New' && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
   const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
   // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
   const canCreateNew = canEditDraft;
-  const canCreateCar = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
 
   useEffect(() => {
     if (!token) return;
@@ -151,11 +152,11 @@ export function FindingsRecord() {
       .catch(() => setDispositionCodeOptions([]));
   }, [token]);
 
-  const handlePatch = async () => {
-    if (!token || !finding || finding.status !== 'DRAFT') return;
-    setSaving(true);
+  const handleSave = async () => {
+    if (!token || !finding) return;
+    setActioning(true);
     try {
-      const updated = await apiJson<Finding>(`/findings/${finding.id}`, {
+      await apiJson<Finding>(`/findings/${finding.id}`, {
         token,
         method: 'PATCH',
         body: JSON.stringify({
@@ -172,20 +173,6 @@ export function FindingsRecord() {
           closingComments: form.closingComments || null,
         }),
       });
-      setFinding(updated);
-      setError(null);
-      toast.info('Draft updated');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!token || !finding) return;
-    setActioning(true);
-    try {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
       setFinding(updated);
       setError(null);
@@ -337,14 +324,43 @@ export function FindingsRecord() {
         </h1>
         <p className="page-description">
           {finding
-            ? `Status: ${formatFindingStatus(finding.status)} — open this record to use Save, Process, Reverse, Approve, or Reject.`
+            ? `Status: ${formatFindingStatus(finding.status)}`
             : isNew
-              ? 'Create a draft finding (Admin, QE, or Auditor).'
+              ? 'Create a new finding (Admin, QE, or Auditor).'
               : 'Finding not found.'}
         </p>
         <p style={{ marginTop: 4 }}>
           <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
         </p>
+        {finding && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
+            {canSave && (
+              <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
+                {actioning ? 'Saving…' : 'Save'}
+              </button>
+            )}
+            {canProcess && (
+              <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
+                Process
+              </button>
+            )}
+            {canReverse && (
+              <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
+                Reverse
+              </button>
+            )}
+            {canApproveReject && (
+              <>
+                <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
+                  Approve
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </header>
 
       {error && (
@@ -429,38 +445,6 @@ export function FindingsRecord() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Corrective actions (CAR)</h2>
-              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                CARs linked to this finding. Create or open a CAR from here or from the Findings list.
-              </p>
-              {(finding.correctiveActions ?? []).length === 0 ? (
-                <p style={{ margin: '0 0 0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>No CARs yet.</p>
-              ) : (
-                <ul style={{ margin: '0 0 0.75rem', paddingLeft: '1.25rem' }}>
-                  {(finding.correctiveActions ?? []).map((c) => (
-                    <li key={c.id} style={{ marginBottom: 4 }}>
-                      <Link to={`/car-record?id=${encodeURIComponent(c.id)}`} className="finding-code-link">
-                        {c.code}
-                      </Link>
-                      <span style={{ color: 'var(--color-text-muted)', marginLeft: 8, fontSize: 'var(--text-sm)' }}>{c.status}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canCreateCar && (
-                <Link
-                  to={`/car-record?findingId=${encodeURIComponent(finding.id)}`}
-                  className="btn btn-primary"
-                  style={{ display: 'inline-block' }}
-                >
-                  + New CAR for this finding
-                </Link>
-              )}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div className="input-group">
                   <label className="input-label">Supplier</label>
@@ -542,38 +526,6 @@ export function FindingsRecord() {
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
               </div>
 
-              <div style={{ marginTop: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {canEdit && (
-                  <button type="button" className="btn btn-ghost" onClick={handlePatch} disabled={saving}>
-                    {saving ? 'Saving…' : 'Update draft'}
-                  </button>
-                )}
-                {canSave && (
-                  <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                    {actioning ? 'Saving…' : 'Save (DRAFT → Waiting Disposition)'}
-                  </button>
-                )}
-                {canProcess && (
-                  <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
-                    Process
-                  </button>
-                )}
-                {canReverse && (
-                  <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
-                    Reverse
-                  </button>
-                )}
-                {canApproveReject && (
-                  <>
-                    <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
-                      Approve
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
-                      Reject
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
           </div>
 

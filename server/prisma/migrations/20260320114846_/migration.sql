@@ -1,2 +1,2 @@
 -- DropIndex
-DROP INDEX "CarApprovalLog_carId_createdAt_idx";
+DROP INDEX IF EXISTS "CarApprovalLog_carId_createdAt_idx";

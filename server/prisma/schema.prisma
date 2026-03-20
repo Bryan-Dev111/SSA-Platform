@@ -140,7 +140,7 @@ model Finding {
   audit                   Audit?        @relation(fields: [auditId], references: [id], onDelete: SetNull)
   supplierId              String
   supplier                Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  status                  FindingStatus @default(DRAFT)
+  status                  FindingStatus @default(New)
   severity                FindingSeverity
   summary                 String
   discrepancy             String
@@ -160,6 +160,7 @@ model Finding {
 }
 
 enum FindingStatus {
+  New
   DRAFT
   WaitingDisposition
   WaitingApproval
