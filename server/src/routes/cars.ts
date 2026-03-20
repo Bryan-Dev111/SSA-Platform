@@ -13,6 +13,21 @@ import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
+const carInclude = {
+  supplier: { select: { id: true, code: true, name: true } },
+  audit: { select: { id: true, code: true, auditDate: true } },
+  finding: { select: { id: true, code: true, severity: true } },
+  approvalLogs: {
+    select: {
+      id: true,
+      action: true,
+      comment: true,
+      createdAt: true,
+      user: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: 'desc' as const },
+  },
+};
 
 const CAR_STATUS_ORDER: CARStatus[] = ['DRAFT', 'RCCA', 'WaitingApproval', 'FollowUp', 'Closed'];
 
@@ -75,11 +90,7 @@ router.get(
     const [list, allForStats] = await Promise.all([
       prisma.correctiveAction.findMany({
         where,
-        include: {
-          supplier: { select: { id: true, code: true, name: true } },
-          audit: { select: { id: true, code: true, auditDate: true } },
-          finding: { select: { id: true, code: true } },
-        },
+        include: carInclude,
         orderBy: { updatedAt: 'desc' },
       }),
       prisma.correctiveAction.findMany({
@@ -139,9 +150,7 @@ router.get(
     const car = await prisma.correctiveAction.findUnique({
       where: { code: req.params.code },
       include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true, severity: true } },
+        ...carInclude,
         createdBy: { select: { id: true, email: true, name: true } },
       },
     });
@@ -169,9 +178,7 @@ router.get(
     const car = await prisma.correctiveAction.findUnique({
       where: { id: req.params.id },
       include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true, severity: true } },
+        ...carInclude,
         createdBy: { select: { id: true, email: true, name: true } },
       },
     });
@@ -273,11 +280,7 @@ router.post(
     };
     const car = await prisma.correctiveAction.create({
       data: createData as any,
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      include: carInclude,
     });
     res.status(201).json(car);
   })
@@ -341,11 +344,7 @@ router.patch(
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
       data,
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      include: carInclude,
     });
     res.json(car);
   })
@@ -386,11 +385,7 @@ router.post(
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
       data: { code, status: 'RCCA' },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      include: carInclude,
     });
     res.json(car);
   })
@@ -427,11 +422,7 @@ router.post(
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
       data: { status: next },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      include: carInclude,
     });
     res.json(car);
   })
@@ -468,11 +459,7 @@ router.post(
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
       data: { status: prev },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      include: carInclude,
     });
     res.json(car);
   })
@@ -505,14 +492,21 @@ router.post(
       res.status(400).json({ error: 'Only CARs in Waiting Approval can be approved' });
       return;
     }
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
+    const approveData = {
+      status: 'FollowUp',
+      approvalLogs: {
+        create: {
+          action: 'Approved',
+          comment: comment || null,
+          userId: req.user.id,
+        },
+      },
+    };
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
-      data: { status: 'Closed' },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      data: approveData as any,
+      include: carInclude,
     });
     res.json(car);
   })
@@ -545,14 +539,21 @@ router.post(
       res.status(400).json({ error: 'Only CARs in Waiting Approval can be rejected' });
       return;
     }
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
+    const rejectData = {
+      status: 'RCCA',
+      approvalLogs: {
+        create: {
+          action: 'Rejected',
+          comment: comment || null,
+          userId: req.user.id,
+        },
+      },
+    };
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
-      data: { status: 'RCCA' },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        finding: { select: { id: true, code: true } },
-      },
+      data: rejectData as any,
+      include: carInclude,
     });
     res.json(car);
   })

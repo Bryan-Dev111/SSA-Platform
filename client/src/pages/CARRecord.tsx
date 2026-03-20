@@ -55,6 +55,13 @@ interface CAR {
   closingComments: string | null;
   createdAt: string;
   updatedAt: string;
+  approvalLogs?: Array<{
+    id: string;
+    action: 'Approved' | 'Rejected' | string;
+    comment: string | null;
+    createdAt: string;
+    user: { id: string; name: string | null; email: string | null } | null;
+  }>;
 }
 
 const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
@@ -92,15 +99,38 @@ export function CARRecord() {
   });
   const [saving, setSaving] = useState(false);
   const [actioning, setActioning] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [approvalComment, setApprovalComment] = useState('');
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
-  const canEdit = car?.status === 'DRAFT' && canEditDraft;
+  const canEdit = !!car && editMode && canEditDraft && car.status === 'DRAFT';
   const canSave = car?.status === 'DRAFT' && canEditDraft;
   const canProcess = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'WaitingApproval' && car.status !== 'Closed';
   const canReverse = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'RCCA' && car.status !== 'Closed';
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
+
+  const syncFormFromCar = (c: CAR) => {
+    setForm((p) => ({
+      ...p,
+      findingId: c.findingId ?? '',
+      auditId: c.auditId,
+      supplierId: c.supplierId,
+      severity: c.severity,
+      carOwner: c.carOwner ?? '',
+      targetCompletionDate: c.targetCompletionDate ? c.targetCompletionDate.slice(0, 10) : '',
+      summary: c.summary,
+      discrepancy: c.discrepancy,
+      defectCode: c.defectCode ?? '',
+      containment: c.containment ?? '',
+      occurrenceRootCause: c.occurrenceRootCause ?? '',
+      escapeRootCause: c.escapeRootCause ?? '',
+      correctiveAction: c.correctiveAction ?? '',
+      verificationOfEffectiveness: c.verificationOfEffectiveness ?? '',
+      closingComments: c.closingComments ?? '',
+    }));
+  };
 
   useEffect(() => {
     if (!token) return;
@@ -175,11 +205,11 @@ export function CARRecord() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load finding for new CAR'));
   }, [token, idParam, codeParam, findingIdFromUrl]);
 
-  const handlePatch = async () => {
-    if (!token || !car || car.status !== 'DRAFT') return;
-    setSaving(true);
+  const handleSave = async () => {
+    if (!token || !car) return;
+    setActioning(true);
     try {
-      const updated = await apiJson<CAR>(`/cars/${car.id}`, {
+      const patched = await apiJson<CAR>(`/cars/${car.id}`, {
         token,
         method: 'PATCH',
         body: JSON.stringify({
@@ -197,22 +227,13 @@ export function CARRecord() {
           closingComments: form.closingComments || null,
         }),
       });
-      setCar(updated);
-      setError(null);
-      toast.info('Draft updated');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update');
-    } finally {
-      setSaving(false);
-    }
-  };
+      setCar(patched);
+      syncFormFromCar(patched);
 
-  const handleSave = async () => {
-    if (!token || !car) return;
-    setActioning(true);
-    try {
       const updated = await apiJson<CAR>(`/cars/${car.id}/save`, { token, method: 'POST' });
       setCar(updated);
+      syncFormFromCar(updated);
+      setEditMode(false);
       setError(null);
       toast.info('CAR saved');
       navigate(`/car-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
@@ -230,18 +251,28 @@ export function CARRecord() {
     try {
       const updated = await apiJson<CAR>(path, { token, method: 'POST' });
       setCar(updated);
-      setForm((p) => ({
-        ...p,
-        summary: updated.summary,
-        discrepancy: updated.discrepancy,
-        defectCode: updated.defectCode ?? '',
-        containment: updated.containment ?? '',
-        occurrenceRootCause: updated.occurrenceRootCause ?? '',
-        escapeRootCause: updated.escapeRootCause ?? '',
-        correctiveAction: updated.correctiveAction ?? '',
-        verificationOfEffectiveness: updated.verificationOfEffectiveness ?? '',
-        closingComments: updated.closingComments ?? '',
-      }));
+      syncFormFromCar(updated);
+      toast.info(`${label} successful`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${label} failed`);
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const runApprovalAction = async (path: string, label: 'Approve' | 'Reject') => {
+    if (!token || !car) return;
+    setActioning(true);
+    setError(null);
+    try {
+      const updated = await apiJson<CAR>(path, {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ comment: approvalComment.trim() || null }),
+      });
+      setCar(updated);
+      syncFormFromCar(updated);
+      setApprovalComment('');
       toast.info(`${label} successful`);
     } catch (e) {
       setError(e instanceof Error ? e.message : `${label} failed`);
@@ -459,7 +490,44 @@ export function CARRecord() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                {canSave && (
+                  <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
+                    {actioning ? 'Saving…' : 'Save'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setEditMode((v) => !v)}
+                  disabled={!canEditDraft || car.status !== 'DRAFT' || actioning}
+                  title={car.status !== 'DRAFT' ? 'Edit is available only in DRAFT before Save' : 'Toggle edit mode'}
+                  style={editMode ? { background: 'var(--color-primary)', color: '#fff', borderColor: 'var(--color-primary)' } : undefined}
+                >
+                  {editMode ? 'Editing' : 'Edit'}
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => runAction(`/cars/${car.id}/process`, 'Process')} disabled={!canProcess || actioning}>
+                  {actioning ? '…' : 'Process'}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => runAction(`/cars/${car.id}/reverse`, 'Reverse')} disabled={!canReverse || actioning}>
+                  {actioning ? '…' : 'Reverse'}
+                </button>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">CAR #</label>
+                  <input className="input" value={car.code} readOnly disabled />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Status</label>
+                  <select className="input" value={car.status === 'DRAFT' ? 'RCCA' : car.status} disabled>
+                    <option value="RCCA">RCCA</option>
+                    <option value="WaitingApproval">Waiting Approval</option>
+                    <option value="FollowUp">Follow Up</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+                </div>
                 <div className="input-group">
                   <label className="input-label">Supplier</label>
                   <input className="input" value={car.supplier?.code ?? ''} readOnly disabled />
@@ -539,54 +607,57 @@ export function CARRecord() {
                 <label className="input-label">Closing Comments</label>
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem' }}>
-                {canEdit && (
-                  <button type="button" className="btn btn-ghost" onClick={handlePatch} disabled={saving}>
-                    {saving ? 'Saving…' : 'Update draft'}
-                  </button>
-                )}
-                {canSave && (
-                  <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                    {actioning ? 'Saving…' : 'Save (DRAFT → RCCA)'}
-                  </button>
-                )}
-                {canProcess && (
-                  <button type="button" className="btn btn-primary" onClick={() => runAction(`/cars/${car.id}/process`, 'Process')} disabled={actioning}>
-                    {actioning ? '…' : 'Process'}
-                  </button>
-                )}
-                {canReverse && (
-                  <button type="button" className="btn btn-ghost" onClick={() => runAction(`/cars/${car.id}/reverse`, 'Reverse')} disabled={actioning}>
-                    {actioning ? '…' : 'Reverse'}
-                  </button>
-                )}
-                {canApproveReject && (
-                  <>
-                    <button type="button" className="btn btn-primary" onClick={() => runAction(`/cars/${car.id}/approve`, 'Approve')} disabled={actioning}>Approve</button>
-                    <button type="button" className="btn btn-ghost" onClick={() => runAction(`/cars/${car.id}/reject`, 'Reject')} disabled={actioning}>Reject</button>
-                  </>
-                )}
-              </div>
             </div>
           </div>
 
           <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Status history</h2>
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Approval</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Approval Comment</label>
+                  <input
+                    className="input"
+                    value={approvalComment}
+                    onChange={(e) => setApprovalComment(e.target.value)}
+                    placeholder="Add approval or rejection comment"
+                    disabled={!canApproveReject || actioning}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-primary" onClick={() => runApprovalAction(`/cars/${car.id}/approve`, 'Approve')} disabled={!canApproveReject || actioning}>
+                    Approve
+                  </button>
+                  <button type="button" className="btn btn-ghost" onClick={() => runApprovalAction(`/cars/${car.id}/reject`, 'Reject')} disabled={!canApproveReject || actioning}>
+                    Reject
+                  </button>
+                </div>
+              </div>
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Approval Log</h2>
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Updated</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Comment</th>
+                    <th>Date/Time</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>{car.status}</td>
-                    <td>{new Date(car.createdAt).toLocaleString()}</td>
-                    <td>{new Date(car.updatedAt).toLocaleString()}</td>
-                  </tr>
+                  {(car.approvalLogs ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="table-empty">No approval actions yet.</td>
+                    </tr>
+                  ) : (
+                    (car.approvalLogs ?? []).map((log) => (
+                      <tr key={log.id}>
+                        <td>{log.user?.name || log.user?.email || 'Unknown'}</td>
+                        <td>{log.action}</td>
+                        <td>{log.comment || '—'}</td>
+                        <td>{new Date(log.createdAt).toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -348,3 +348,117 @@
 ### Environment note
 - `npx prisma generate` hit Windows file-lock (`EPERM` on `query_engine-windows.dll.node`).
 - If needed for local runtime schema sync, stop active Node processes and rerun Prisma generate/migrate.
+
+## 2026-03-20 - CAR Record workflow/UI rework
+
+### Requirement summary
+- Move core action buttons to top area and include: `Save`, `Edit`, `Process`, `Reverse`.
+- Show CAR number/status at top.
+- Use status lifecycle in UI: `RCCA`, `Waiting Approval`, `Follow Up`, `Closed` (no Draft after Save).
+- Add approval block with `Approve` / `Reject` + comment input.
+- Add approval log table with columns: `User`, `Action`, `Comment`, `Date/Time`.
+
+### Implemented changes
+- **Server**
+  - Updated `server/src/routes/cars.ts`:
+    - Added reusable `carInclude` containing supplier/audit/finding + approval logs (with user and timestamp).
+    - Changed approve transition to:
+      - `WaitingApproval -> FollowUp`
+    - Reject remains:
+      - `WaitingApproval -> RCCA`
+    - Approve/Reject endpoints now accept optional `comment` in body and append log entries.
+  - Updated Prisma schema:
+    - Added `CarApprovalLog` model and relation from `CorrectiveAction`.
+  - Added migration:
+    - `server/prisma/migrations/20260331002000_car_approval_logs/migration.sql`
+
+- **Client**
+  - Updated `client/src/pages/CARRecord.tsx`:
+    - Top action row now presents `Save`, `Edit`, `Process`, `Reverse`.
+    - Removed bottom `Update draft` action area (replaced by top actions).
+    - Added top metadata fields including:
+      - `CAR #`
+      - `Status` (displayed within the required 4-status set)
+      - `Supplier`, `Audit`, `Finding`, `Severity`, `Owner`
+    - Added approval block:
+      - `Approval Comment` input
+      - `Approve` and `Reject` buttons
+    - Added `Approval Log` table:
+      - `User`, `Action`, `Comment`, `Date/Time`
+      - Populated from server logs created on approve/reject.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
+## 2026-03-20 - Fix Prisma relation validation (CarApprovalLog.user)
+
+### Issue
+- `prisma migrate dev` failed with:
+  - `P1012`
+  - missing opposite relation field on `User` for `CarApprovalLog.user`
+
+### Implemented fix
+- Updated `server/prisma/schema.prisma`:
+  - Added back relation on `User`:
+    - `carApprovalLogs CarApprovalLog[]`
+
+### Verification
+- `npx prisma validate` -> PASS
+- `npx tsc -p tsconfig.json --noEmit` (server) -> PASS
+
+## 2026-03-20 - CAR Draft Edit button visual feedback
+
+### Requirement summary
+- In CAR Draft page, when clicking `Edit`, user should clearly see whether edit mode is active.
+
+### Implemented changes
+- Updated `client/src/pages/CARRecord.tsx`:
+  - Edit button now changes label:
+    - `Edit` -> `Editing` when toggled on.
+  - Edit button now changes style in active mode (primary-colored background/text) for clear visual state.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Fix CAR Draft edit/save/process data loss
+
+### Issue observed
+- In CAR Draft flow, after editing fields, clicking Save and then Process could show old data (edited values appeared lost).
+
+### Root cause
+- Save transitioned status (`/cars/:id/save`) without first persisting the latest draft form data.
+- Process/approval actions only partially synced local form fields from API response.
+
+### Implemented fix
+- Updated `client/src/pages/CARRecord.tsx`:
+  - Added `syncFormFromCar()` helper to keep full form state aligned with backend payload.
+  - `handleSave()` now:
+    1) PATCHes current edits to persist draft fields
+    2) then calls `/cars/:id/save` to transition to RCCA
+  - `runAction()` and `runApprovalAction()` now sync full form using `syncFormFromCar()` after server response.
+  - Save exits edit mode after successful transition.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - CAR Record workflow re-check + remove lower Save
+
+### Requirement summary
+- Re-check CAR workflow alignment and remove the extra `Save` button under `Closing Comments`.
+- Keep `Save` button only in the top action area.
+
+### Implemented changes
+- Updated `client/src/pages/CARRecord.tsx`:
+  - Removed the lower `Save` button block beneath `Closing Comments`.
+  - Removed now-unused `handlePatch` function after button removal.
+
+### Workflow check result
+- Confirmed implemented path remains:
+  - `Draft -> Save -> RCCA -> Process -> WaitingApproval -> Approve -> FollowUp -> Process -> Closed`
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS

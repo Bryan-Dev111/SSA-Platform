@@ -31,6 +31,7 @@ model User {
   recordsUploaded Record[]
   findingsCreated Finding[]
   carsCreated  CorrectiveAction[]
+  carApprovalLogs CarApprovalLog[]
   opportunitiesCreated Opportunity[]
   alerts       Alert[]
   alertPrefs   UserAlertPreference[]
@@ -193,10 +194,22 @@ model CorrectiveAction {
   correctiveAction            String?
   verificationOfEffectiveness  String?
   closingComments             String?
+  approvalLogs                CarApprovalLog[]
   createdById                 String?
   createdBy                   User?     @relation(fields: [createdById], references: [id])
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
+}
+
+model CarApprovalLog {
+  id         String           @id @default(cuid())
+  carId      String
+  car        CorrectiveAction @relation(fields: [carId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  comment    String?
+  createdAt  DateTime         @default(now())
 }
 
 enum CARStatus {
