@@ -11,6 +11,16 @@ interface DocumentRow {
   id: string;
   documentNumber: string;
   name: string;
+  revision: string | null;
+  documentType: string;
+  filePath: string | null;
+  createdAt: string;
+}
+
+interface DocumentApiRow {
+  id: string;
+  documentNumber: string;
+  name: string;
   category: string | null;
   documentType: string;
   filePath: string | null;
@@ -38,7 +48,7 @@ export function Documents() {
 
   const [docNum, setDocNum] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
+  const [revision, setRevision] = useState('');
   const [docType, setDocType] = useState('Procedure');
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -49,8 +59,15 @@ export function Documents() {
 
   const load = () => {
     if (!token) return;
-    apiJson<DocumentRow[]>('/documents', { token })
-      .then(setRows)
+    apiJson<DocumentApiRow[]>('/documents', { token })
+      .then((list) =>
+        setRows(
+          list.map((r) => ({
+            ...r,
+            revision: r.category,
+          }))
+        )
+      )
       .catch((e) => setError(parseApiError(e)));
   };
 
@@ -58,8 +75,15 @@ export function Documents() {
     if (!token) return;
     setLoading(true);
     setError(null);
-    apiJson<DocumentRow[]>('/documents', { token })
-      .then(setRows)
+    apiJson<DocumentApiRow[]>('/documents', { token })
+      .then((list) =>
+        setRows(
+          list.map((r) => ({
+            ...r,
+            revision: r.category,
+          }))
+        )
+      )
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token]);
@@ -85,14 +109,14 @@ export function Documents() {
         body: JSON.stringify({
           documentNumber: docNum.trim(),
           name: name.trim(),
-          category: category.trim() || null,
+          revision: revision.trim() || null,
           documentType: docType,
           ...(fileBase64 ? { fileBase64, fileName } : {}),
         }),
       });
       setDocNum('');
       setName('');
-      setCategory('');
+      setRevision('');
       setFile(null);
       toast.success('Document created');
       load();
@@ -154,16 +178,12 @@ export function Documents() {
                 }}
               >
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Document # *</label>
+                  <label className="input-label">Document Number *</label>
                   <input className="input" value={docNum} onChange={(e) => setDocNum(e.target.value)} required />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">Name *</label>
                   <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Category</label>
-                  <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">Type *</label>
@@ -174,6 +194,10 @@ export function Documents() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Revision</label>
+                  <input className="input" value={revision} onChange={(e) => setRevision(e.target.value)} />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">File (optional)</label>
@@ -200,10 +224,10 @@ export function Documents() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>#</th>
+                    <th>Number</th>
                     <th>Name</th>
                     <th>Type</th>
-                    <th>Category</th>
+                    <th>Revision</th>
                     <th>View</th>
                     {canMutate ? <th /> : null}
                   </tr>
@@ -214,7 +238,7 @@ export function Documents() {
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{typeLabel(r.documentType)}</td>
-                      <td>{r.category ?? '—'}</td>
+                      <td>{r.revision ?? '—'}</td>
                       <td>
                         {r.filePath ? (
                           <button type="button" className="btn" onClick={() => download(r)}>

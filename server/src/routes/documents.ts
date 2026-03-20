@@ -59,7 +59,13 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const documentNumber = typeof req.body?.documentNumber === 'string' ? req.body.documentNumber.trim() : '';
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-    const category = typeof req.body?.category === 'string' ? req.body.category.trim() || null : null;
+    const revisionRaw =
+      typeof req.body?.revision === 'string'
+        ? req.body.revision
+        : typeof req.body?.category === 'string'
+          ? req.body.category
+          : '';
+    const category = revisionRaw.trim() || null;
     const documentType = req.body?.documentType as string;
     const fileBase64Raw =
       typeof req.body?.fileBase64 === 'string' && req.body.fileBase64.trim() !== ''
@@ -118,7 +124,8 @@ router.patch(
     } = {};
     if (typeof req.body?.documentNumber === 'string') data.documentNumber = req.body.documentNumber.trim();
     if (typeof req.body?.name === 'string') data.name = req.body.name.trim();
-    if (typeof req.body?.category === 'string') data.category = req.body.category.trim() || null;
+    if (typeof req.body?.revision === 'string') data.category = req.body.revision.trim() || null;
+    else if (typeof req.body?.category === 'string') data.category = req.body.category.trim() || null;
     if (req.body?.documentType !== undefined) {
       if (!DOCUMENT_TYPES.includes(req.body.documentType as DocumentType)) {
         res.status(400).json({ error: 'Invalid documentType' });

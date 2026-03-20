@@ -89,6 +89,40 @@
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
 
+## 2026-03-20 - Documents page terminology/order alignment (Number + Revision)
+
+### Requirement summary
+- Replace `#` with `Number`.
+- Rename `Category` to `Revision`.
+- Form order: `Document Number -> Name -> Type -> Revision -> File`.
+- Table order/headers: `Number | Name | Type | Revision | View | Delete`.
+- Keep manual document number input (no auto-generation).
+
+### Implemented changes
+- Updated `client/src/pages/Documents.tsx`:
+  - Form label changed:
+    - `Document #` -> `Document Number`
+  - Table header changed:
+    - `#` -> `Number`
+  - Renamed form field/state from `category` to `revision` (UI terminology).
+  - Reordered form fields to:
+    - Document Number
+    - Name
+    - Type
+    - Revision
+    - File
+  - Table now displays `Revision` column (mapped from API category data).
+  - Kept manual document number entry behavior unchanged.
+
+- Updated `server/src/routes/documents.ts`:
+  - Accepts `revision` in POST/PATCH payload and maps it to existing DB field (`category`) for backward compatibility.
+  - Still accepts legacy `category` payload as fallback.
+
+### Verification
+- Client type-check: `npx tsc --noEmit` -> PASS
+- Server type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed files -> PASS
+
 ## 2026-03-20 - Records form row alignment + reject disable on rejected
 
 ### Requirement summary
