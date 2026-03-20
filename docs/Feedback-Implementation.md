@@ -252,3 +252,53 @@
 ### Verification
 - Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Match CAR age chart visual style
+
+### Requirement summary
+- Update the current CAR age bar chart to match the provided visual style attachment.
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx` (age chart presentation only):
+  - Switched age chart from horizontal bars to vertical bars.
+  - Added left-side axis label (`Number of CARs`).
+  - Kept X-axis bucket labels as:
+    - `0-30 days`, `31-60 days`, `61-90 days`, `90+ days`
+  - Applied purple bar styling and chart grid background for closer visual match.
+- Kept all age calculation and bucket logic unchanged.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Fix CAR age bar chart splitting
+
+### Requirement summary
+- CAR page age bar chart is visually splitting; fix layout/rendering.
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx` age chart layout:
+  - Reworked chart plot area to a stable single horizontal bar-group container.
+  - Moved X-axis labels into a dedicated axis row below the bars.
+  - Added horizontal overflow safety to avoid bar/label wrapping or split on smaller widths.
+  - Kept age bucket logic and counts unchanged.
+- Also corrected empty-table `colSpan` for current CAR table columns.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - Show full CAR age chart without scroll/pagination
+
+### Requirement summary
+- Display the entire CAR age bar chart in one view (no pagination/scroll behavior).
+
+### Implemented changes
+- Updated `client/src/pages/CorrectiveActions.tsx`:
+  - Removed horizontal overflow behavior from the age chart container.
+  - Removed fixed `minWidth` that forced partial/off-screen rendering.
+  - Made bar and label widths responsive so all four buckets render within the card.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+- Lint diagnostics on changed file -> PASS
