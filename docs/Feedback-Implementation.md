@@ -169,3 +169,35 @@
 ### Verification
 - Client type-check: `npx tsc --noEmit` -> PASS
 - Lint diagnostics on changed file -> PASS
+
+## 2026-03-20 - CAR Audit/Finding column deep links
+
+### Requirement summary
+- On the CAR table:
+  - `Audit` value must be clickable and open the Audit detail page.
+  - `Finding` value must be clickable and open the Finding detail page.
+
+### Implemented changes
+- Added `client/src/pages/AuditRecord.tsx` (read-only Audit detail view).
+- Added route `/audit-record` in `client/src/App.tsx` (guarded with the same access as `/audits`).
+- Updated `client/src/pages/CorrectiveActions.tsx`:
+  - Made the **Audit** column clickable:
+    - Links to `/audit-record?id=<auditId>`
+  - Kept the **Finding** column clickable:
+    - Links to `/findings-record?findingId=<findingCode>`
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS
+
+## 2026-03-20 - Fix `/audit-record` route RBAC redirect
+
+### Root cause
+- `Layout` blocks access to any path not present in `PATH_ROLES`.
+- `/audit-record` was missing, causing redirect (often to `/dashboard`).
+
+### Implemented changes
+- Updated `client/src/config/rolePageAccess.ts` to add:
+  - `/audit-record` with the same roles as `/audits`.
+
+### Verification
+- Client type-check: `npx tsc -p tsconfig.json --noEmit` -> PASS

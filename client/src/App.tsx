@@ -16,6 +16,7 @@ import { CARRecord } from './pages/CARRecord';
 import { Findings } from './pages/Findings';
 import { FindingsRecord } from './pages/FindingsRecord';
 import { Audits } from './pages/Audits';
+import { AuditRecord } from './pages/AuditRecord';
 import { SupplierProfile } from './pages/SupplierProfile';
 import { SupplierList } from './pages/SupplierList';
 import { SuppliersMap } from './pages/SuppliersMap';
@@ -54,6 +55,7 @@ function App() {
             <Route path="findings" element={<ProtectedRoute path="/findings"><Findings /></ProtectedRoute>} />
             <Route path="findings-record" element={<ProtectedRoute path="/findings-record"><FindingsRecord /></ProtectedRoute>} />
             <Route path="audits" element={<ProtectedRoute path="/audits"><Audits /></ProtectedRoute>} />
+            <Route path="audit-record" element={<ProtectedRoute path="/audits"><AuditRecord /></ProtectedRoute>} />
             <Route path="supplier-profile" element={<ProtectedRoute path="/supplier-profile"><SupplierProfile /></ProtectedRoute>} />
             <Route path="supplier-list" element={<ProtectedRoute path="/supplier-list"><SupplierList /></ProtectedRoute>} />
             <Route path="suppliers-map" element={<ProtectedRoute path="/suppliers-map"><SuppliersMap /></ProtectedRoute>} />

@@ -337,7 +337,14 @@ export function CorrectiveActions() {
                       </Link>
                     </td>
                     <td>{c.supplier.code} — {c.supplier.name}</td>
-                    <td>{c.audit.code}</td>
+                    <td>
+                      <Link
+                        to={`/audit-record?id=${encodeURIComponent(c.audit.id)}`}
+                        className="finding-code-link"
+                      >
+                        {c.audit.code}
+                      </Link>
+                    </td>
                     <td>
                       <Link to={`/findings-record?findingId=${encodeURIComponent(c.finding.code)}`} className="finding-code-link" style={{ fontSize: 'var(--text-sm)' }}>
                         {c.finding.code}
