@@ -72,6 +72,11 @@ export function Audits() {
   const [pageSize, setPageSize] = useState(10);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** Pending audit result change — API runs only after Confirm in modal */
+  const [resultConfirm, setResultConfirm] = useState<{
+    auditId: string;
+    result: 'Passed' | 'Failed' | 'Cancelled';
+  } | null>(null);
   const roleNames = user?.roleNames ?? [];
   const isAdmin = roleNames.includes('Admin');
   const canSetResult = roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
@@ -129,7 +134,7 @@ export function Audits() {
     }
   };
 
-  const handleSetResult = async (auditId: string, result: 'Passed' | 'Failed' | 'Cancelled') => {
+  const applyAuditResult = async (auditId: string, result: 'Passed' | 'Failed' | 'Cancelled') => {
     if (!token) return;
     setUpdatingId(auditId);
     try {
@@ -147,6 +152,13 @@ export function Audits() {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const confirmApplyAuditResult = () => {
+    if (!resultConfirm) return;
+    const { auditId, result } = resultConfirm;
+    setResultConfirm(null);
+    void applyAuditResult(auditId, result);
   };
 
   const handleCreateAudit = async (e: React.FormEvent) => {
@@ -196,7 +208,10 @@ export function Audits() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Audits</h1>
-        <p className="page-description">Schedule and results. Set result (Passed/Failed/Cancelled) as Admin or Quality Engineer.</p>
+        <p className="page-description">
+          Schedule and results. Set result (Passed/Failed/Cancelled) as Admin or Quality Engineer — confirmation required before
+          saving.
+        </p>
       </header>
 
       {error && (
@@ -346,10 +361,13 @@ export function Audits() {
                       {canSetResult && a.derivedStatus !== 'Cancelled' && a.derivedStatus !== 'Complete' ? (
                         <select
                           className="input"
-                          value={a.result ?? ''}
+                          value={
+                            resultConfirm?.auditId === a.id ? resultConfirm.result : (a.result ?? '')
+                          }
                           onChange={(e) => {
-                            const v = e.target.value as 'Passed' | 'Failed' | 'Cancelled';
-                            if (v) handleSetResult(a.id, v);
+                            const v = e.target.value;
+                            if (v !== 'Passed' && v !== 'Failed' && v !== 'Cancelled') return;
+                            setResultConfirm({ auditId: a.id, result: v });
                           }}
                           disabled={updatingId === a.id}
                           style={{ width: 'auto', minWidth: 100 }}
@@ -454,6 +472,20 @@ export function Audits() {
         variant="danger"
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
         onCancel={() => setDeleteConfirmId(null)}
+      />
+
+      <ConfirmDialog
+        open={resultConfirm !== null}
+        title="Confirm audit result"
+        message={
+          resultConfirm
+            ? `Are you sure you want to mark this audit as "${resultConfirm.result}"?`
+            : ''
+        }
+        confirmLabel="Confirm"
+        variant="default"
+        onConfirm={confirmApplyAuditResult}
+        onCancel={() => setResultConfirm(null)}
       />
     </div>
   );
