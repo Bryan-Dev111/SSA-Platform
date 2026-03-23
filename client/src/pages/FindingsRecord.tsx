@@ -476,35 +476,6 @@ export function FindingsRecord() {
             )}
           </form>
         </div>
-        {finding && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
-            {canSave && (
-              <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                {actioning ? 'Saving…' : 'Save'}
-              </button>
-            )}
-            {canProcess && (
-              <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
-                Process
-              </button>
-            )}
-            {canReverse && (
-              <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
-                Reverse
-              </button>
-            )}
-            {canApproveReject && (
-              <>
-                <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
-                  Approve
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
-                  Reject
-                </button>
-              </>
-            )}
-          </div>
-        )}
       </header>
 
       {error && (
@@ -589,8 +560,15 @@ export function FindingsRecord() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div className="input-group">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(220px, 1fr) minmax(180px, 0.9fr) minmax(160px, 0.8fr) auto',
+                  gap: '1rem',
+                  alignItems: 'end',
+                }}
+              >
+                <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">Supplier</label>
                   <input
                     className="input"
@@ -599,7 +577,7 @@ export function FindingsRecord() {
                     disabled
                   />
                 </div>
-                <div className="input-group">
+                <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">Audit #</label>
                   {finding.audit?.code ? (
                     <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
@@ -609,7 +587,7 @@ export function FindingsRecord() {
                     <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
                   )}
                 </div>
-                <div className="input-group">
+                <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">Severity</label>
                   <select
                     className="input"
@@ -621,6 +599,35 @@ export function FindingsRecord() {
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '0.5rem' }}>
+                    {canSave && (
+                      <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
+                        {actioning ? 'Saving…' : 'Save'}
+                      </button>
+                    )}
+                    {canProcess && (
+                      <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
+                        Process
+                      </button>
+                    )}
+                    {canReverse && (
+                      <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
+                        Reverse
+                      </button>
+                    )}
+                    {canApproveReject && (
+                      <>
+                        <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
+                          Approve
+                        </button>
+                        <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
+                          Reject
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="input-group">
