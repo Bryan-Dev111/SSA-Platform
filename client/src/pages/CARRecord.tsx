@@ -64,7 +64,54 @@ interface CAR {
   }>;
 }
 
+interface StatusHistoryEntry {
+  id: string;
+  status: string;
+  note: string;
+  at: string;
+}
+
 const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
+
+function buildCarStatusHistory(car: CAR): StatusHistoryEntry[] {
+  const approvalEvents = (car.approvalLogs ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .map((log) => {
+      const actor = log.user?.name || log.user?.email || 'Unknown';
+      const normalizedAction = log.action.trim().toLowerCase();
+      const statusFromAction = normalizedAction === 'approved' ? 'FollowUp' : normalizedAction === 'rejected' ? 'RCCA' : car.status;
+      const commentPart = log.comment?.trim() ? ` Comment: ${log.comment.trim()}` : '';
+      return {
+        id: `approval-${log.id}`,
+        status: statusFromAction,
+        note: `${log.action} by ${actor}.${commentPart}`.trim(),
+        at: log.createdAt,
+      } satisfies StatusHistoryEntry;
+    });
+
+  const seed: StatusHistoryEntry[] = [
+    {
+      id: `created-${car.id}`,
+      status: 'DRAFT',
+      note: 'CAR created.',
+      at: car.createdAt,
+    },
+    ...approvalEvents,
+  ];
+
+  const latest = seed[seed.length - 1];
+  if (!latest || latest.status !== car.status) {
+    seed.push({
+      id: `current-${car.id}`,
+      status: car.status,
+      note: 'Latest status.',
+      at: car.updatedAt,
+    });
+  }
+
+  return seed.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+}
 
 export function CARRecord() {
   const { token, user } = useAuth();
@@ -110,6 +157,7 @@ export function CARRecord() {
   const canReverse = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'RCCA' && car.status !== 'Closed';
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
+  const statusHistory = car ? buildCarStatusHistory(car) : [];
 
   const syncFormFromCar = (c: CAR) => {
     setForm((p) => ({
@@ -655,6 +703,32 @@ export function CARRecord() {
                         <td>{log.action}</td>
                         <td>{log.comment || '—'}</td>
                         <td>{new Date(log.createdAt).toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              <h2 style={{ marginTop: '1rem', marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Status History</h2>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Note</th>
+                    <th>Date/Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statusHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="table-empty">No status history yet.</td>
+                    </tr>
+                  ) : (
+                    statusHistory.map((entry) => (
+                      <tr key={entry.id}>
+                        <td>{entry.status}</td>
+                        <td>{entry.note}</td>
+                        <td>{new Date(entry.at).toLocaleString()}</td>
                       </tr>
                     ))
                   )}
