@@ -304,12 +304,19 @@ interface UserRow {
   assignedSupplierIds: string[];
 }
 
+interface CommodityTypeRow {
+  id: string;
+  name: string;
+}
+
 interface SupplierRow {
   id: string;
   code: string;
   name: string;
   city: string | null;
   country: string | null;
+  commodityTypeId: string | null;
+  commodityType: { id: string; name: string } | null;
 }
 
 const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'Auditor'] as const;
@@ -343,6 +350,8 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
   const [newSupName, setNewSupName] = useState('');
   const [newSupCity, setNewSupCity] = useState('');
   const [newSupCountry, setNewSupCountry] = useState('');
+  const [newSupCommodityTypeId, setNewSupCommodityTypeId] = useState('');
+  const [commodityTypes, setCommodityTypes] = useState<CommodityTypeRow[]>([]);
   const [editSup, setEditSup] = useState<SupplierRow | null>(null);
   const [delSup, setDelSup] = useState<SupplierRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -350,12 +359,14 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const [u, s] = await Promise.all([
+      const [u, s, ct] = await Promise.all([
         apiJson<UserRow[]>('/users', { token }),
         apiJson<SupplierRow[]>('/suppliers', { token }),
+        apiJson<{ list: CommodityTypeRow[] }>('/commodity-types', { token }).catch(() => ({ list: [] as CommodityTypeRow[] })),
       ]);
       setUsers(u);
       setSuppliers(s);
+      setCommodityTypes(ct.list);
       const p = await apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token });
       setPermissions(p);
     } catch {
@@ -497,11 +508,13 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
           name: newSupName.trim(),
           city: newSupCity.trim() || null,
           country: newSupCountry.trim() || null,
+          commodityTypeId: newSupCommodityTypeId.trim() ? newSupCommodityTypeId.trim() : null,
         }),
       });
       setNewSupName('');
       setNewSupCity('');
       setNewSupCountry('');
+      setNewSupCommodityTypeId('');
       toast.success('Supplier created');
       await load();
     } catch (e) {
@@ -522,6 +535,7 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
           name: editSup.name.trim(),
           city: editSup.city?.trim() || null,
           country: editSup.country?.trim() || null,
+          commodityTypeId: editSup.commodityTypeId,
         }),
       });
       setEditSup(null);
@@ -654,6 +668,22 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
               <label className="input-label">Country</label>
               <input className="input" value={newSupCountry} onChange={(e) => setNewSupCountry(e.target.value)} />
             </div>
+            <div className="input-group">
+              <label className="input-label">Commodity</label>
+              <select
+                className="input"
+                value={newSupCommodityTypeId}
+                onChange={(e) => setNewSupCommodityTypeId(e.target.value)}
+                style={{ minWidth: 180 }}
+              >
+                <option value="">— None —</option>
+                {commodityTypes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
             Create supplier (auto code)
@@ -757,6 +787,7 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
                   <th>Name</th>
                   <th>City</th>
                   <th>Country</th>
+                  <th>Commodity</th>
                   <th style={{ width: 220 }}>Actions</th>
                 </tr>
               </thead>
@@ -787,6 +818,33 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
                         />
                       ) : (
                         s.country ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <select
+                          className="input"
+                          style={{ minWidth: 140 }}
+                          value={editSup.commodityTypeId ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const ct = v ? commodityTypes.find((x) => x.id === v) ?? null : null;
+                            setEditSup({
+                              ...editSup,
+                              commodityTypeId: v === '' ? null : v,
+                              commodityType: ct ? { id: ct.id, name: ct.name } : null,
+                            });
+                          }}
+                        >
+                          <option value="">— None —</option>
+                          {commodityTypes.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        s.commodityType?.name ?? '—'
                       )}
                     </td>
                     <td>
