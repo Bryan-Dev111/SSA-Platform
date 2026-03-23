@@ -37,6 +37,20 @@ interface RecordRow {
   createdAt: string;
 }
 
+function getRecordReviewLabel(status: string): 'Pending' | 'Approved' | 'Rejected' {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'approved') return 'Approved';
+  if (normalized === 'rejected') return 'Rejected';
+  return 'Pending';
+}
+
+function getRecordRowSlug(status: string): 'pending' | 'approved' | 'rejected' {
+  const label = getRecordReviewLabel(status);
+  if (label === 'Approved') return 'approved';
+  if (label === 'Rejected') return 'rejected';
+  return 'pending';
+}
+
 function postRecordWithProgress(
   payload: { name: string; supplierId: string | null; auditId: string | null; internalOrSupplier: 'supplier' | 'internal'; file: File | null },
   token: string,
@@ -90,7 +104,6 @@ export function Records() {
   const [name, setName] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [auditId, setAuditId] = useState('');
-  const [source, setSource] = useState<'supplier' | 'internal'>('supplier');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -108,7 +121,6 @@ export function Records() {
   const canUpload =
     isAdmin ||
     isQE ||
-    isSupplier ||
     user?.roleNames?.includes('Auditor') ||
     user?.roleNames?.includes('Buyer');
 
@@ -157,10 +169,6 @@ export function Records() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !name.trim()) return;
-    if (isSupplier && source !== 'supplier') {
-      toast.error('Suppliers may only submit supplier-sourced records');
-      return;
-    }
     if (file && file.size > MAX_UPLOAD_BYTES) {
       toast.error('File exceeds current upload limit (75MB)');
       return;
@@ -172,7 +180,7 @@ export function Records() {
         name: name.trim(),
         supplierId: supplierId || null,
         auditId: auditId || null,
-        internalOrSupplier: source,
+        internalOrSupplier: 'internal' as const,
         file: file ?? null,
       };
       await postRecordWithProgress(payload, token, (p) => setUploadProgress(p));
@@ -289,7 +297,7 @@ export function Records() {
                   display: 'grid',
                   gridTemplateColumns: isSupplier
                     ? 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(220px, 1fr) auto'
-                    : 'minmax(180px, 1fr) minmax(120px, 0.8fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr) auto',
+                    : 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr) auto',
                   gap: '0.75rem',
                   alignItems: 'flex-end',
                   paddingBottom: 22,
@@ -299,19 +307,6 @@ export function Records() {
                   <label className="input-label">Name *</label>
                   <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
-                {!isSupplier && (
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Source</label>
-                    <select
-                      className="input"
-                      value={source}
-                      onChange={(e) => setSource(e.target.value as 'supplier' | 'internal')}
-                    >
-                      <option value="supplier">Supplier</option>
-                      <option value="internal">Internal</option>
-                    </select>
-                  </div>
-                )}
                 {!isSupplier && (
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Supplier</label>
@@ -433,8 +428,7 @@ export function Records() {
                     <th>Name</th>
                     <th>Supplier</th>
                     <th>Audit</th>
-                    <th>Source</th>
-                    <th>Status</th>
+                    <th>Review</th>
                     <th>File</th>
                     <th>Uploaded by</th>
                     <th>Created</th>
@@ -443,12 +437,11 @@ export function Records() {
                 </thead>
                 <tbody>
                   {paginatedRows.map((r) => (
-                    <tr key={r.id}>
+                    <tr key={r.id} className={`record-row record-row--${getRecordRowSlug(r.status)}`}>
                       <td>{r.name}</td>
                       <td>{r.supplier?.code ?? 'None'}</td>
                       <td>{r.audit?.code ?? 'None'}</td>
-                      <td>{r.internalOrSupplier}</td>
-                      <td>{r.status}</td>
+                      <td>{getRecordReviewLabel(r.status)}</td>
                       <td>
                         {r.filePath ? (
                           <button

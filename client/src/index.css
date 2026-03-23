@@ -622,6 +622,28 @@ a.btn:focus {
   border-color: var(--color-border);
 }
 
+/* Records table: review-state row colors */
+.record-row--pending {
+  background: #fffbeb;
+}
+.record-row--approved {
+  background: #f3f4f6;
+}
+.record-row--rejected {
+  background: #fef2f2;
+}
+
+/* Records table: keep review hue on hover */
+.table tbody tr.record-row--pending:hover {
+  background: #fef3c7;
+}
+.table tbody tr.record-row--approved:hover {
+  background: #e5e7eb;
+}
+.table tbody tr.record-row--rejected:hover {
+  background: #fee2e2;
+}
+
 /* ----- Alerts & states ----- */
 .alert-error {
   padding: var(--space-3) var(--space-4);
