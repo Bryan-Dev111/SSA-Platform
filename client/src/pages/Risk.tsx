@@ -392,6 +392,61 @@ export function Risk() {
         </div>
       </div>
 
+      {canEditRiskItems && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Add risk/opportunity</h2>
+            <form onSubmit={createItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr auto', gap: '0.75rem' }}>
+              <select className="input" value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)} required>
+                <option value="">Supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} — {s.name}
+                  </option>
+                ))}
+              </select>
+              <select className="input" value={newType} onChange={(e) => setNewType(e.target.value as 'risk' | 'opportunity')}>
+                <option value="risk">Risk</option>
+                <option value="opportunity">Opportunity</option>
+              </select>
+              <input
+                className="input"
+                placeholder="Description"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                required
+              />
+              {newType === 'risk' ? (
+                <>
+                  <select className="input" value={newLikelihood} onChange={(e) => setNewLikelihood(e.target.value as 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely')}>
+                    <option value="VeryUnlikely">Very Unlikely</option>
+                    <option value="Unlikely">Unlikely</option>
+                    <option value="Possible">Possible</option>
+                    <option value="Likely">Likely</option>
+                    <option value="VeryLikely">Very Likely</option>
+                  </select>
+                  <select className="input" value={newSeverity} onChange={(e) => setNewSeverity(e.target.value as 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe')}>
+                    <option value="Negligible">Negligible</option>
+                    <option value="Minor">Minor</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Significant">Significant</option>
+                    <option value="Severe">Severe</option>
+                  </select>
+                </>
+              ) : (
+                <>
+                  <div />
+                  <div />
+                </>
+              )}
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving ? 'Saving…' : 'Add'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
@@ -452,61 +507,6 @@ export function Risk() {
           </div>
         </div>
       </div>
-
-      {canEditRiskItems && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Add risk/opportunity</h2>
-            <form onSubmit={createItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr auto', gap: '0.75rem' }}>
-              <select className="input" value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)} required>
-                <option value="">Supplier</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
-                  </option>
-                ))}
-              </select>
-              <select className="input" value={newType} onChange={(e) => setNewType(e.target.value as 'risk' | 'opportunity')}>
-                <option value="risk">Risk</option>
-                <option value="opportunity">Opportunity</option>
-              </select>
-              <input
-                className="input"
-                placeholder="Description"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                required
-              />
-              {newType === 'risk' ? (
-                <>
-                  <select className="input" value={newLikelihood} onChange={(e) => setNewLikelihood(e.target.value as 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely')}>
-                    <option value="VeryUnlikely">Very Unlikely</option>
-                    <option value="Unlikely">Unlikely</option>
-                    <option value="Possible">Possible</option>
-                    <option value="Likely">Likely</option>
-                    <option value="VeryLikely">Very Likely</option>
-                  </select>
-                  <select className="input" value={newSeverity} onChange={(e) => setNewSeverity(e.target.value as 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe')}>
-                    <option value="Negligible">Negligible</option>
-                    <option value="Minor">Minor</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Significant">Significant</option>
-                    <option value="Severe">Severe</option>
-                  </select>
-                </>
-              ) : (
-                <>
-                  <div />
-                  <div />
-                </>
-              )}
-              <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving ? 'Saving…' : 'Add'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
       {editingId && (
         <div className="confirm-dialog-overlay" onClick={closeEditModal} role="dialog" aria-modal="true" aria-labelledby="risk-edit-title">
