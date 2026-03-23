@@ -66,12 +66,11 @@ export function CorrectiveActions() {
     { severity: 'Minor', count: 0 },
   ];
   const maxSeverityCount = Math.max(1, ...severityCounts.map((s) => s.count));
-  const statusLabels = ['RCCA', 'WaitingApproval', 'FollowUp', 'Closed'] as const;
+  const statusLabels = ['RCCA', 'WaitingApproval', 'FollowUp'] as const;
   const statusColorMap: Record<(typeof statusLabels)[number], string> = {
     RCCA: '#0ea5e9',
     WaitingApproval: '#f59e0b',
     FollowUp: '#8b5cf6',
-    Closed: '#22c55e',
   };
   const statusCounts = statusLabels.map((status) => ({
     status,
