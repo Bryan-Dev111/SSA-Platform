@@ -17,6 +17,12 @@ interface Supplier {
   name: string;
 }
 
+interface AuditOption {
+  id: string;
+  code: string;
+  supplierId: string;
+}
+
 interface RecordRow {
   id: string;
   name: string;
@@ -25,12 +31,14 @@ interface RecordRow {
   filePath: string | null;
   supplierId: string | null;
   supplier: { id: string; code: string; name: string } | null;
+  auditId?: string | null;
+  audit?: { id: string; code: string } | null;
   uploadedBy: { id: string; email: string; name: string | null } | null;
   createdAt: string;
 }
 
 function postRecordWithProgress(
-  payload: { name: string; supplierId: string | null; internalOrSupplier: 'supplier' | 'internal'; file: File | null },
+  payload: { name: string; supplierId: string | null; auditId: string | null; internalOrSupplier: 'supplier' | 'internal'; file: File | null },
   token: string,
   onProgress: (percent: number) => void
 ): Promise<void> {
@@ -63,6 +71,7 @@ function postRecordWithProgress(
     form.append('name', payload.name);
     form.append('internalOrSupplier', payload.internalOrSupplier);
     form.append('supplierId', payload.supplierId ?? '');
+    form.append('auditId', payload.auditId ?? '');
     if (payload.file) form.append('file', payload.file);
     xhr.send(form);
   });
@@ -73,12 +82,14 @@ export function Records() {
   const toast = useToast();
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [audits, setAudits] = useState<AuditOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [auditId, setAuditId] = useState('');
   const [source, setSource] = useState<'supplier' | 'internal'>('supplier');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -122,6 +133,9 @@ export function Records() {
         }
       })
       .catch(() => setSuppliers([]));
+    apiJson<AuditOption[]>('/audits', { token })
+      .then((list) => setAudits(list))
+      .catch(() => setAudits([]));
   }, [token, isSupplier]);
 
   useEffect(() => {
@@ -157,11 +171,13 @@ export function Records() {
       const payload = {
         name: name.trim(),
         supplierId: supplierId || null,
+        auditId: auditId || null,
         internalOrSupplier: source,
         file: file ?? null,
       };
       await postRecordWithProgress(payload, token, (p) => setUploadProgress(p));
       setName('');
+      setAuditId('');
       setFile(null);
       setUploadProgress(null);
       toast.success('Record submitted');
@@ -272,8 +288,8 @@ export function Records() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: isSupplier
-                    ? 'minmax(180px, 1fr) minmax(220px, 1fr) auto'
-                    : 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr) auto',
+                    ? 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(220px, 1fr) auto'
+                    : 'minmax(180px, 1fr) minmax(120px, 0.8fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr) auto',
                   gap: '0.75rem',
                   alignItems: 'flex-end',
                   paddingBottom: 22,
@@ -302,7 +318,10 @@ export function Records() {
                     <select
                       className="input"
                       value={supplierId}
-                      onChange={(e) => setSupplierId(e.target.value)}
+                      onChange={(e) => {
+                        setSupplierId(e.target.value);
+                        setAuditId('');
+                      }}
                     >
                       <option value="">None</option>
                       {suppliers.map((s) => (
@@ -313,6 +332,19 @@ export function Records() {
                     </select>
                   </div>
                 )}
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Audit</label>
+                  <select className="input" value={auditId} onChange={(e) => setAuditId(e.target.value)}>
+                    <option value="">None</option>
+                    {audits
+                      .filter((a) => !supplierId || a.supplierId === supplierId)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code}
+                        </option>
+                      ))}
+                  </select>
+                </div>
                 <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
                   <label className="input-label">File (optional)</label>
                   <input
@@ -400,6 +432,7 @@ export function Records() {
                   <tr>
                     <th>Name</th>
                     <th>Supplier</th>
+                    <th>Audit</th>
                     <th>Source</th>
                     <th>Status</th>
                     <th>File</th>
@@ -413,6 +446,7 @@ export function Records() {
                     <tr key={r.id}>
                       <td>{r.name}</td>
                       <td>{r.supplier?.code ?? 'None'}</td>
+                      <td>{r.audit?.code ?? 'None'}</td>
                       <td>{r.internalOrSupplier}</td>
                       <td>{r.status}</td>
                       <td>

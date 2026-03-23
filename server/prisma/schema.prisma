@@ -139,6 +139,7 @@ model Audit {
   updatedAt    DateTime  @updatedAt
   findings     Finding[]
   correctiveActions CorrectiveAction[]
+  records      Record[]
 }
 
 enum AuditResult {
@@ -281,6 +282,8 @@ model Record {
   internalOrSupplier RecordSource
   supplierId       String?
   supplier         Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  auditId          String?
+  audit            Audit?      @relation(fields: [auditId], references: [id], onDelete: SetNull)
   status          RecordStatus @default(PENDING)
   filePath        String?
   fileName        String?

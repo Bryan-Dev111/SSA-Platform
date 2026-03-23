@@ -48,6 +48,7 @@ router.get(
         where: { supplierId: null as any },
         include: {
           supplier: { select: { id: true, code: true, name: true } },
+          audit: { select: { id: true, code: true } },
           uploadedBy: { select: { id: true, email: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -65,6 +66,7 @@ router.get(
       where,
       include: {
         supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -178,10 +180,15 @@ router.post(
     }
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const supplierIdRaw = req.body?.supplierId;
-    const supplierId =
+    let supplierId =
       supplierIdRaw === null || supplierIdRaw === undefined || supplierIdRaw === ''
         ? null
         : String(supplierIdRaw);
+    const auditIdRaw = req.body?.auditId;
+    const auditId =
+      auditIdRaw === null || auditIdRaw === undefined || auditIdRaw === ''
+        ? null
+        : String(auditIdRaw);
     const internalOrSupplier = req.body?.internalOrSupplier === 'internal' ? 'internal' : 'supplier';
     const fileBase64Raw =
       typeof req.body?.fileBase64 === 'string' && req.body.fileBase64.trim() !== ''
@@ -212,6 +219,26 @@ router.post(
     if (supplierId && allowedIds !== null && !allowedIds.includes(supplierId)) {
       res.status(403).json({ error: 'Supplier not in scope' });
       return;
+    }
+    if (auditId) {
+      const audit = await prisma.audit.findUnique({
+        where: { id: auditId },
+        select: { id: true, code: true, supplierId: true },
+      });
+      if (!audit) {
+        res.status(400).json({ error: 'Invalid audit id' });
+        return;
+      }
+      if (supplierId && supplierId !== audit.supplierId) {
+        res.status(400).json({ error: 'Selected audit does not belong to selected supplier' });
+        return;
+      }
+      // If supplier was omitted, derive it from audit for proper scope/ownership behavior.
+      supplierId = supplierId ?? audit.supplierId;
+      if (allowedIds !== null && !allowedIds.includes(audit.supplierId)) {
+        res.status(403).json({ error: 'Supplier not in scope' });
+        return;
+      }
     }
     if (isSupplierUser) {
       const own = await prisma.supplier.findFirst({ where: { userId: req.user.id }, select: { id: true } });
@@ -272,6 +299,7 @@ router.post(
       data: {
         name,
         supplierId,
+        auditId,
         internalOrSupplier: internalOrSupplier as RecordSource,
         status: RecordStatus.PENDING,
         filePath,
@@ -282,6 +310,7 @@ router.post(
       },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
     });

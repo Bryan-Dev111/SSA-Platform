@@ -76,6 +76,7 @@ router.get(
         supplier: { select: { id: true, code: true, name: true } },
         auditType: { select: { id: true, code: true, name: true } },
         findings: { select: { id: true, code: true } },
+        records: { select: { id: true, name: true, filePath: true }, orderBy: { createdAt: 'desc' } },
       },
       orderBy: { auditDate: 'desc' },
     });
@@ -93,6 +94,7 @@ router.get(
       createdAt: a.createdAt,
       derivedStatus: getDerivedStatus(a.result, a.auditDate),
       findingCodes: a.findings.map((f) => f.code),
+      records: a.records.map((r) => ({ id: r.id, name: r.name, hasFile: Boolean(r.filePath) })),
     }));
     res.json(list);
   })

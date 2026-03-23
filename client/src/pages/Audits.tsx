@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { downloadWithAuthProgress, parseApiError } from '../utils/apiHelpers';
 
 interface Supplier {
   id: string;
@@ -34,6 +35,7 @@ interface Audit {
   notes: string | null;
   derivedStatus: string;
   findingCodes: string[];
+  records: Array<{ id: string; name: string; hasFile: boolean }>;
 }
 
 /** Format ISO/YYYY-MM-DD date as locale date string without timezone shift */
@@ -72,6 +74,7 @@ export function Audits() {
   const [pageSize, setPageSize] = useState(10);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [downloadingRecord, setDownloadingRecord] = useState<Record<string, boolean>>({});
   /** Pending audit result change — API runs only after Confirm in modal */
   const [resultConfirm, setResultConfirm] = useState<{
     auditId: string;
@@ -159,6 +162,23 @@ export function Audits() {
     const { auditId, result } = resultConfirm;
     setResultConfirm(null);
     void applyAuditResult(auditId, result);
+  };
+
+  const downloadRecord = async (recordId: string, recordName: string) => {
+    if (!token) return;
+    try {
+      setDownloadingRecord((prev) => ({ ...prev, [recordId]: true }));
+      await downloadWithAuthProgress(`/records/${recordId}/download`, token, recordName, () => {});
+      toast.success('Record download completed');
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setDownloadingRecord((prev) => {
+        const next = { ...prev };
+        delete next[recordId];
+        return next;
+      });
+    }
   };
 
   const handleCreateAudit = async (e: React.FormEvent) => {
@@ -334,13 +354,14 @@ export function Audits() {
                 <th>Result</th>
                 <th>Notes</th>
                 <th>Findings</th>
+                <th>Records</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {audits.length === 0 ? (
                 <tr>
-                  <td colSpan={9 + (isAdmin ? 1 : 0)} className="table-empty">
+                  <td colSpan={10 + (isAdmin ? 1 : 0)} className="table-empty">
                     No audits in scope.
                   </td>
                 </tr>
@@ -395,6 +416,32 @@ export function Audits() {
                             >
                               {code}
                             </Link>
+                          ))}
+                    </td>
+                    <td>
+                      {a.records.length === 0
+                        ? '—'
+                        : a.records.map((r) => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{
+                                display: 'block',
+                                padding: 0,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--color-primary)',
+                                textDecoration: 'underline',
+                                marginBottom: 2,
+                                cursor: r.hasFile ? 'pointer' : 'default',
+                              }}
+                              disabled={!r.hasFile || Boolean(downloadingRecord[r.id])}
+                              onClick={() => r.hasFile && downloadRecord(r.id, r.name)}
+                              title={r.hasFile ? 'Download record file' : 'No file attached'}
+                            >
+                              {downloadingRecord[r.id] ? 'Downloading…' : r.name}
+                            </button>
                           ))}
                     </td>
                     {isAdmin && (
