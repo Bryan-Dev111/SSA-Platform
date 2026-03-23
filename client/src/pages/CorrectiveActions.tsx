@@ -68,8 +68,8 @@ export function CorrectiveActions() {
   const maxSeverityCount = Math.max(1, ...severityCounts.map((s) => s.count));
   const statusLabels = ['RCCA', 'WaitingApproval', 'FollowUp'] as const;
   const statusColorMap: Record<(typeof statusLabels)[number], string> = {
-    RCCA: '#0ea5e9',
-    WaitingApproval: '#f59e0b',
+    RCCA: '#f59e0b',
+    WaitingApproval: '#ef4444',
     FollowUp: '#8b5cf6',
   };
   const statusCounts = statusLabels.map((status) => ({
@@ -324,7 +324,7 @@ export function CorrectiveActions() {
                       <div key={s.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
-                          {s.status}
+                          {formatCarStatusLabel(s.status)}
                         </span>
                         <span style={{ color: 'var(--color-text-muted)' }}>{s.count}</span>
                       </div>
@@ -463,7 +463,7 @@ export function CorrectiveActions() {
                       <span
                         className={`finding-status-badge car-table-status-badge car-table-status-badge--${getCarStatusSlug(c.status)}`}
                       >
-                        {c.status}
+                        {formatCarStatusLabel(c.status)}
                       </span>
                     </td>
                     <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.summary}>
@@ -560,4 +560,14 @@ function getCarStatusSlug(status: string): string {
   if (s === 'followup') return 'follow-up';
   if (s === 'closed') return 'closed';
   return s || 'unknown';
+}
+
+function formatCarStatusLabel(status: string): string {
+  const s = status.trim().toLowerCase();
+  if (s === 'waitingapproval' || s === 'waiting approval') return 'Waiting Approval';
+  if (s === 'followup' || s === 'follow up') return 'FollowUp';
+  if (s === 'rcca') return 'RCCA';
+  if (s === 'closed') return 'Closed';
+  if (s === 'draft') return 'Draft';
+  return status;
 }
