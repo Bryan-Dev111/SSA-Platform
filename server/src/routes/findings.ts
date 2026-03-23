@@ -38,26 +38,25 @@ router.get(
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
     const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
-    const where: { supplierId?: { in: string[] } | string; status?: { notIn: FindingStatus[] } } = {
-      status: { notIn: ['New', 'DRAFT'] },
-    };
+    const where: { supplierId?: { in: string[] } | string; status?: { notIn: FindingStatus[] } } = {};
     if (allowedIds !== null) {
       where.supplierId = { in: allowedIds };
       if (allowedIds.length === 0) {
-        res.json({ list: [], stats: { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 }, defectCodeCounts: [] });
+        res.json({ list: [], stats: { totalAll: 0, openAll: 0, criticalMajor: 0 }, defectCodeCounts: [] });
         return;
       }
     }
     if (supplierId) {
       if (allowedIds !== null && !allowedIds.includes(supplierId)) {
-        res.json({ list: [], stats: { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 }, defectCodeCounts: [] });
+        res.json({ list: [], stats: { totalAll: 0, openAll: 0, criticalMajor: 0 }, defectCodeCounts: [] });
         return;
       }
       where.supplierId = supplierId;
     }
+    // Stats are computed from all DB findings in scope (no status exclusion).
+    const statsWhere = { ...where };
     // List shows only findings that have left New (and legacy DRAFT).
     where.status = { notIn: ['New', 'DRAFT'] };
-    const statsWhere = { ...where };
     const [list, allForStats] = await Promise.all([
       prisma.finding.findMany({
         where,
@@ -76,11 +75,9 @@ router.get(
         select: { severity: true, status: true, defectCode: true },
       }),
     ]);
-    const totalCriticalMajor = allForStats.filter((f) => f.severity === 'Critical' || f.severity === 'Major').length;
-    const openCriticalMajor = allForStats.filter(
-      (f) => (f.severity === 'Critical' || f.severity === 'Major') && f.status !== 'Closed'
-    ).length;
-    const waitingApproval = allForStats.filter((f) => f.status === 'WaitingApproval').length;
+    const totalAll = allForStats.length;
+    const openAll = allForStats.filter((f) => f.status !== 'Closed').length;
+    const criticalMajor = allForStats.filter((f) => f.severity === 'Critical' || f.severity === 'Major').length;
     const defectCodeCounts = allForStats
       .filter((f) => f.defectCode)
       .reduce((acc: Record<string, number>, f) => {
@@ -94,7 +91,7 @@ router.get(
       .slice(0, 10);
     res.json({
       list,
-      stats: { totalCriticalMajor, openCriticalMajor, waitingApproval },
+      stats: { totalAll, openAll, criticalMajor },
       defectCodeCounts: defectCodeArray,
     });
   })

@@ -32,7 +32,13 @@ interface Finding {
 
 interface FindingsResponse {
   list: Finding[];
-  stats: { totalCriticalMajor: number; openCriticalMajor: number; waitingApproval: number };
+  stats?: {
+    totalAll?: number;
+    openAll?: number;
+    criticalMajor?: number;
+    totalCriticalMajor?: number;
+    openCriticalMajor?: number;
+  };
   defectCodeCounts: { code: string; count: number }[];
 }
 
@@ -58,7 +64,19 @@ export function Findings() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const list = data?.list ?? [];
-  const stats = data?.stats ?? { totalCriticalMajor: 0, openCriticalMajor: 0, waitingApproval: 0 };
+  const statsFromApi = data?.stats;
+  const stats = {
+    totalAll:
+      statsFromApi?.totalAll ??
+      list.length,
+    openAll:
+      statsFromApi?.openAll ??
+      list.filter((f) => f.status !== 'Closed').length,
+    criticalMajor:
+      statsFromApi?.criticalMajor ??
+      statsFromApi?.totalCriticalMajor ??
+      list.filter((f) => f.severity === 'Critical' || f.severity === 'Major').length,
+  };
   const defectCodeCounts = data?.defectCodeCounts ?? [];
   const topDefectCodes = defectCodeCounts.slice(0, 10);
   const maxDefectCount = Math.max(1, ...defectCodeCounts.map((d) => d.count));
@@ -152,7 +170,7 @@ export function Findings() {
       <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         {canCreateFinding && (
           <Link to="/findings-record" className="btn btn-primary">
-            New finding
+            FINDING RECORDS
           </Link>
         )}
         <label>
@@ -177,16 +195,16 @@ export function Findings() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total (Critical/Major)</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalCriticalMajor}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total (All)</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalAll}</div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open (Critical/Major)</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openCriticalMajor}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open (All)</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Waiting Approval</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.waitingApproval}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Critical/Major</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.criticalMajor}</div>
         </div>
       </div>
 
@@ -245,7 +263,7 @@ export function Findings() {
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Summary</th>
-                <th>Updated</th>
+                <th>Defect Code</th>
                 <th>CAR</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
@@ -276,7 +294,7 @@ export function Findings() {
                     <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.summary}>
                       {f.summary}
                     </td>
-                    <td>{new Date(f.updatedAt).toLocaleDateString()}</td>
+                    <td>{f.defectCode?.trim() ? f.defectCode : '—'}</td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
                         {(f.correctiveActions ?? []).length === 0 ? (
