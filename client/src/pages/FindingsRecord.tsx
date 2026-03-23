@@ -3,7 +3,7 @@
  * Containment, Occurrence/Escape Root Cause, Corrective Action, VOE, Closing Comments);
  * approval/status history; workflow buttons Save and Process.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -60,6 +60,15 @@ function formatFindingStatus(status: string): string {
   return status;
 }
 
+function isFindingNotFoundErrorMessage(message: string): boolean {
+  const normalized = message.toLowerCase().replace(/\s+/g, '');
+  return (
+    normalized.includes('findingnotfound') ||
+    normalized.includes('"error":"findingnotfound"') ||
+    normalized.includes("{\"error\":\"findingnotfound\"}")
+  );
+}
+
 export function FindingsRecord() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -89,6 +98,10 @@ export function FindingsRecord() {
   });
   const [saving, setSaving] = useState(false);
   const [actioning, setActioning] = useState(false);
+  const [findingQuery, setFindingQuery] = useState(codeParam ?? idParam ?? '');
+  const [searching, setSearching] = useState(false);
+  const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
+  const activeLoadIdRef = useRef(0);
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
@@ -102,16 +115,77 @@ export function FindingsRecord() {
   // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
   const canCreateNew = canEditDraft;
 
+  const resetCreateForm = () => {
+    setForm({
+      supplierId: '',
+      auditId: '',
+      severity: 'Major',
+      summary: '',
+      discrepancy: '',
+      defectCode: '',
+      dispositionCode: '',
+      containment: '',
+      occurrenceRootCause: '',
+      escapeRootCause: '',
+      correctiveAction: '',
+      verificationOfEffectiveness: '',
+      closingComments: '',
+    });
+  };
+
+  const fetchFindingByQuery = async (queryRaw: string) => {
+    const query = queryRaw.trim();
+    if (!query) throw new Error('Enter a Finding id or code to search.');
+    const tryById = async (): Promise<Finding | null> => {
+      try {
+        return await apiJson<Finding>(`/findings/${encodeURIComponent(query)}`, { token: token! });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (isFindingNotFoundErrorMessage(message)) return null;
+        throw err;
+      }
+    };
+    const tryByCode = async (): Promise<Finding | null> =>
+      apiJson<Finding | null>(`/findings/by-code/${encodeURIComponent(query.toUpperCase())}`, { token: token! });
+
+    const looksLikeFindingCode = /^fin[-\s]?\d+/i.test(query);
+    if (looksLikeFindingCode) {
+      const byCode = await tryByCode();
+      if (byCode) return byCode;
+      const byId = await tryById();
+      if (byId) return byId;
+      throw new Error('Finding not found');
+    }
+    const byId = await tryById();
+    if (byId) return byId;
+    const byCode = await tryByCode();
+    if (byCode) return byCode;
+    throw new Error('Finding not found');
+  };
+
+  useEffect(() => {
+    setFindingQuery(codeParam ?? idParam ?? '');
+  }, [codeParam, idParam]);
+
   useEffect(() => {
     if (!token) return;
+    const loadId = ++activeLoadIdRef.current;
+    const isActive = () => activeLoadIdRef.current === loadId;
     if (!idParam && !codeParam) {
       setLoading(false);
-      apiJson<Supplier[]>('/suppliers', { token }).then(setSuppliers).catch(() => setSuppliers([]));
+      setError(null);
+      setFinding(null);
+      setSearchMissNoCreate(false);
+      apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => { if (isActive()) setSuppliers([]); });
       return;
     }
-    const url = idParam ? `/findings/${idParam}` : `/findings/by-code/${encodeURIComponent(codeParam!)}`;
-    apiJson<Finding>(url, { token })
+    setLoading(true);
+    setError(null);
+    setSearchMissNoCreate(false);
+    const loadFinding = async () => (idParam ? apiJson<Finding>(`/findings/${encodeURIComponent(idParam.trim())}`, { token }) : fetchFindingByQuery(codeParam ?? ''));
+    loadFinding()
       .then((f) => {
+        if (!isActive()) return;
         setFinding(f);
         setForm({
           supplierId: f.supplierId,
@@ -129,10 +203,19 @@ export function FindingsRecord() {
           closingComments: f.closingComments ?? '',
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!isActive()) return;
+        setFinding(null);
+        const message = e instanceof Error ? e.message : 'Failed to load';
+        const isNotFound = isFindingNotFoundErrorMessage(message);
+        setError(isNotFound ? null : message);
+        setSearchMissNoCreate(isNotFound);
+      })
+      .finally(() => {
+        if (isActive()) setLoading(false);
+      });
 
-    apiJson<Supplier[]>('/suppliers', { token }).then(setSuppliers).catch(() => {});
+    apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => {});
   }, [token, idParam, codeParam]);
 
   useEffect(() => {
@@ -271,19 +354,7 @@ export function FindingsRecord() {
         }),
       });
       setFinding(created);
-      setForm((p) => ({
-        ...p,
-        summary: '',
-        discrepancy: '',
-        defectCode: '',
-        dispositionCode: '',
-        containment: '',
-        occurrenceRootCause: '',
-        escapeRootCause: '',
-        correctiveAction: '',
-        verificationOfEffectiveness: '',
-        closingComments: '',
-      }));
+      resetCreateForm();
       setError(null);
       toast.success('Finding created');
       // Move to a stable URL so refresh/navigation keeps showing the saved record.
@@ -293,6 +364,60 @@ export function FindingsRecord() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = findingQuery.trim();
+    if (!q) {
+      toast.info('Enter a Finding id or code to search.');
+      return;
+    }
+    if (!token) return;
+    const loadId = ++activeLoadIdRef.current;
+    const isActive = () => activeLoadIdRef.current === loadId;
+    setSearching(true);
+    setError(null);
+    setSearchMissNoCreate(false);
+    try {
+      const found = await fetchFindingByQuery(q);
+      if (!isActive()) return;
+      setFinding(found);
+      setForm({
+        supplierId: found.supplierId,
+        auditId: found.auditId ?? '',
+        severity: found.severity,
+        summary: found.summary,
+        discrepancy: found.discrepancy,
+        defectCode: found.defectCode ?? '',
+        dispositionCode: found.dispositionCode ?? '',
+        containment: found.containment ?? '',
+        occurrenceRootCause: found.occurrenceRootCause ?? '',
+        escapeRootCause: found.escapeRootCause ?? '',
+        correctiveAction: found.correctiveAction ?? '',
+        verificationOfEffectiveness: found.verificationOfEffectiveness ?? '',
+        closingComments: found.closingComments ?? '',
+      });
+    } catch (err) {
+      if (!isActive()) return;
+      setFinding(null);
+      const message = err instanceof Error ? err.message : 'Failed to load';
+      const isNotFound = isFindingNotFoundErrorMessage(message);
+      setError(isNotFound ? null : message);
+      setSearchMissNoCreate(isNotFound);
+    } finally {
+      if (isActive()) setSearching(false);
+    }
+  };
+
+  const handleStartCreateFinding = () => {
+    setFinding(null);
+    setError(null);
+    setSearching(false);
+    setSearchMissNoCreate(false);
+    setFindingQuery('');
+    resetCreateForm();
+    navigate('/findings-record');
   };
 
   if (loading) {
@@ -309,7 +434,7 @@ export function FindingsRecord() {
     );
   }
 
-  const isNew = !finding && !idParam && !codeParam;
+  const isNew = !finding && !idParam && !codeParam && !searchMissNoCreate;
 
   // Viewer/Buyer are read-only: do not show the "New finding" create form (redirect to list)
   if (!loading && isNew && !canCreateNew) {
@@ -320,7 +445,7 @@ export function FindingsRecord() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">
-          {finding ? `${finding.code} — Finding` : isNew ? 'New Finding' : 'Findings Record'}
+          {finding ? `${finding.code} — Finding` : 'Finding Record'}
         </h1>
         <p className="page-description">
           {finding
@@ -332,6 +457,25 @@ export function FindingsRecord() {
         <p style={{ marginTop: 4 }}>
           <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
         </p>
+        <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
+          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap', flex: '1 1 auto' }}>
+            <input
+              className="input"
+              value={findingQuery}
+              onChange={(e) => setFindingQuery(e.target.value)}
+              placeholder="Search by Finding id or code"
+              style={{ width: 320, minWidth: 320, maxWidth: 320 }}
+            />
+            <button type="submit" className="btn btn-ghost" disabled={searching}>
+              {searching ? 'Searching…' : 'Search'}
+            </button>
+            {canCreateNew && (
+              <button type="button" className="btn btn-primary" onClick={handleStartCreateFinding}>
+                Create Finding
+              </button>
+            )}
+          </form>
+        </div>
         {finding && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
             {canSave && (

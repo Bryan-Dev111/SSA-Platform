@@ -105,8 +105,13 @@ router.get(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const finding = await prisma.finding.findUnique({
-      where: { code: req.params.code },
+    const rawCode = String(req.params.code ?? '').trim();
+    if (!rawCode) {
+      res.status(400).json({ error: 'Finding code is required' });
+      return;
+    }
+    const finding = await prisma.finding.findFirst({
+      where: { code: { equals: rawCode.toUpperCase(), mode: 'insensitive' } },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
@@ -118,7 +123,8 @@ router.get(
       },
     });
     if (!finding) {
-      res.status(404).json({ error: 'Finding not found' });
+      // Search endpoint behavior: return null to avoid noisy network errors for misses.
+      res.json(null);
       return;
     }
     if (allowedIds !== null && !allowedIds.includes(finding.supplierId)) {
