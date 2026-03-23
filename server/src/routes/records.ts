@@ -11,6 +11,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { createAlertForRecipients } from '../services/alerts';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_RECORD_FILE_BYTES } });
@@ -166,6 +167,14 @@ router.patch(
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
     });
+    if (updated.status === 'Rejected') {
+      await createAlertForRecipients({
+        category: 'rejectedShipmentDocument',
+        entityType: 'Record',
+        entityId: updated.id,
+        message: `Record ${updated.name} was rejected${updated.supplier ? ` for ${updated.supplier.code} — ${updated.supplier.name}` : ''}.`,
+      });
+    }
     res.json(updated);
   })
 );

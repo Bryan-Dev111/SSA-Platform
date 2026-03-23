@@ -11,6 +11,7 @@ import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { createAlertForRecipients } from '../services/alerts';
 
 const router = Router();
 
@@ -243,6 +244,14 @@ router.post(
         correctiveActions: { select: { id: true, code: true, status: true }, orderBy: { updatedAt: 'desc' } },
       },
     });
+    if (finding.severity === 'Critical' || finding.severity === 'Major') {
+      await createAlertForRecipients({
+        category: 'majorCriticalFinding',
+        entityType: 'Finding',
+        entityId: finding.id,
+        message: `${finding.severity} finding ${finding.code} created for ${finding.supplier.code} — ${finding.supplier.name}.`,
+      });
+    }
     res.status(201).json(finding);
   })
 );

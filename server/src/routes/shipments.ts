@@ -9,6 +9,7 @@ import { getAllowedSupplierIds } from '../services/scope';
 import { computeShipmentMetrics } from '../services/shipmentMetrics';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { ShipmentResult, ShipmentStatus } from '@prisma/client';
+import { createAlertForRecipients } from '../services/alerts';
 
 const router = Router();
 
@@ -141,6 +142,12 @@ router.post(
       },
       include: { supplier: { select: { id: true, code: true, name: true } } },
     });
+    await createAlertForRecipients({
+      category: 'shipmentInspectionRequest',
+      entityType: 'Shipment',
+      entityId: shipment.id,
+      message: `Shipment inspection request for ${shipment.supplier.code} — ${shipment.supplier.name} (${shipment.purchaseOrder || 'PO-N/A'}).`,
+    });
     res.status(201).json(shipment);
   })
 );
@@ -180,6 +187,14 @@ router.patch(
       data: { result, status },
       include: { supplier: { select: { id: true, code: true, name: true } } },
     });
+    if (updated.result === 'Failed') {
+      await createAlertForRecipients({
+        category: 'rejectedShipmentDocument',
+        entityType: 'Shipment',
+        entityId: updated.id,
+        message: `Shipment ${updated.purchaseOrder || updated.id} was rejected for ${updated.supplier.code} — ${updated.supplier.name}.`,
+      });
+    }
     res.json(updated);
   })
 );
