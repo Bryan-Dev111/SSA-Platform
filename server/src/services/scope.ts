@@ -1,6 +1,6 @@
 /**
- * Buyer/Supplier scope helpers for data access
- * Buyer: only assigned suppliers; Supplier: only own data
+ * Supplier scope helpers for data access.
+ * Buyer/QE: assigned suppliers only; Supplier: only own data.
  */
 import { prisma } from '../lib/prisma';
 
@@ -8,6 +8,15 @@ import { prisma } from '../lib/prisma';
 export async function getAssignedSupplierIds(userId: string): Promise<string[]> {
   const assignments = await prisma.buyerSupplier.findMany({
     where: { buyerId: userId },
+    select: { supplierId: true },
+  });
+  return assignments.map((a) => a.supplierId);
+}
+
+/** For QualityEngineer: return list of supplier IDs assigned to this user. Empty array = no assignments. */
+export async function getQeAssignedSupplierIds(userId: string): Promise<string[]> {
+  const assignments = await prisma.qeSupplier.findMany({
+    where: { qualityEngineerId: userId },
     select: { supplierId: true },
   });
   return assignments.map((a) => a.supplierId);
@@ -22,7 +31,7 @@ export async function getSupplierIdForUser(userId: string): Promise<string | nul
   return supplier?.id ?? null;
 }
 
-/** Return allowed supplier IDs: Buyer = assigned only; Supplier = [own] or [] if unlinked; else null = all (Admin, Viewer, QE, Auditor). */
+/** Return allowed supplier IDs based on role assignment rules. */
 export async function getAllowedSupplierIds(user: {
   roleNames: string[];
   id: string;
@@ -33,9 +42,13 @@ export async function getAllowedSupplierIds(user: {
     // Supplier role but no Supplier row linked to user — must not see all suppliers (Day 9.5 / security)
     return [];
   }
-  if (user.roleNames.includes('Buyer')) {
-    const ids = await getAssignedSupplierIds(user.id);
-    return ids; // can be [] if no assignments
+  const restrictToAssignments = user.roleNames.includes('Buyer') || user.roleNames.includes('QualityEngineer');
+  if (restrictToAssignments) {
+    const [buyerIds, qeIds] = await Promise.all([
+      user.roleNames.includes('Buyer') ? getAssignedSupplierIds(user.id) : Promise.resolve<string[]>([]),
+      user.roleNames.includes('QualityEngineer') ? getQeAssignedSupplierIds(user.id) : Promise.resolve<string[]>([]),
+    ]);
+    return [...new Set([...buyerIds, ...qeIds])]; // can be [] if no assignments
   }
-  return null; // Admin, Viewer, QE, Auditor: no restriction
+  return null; // Admin, Viewer, Auditor: no restriction
 }

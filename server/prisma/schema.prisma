@@ -40,6 +40,7 @@ model User {
   updatedAt    DateTime  @updatedAt
   userRoles    UserRole[]
   buyerSuppliers BuyerSupplier[]  @relation("BuyerAssignments")
+  qeSuppliers  QeSupplier[]       @relation("QeAssignments")
   supplier     Supplier?          @relation("SupplierUser")
   recordsUploaded Record[]
   findingsCreated Finding[]
@@ -100,6 +101,7 @@ model Supplier {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   buyerSuppliers  BuyerSupplier[]
+  qeSuppliers     QeSupplier[]
   audits          Audit[]
   findings        Finding[]
   correctiveActions CorrectiveAction[]
@@ -121,6 +123,14 @@ model BuyerSupplier {
   buyer      User     @relation("BuyerAssignments", fields: [buyerId], references: [id], onDelete: Cascade)
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   @@id([buyerId, supplierId])
+}
+
+model QeSupplier {
+  qualityEngineerId String
+  supplierId        String
+  qualityEngineer   User     @relation("QeAssignments", fields: [qualityEngineerId], references: [id], onDelete: Cascade)
+  supplier          Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  @@id([qualityEngineerId, supplierId])
 }
 
 // ============== Audits & Findings & CARs ==============

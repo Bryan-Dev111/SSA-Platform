@@ -302,6 +302,7 @@ interface UserRow {
   name: string | null;
   roleNames: string[];
   assignedSupplierIds: string[];
+  qeAssignedSupplierIds?: string[];
 }
 
 interface CommodityTypeRow {
@@ -358,6 +359,8 @@ export function AdminBuyersSuppliersPanel({
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [buyerId, setBuyerId] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [qeId, setQeId] = useState('');
+  const [qeSupplierId, setQeSupplierId] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
@@ -403,6 +406,7 @@ export function AdminBuyersSuppliersPanel({
   }, [load]);
 
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
+  const qualityEngineers = users.filter((u) => u.roleNames.includes('QualityEngineer'));
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
 
   const assign = async () => {
@@ -430,6 +434,39 @@ export function AdminBuyersSuppliersPanel({
     try {
       await apiJson(`/buyer-suppliers/${bId}/${sId}`, { token, method: 'DELETE' });
       toast.info('Unassigned');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const assignQe = async () => {
+    if (!token || !qeId || !qeSupplierId) return;
+    setBusy(true);
+    try {
+      await apiJson('/qe-suppliers', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ qualityEngineerId: qeId, supplierId: qeSupplierId }),
+      });
+      toast.success('QE assignment created');
+      setQeSupplierId('');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Assign failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unassignQe = async (qualityEngineerId: string, supplierIdToRemove: string) => {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await apiJson(`/qe-suppliers/${qualityEngineerId}/${supplierIdToRemove}`, { token, method: 'DELETE' });
+      toast.info('QE unassigned');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed');
@@ -760,6 +797,95 @@ export function AdminBuyersSuppliersPanel({
               </tbody>
             </table>
           </div>
+          </div>
+        </div>
+      )}
+
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Assign supplier → Quality Engineer</h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Quality Engineer</label>
+                <select className="input" value={qeId} onChange={(e) => setQeId(e.target.value)} style={{ minWidth: 240 }}>
+                  <option value="">Select QE</option>
+                  {qualityEngineers.map((qe) => (
+                    <option key={qe.id} value={qe.id}>
+                      {qe.name?.trim() ? `${qe.name} (${qe.email})` : qe.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Supplier</label>
+                <select className="input" value={qeSupplierId} onChange={(e) => setQeSupplierId(e.target.value)} style={{ minWidth: 200 }}>
+                  <option value="">Select supplier</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.code} — {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" className="btn btn-primary" onClick={assignQe} disabled={busy || !qeId || !qeSupplierId}>
+                Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>QE assignments</h2>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Quality Engineer</th>
+                    <th>Assigned suppliers</th>
+                    <th style={{ width: 100 }}>Unassign</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {qualityEngineers.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="table-empty">
+                        No Quality Engineers. Create a user with Quality Engineer role.
+                      </td>
+                    </tr>
+                  ) : (
+                    qualityEngineers.flatMap((qe) =>
+                      (qe.qeAssignedSupplierIds ?? []).length === 0
+                        ? [
+                            <tr key={qe.id}>
+                              <td>{qe.name?.trim() ? `${qe.name} (${qe.email})` : qe.email}</td>
+                              <td colSpan={2} className="table-empty">
+                                None
+                              </td>
+                            </tr>,
+                          ]
+                        : (qe.qeAssignedSupplierIds ?? []).map((sid) => {
+                            const sup = suppliers.find((x) => x.id === sid);
+                            return (
+                              <tr key={`${qe.id}-${sid}`}>
+                                <td>{qe.name?.trim() ? `${qe.name} (${qe.email})` : qe.email}</td>
+                                <td>{sup ? `${sup.code} — ${sup.name}` : sid}</td>
+                                <td>
+                                  <button type="button" className="btn btn-ghost" onClick={() => unassignQe(qe.id, sid)} disabled={busy}>
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

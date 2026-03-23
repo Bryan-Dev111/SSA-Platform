@@ -133,6 +133,7 @@ router.get(
       userRoles: { include: { role: true } },
       supplier: { select: { id: true, code: true, name: true } },
       buyerSuppliers: { select: { supplierId: true } },
+      qeSuppliers: { select: { supplierId: true } },
     },
   });
   if (!user) {
@@ -147,6 +148,7 @@ router.get(
     roleNames: user.userRoles.map((ur) => ur.role.name),
     supplier: user.supplier ?? undefined,
     assignedSupplierIds: user.buyerSuppliers.map((b) => b.supplierId),
+    qeAssignedSupplierIds: user.qeSuppliers.map((q) => q.supplierId),
   });
   })
 );

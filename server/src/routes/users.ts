@@ -110,6 +110,7 @@ router.get(
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
         buyerSuppliers: { select: { supplierId: true } },
+        qeSuppliers: { select: { supplierId: true } },
       },
       orderBy: { email: 'asc' },
     });
@@ -122,6 +123,7 @@ router.get(
         roleNames: u.userRoles.map((ur) => ur.role.name),
         supplier: u.supplier ?? undefined,
         assignedSupplierIds: u.buyerSuppliers.map((b) => b.supplierId),
+        qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId),
       }))
     );
   })
@@ -175,6 +177,7 @@ router.post(
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
         buyerSuppliers: { select: { supplierId: true } },
+        qeSuppliers: { select: { supplierId: true } },
       },
     });
     res.status(201).json({
@@ -185,6 +188,7 @@ router.post(
       roleNames: user.userRoles.map((ur) => ur.role.name),
       supplier: user.supplier ?? undefined,
       assignedSupplierIds: user.buyerSuppliers.map((b) => b.supplierId),
+      qeAssignedSupplierIds: user.qeSuppliers.map((q) => q.supplierId),
     });
   })
 );
