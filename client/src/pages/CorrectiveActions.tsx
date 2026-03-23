@@ -445,13 +445,21 @@ export function CorrectiveActions() {
                       <Link
                         to={`/audit-record?id=${encodeURIComponent(c.audit.id)}`}
                         className="finding-code-link"
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
                         {c.audit.code}
                       </Link>
                     </td>
                     <td>
                       {c.finding ? (
-                        <Link to={`/findings-record?findingId=${encodeURIComponent(c.finding.code)}`} className="finding-code-link" style={{ fontSize: 'var(--text-sm)' }}>
+                        <Link
+                          to={`/findings-record?findingId=${encodeURIComponent(c.finding.code)}`}
+                          className="finding-code-link"
+                          style={{ fontSize: 'var(--text-sm)' }}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           {c.finding.code}
                         </Link>
                       ) : (

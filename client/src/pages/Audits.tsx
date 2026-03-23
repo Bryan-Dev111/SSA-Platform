@@ -413,6 +413,8 @@ export function Audits() {
                               key={code}
                               to={`/findings-record?findingId=${encodeURIComponent(code)}`}
                               style={{ display: 'block', marginBottom: 2 }}
+                              target="_blank"
+                              rel="noopener noreferrer"
                             >
                               {code}
                             </Link>
