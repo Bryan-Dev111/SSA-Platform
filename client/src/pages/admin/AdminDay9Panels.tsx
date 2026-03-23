@@ -321,6 +321,10 @@ interface SupplierRow {
 
 const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'Auditor'] as const;
 
+function formatUserRoleLabel(roleName: string): string {
+  return roleName === 'QualityEngineer' ? 'Quality Engineer' : roleName;
+}
+
 interface PermissionPageDef {
   key: string;
   label: string;
@@ -589,6 +593,46 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
           <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
             Create supplier (auto code)
           </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Users</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '0.75rem' }}>
+            All accounts. The Password column cannot show real values — they are stored only as a one-way hash on the server (not
+            retrievable).
+          </p>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Password</th>
+                  <th>Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="table-empty">
+                      No users yet.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.name?.trim() ? u.name : '—'}</td>
+                      <td>{u.email}</td>
+                      <td style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Not shown</td>
+                      <td>{u.roleNames.map(formatUserRoleLabel).join(', ')}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
