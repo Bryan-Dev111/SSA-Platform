@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError, readFileAsBase64 } from '../utils/apiHelpers';
+import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 import { Link } from 'react-router-dom';
 
 interface Buyer {
@@ -438,7 +439,26 @@ export function SupplierProfile() {
       </div>
       )}
 
-      <SectionTable title="Audits" empty="No audits." rowCount={data.audits.length}>
+      <SectionTable
+        title="Audits"
+        empty="No audits."
+        rowCount={data.audits.length}
+        excelExport={{
+          filename: `${safeExportFilePart(supplier.code)}_Audits`,
+          sheetName: 'Audits',
+          getRows: () =>
+            data.audits.map(
+              (a): ExportRow => ({
+                Code: a.code,
+                Date: a.auditDate?.slice(0, 10) ?? '',
+                Type: a.auditType
+                  ? `${a.auditType.code}${a.auditType.name ? ` — ${a.auditType.name}` : ''}`
+                  : '',
+                Result: a.result ?? '',
+              })
+            ),
+        }}
+      >
         <table className="table">
           <thead>
             <tr>
@@ -461,7 +481,24 @@ export function SupplierProfile() {
         </table>
       </SectionTable>
 
-      <SectionTable title="Findings" empty="No findings." rowCount={data.findings.length}>
+      <SectionTable
+        title="Findings"
+        empty="No findings."
+        rowCount={data.findings.length}
+        excelExport={{
+          filename: `${safeExportFilePart(supplier.code)}_Findings`,
+          sheetName: 'Findings',
+          getRows: () =>
+            data.findings.map(
+              (f): ExportRow => ({
+                Code: f.code,
+                Status: f.status,
+                Severity: f.severity,
+                Summary: f.summary,
+              })
+            ),
+        }}
+      >
         <table className="table">
           <thead>
             <tr>
@@ -486,12 +523,30 @@ export function SupplierProfile() {
         </table>
       </SectionTable>
 
-      <SectionTable title="Corrective actions (CARs)" empty="No CARs." rowCount={data.cars.length}>
+      <SectionTable
+        title="Corrective actions (CARs)"
+        empty="No CARs."
+        rowCount={data.cars.length}
+        excelExport={{
+          filename: `${safeExportFilePart(supplier.code)}_CARs`,
+          sheetName: 'CARs',
+          getRows: () =>
+            data.cars.map(
+              (c): ExportRow => ({
+                Code: c.code,
+                Status: c.status,
+                Severity: c.severity,
+                Summary: c.summary,
+              })
+            ),
+        }}
+      >
         <table className="table">
           <thead>
             <tr>
               <th>Code</th>
               <th>Status</th>
+              <th>Severity</th>
               <th>Summary</th>
             </tr>
           </thead>
@@ -502,6 +557,7 @@ export function SupplierProfile() {
                   <Link to={`/car-record?id=${c.id}`}>{c.code}</Link>
                 </td>
                 <td>{c.status}</td>
+                <td>{c.severity}</td>
                 <td>{c.summary}</td>
               </tr>
             ))}
@@ -509,7 +565,23 @@ export function SupplierProfile() {
         </table>
       </SectionTable>
 
-      <SectionTable title="Risk history" empty="No risk snapshots." rowCount={data.riskSnapshots.length}>
+      <SectionTable
+        title="Risk history"
+        empty="No risk snapshots."
+        rowCount={data.riskSnapshots.length}
+        excelExport={{
+          filename: `${safeExportFilePart(supplier.code)}_Risk_history`,
+          sheetName: 'Risk history',
+          getRows: () =>
+            data.riskSnapshots.map(
+              (r): ExportRow => ({
+                Date: new Date(r.createdAt).toLocaleString(),
+                Level: r.level,
+                Score: r.score ?? '',
+              })
+            ),
+        }}
+      >
         <table className="table">
           <thead>
             <tr>
@@ -530,7 +602,25 @@ export function SupplierProfile() {
         </table>
       </SectionTable>
 
-      <SectionTable title="Records" empty="No records." rowCount={data.records.length}>
+      <SectionTable
+        title="Records"
+        empty="No records."
+        rowCount={data.records.length}
+        excelExport={{
+          filename: `${safeExportFilePart(supplier.code)}_Records`,
+          sheetName: 'Records',
+          getRows: () =>
+            data.records.map(
+              (r): ExportRow => ({
+                Name: r.name,
+                File: r.filePath ? 'Yes' : '',
+                Source: r.internalOrSupplier,
+                Status: r.status,
+                Created: new Date(r.createdAt).toLocaleString(),
+              })
+            ),
+        }}
+      >
         <table className="table">
           <thead>
             <tr>
@@ -585,21 +675,64 @@ export function SupplierProfile() {
   );
 }
 
+function safeExportFilePart(s: string): string {
+  return s.replace(/[/\\?*:[\]"<>|]/g, '_').trim() || 'supplier';
+}
+
 function SectionTable({
   title,
   empty,
   rowCount,
   children,
+  excelExport,
 }: {
   title: string;
   empty: string;
   rowCount: number;
   children: ReactNode;
+  excelExport?: { filename: string; sheetName: string; getRows: () => ExportRow[] };
 }) {
+  const toast = useToast();
+
+  const handleExportExcel = () => {
+    if (!excelExport) return;
+    if (rowCount === 0) {
+      toast.info('No data to export');
+      return;
+    }
+    try {
+      const rows = excelExport.getRows();
+      if (rows.length === 0) {
+        toast.info('No data to export');
+        return;
+      }
+      downloadTableXlsx(excelExport.filename, excelExport.sheetName, rows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  };
+
   return (
     <div className="card" style={{ marginBottom: '1rem' }}>
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>{title}</h2>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            marginBottom: '0.75rem',
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: 0 }}>{title}</h2>
+          {excelExport ? (
+            <button type="button" className="btn btn-ghost" onClick={handleExportExcel} disabled={rowCount === 0}>
+              Export to Excel
+            </button>
+          ) : null}
+        </div>
         <div className="table-wrap">
           {rowCount === 0 ? <p className="table-empty">{empty}</p> : children}
         </div>
