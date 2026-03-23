@@ -39,13 +39,11 @@ interface ScheduleRow {
 interface Metrics {
   totalInspectionRequests: number;
   waitingInspection: number;
-  passed: number;
   failed: number;
   overdueWaiting: number;
   lateVsSchedule: number;
   otdPercent: number | null;
   fpyPercent: number | null;
-  scheduleRowCount: number;
 }
 
 export function Shipments() {
@@ -64,7 +62,6 @@ export function Shipments() {
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
   const canRecordResult = isAdmin || isQE;
-
   const [schedSupplier, setSchedSupplier] = useState('');
   const [schedPo, setSchedPo] = useState('');
   const [schedPart, setSchedPart] = useState('');
@@ -244,13 +241,11 @@ export function Shipments() {
         >
           <Metric label="Total requests" value={metrics.totalInspectionRequests} />
           <Metric label="Waiting inspection" value={metrics.waitingInspection} />
-          <Metric label="Passed" value={metrics.passed} />
           <Metric label="Rejected (failed)" value={metrics.failed} />
           <Metric label="Overdue (waiting)" value={metrics.overdueWaiting} />
           <Metric label="Late vs schedule" value={metrics.lateVsSchedule} />
           <Metric label="OTD %" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
           <Metric label="FPY %" value={metrics.fpyPercent != null ? `${metrics.fpyPercent}%` : '—'} />
-          <Metric label="Schedule rows" value={metrics.scheduleRowCount} />
         </div>
       )}
 
@@ -328,7 +323,7 @@ export function Shipments() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Shipment schedule (admin)</h2>
+          <h2 style={{ marginTop: 0 }}>Shipment schedule</h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
             Load planned shipments for OTD comparison (same supplier, PO, and part # as inspection requests).
           </p>
@@ -430,6 +425,7 @@ export function Shipments() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
