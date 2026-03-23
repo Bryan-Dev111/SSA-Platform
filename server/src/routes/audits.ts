@@ -66,6 +66,7 @@ router.get(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
+    const currentUser = req.user;
     const allowedIds = await getAllowedSupplierIds(req.user);
     const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
     const where: { supplierId?: string | { in: string[] } } = {};
@@ -93,7 +94,10 @@ router.get(
       },
       orderBy: { auditDate: 'desc' },
     });
-    const list = audits.map((a) => ({
+    const scopedAudits = currentUser.roleNames.includes('Auditor')
+      ? audits.filter((a) => isAssignedAuditorForAudit(a.auditor, currentUser))
+      : audits;
+    const list = scopedAudits.map((a) => ({
       id: a.id,
       code: a.code,
       supplierId: a.supplierId,
@@ -130,6 +134,10 @@ router.get(
       },
     });
     if (!audit) {
+      res.status(404).json({ error: 'Audit not found' });
+      return;
+    }
+    if (req.user.roleNames.includes('Auditor') && !isAssignedAuditorForAudit(audit.auditor, req.user)) {
       res.status(404).json({ error: 'Audit not found' });
       return;
     }

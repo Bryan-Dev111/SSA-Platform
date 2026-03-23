@@ -11,6 +11,16 @@ import { DEFAULT_PATH_ROLES, PAGE_DEFINITIONS } from '../lib/permissions';
 
 const router = Router();
 
+function parseIsEmployee(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'yes' || normalized === 'true' || normalized === '1';
+  }
+  if (typeof value === 'number') return value === 1;
+  return false;
+}
+
 router.use(authMiddleware);
 router.use(requireRole(['Admin']));
 
@@ -106,6 +116,7 @@ router.get(
         id: true,
         email: true,
         name: true,
+        isEmployee: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -119,6 +130,7 @@ router.get(
         id: u.id,
         email: u.email,
         name: u.name,
+        isEmployee: u.isEmployee,
         createdAt: u.createdAt,
         roleNames: u.userRoles.map((ur) => ur.role.name),
         supplier: u.supplier ?? undefined,
@@ -139,6 +151,7 @@ router.post(
     const nameFromParts = [firstName, lastName].filter(Boolean).join(' ').trim();
     const nameLegacy = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const name = nameFromParts || nameLegacy || null;
+    const isEmployee = parseIsEmployee(req.body?.isEmployee);
     const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : [];
     const roleNames = [...new Set(roleNamesRaw)];
     if (!emailRaw || !password) {
@@ -165,6 +178,7 @@ router.post(
         email: emailRaw,
         passwordHash,
         name,
+        isEmployee,
         userRoles: {
           create: roleRows.map((r) => ({ roleId: r.id })),
         },
@@ -173,6 +187,7 @@ router.post(
         id: true,
         email: true,
         name: true,
+        isEmployee: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -184,6 +199,7 @@ router.post(
       id: user.id,
       email: user.email,
       name: user.name,
+      isEmployee: user.isEmployee,
       createdAt: user.createdAt,
       roleNames: user.userRoles.map((ur) => ur.role.name),
       supplier: user.supplier ?? undefined,

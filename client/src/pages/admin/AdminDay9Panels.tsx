@@ -300,6 +300,7 @@ interface UserRow {
   id: string;
   email: string;
   name: string | null;
+  isEmployee?: boolean;
   roleNames: string[];
   assignedSupplierIds: string[];
   qeAssignedSupplierIds?: string[];
@@ -348,12 +349,16 @@ export function AdminBuyersSuppliersPanel({
   showCreateUser = true,
   showUsersTable = true,
   showBuyerSupplierSections = true,
+  usersOnlyEmployees = false,
+  usersTableTitle = 'Users',
 }: {
   token: string | null;
   toast: ToastApi;
   showCreateUser?: boolean;
   showUsersTable?: boolean;
   showBuyerSupplierSections?: boolean;
+  usersOnlyEmployees?: boolean;
+  usersTableTitle?: string;
 }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -366,6 +371,7 @@ export function AdminBuyersSuppliersPanel({
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
   const [newUserRole, setNewUserRole] = useState<string>('Viewer');
+  const [newUserIsEmployee, setNewUserIsEmployee] = useState<'Yes' | 'No'>('No');
   /** Role names from server (includes custom roles); matrix UI lives only on Permissions tab. */
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [newSupName, setNewSupName] = useState('');
@@ -407,6 +413,7 @@ export function AdminBuyersSuppliersPanel({
 
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
   const qualityEngineers = users.filter((u) => u.roleNames.includes('QualityEngineer'));
+  const visibleUsers = usersOnlyEmployees ? users.filter((u) => u.isEmployee === true) : users;
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
 
   const assign = async () => {
@@ -488,6 +495,7 @@ export function AdminBuyersSuppliersPanel({
           lastName: newUserLastName.trim(),
           email: newUserEmail.trim(),
           password: newUserPassword,
+          isEmployee: newUserIsEmployee === 'Yes',
           roleNames,
         }),
       });
@@ -496,6 +504,7 @@ export function AdminBuyersSuppliersPanel({
       setNewUserFirstName('');
       setNewUserLastName('');
       setNewUserRole('Viewer');
+      setNewUserIsEmployee('No');
       toast.success('User created');
       await load();
     } catch (e) {
@@ -610,6 +619,13 @@ export function AdminBuyersSuppliersPanel({
                   ))}
                 </select>
               </div>
+              <div className="input-group">
+                <label className="input-label">Employee</label>
+                <select className="input" value={newUserIsEmployee} onChange={(e) => setNewUserIsEmployee(e.target.value as 'Yes' | 'No')}>
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
             </div>
             <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createUser} disabled={busy}>
               Create user
@@ -673,7 +689,7 @@ export function AdminBuyersSuppliersPanel({
       {showUsersTable && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Users</h2>
+            <h2 style={{ marginTop: 0 }}>{usersTableTitle}</h2>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '0.75rem' }}>
               All accounts. The Password column cannot show real values — they are stored only as a one-way hash on the server (not
               retrievable).
@@ -684,22 +700,24 @@ export function AdminBuyersSuppliersPanel({
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
+                  <th>Employee</th>
                   <th>Password</th>
                   <th>Role</th>
                 </tr>
               </thead>
               <tbody>
-                {users.length === 0 ? (
+                {visibleUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="table-empty">
+                    <td colSpan={5} className="table-empty">
                       No users yet.
                     </td>
                   </tr>
                 ) : (
-                  users.map((u) => (
+                  visibleUsers.map((u) => (
                     <tr key={u.id}>
                       <td>{u.name?.trim() ? u.name : '—'}</td>
                       <td>{u.email}</td>
+                      <td>{u.isEmployee ? 'Yes' : 'No'}</td>
                       <td style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Not shown</td>
                       <td>{u.roleNames.map(formatUserRoleLabel).join(', ')}</td>
                     </tr>

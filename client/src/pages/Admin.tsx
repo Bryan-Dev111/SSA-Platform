@@ -20,6 +20,7 @@ type Tab =
   | 'auditTypes'
   | 'riskWeights'
   | 'users'
+  | 'employees'
   | 'buyersSuppliers'
   | 'permissions';
 
@@ -303,6 +304,7 @@ export function Admin() {
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
             ['users', 'Users'],
+            ['employees', 'Employees'],
             ['buyersSuppliers', 'Buyers & suppliers'],
             ['permissions', 'Permissions'],
           ] as const
@@ -327,6 +329,19 @@ export function Admin() {
           showCreateUser
           showUsersTable
           showBuyerSupplierSections={false}
+          usersOnlyEmployees={false}
+          usersTableTitle="Users"
+        />
+      )}
+      {tab === 'employees' && (
+        <AdminBuyersSuppliersPanel
+          token={token}
+          toast={toast}
+          showCreateUser={false}
+          showUsersTable
+          showBuyerSupplierSections={false}
+          usersOnlyEmployees
+          usersTableTitle="Employees"
         />
       )}
       {tab === 'buyersSuppliers' && (
