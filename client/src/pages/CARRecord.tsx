@@ -3,7 +3,7 @@
  * Summary, Defect Code, Discrepancy, Containment, Occurrence/Escape Root Cause, Corrective Action,
  * VOE, Closing Comments); status history; workflow Save (DRAFT → RCCA), Process, Reverse, Approve, Reject.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -113,6 +113,15 @@ function buildCarStatusHistory(car: CAR): StatusHistoryEntry[] {
   return seed.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 }
 
+function isCarNotFoundErrorMessage(message: string): boolean {
+  const normalized = message.toLowerCase().replace(/\s+/g, '');
+  return (
+    normalized.includes('carnotfound') ||
+    normalized.includes('"error":"carnotfound"') ||
+    normalized.includes("{\"error\":\"carnotfound\"}")
+  );
+}
+
 export function CARRecord() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -149,6 +158,10 @@ export function CARRecord() {
   const [editMode, setEditMode] = useState(false);
   const [approvalComment, setApprovalComment] = useState('');
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
+  const [carQuery, setCarQuery] = useState(codeParam ?? idParam ?? '');
+  const [searching, setSearching] = useState(false);
+  const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
+  const activeLoadIdRef = useRef(0);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canEdit = !!car && editMode && canEditDraft;
@@ -158,6 +171,30 @@ export function CARRecord() {
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
   const statusHistory = car ? buildCarStatusHistory(car) : [];
+
+  const resetCreateForm = () => {
+    setForm({
+      findingId: '',
+      auditId: '',
+      supplierId: '',
+      severity: 'Major',
+      carOwner: '',
+      targetCompletionDate: '',
+      summary: '',
+      discrepancy: '',
+      defectCode: '',
+      containment: '',
+      occurrenceRootCause: '',
+      escapeRootCause: '',
+      correctiveAction: '',
+      verificationOfEffectiveness: '',
+      closingComments: '',
+    });
+  };
+
+  useEffect(() => {
+    setCarQuery(codeParam ?? idParam ?? '');
+  }, [codeParam, idParam]);
 
   const syncFormFromCar = (c: CAR) => {
     setForm((p) => ({
@@ -180,21 +217,63 @@ export function CARRecord() {
     }));
   };
 
+  const fetchCarByQuery = async (queryRaw: string) => {
+    const query = queryRaw.trim();
+    if (!query) {
+      throw new Error('Enter a CAR id or code to search.');
+    }
+    const tryById = async (): Promise<CAR | null> => {
+      try {
+        return await apiJson<CAR>(`/cars/${encodeURIComponent(query)}`, { token: token! });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (isCarNotFoundErrorMessage(message)) return null;
+        throw err;
+      }
+    };
+    const tryByCode = async (): Promise<CAR | null> =>
+      apiJson<CAR | null>(`/cars/by-code/${encodeURIComponent(query.toUpperCase())}`, { token: token! });
+
+    const looksLikeCarCode = /^car[-\s]?\d+/i.test(query);
+    if (looksLikeCarCode) {
+      const byCode = await tryByCode();
+      if (byCode) return byCode;
+      const byId = await tryById();
+      if (byId) return byId;
+      throw new Error('CAR not found');
+    }
+    const byId = await tryById();
+    if (byId) return byId;
+    const byCode = await tryByCode();
+    if (byCode) return byCode;
+    throw new Error('CAR not found');
+  };
+
   useEffect(() => {
     if (!token) return;
+    const loadId = ++activeLoadIdRef.current;
+    const isActive = () => activeLoadIdRef.current === loadId;
     if (!idParam && !codeParam) {
       setLoading(false);
-      apiJson<Supplier[]>('/suppliers', { token }).then(setSuppliers).catch(() => setSuppliers([]));
+      setError(null);
+      setCar(null);
+      setSearchMissNoCreate(false);
+      apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => { if (isActive()) setSuppliers([]); });
       apiJson<{ list: Array<{ id: string; code: string; auditId: string; supplierId: string; severity: string }> }>('/findings', { token })
-        .then((r) => setFindings(r.list.map((f) => ({ id: f.id, code: f.code, auditId: f.auditId, supplierId: f.supplierId, severity: f.severity }))))
-        .catch(() => setFindings([]));
-      apiJson<AuditOption[]>('/audits', { token }).then(setAudits).catch(() => setAudits([]));
+        .then((r) => { if (isActive()) setFindings(r.list.map((f) => ({ id: f.id, code: f.code, auditId: f.auditId, supplierId: f.supplierId, severity: f.severity }))); })
+        .catch(() => { if (isActive()) setFindings([]); });
+      apiJson<AuditOption[]>('/audits', { token }).then((rows) => { if (isActive()) setAudits(rows); }).catch(() => { if (isActive()) setAudits([]); });
       return;
     }
-    const url = idParam ? `/cars/${idParam}` : `/cars/by-code/${encodeURIComponent(codeParam!)}`;
-    apiJson<CAR>(url, { token })
-      .then((c) => {
+    setLoading(true);
+    setError(null);
+    setSearchMissNoCreate(false);
+    const loadCar = async () => (idParam ? apiJson<CAR>(`/cars/${encodeURIComponent(idParam.trim())}`, { token }) : fetchCarByQuery(codeParam ?? ''));
+    loadCar()
+      .then((c: CAR) => {
+        if (!isActive()) return;
         setCar(c);
+        setError(null);
         setForm({
           findingId: c.findingId ?? '',
           auditId: c.auditId,
@@ -213,12 +292,19 @@ export function CARRecord() {
           closingComments: c.closingComments ?? '',
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!isActive()) return;
+        setCar(null);
+        const message = e instanceof Error ? e.message : 'Failed to load';
+        setError(isCarNotFoundErrorMessage(message) ? null : message);
+      })
+      .finally(() => {
+        if (isActive()) setLoading(false);
+      });
 
-    apiJson<Supplier[]>('/suppliers', { token }).then(setSuppliers).catch(() => setSuppliers([]));
-    apiJson<{ list: unknown[] }>('/findings', { token }).then((r) => setFindings(r.list as FindingOption[])).catch(() => setFindings([]));
-    apiJson<AuditOption[]>('/audits', { token }).then(setAudits).catch(() => setAudits([]));
+    apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => { if (isActive()) setSuppliers([]); });
+    apiJson<{ list: unknown[] }>('/findings', { token }).then((r) => { if (isActive()) setFindings(r.list as FindingOption[]); }).catch(() => { if (isActive()) setFindings([]); });
+    apiJson<AuditOption[]>('/audits', { token }).then((rows) => { if (isActive()) setAudits(rows); }).catch(() => { if (isActive()) setAudits([]); });
   }, [token, idParam, codeParam]);
 
   useEffect(() => {
@@ -353,23 +439,7 @@ export function CARRecord() {
         }),
       });
       setCar(created);
-      setForm({
-        findingId: '',
-        auditId: '',
-        supplierId: '',
-        severity: 'Major',
-        carOwner: '',
-        targetCompletionDate: '',
-        summary: '',
-        discrepancy: '',
-        defectCode: '',
-        containment: '',
-        occurrenceRootCause: '',
-        escapeRootCause: '',
-        correctiveAction: '',
-        verificationOfEffectiveness: '',
-        closingComments: '',
-      });
+      resetCreateForm();
       toast.success('CAR created');
       navigate(`/car-record?id=${encodeURIComponent(created.id)}`, { replace: true });
     } catch (err) {
@@ -396,6 +466,50 @@ export function CARRecord() {
     }
   };
 
+  const handleSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = carQuery.trim();
+    if (!q) {
+      toast.info('Enter a CAR id or code to search.');
+      return;
+    }
+    if (!token) return;
+    const loadId = ++activeLoadIdRef.current;
+    const isActive = () => activeLoadIdRef.current === loadId;
+    setSearching(true);
+    setError(null);
+    setSearchMissNoCreate(false);
+    try {
+      const found = await fetchCarByQuery(q);
+      if (!isActive()) return;
+      setCar(found);
+      syncFormFromCar(found);
+      setError(null);
+      setSearchMissNoCreate(false);
+    } catch (err) {
+      if (!isActive()) return;
+      setCar(null);
+      const message = err instanceof Error ? err.message : 'Failed to load';
+      const isNotFound = isCarNotFoundErrorMessage(message);
+      setError(isNotFound ? null : message);
+      setSearchMissNoCreate(isNotFound);
+    } finally {
+      if (isActive()) setSearching(false);
+    }
+  };
+
+  const handleStartCreateCar = () => {
+    setCar(null);
+    setError(null);
+    setSearching(false);
+    setSearchMissNoCreate(false);
+    setEditMode(false);
+    setApprovalComment('');
+    setCarQuery('');
+    resetCreateForm();
+    navigate('/car-record');
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -410,7 +524,7 @@ export function CARRecord() {
     );
   }
 
-  const isNew = !car && !idParam && !codeParam;
+  const isNew = !car && !idParam && !codeParam && !searchMissNoCreate;
 
   if (!loading && isNew && !canCreateNew) {
     // Viewer/Auditor cannot create CARs, so redirect to the list page.
@@ -421,7 +535,7 @@ export function CARRecord() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">
-          {car ? `${car.code} — CAR` : isNew ? 'New CAR' : 'CAR Record'}
+          {car ? `${car.code} — CAR` : 'CAR Record'}
         </h1>
         <p className="page-description">
           {car ? `Status: ${car.status}` : isNew ? 'Create a draft CAR (Admin, QE, or Buyer).' : 'CAR not found.'}
@@ -430,6 +544,26 @@ export function CARRecord() {
           <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions</Link>
         </p>
       </header>
+
+      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap', flex: '1 1 auto' }}>
+          <input
+            className="input"
+            value={carQuery}
+            onChange={(e) => setCarQuery(e.target.value)}
+            placeholder="Search by CAR id or code"
+            style={{ width: 320, minWidth: 320, maxWidth: 320 }}
+          />
+          <button type="submit" className="btn btn-ghost" disabled={searching}>
+            {searching ? 'Searching…' : 'Search'}
+          </button>
+          {canCreateNew && (
+            <button type="button" className="btn btn-primary" onClick={handleStartCreateCar}>
+              Create CAR
+            </button>
+          )}
+        </form>
+      </div>
 
       {error && (
         <div className="alert-error" role="alert">

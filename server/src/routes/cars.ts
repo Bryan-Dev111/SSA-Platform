@@ -147,15 +147,22 @@ router.get(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const car = await prisma.correctiveAction.findUnique({
-      where: { code: req.params.code },
+    const rawCode = String(req.params.code ?? '').trim();
+    if (!rawCode) {
+      res.status(400).json({ error: 'CAR code is required' });
+      return;
+    }
+    const normalizedCode = rawCode.toUpperCase();
+    const car = await prisma.correctiveAction.findFirst({
+      where: { code: { equals: normalizedCode, mode: 'insensitive' } },
       include: {
         ...carInclude,
         createdBy: { select: { id: true, email: true, name: true } },
       },
     });
     if (!car) {
-      res.status(404).json({ error: 'CAR not found' });
+      // Search endpoint behavior: return null instead of 404 to avoid noisy client/network errors.
+      res.json(null);
       return;
     }
     if (allowedIds !== null && !allowedIds.includes(car.supplierId)) {

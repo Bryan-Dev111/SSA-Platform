@@ -189,7 +189,7 @@ export function CorrectiveActions() {
       <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         {canCreateCAR && (
           <Link to="/car-record" className="btn btn-primary">
-            New CAR
+            CAR RECORDS
           </Link>
         )}
         <label>
