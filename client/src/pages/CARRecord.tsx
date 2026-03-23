@@ -535,11 +535,6 @@ export function CARRecord() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-                {canSave && (
-                  <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                    {actioning ? 'Saving…' : 'Save'}
-                  </button>
-                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
@@ -611,6 +606,11 @@ export function CARRecord() {
                     />
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', paddingBottom: 1 }}>
+                    {canSave && (
+                      <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
+                        {actioning ? 'Saving…' : 'Save'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-ghost"
