@@ -32,6 +32,7 @@ import documentsRoutes from './routes/documents';
 import internalDocsRoutes from './routes/internal-docs';
 import opportunitiesRoutes from './routes/opportunities';
 import riskSnapshotsRoutes from './routes/risk-snapshots';
+import dashboardRoutes from './routes/dashboard';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -65,6 +66,7 @@ app.use('/documents', documentsRoutes);
 app.use('/internal-docs', internalDocsRoutes);
 app.use('/opportunities', opportunitiesRoutes);
 app.use('/risk-snapshots', riskSnapshotsRoutes);
+app.use('/dashboard', dashboardRoutes);
 
 app.use(errorHandler);
 

@@ -13,8 +13,13 @@ export function errorHandler(
   let status = errObj.status ?? 500;
   let message = err instanceof Error ? err.message : 'Internal server error';
 
-  // Prisma DB connectivity failures (e.g., P1001) should be surfaced as service unavailable.
-  if (errObj.code === 'P1001' || /Can't reach database server/i.test(message)) {
+  // Prisma DB connectivity failures should be surfaced as service unavailable.
+  if (
+    errObj.code === 'P1001' ||
+    errObj.code === 'P1017' ||
+    /Can't reach database server/i.test(message) ||
+    /Server has closed the connection/i.test(message)
+  ) {
     status = 503;
     message = 'Database is temporarily unavailable. Please try again shortly.';
   }
