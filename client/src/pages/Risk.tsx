@@ -26,6 +26,7 @@ interface OpportunityRow {
   id: string;
   supplierId: string;
   supplier: Supplier;
+  createdBy?: { id: string; name: string | null; email: string } | null;
   type: 'risk' | 'opportunity';
   description: string;
   likelihood: 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely' | null;
@@ -35,12 +36,21 @@ interface OpportunityRow {
   createdAt: string;
 }
 
+interface RiskSnapshotRow {
+  id: string;
+  supplierId: string;
+  score: number | null;
+  level: 'Low' | 'Medium' | 'High';
+  createdAt: string;
+}
+
 export function Risk() {
   const { token, user } = useAuth();
   const toast = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [currents, setCurrents] = useState<RiskCurrent[]>([]);
+  const [snapshots, setSnapshots] = useState<RiskSnapshotRow[]>([]);
   const [items, setItems] = useState<OpportunityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +78,15 @@ export function Risk() {
     try {
       const currentQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
       const listQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
-      const [supplierList, currentList, allItems] = await Promise.all([
+      const [supplierList, currentList, snapshotList, allItems] = await Promise.all([
         apiJson<Supplier[]>('/suppliers', { token }),
         apiJson<RiskCurrent[]>(`/risk-snapshots/current${currentQ}`, { token }),
+        apiJson<RiskSnapshotRow[]>(`/risk-snapshots${currentQ}`, { token }),
         apiJson<OpportunityRow[]>(`/opportunities${listQ}`, { token }),
       ]);
       setSuppliers(supplierList);
       setCurrents(currentList);
+      setSnapshots(snapshotList);
       setItems(allItems.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
       if (!newSupplierId && supplierList.length === 1) {
         setNewSupplierId(supplierList[0].id);
@@ -139,6 +151,105 @@ export function Risk() {
     distributionTotal === 0
       ? 'conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg)'
       : `conic-gradient(${distributionPieSegments.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`;
+
+  const trendBySupplier = useMemo(() => {
+    const grouped = new Map<string, RiskSnapshotRow[]>();
+    for (const row of snapshots) {
+      const existing = grouped.get(row.supplierId) ?? [];
+      existing.push(row);
+      grouped.set(row.supplierId, existing);
+    }
+    const result = new Map<string, number | null>();
+    for (const [supplierId, rows] of grouped.entries()) {
+      const sorted = [...rows]
+        .filter((r) => typeof r.score === 'number')
+        .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      if (sorted.length < 2 || !sorted[0].score || !sorted[1].score) {
+        result.set(supplierId, null);
+        continue;
+      }
+      const latest = Number(sorted[0].score);
+      const previous = Number(sorted[1].score);
+      if (previous === 0) {
+        result.set(supplierId, null);
+        continue;
+      }
+      const pct = ((latest - previous) / previous) * 100;
+      result.set(supplierId, Math.round(pct * 100) / 100);
+    }
+    return result;
+  }, [snapshots]);
+
+  const avgTrendPercent = useMemo(() => {
+    const rows = Array.from(trendBySupplier.values()).filter((v): v is number => typeof v === 'number');
+    if (rows.length === 0) return null;
+    const avg = rows.reduce((sum, v) => sum + v, 0) / rows.length;
+    return Math.round(avg * 100) / 100;
+  }, [trendBySupplier]);
+
+  const matrixLikelihoodOrder: Array<OpportunityRow['likelihood']> = [
+    'VeryLikely',
+    'Likely',
+    'Possible',
+    'Unlikely',
+    'VeryUnlikely',
+  ];
+  const matrixSeverityOrder: Array<OpportunityRow['severity']> = [
+    'Negligible',
+    'Minor',
+    'Moderate',
+    'Significant',
+    'Severe',
+  ];
+  const matrixLabelGrid: string[][] = [
+    ['Low Med', 'Medium', 'Med Hi', 'High', 'High'],
+    ['Low', 'Low Med', 'Medium', 'Med Hi', 'High'],
+    ['Low', 'Low Med', 'Medium', 'Med Hi', 'Med Hi'],
+    ['Low', 'Low Med', 'Low Med', 'Medium', 'Med Hi'],
+    ['Low', 'Low', 'Low Med', 'Medium', 'Medium'],
+  ];
+  const matrixColorByLabel: Record<string, string> = {
+    Low: '#22c55e',
+    'Low Med': '#9ad950',
+    Medium: '#f6ea23',
+    'Med Hi': '#f7c81e',
+    High: '#f0142f',
+  };
+
+  const riskPinsByCell = useMemo(() => {
+    const map = new Map<string, OpportunityRow[]>();
+    for (const row of items) {
+      if (row.type !== 'risk' || !row.likelihood || !row.severity) continue;
+      const key = `${row.likelihood}|${row.severity}`;
+      const existing = map.get(key) ?? [];
+      existing.push(row);
+      map.set(key, existing);
+    }
+    return map;
+  }, [items]);
+
+  const actionRows = useMemo(
+    () =>
+      items
+        .filter((r) => r.type === 'risk' && r.status !== 'Closed')
+        .map((r) => {
+          const actionText =
+            r.riskLevel === 'High'
+              ? 'Immediate containment and corrective plan'
+              : r.riskLevel === 'Medium'
+                ? 'Define mitigation plan and weekly review'
+                : 'Monitor trend and review monthly';
+          const dueDays = r.riskLevel === 'High' ? 7 : r.riskLevel === 'Medium' ? 14 : 30;
+          const dueDate = new Date(new Date(r.createdAt).getTime() + dueDays * 24 * 60 * 60 * 1000);
+          return {
+            ...r,
+            actionText,
+            dueDate: dueDate.toLocaleDateString(),
+            trend: trendBySupplier.get(r.supplierId) ?? null,
+          };
+        }),
+    [items, trendBySupplier]
+  );
 
   const matchesActiveFilters = (row: OpportunityRow): boolean => !filterSupplierId || row.supplierId === filterSupplierId;
 
@@ -261,6 +372,10 @@ export function Risk() {
         }}
       >
         <MetricCard title="Risk score (avg)" value={String(stats.avgScore)} />
+        <MetricCard
+          title="Risk trend (avg)"
+          value={avgTrendPercent === null ? 'N/A' : `${avgTrendPercent > 0 ? '+' : ''}${avgTrendPercent}%`}
+        />
         <MetricCard title="Open risks" value={String(stats.openRisks)} />
         <MetricCard title="Mitigated risks" value={String(stats.mitigatedRisks)} />
         <MetricCard title="Open opportunities" value={String(stats.opportunities)} />
@@ -352,6 +467,81 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Risk matrix (likelihood x impact)</h2>
+          <div className="table-wrap">
+            <table className="table" style={{ minWidth: 840 }}>
+              <thead>
+                <tr>
+                  <th>Likelihood \ Impact</th>
+                  {matrixSeverityOrder.map((severity) => (
+                    <th key={severity}>{severity === 'Negligible' ? 'Negligible' : severity}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {matrixLikelihoodOrder.map((likelihood, rowIndex) => (
+                  <tr key={likelihood}>
+                    <td style={{ whiteSpace: 'nowrap' }}>{likelihood?.replace('Very', 'Very ')}</td>
+                    {matrixSeverityOrder.map((severity, colIndex) => {
+                      const cellLabel = matrixLabelGrid[rowIndex][colIndex];
+                      const cellColor = matrixColorByLabel[cellLabel] ?? '#e5e7eb';
+                      const cellKey = `${likelihood}|${severity}`;
+                      const cellRisks = riskPinsByCell.get(cellKey) ?? [];
+                      return (
+                        <td
+                          key={`${likelihood}-${severity}`}
+                          style={{
+                            background: cellColor,
+                            color: cellLabel === 'High' ? '#ffffff' : '#111827',
+                            fontWeight: 700,
+                            minWidth: 120,
+                            verticalAlign: 'top',
+                          }}
+                          title={
+                            cellRisks.length > 0
+                              ? cellRisks
+                                  .slice(0, 5)
+                                  .map((r) => `${r.supplier.code}: ${r.description}`)
+                                  .join('\n')
+                              : ''
+                          }
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <span>{cellLabel}</span>
+                            {cellRisks.length > 0 ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  borderRadius: 999,
+                                  padding: '0.05rem 0.45rem',
+                                  background: 'rgba(17, 24, 39, 0.18)',
+                                  color: cellLabel === 'High' ? '#ffffff' : '#111827',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                Pin {cellRisks.length}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+            Pins show how many current risk records fall into each likelihood-impact cell.
+          </p>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Risk scores by supplier</h2>
           <div className="table-wrap">
             {currents.length === 0 ? (
@@ -368,6 +558,7 @@ export function Risk() {
                     <th>Delivery</th>
                     <th>CAR closure</th>
                     <th>Documentation</th>
+                    <th>Trend</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -383,6 +574,11 @@ export function Risk() {
                       <td>{r.factors.delivery}</td>
                       <td>{r.factors.carClosure}</td>
                       <td>{r.factors.documentation}</td>
+                      <td>
+                        {trendBySupplier.get(r.supplier.id) === null || trendBySupplier.get(r.supplier.id) === undefined
+                          ? 'N/A'
+                          : `${(trendBySupplier.get(r.supplier.id) ?? 0) > 0 ? '+' : ''}${trendBySupplier.get(r.supplier.id)}%`}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -449,6 +645,42 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Actions table</h2>
+          <div className="table-wrap" style={{ marginBottom: '1rem' }}>
+            {actionRows.length === 0 ? (
+              <p className="table-empty">No active risk actions.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>Risk description</th>
+                    <th>Risk level</th>
+                    <th>Recommended action</th>
+                    <th>Owner</th>
+                    <th>Due date</th>
+                    <th>Status</th>
+                    <th>Trend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {actionRows.map((row) => (
+                    <tr key={`action-${row.id}`}>
+                      <td>{row.supplier.code} — {row.supplier.name}</td>
+                      <td>{row.description}</td>
+                      <td>{row.riskLevel ?? 'TBD'}</td>
+                      <td>{row.actionText}</td>
+                      <td>{row.createdBy?.name || row.createdBy?.email || 'Buyer / QE'}</td>
+                      <td>{row.dueDate}</td>
+                      <td>{row.status}</td>
+                      <td>{row.trend === null ? 'N/A' : `${row.trend > 0 ? '+' : ''}${row.trend}%`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
           <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
           <div className="table-wrap">
             {items.length === 0 ? (
