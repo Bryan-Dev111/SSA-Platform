@@ -45,7 +45,6 @@ export function Risk() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [recalcLoading, setRecalcLoading] = useState(false);
   const [newType, setNewType] = useState<'risk' | 'opportunity'>('risk');
   const [newSupplierId, setNewSupplierId] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -57,11 +56,8 @@ export function Risk() {
   const [editLikelihood, setEditLikelihood] = useState<'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely'>('Possible');
   const [editSeverity, setEditSeverity] = useState<'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe'>('Moderate');
   const [editStatus, setEditStatus] = useState<'Open' | 'Mitigated' | 'Closed'>('Open');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterRiskLevel, setFilterRiskLevel] = useState('');
 
   const roleNames = user?.roleNames ?? [];
-  const isBuyer = roleNames.includes('Buyer');
   const canEditRiskItems =
     roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('Buyer');
 
@@ -71,11 +67,7 @@ export function Risk() {
     setError(null);
     try {
       const currentQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
-      const listParams = new URLSearchParams();
-      if (filterSupplierId) listParams.set('supplierId', filterSupplierId);
-      if (filterStatus) listParams.set('status', filterStatus);
-      if (filterRiskLevel) listParams.set('riskLevel', filterRiskLevel);
-      const listQ = listParams.toString() ? `?${listParams.toString()}` : '';
+      const listQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
       const [supplierList, currentList, allItems] = await Promise.all([
         apiJson<Supplier[]>('/suppliers', { token }),
         apiJson<RiskCurrent[]>(`/risk-snapshots/current${currentQ}`, { token }),
@@ -97,7 +89,7 @@ export function Risk() {
   useEffect(() => {
     void load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, filterSupplierId, filterStatus, filterRiskLevel]);
+  }, [token, filterSupplierId]);
 
   const stats = useMemo(() => {
     const rows = currents;
@@ -148,12 +140,7 @@ export function Risk() {
       ? 'conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg)'
       : `conic-gradient(${distributionPieSegments.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`;
 
-  const matchesActiveFilters = (row: OpportunityRow): boolean => {
-    if (filterSupplierId && row.supplierId !== filterSupplierId) return false;
-    if (filterStatus && row.status !== filterStatus) return false;
-    if (filterRiskLevel && (row.riskLevel ?? '') !== filterRiskLevel) return false;
-    return true;
-  };
+  const matchesActiveFilters = (row: OpportunityRow): boolean => !filterSupplierId || row.supplierId === filterSupplierId;
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,24 +208,6 @@ export function Risk() {
     setEditingId(null);
   };
 
-  const recalculate = async () => {
-    if (!token) return;
-    setRecalcLoading(true);
-    try {
-      await apiJson('/risk-snapshots/recalculate', {
-        token,
-        method: 'POST',
-        body: JSON.stringify(filterSupplierId ? { supplierId: filterSupplierId } : {}),
-      });
-      toast.success('Risk snapshots recalculated');
-      await load(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to recalculate');
-    } finally {
-      setRecalcLoading(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="page">
@@ -281,29 +250,6 @@ export function Risk() {
             ))}
           </select>
         </label>
-        <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Status:</span>
-          <select className="input" style={{ width: 'auto' }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">All</option>
-            <option value="Open">Open</option>
-            <option value="Mitigated">Mitigated</option>
-            <option value="Closed">Closed</option>
-          </select>
-        </label>
-        <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Risk level:</span>
-          <select className="input" style={{ width: 'auto' }} value={filterRiskLevel} onChange={(e) => setFilterRiskLevel(e.target.value)}>
-            <option value="">All</option>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-          </select>
-        </label>
-        {!isBuyer && (
-          <button className="btn btn-secondary" type="button" onClick={recalculate} disabled={recalcLoading}>
-            {recalcLoading ? 'Recalculating…' : 'Recalculate risk'}
-          </button>
-        )}
       </div>
 
       <div
