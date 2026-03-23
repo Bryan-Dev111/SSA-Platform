@@ -3,11 +3,13 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { requirePageAccess } from '../middleware/rbac';
 import { backfillLateShipmentAlerts, backfillOverdueAuditAlerts, backfillOverdueCarAlerts } from '../services/alerts';
 
 const router = Router();
 
 router.use(authMiddleware);
+router.use(requirePageAccess('Dashboard'));
 
 const ALERT_CATEGORIES: AlertCategory[] = [
   'overdueAudit',

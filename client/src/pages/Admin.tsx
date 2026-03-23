@@ -2,6 +2,7 @@
  * Admin: Day 8 reference data + Day 9 audit types, risk weights, buyers/suppliers, permissions.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -22,7 +23,8 @@ type Tab =
   | 'users'
   | 'employees'
   | 'buyersSuppliers'
-  | 'permissions';
+  | 'permissions'
+  | 'loadData';
 
 interface CommodityType {
   id: string;
@@ -307,6 +309,7 @@ export function Admin() {
             ['employees', 'Employees'],
             ['buyersSuppliers', 'Buyers & suppliers'],
             ['permissions', 'Permissions'],
+            ['loadData', 'Load data'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -354,6 +357,35 @@ export function Admin() {
         />
       )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
+      {tab === 'loadData' && (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Load audits and shipment schedule</h2>
+            <p style={{ color: 'var(--color-text-muted)' }}>
+              Day 13 admin operation guidance: load audits into schedule and load shipment schedule data.
+            </p>
+            <ul style={{ marginTop: 0, marginBottom: '1rem' }}>
+              <li>
+                Audit load: use <strong>Internal Management</strong> to schedule new audits.
+              </li>
+              <li>
+                Shipment schedule load: use <strong>Shipments</strong> page schedule table to add/update planned rows.
+              </li>
+            </ul>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Link to="/internal-management" className="btn btn-primary">
+                Open Internal Management
+              </Link>
+              <Link to="/shipments" className="btn btn-ghost">
+                Open Shipments
+              </Link>
+              <Link to="/audits" className="btn btn-ghost">
+                Open Audits
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {tab === 'commodity' && (
         <div className="card">
