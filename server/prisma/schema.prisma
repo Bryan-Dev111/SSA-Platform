@@ -327,6 +327,8 @@ model Document {
 enum DocumentType {
   Procedure
   Policy
+  QualityManual
+  Standard
   StandardOperatingProcedure
   WorkInstruction
   Form

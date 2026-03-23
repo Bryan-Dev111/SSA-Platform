@@ -71,6 +71,8 @@ function postDocumentWithProgress(
 const DOC_TYPES: { value: string; label: string }[] = [
   { value: 'Procedure', label: 'Procedure' },
   { value: 'Policy', label: 'Policy' },
+  { value: 'QualityManual', label: 'Quality Manual' },
+  { value: 'Standard', label: 'Standard' },
   { value: 'StandardOperatingProcedure', label: 'SOP' },
   { value: 'WorkInstruction', label: 'Work Instruction' },
   { value: 'Form', label: 'Form' },
@@ -352,9 +354,9 @@ export function Documents() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th>Type</th>
                     <th>Number</th>
                     <th>Name</th>
-                    <th>Type</th>
                     <th>Revision</th>
                     <th>View</th>
                     {canMutate ? <th /> : null}
@@ -363,9 +365,9 @@ export function Documents() {
                 <tbody>
                   {paginatedRows.map((r) => (
                     <tr key={r.id}>
+                      <td>{typeLabel(r.documentType)}</td>
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
-                      <td>{typeLabel(r.documentType)}</td>
                       <td>{r.revision ?? '—'}</td>
                       <td>
                         {r.filePath ? (

@@ -22,6 +22,8 @@ const canMutate = requireRole(['Admin', 'QualityEngineer']);
 const DOCUMENT_TYPES: DocumentType[] = [
   'Procedure',
   'Policy',
+  'QualityManual',
+  'Standard',
   'StandardOperatingProcedure',
   'WorkInstruction',
   'Form',
