@@ -460,7 +460,9 @@ export function CorrectiveActions() {
                     </td>
                     <td>{c.severity}</td>
                     <td>
-                      <span className={`finding-status-badge finding-status-badge--${getCarStatusSlug(c.status)}`}>
+                      <span
+                        className={`finding-status-badge car-table-status-badge car-table-status-badge--${getCarStatusSlug(c.status)}`}
+                      >
                         {c.status}
                       </span>
                     </td>
