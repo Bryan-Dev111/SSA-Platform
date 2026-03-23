@@ -120,6 +120,33 @@ export function Risk() {
     () => [...currents].sort((a, b) => b.score - a.score).slice(0, 5),
     [currents]
   );
+  const maxTopRiskScore = Math.max(1, ...topRiskSuppliers.map((r) => r.score));
+  const topRiskTotalScore = topRiskSuppliers.reduce((sum, r) => sum + r.score, 0);
+  const topRiskPareto = topRiskSuppliers.map((row, idx) => {
+    const cumulative = topRiskSuppliers.slice(0, idx + 1).reduce((sum, r) => sum + r.score, 0);
+    return {
+      ...row,
+      cumulativePercent: topRiskTotalScore > 0 ? Math.round((cumulative / topRiskTotalScore) * 100) : 0,
+    };
+  });
+
+  const distributionSlices = [
+    { label: 'Low', count: distribution.low, color: '#22c55e' },
+    { label: 'Medium', count: distribution.medium, color: '#f59e0b' },
+    { label: 'High', count: distribution.high, color: '#ef4444' },
+  ] as const;
+  const distributionTotal = distributionSlices.reduce((sum, s) => sum + s.count, 0);
+  const distributionPieSegments = distributionSlices.reduce<{ color: string; start: number; end: number }[]>((acc, s) => {
+    const start = acc.length > 0 ? acc[acc.length - 1].end : 0;
+    const pct = distributionTotal > 0 ? (s.count / distributionTotal) * 100 : 0;
+    const end = start + pct;
+    acc.push({ color: s.color, start, end });
+    return acc;
+  }, []);
+  const distributionPieBackground =
+    distributionTotal === 0
+      ? 'conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg)'
+      : `conic-gradient(${distributionPieSegments.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`;
 
   const matchesActiveFilters = (row: OpportunityRow): boolean => {
     if (filterSupplierId && row.supplierId !== filterSupplierId) return false;
@@ -304,9 +331,33 @@ export function Risk() {
         <div className="card">
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Risk distribution</h2>
-            <p style={{ margin: 0 }}>Low: {distribution.low}</p>
-            <p style={{ margin: 0 }}>Medium: {distribution.medium}</p>
-            <p style={{ margin: 0 }}>High: {distribution.high}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div
+                aria-label="Risk distribution pie chart"
+                style={{
+                  width: 140,
+                  height: 140,
+                  borderRadius: '50%',
+                  background: distributionPieBackground,
+                  border: '1px solid var(--color-border)',
+                  flex: '0 0 auto',
+                }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 160 }}>
+                {distributionSlices.map((s) => (
+                  <div
+                    key={s.label}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
+                      {s.label}
+                    </span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
         <div className="card">
@@ -315,13 +366,39 @@ export function Risk() {
             {topRiskSuppliers.length === 0 ? (
               <p className="table-empty">No data.</p>
             ) : (
-              <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                {topRiskSuppliers.map((r) => (
-                  <li key={r.supplier.id}>
-                    {r.supplier.code} — {r.supplier.name} ({r.level}, {r.score})
-                  </li>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {topRiskPareto.map((r) => (
+                  <div key={r.supplier.id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.supplier.code} — {r.supplier.name}
+                      </span>
+                      <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                        {r.score} ({r.cumulativePercent}% cumulative)
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 8,
+                        background: 'var(--color-border-subtle)',
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${(r.score / maxTopRiskScore) * 100}%`,
+                          height: '100%',
+                          background: '#4f46e5',
+                          borderRadius: 4,
+                          minWidth: r.score > 0 ? 4 : 0,
+                          transition: 'width 0.2s ease',
+                        }}
+                      />
+                    </div>
+                  </div>
                 ))}
-              </ol>
+              </div>
             )}
           </div>
         </div>
