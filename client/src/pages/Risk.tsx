@@ -406,6 +406,48 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Risk scores by supplier</h2>
+          <div className="table-wrap">
+            {currents.length === 0 ? (
+              <p className="table-empty">No suppliers in scope.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>Score</th>
+                    <th>Level</th>
+                    <th>Quality</th>
+                    <th>Audit</th>
+                    <th>Delivery</th>
+                    <th>CAR closure</th>
+                    <th>Documentation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currents.map((r) => (
+                    <tr key={r.supplier.id}>
+                      <td>
+                        {r.supplier.code} — {r.supplier.name}
+                      </td>
+                      <td>{r.score}</td>
+                      <td>{r.level}</td>
+                      <td>{r.factors.quality}</td>
+                      <td>{r.factors.audit}</td>
+                      <td>{r.factors.delivery}</td>
+                      <td>{r.factors.carClosure}</td>
+                      <td>{r.factors.documentation}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
           <div className="table-wrap">
             {items.length === 0 ? (
@@ -519,49 +561,6 @@ export function Risk() {
           </div>
         </div>
       )}
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risk scores by supplier</h2>
-          <div className="table-wrap">
-            {currents.length === 0 ? (
-              <p className="table-empty">No suppliers in scope.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Supplier</th>
-                    <th>Score</th>
-                    <th>Level</th>
-                    <th>Quality</th>
-                    <th>Audit</th>
-                    <th>Delivery</th>
-                    <th>CAR closure</th>
-                    <th>Documentation</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currents.map((r) => (
-                    <tr key={r.supplier.id}>
-                      <td>
-                        {r.supplier.code} — {r.supplier.name}
-                      </td>
-                      <td>{r.score}</td>
-                      <td>{r.level}</td>
-                      <td>{r.factors.quality}</td>
-                      <td>{r.factors.audit}</td>
-                      <td>{r.factors.delivery}</td>
-                      <td>{r.factors.carClosure}</td>
-                      <td>{r.factors.documentation}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-
 
       {editingId && (
         <div className="confirm-dialog-overlay" onClick={closeEditModal} role="dialog" aria-modal="true" aria-labelledby="risk-edit-title">
