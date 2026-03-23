@@ -151,10 +151,10 @@ export function CARRecord() {
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
-  const canEdit = !!car && editMode && canEditDraft && car.status === 'DRAFT';
-  const canSave = car?.status === 'DRAFT' && canEditDraft;
-  const canProcess = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'WaitingApproval' && car.status !== 'Closed';
-  const canReverse = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'RCCA' && car.status !== 'Closed';
+  const canEdit = !!car && editMode && canEditDraft;
+  const canSave = !!car && canEditDraft;
+  const canProcess = canEditDraft && !!car && car.status !== 'WaitingApproval' && car.status !== 'Closed';
+  const canReverse = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'RCCA';
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
   const statusHistory = car ? buildCarStatusHistory(car) : [];
@@ -277,14 +277,10 @@ export function CARRecord() {
       });
       setCar(patched);
       syncFormFromCar(patched);
-
-      const updated = await apiJson<CAR>(`/cars/${car.id}/save`, { token, method: 'POST' });
-      setCar(updated);
-      syncFormFromCar(updated);
       setEditMode(false);
       setError(null);
-      toast.info('CAR saved');
-      navigate(`/car-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
+      toast.info('CAR updated');
+      navigate(`/car-record?id=${encodeURIComponent(patched.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
     } finally {
@@ -544,22 +540,6 @@ export function CARRecord() {
                     {actioning ? 'Saving…' : 'Save'}
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEditMode((v) => !v)}
-                  disabled={!canEditDraft || car.status !== 'DRAFT' || actioning}
-                  title={car.status !== 'DRAFT' ? 'Edit is available only in DRAFT before Save' : 'Toggle edit mode'}
-                  style={editMode ? { background: 'var(--color-primary)', color: '#fff', borderColor: 'var(--color-primary)' } : undefined}
-                >
-                  {editMode ? 'Editing' : 'Edit'}
-                </button>
-                <button type="button" className="btn btn-primary" onClick={() => runAction(`/cars/${car.id}/process`, 'Process')} disabled={!canProcess || actioning}>
-                  {actioning ? '…' : 'Process'}
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={() => runAction(`/cars/${car.id}/reverse`, 'Reverse')} disabled={!canReverse || actioning}>
-                  {actioning ? '…' : 'Reverse'}
-                </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
@@ -594,26 +574,69 @@ export function CARRecord() {
                     <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
                   )}
                 </div>
-                <div className="input-group">
-                  <label className="input-label">Severity</label>
-                  <select
-                    className="input"
-                    value={form.severity}
-                    onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value }))}
-                    disabled={!canEdit}
-                  >
-                    {SEVERITIES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label className="input-label">CAR Owner</label>
-                  <input className="input" value={form.carOwner} onChange={(e) => setForm((p) => ({ ...p, carOwner: e.target.value }))} disabled={!canEdit} />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Target Completion Date</label>
-                  <input className="input" type="date" value={form.targetCompletionDate} onChange={(e) => setForm((p) => ({ ...p, targetCompletionDate: e.target.value }))} disabled={!canEdit} />
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(170px, 1fr)) auto',
+                    gap: '1rem',
+                    alignItems: 'end',
+                  }}
+                >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Severity</label>
+                    <select
+                      className="input"
+                      value={form.severity}
+                      onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value }))}
+                      disabled={!canEdit}
+                    >
+                      {SEVERITIES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">CAR Owner</label>
+                    <input className="input" value={form.carOwner} onChange={(e) => setForm((p) => ({ ...p, carOwner: e.target.value }))} disabled={!canEdit} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Target Completion Date</label>
+                    <input
+                      className="input"
+                      type="date"
+                      value={form.targetCompletionDate}
+                      onChange={(e) => setForm((p) => ({ ...p, targetCompletionDate: e.target.value }))}
+                      disabled={!canEdit}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', paddingBottom: 1 }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setEditMode((v) => !v)}
+                      disabled={!canEditDraft || actioning}
+                      style={editMode ? { background: 'var(--color-primary)', color: '#fff', borderColor: 'var(--color-primary)' } : undefined}
+                    >
+                      {editMode ? 'Editing' : 'Edit'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => runAction(`/cars/${car.id}/process`, 'Process')}
+                      disabled={!canProcess || actioning}
+                    >
+                      {actioning ? '…' : 'Process'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => runAction(`/cars/${car.id}/reverse`, 'Reverse')}
+                      disabled={!canReverse || actioning}
+                    >
+                      {actioning ? '…' : 'Reverse'}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="input-group">

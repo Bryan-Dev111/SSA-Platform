@@ -286,7 +286,7 @@ router.post(
   })
 );
 
-/** PATCH /cars/:id — update DRAFT only */
+/** PATCH /cars/:id — update CAR fields */
 router.patch(
   '/:id',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -307,10 +307,6 @@ router.patch(
     }
     if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
       res.status(404).json({ error: 'CAR not found' });
-      return;
-    }
-    if (existing.status !== 'DRAFT') {
-      res.status(400).json({ error: 'Only draft CARs can be updated via PATCH' });
       return;
     }
     const body = req.body as Record<string, unknown>;
