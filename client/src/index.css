@@ -553,6 +553,27 @@ a.btn:focus {
   background: var(--color-bg-subtle);
 }
 
+/* Findings table: CAR-like hover behavior (keep status hue, slightly stronger on hover) */
+.table tbody tr.finding-row--new:hover,
+.table tbody tr.finding-row--draft:hover {
+  background: #f1f5f9;
+}
+.table tbody tr.finding-row--waiting-disposition:hover {
+  background: #fef3c7;
+}
+.table tbody tr.finding-row--waiting-approval:hover {
+  background: #fee2e2;
+}
+.table tbody tr.finding-row--closed:hover {
+  background: #e5e7eb;
+}
+.table tbody tr.finding-row--follow-up:hover {
+  background: #ede9fe;
+}
+.table tbody tr.finding-row--unknown:hover {
+  background: var(--color-border-subtle);
+}
+
 /* Audits table: row background by derived status */
 .audit-row--scheduled {
   background: #eff6ff;
