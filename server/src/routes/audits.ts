@@ -16,6 +16,19 @@ const router = Router();
 type AuditResult = 'Passed' | 'Failed' | 'Cancelled';
 type DerivedStatus = 'Scheduled' | 'In Process' | 'Overdue' | 'Complete' | 'Cancelled';
 
+function normalizeIdentity(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function isAssignedAuditorForAudit(auditorField: string | null, user: { email: string; name?: string | null }): boolean {
+  const target = normalizeIdentity(auditorField);
+  if (!target) return false;
+  const email = normalizeIdentity(user.email);
+  const name = normalizeIdentity(user.name);
+  const emailLocal = email.includes('@') ? email.split('@')[0] : email;
+  return target === email || target === name || target === emailLocal;
+}
+
 /** Compare calendar dates in UTC so status is correct regardless of server timezone. */
 function getDerivedStatus(result: AuditResult | null, auditDate: Date): DerivedStatus {
   if (result === 'Cancelled') return 'Cancelled';
@@ -215,7 +228,10 @@ router.patch(
       auditTypeId?: string | null;
       auditor?: string | null;
     };
-    const canSetResult = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
+    const canSetResult =
+      req.user.roleNames.includes('Admin') ||
+      req.user.roleNames.includes('QualityEngineer') ||
+      (req.user.roleNames.includes('Auditor') && isAssignedAuditorForAudit(existing.auditor, req.user));
     const update: {
       auditDate?: Date;
       notes?: string | null;
@@ -230,7 +246,7 @@ router.patch(
     if (auditor !== undefined) update.auditor = auditor ? String(auditor).trim() : null;
     if (result !== undefined) {
       if (!canSetResult) {
-        res.status(403).json({ error: 'Only Admin or Quality Engineer can set audit result' });
+        res.status(403).json({ error: 'Only assigned Auditor, Admin, or Quality Engineer can set audit result' });
         return;
       }
       if (result !== null && result !== 'Passed' && result !== 'Failed' && result !== 'Cancelled') {

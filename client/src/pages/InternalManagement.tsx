@@ -20,10 +20,24 @@ interface InternalRow {
   updatedAt: string;
 }
 
+interface SupplierOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface AuditTypeOption {
+  id: string;
+  code: string;
+  name: string | null;
+}
+
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
   const [rows, setRows] = useState<InternalRow[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [auditTypes, setAuditTypes] = useState<AuditTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,14 +50,24 @@ export function InternalManagement() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<Record<string, number>>({});
+  const [newAudit, setNewAudit] = useState({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
+  const [submittingAudit, setSubmittingAudit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
   const load = () => {
     if (!token) return;
-    apiJson<InternalRow[]>('/internal-docs', { token })
-      .then(setRows)
+    Promise.all([
+      apiJson<InternalRow[]>('/internal-docs', { token }),
+      apiJson<SupplierOption[]>('/suppliers', { token }),
+      apiJson<AuditTypeOption[]>('/audits/types', { token }),
+    ])
+      .then(([docs, supplierList, typeList]) => {
+        setRows(docs);
+        setSuppliers(supplierList);
+        setAuditTypes(typeList);
+      })
       .catch((e) => setError(parseApiError(e)));
   };
 
@@ -51,8 +75,16 @@ export function InternalManagement() {
     if (!token || !isAdmin) return;
     setLoading(true);
     setError(null);
-    apiJson<InternalRow[]>('/internal-docs', { token })
-      .then(setRows)
+    Promise.all([
+      apiJson<InternalRow[]>('/internal-docs', { token }),
+      apiJson<SupplierOption[]>('/suppliers', { token }),
+      apiJson<AuditTypeOption[]>('/audits/types', { token }),
+    ])
+      .then(([docs, supplierList, typeList]) => {
+        setRows(docs);
+        setSuppliers(supplierList);
+        setAuditTypes(typeList);
+      })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token, isAdmin]);
@@ -154,6 +186,31 @@ export function InternalManagement() {
     }
   };
 
+  const submitAudit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !newAudit.supplierId || !newAudit.auditDate) return;
+    setSubmittingAudit(true);
+    try {
+      const created = await apiJson<{ code: string }>('/audits', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          supplierId: newAudit.supplierId,
+          auditDate: newAudit.auditDate,
+          auditTypeId: newAudit.auditTypeId || null,
+          auditor: newAudit.auditor || null,
+          notes: newAudit.notes || null,
+        }),
+      });
+      toast.success(`Audit ${created.code} created`);
+      setNewAudit({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setSubmittingAudit(false);
+    }
+  };
+
   return (
     <div className="page">
       <header className="page-header">
@@ -162,6 +219,74 @@ export function InternalManagement() {
       </header>
 
       {error && <div className="alert-error">{error}</div>}
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Schedule new audit</h2>
+          <form onSubmit={submitAudit}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Supplier *</label>
+                <select
+                  className="input"
+                  value={newAudit.supplierId}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, supplierId: e.target.value }))}
+                  required
+                >
+                  <option value="">Select</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Audit date *</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={newAudit.auditDate}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, auditDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Audit type</label>
+                <select
+                  className="input"
+                  value={newAudit.auditTypeId}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, auditTypeId: e.target.value }))}
+                >
+                  <option value="">—</option>
+                  {auditTypes.map((t) => (
+                    <option key={t.id} value={t.id}>{t.code}{t.name ? ` — ${t.name}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Auditor</label>
+                <input
+                  className="input"
+                  value={newAudit.auditor}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
+                  placeholder="Assigned auditor name/email"
+                />
+              </div>
+            </div>
+            <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+              <label className="input-label">Notes</label>
+              <input
+                className="input"
+                value={newAudit.notes}
+                onChange={(e) => setNewAudit((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={submittingAudit}>
+              {submittingAudit ? 'Creating…' : 'Create Audit'}
+            </button>
+          </form>
+        </div>
+      </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">

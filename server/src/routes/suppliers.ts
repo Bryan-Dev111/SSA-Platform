@@ -31,6 +31,8 @@ router.get(
         name: true,
         city: true,
         country: true,
+        status: true,
+        notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
       },
@@ -52,6 +54,9 @@ router.post(
     }
     const city = typeof req.body?.city === 'string' ? req.body.city.trim() || null : null;
     const country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
+    const statusRaw = typeof req.body?.status === 'string' ? req.body.status.trim() : 'Active';
+    const status = statusRaw === 'Inactive' ? 'Inactive' : 'Active';
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() || null : null;
     const commodityTypeIdRaw = req.body?.commodityTypeId;
     // Omitting the field must mean "no commodity" — do not use String(undefined) → "undefined"
     const commodityTypeId =
@@ -69,13 +74,15 @@ router.post(
     }
     const code = await getNextCode('SUP');
     const created = await prisma.supplier.create({
-      data: { code, name, city, country, commodityTypeId },
+      data: { code, name, city, country, status: status as 'Active' | 'Inactive', notes, commodityTypeId },
       select: {
         id: true,
         code: true,
         name: true,
         city: true,
         country: true,
+        status: true,
+        notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
       },
@@ -98,6 +105,8 @@ router.patch(
       name?: string;
       city?: string | null;
       country?: string | null;
+      status?: 'Active' | 'Inactive';
+      notes?: string | null;
       commodityTypeId?: string | null;
     } = {};
     if (body.name !== undefined) {
@@ -114,6 +123,17 @@ router.patch(
     if (body.country !== undefined) {
       data.country = typeof body.country === 'string' ? body.country.trim() || null : null;
     }
+    if (body.status !== undefined) {
+      const status = typeof body.status === 'string' ? body.status.trim() : '';
+      if (status !== 'Active' && status !== 'Inactive') {
+        res.status(400).json({ error: 'status must be Active or Inactive' });
+        return;
+      }
+      data.status = status as 'Active' | 'Inactive';
+    }
+    if (body.notes !== undefined) {
+      data.notes = typeof body.notes === 'string' ? body.notes.trim() || null : null;
+    }
     if (body.commodityTypeId !== undefined) {
       const raw = body.commodityTypeId;
       const commodityTypeId =
@@ -128,7 +148,7 @@ router.patch(
       data.commodityTypeId = commodityTypeId;
     }
     if (Object.keys(data).length === 0) {
-      res.status(400).json({ error: 'Provide at least one of: name, city, country, commodityTypeId' });
+      res.status(400).json({ error: 'Provide at least one of: name, city, country, status, notes, commodityTypeId' });
       return;
     }
     const existing = await prisma.supplier.findUnique({ where: { id: req.params.id } });
@@ -145,6 +165,8 @@ router.patch(
         name: true,
         city: true,
         country: true,
+        status: true,
+        notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
       },
@@ -301,6 +323,8 @@ router.get(
         name: true,
         city: true,
         country: true,
+        status: true,
+        notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
         createdAt: true,

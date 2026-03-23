@@ -1,0 +1,3 @@
+ALTER TABLE "Supplier" ADD COLUMN "status" TEXT NOT NULL DEFAULT 'Active';
+ALTER TABLE "Supplier" ADD COLUMN "notes" TEXT;
+

@@ -71,6 +71,7 @@ async function loadUser(userId: string) {
   return {
     id: user.id,
     email: user.email,
+    name: user.name,
     roleNames,
     roleIds,
     buyerId: buyerId ?? undefined,

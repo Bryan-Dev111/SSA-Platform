@@ -315,6 +315,8 @@ interface SupplierRow {
   name: string;
   city: string | null;
   country: string | null;
+  status: 'Active' | 'Inactive';
+  notes: string | null;
   commodityTypeId: string | null;
   commodityType: { id: string; name: string } | null;
 }
@@ -354,6 +356,8 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
   const [newSupName, setNewSupName] = useState('');
   const [newSupCity, setNewSupCity] = useState('');
   const [newSupCountry, setNewSupCountry] = useState('');
+  const [newSupStatus, setNewSupStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [newSupNotes, setNewSupNotes] = useState('');
   const [newSupCommodityTypeId, setNewSupCommodityTypeId] = useState('');
   const [commodityTypes, setCommodityTypes] = useState<CommodityTypeRow[]>([]);
   const [editSup, setEditSup] = useState<SupplierRow | null>(null);
@@ -463,12 +467,16 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
           name: newSupName.trim(),
           city: newSupCity.trim() || null,
           country: newSupCountry.trim() || null,
+          status: newSupStatus,
+          notes: newSupNotes.trim() || null,
           commodityTypeId: newSupCommodityTypeId.trim() ? newSupCommodityTypeId.trim() : null,
         }),
       });
       setNewSupName('');
       setNewSupCity('');
       setNewSupCountry('');
+      setNewSupStatus('Active');
+      setNewSupNotes('');
       setNewSupCommodityTypeId('');
       toast.success('Supplier created');
       await load();
@@ -490,6 +498,8 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
           name: editSup.name.trim(),
           city: editSup.city?.trim() || null,
           country: editSup.country?.trim() || null,
+          status: editSup.status,
+          notes: editSup.notes?.trim() || null,
           commodityTypeId: editSup.commodityTypeId,
         }),
       });
@@ -574,6 +584,13 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
               <input className="input" value={newSupCountry} onChange={(e) => setNewSupCountry(e.target.value)} />
             </div>
             <div className="input-group">
+              <label className="input-label">Status</label>
+              <select className="input" value={newSupStatus} onChange={(e) => setNewSupStatus(e.target.value as 'Active' | 'Inactive')}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="input-group">
               <label className="input-label">Commodity</label>
               <select
                 className="input"
@@ -588,6 +605,10 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Notes</label>
+              <input className="input" value={newSupNotes} onChange={(e) => setNewSupNotes(e.target.value)} />
             </div>
           </div>
           <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
@@ -733,6 +754,8 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
                   <th>City</th>
                   <th>Country</th>
                   <th>Commodity</th>
+                  <th>Status</th>
+                  <th>Notes</th>
                   <th style={{ width: 220 }}>Actions</th>
                 </tr>
               </thead>
@@ -790,6 +813,31 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
                         </select>
                       ) : (
                         s.commodityType?.name ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <select
+                          className="input"
+                          value={editSup.status}
+                          onChange={(e) => setEditSup({ ...editSup, status: e.target.value as 'Active' | 'Inactive' })}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      ) : (
+                        s.status
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input
+                          className="input"
+                          value={editSup.notes ?? ''}
+                          onChange={(e) => setEditSup({ ...editSup, notes: e.target.value })}
+                        />
+                      ) : (
+                        s.notes?.trim() ? s.notes : '—'
                       )}
                     </td>
                     <td>

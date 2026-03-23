@@ -1,5 +1,5 @@
 /**
- * Audits page: table (schedule, results, notes); only Admin/QE set result;
+ * Audits page: table (schedule, results, notes); only assigned Auditor/Admin/QE set result;
  * column with finding #s (clickable → Findings Record). Only Admin can delete.
  */
 import { useEffect, useState } from 'react';
@@ -16,19 +16,13 @@ interface Supplier {
   name: string;
 }
 
-interface AuditType {
-  id: string;
-  code: string;
-  name: string | null;
-}
-
 interface Audit {
   id: string;
   code: string;
   supplierId: string;
   supplier: Supplier;
   auditTypeId: string | null;
-  auditType: AuditType | null;
+  auditType: { id: string; code: string; name: string | null } | null;
   auditDate: string;
   auditor: string | null;
   result: 'Passed' | 'Failed' | 'Cancelled' | null;
@@ -63,13 +57,9 @@ export function Audits() {
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [audits, setAudits] = useState<Audit[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [auditTypes, setAuditTypes] = useState<AuditType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [newAudit, setNewAudit] = useState({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
-  const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -82,8 +72,16 @@ export function Audits() {
   } | null>(null);
   const roleNames = user?.roleNames ?? [];
   const isAdmin = roleNames.includes('Admin');
-  const canSetResult = roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
-  const canCreateAudit = roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
+  const canSetResultForAudit = (audit: Audit): boolean => {
+    if (roleNames.includes('Admin') || roleNames.includes('QualityEngineer')) return true;
+    if (!roleNames.includes('Auditor')) return false;
+    const target = (audit.auditor ?? '').trim().toLowerCase();
+    if (!target) return false;
+    const email = (user?.email ?? '').trim().toLowerCase();
+    const name = (user?.name ?? '').trim().toLowerCase();
+    const emailLocal = email.includes('@') ? email.split('@')[0] : email;
+    return target === email || target === name || target === emailLocal;
+  };
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(audits.length / pageSize));
@@ -101,12 +99,10 @@ export function Audits() {
     Promise.all([
       apiJson<Audit[]>(`/audits${q}`, { token }),
       apiJson<Supplier[]>('/suppliers', { token }),
-      apiJson<AuditType[]>('/audits/types', { token }),
     ])
-      .then(([a, s, t]) => {
+      .then(([a, s]) => {
         setAudits(a);
         setSuppliers(s);
-        setAuditTypes(t);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false));
@@ -181,35 +177,6 @@ export function Audits() {
     }
   };
 
-  const handleCreateAudit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token || !newAudit.supplierId || !newAudit.auditDate) return;
-    setSubmitting(true);
-    try {
-      const created = await apiJson<Audit>('/audits', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({
-          supplierId: newAudit.supplierId,
-          auditDate: newAudit.auditDate,
-          auditTypeId: newAudit.auditTypeId || null,
-          auditor: newAudit.auditor || null,
-          notes: newAudit.notes || null,
-        }),
-      });
-      setAudits((prev) => [created, ...prev]);
-      setNewAudit({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
-      setShowNewForm(false);
-      toast.success(`Audit ${created.code} created`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create audit';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="page">
@@ -229,7 +196,8 @@ export function Audits() {
       <header className="page-header">
         <h1 className="page-title">Audits</h1>
         <p className="page-description">
-          Schedule and results. Set result (Passed/Failed/Cancelled) as Admin or Quality Engineer — confirmation required before
+          Schedule and results. Set result (Passed/Failed/Cancelled) as assigned Auditor, Admin, or Quality Engineer —
+          confirmation required before
           saving.
         </p>
       </header>
@@ -261,84 +229,7 @@ export function Audits() {
             ))}
           </select>
         </label>
-        {canCreateAudit && (
-          <button type="button" className="btn btn-primary" onClick={() => setShowNewForm(!showNewForm)}>
-            {showNewForm ? 'Cancel' : 'New audit'}
-          </button>
-        )}
       </div>
-
-      {showNewForm && canCreateAudit && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Schedule new audit</h2>
-            <form onSubmit={handleCreateAudit}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-                <div className="input-group">
-                  <label className="input-label">Supplier *</label>
-                  <select
-                    className="input"
-                    value={newAudit.supplierId}
-                    onChange={(e) => setNewAudit((p) => ({ ...p, supplierId: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Audit date *</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={newAudit.auditDate}
-                    onChange={(e) => setNewAudit((p) => ({ ...p, auditDate: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Audit type</label>
-                  <select
-                    className="input"
-                    value={newAudit.auditTypeId}
-                    onChange={(e) => setNewAudit((p) => ({ ...p, auditTypeId: e.target.value }))}
-                  >
-                    <option value="">—</option>
-                    {auditTypes.map((t) => (
-                      <option key={t.id} value={t.id}>{t.code} {t.name ? `— ${t.name}` : ''}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="input-group" style={{ marginBottom: '1rem' }}>
-                <label className="input-label">Auditor</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={newAudit.auditor}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
-                  placeholder="e.g. Brian"
-                />
-              </div>
-              <div className="input-group" style={{ marginBottom: '1rem' }}>
-                <label className="input-label">Notes</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={newAudit.notes}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, notes: e.target.value }))}
-                  placeholder="Optional"
-                />
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Creating…' : 'Save'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
       <div className="card">
         <div className="table-wrap">
@@ -352,10 +243,10 @@ export function Audits() {
                 <th>Auditor</th>
                 <th>Status</th>
                 <th>Result</th>
-                <th>Notes</th>
                 <th>Findings</th>
-                <th>Records</th>
+                <th>Notes</th>
                 {isAdmin && <th>Delete</th>}
+                <th>Records</th>
               </tr>
             </thead>
             <tbody>
@@ -379,7 +270,7 @@ export function Audits() {
                       </span>
                     </td>
                     <td>
-                      {canSetResult && a.derivedStatus !== 'Cancelled' && a.derivedStatus !== 'Complete' ? (
+                      {canSetResultForAudit(a) && a.derivedStatus !== 'Cancelled' && a.derivedStatus !== 'Complete' ? (
                         <select
                           className="input"
                           value={
@@ -402,9 +293,6 @@ export function Audits() {
                         a.result ?? '—'
                       )}
                     </td>
-                    <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.notes ?? ''}>
-                      {a.notes ?? '—'}
-                    </td>
                     <td>
                       {a.findingCodes.length === 0
                         ? '—'
@@ -420,6 +308,23 @@ export function Audits() {
                             </Link>
                           ))}
                     </td>
+                    <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.notes ?? ''}>
+                      {a.notes ?? '—'}
+                    </td>
+                    {isAdmin && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
+                          onClick={() => setDeleteConfirmId(a.id)}
+                          disabled={deletingId !== null}
+                          title="Delete audit (Admin only)"
+                        >
+                          {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </td>
+                    )}
                     <td>
                       {a.records.length === 0
                         ? '—'
@@ -446,20 +351,6 @@ export function Audits() {
                             </button>
                           ))}
                     </td>
-                    {isAdmin && (
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
-                          onClick={() => setDeleteConfirmId(a.id)}
-                          disabled={deletingId !== null}
-                          title="Delete audit (Admin only)"
-                        >
-                          {deletingId === a.id ? 'Deleting…' : 'Delete'}
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 ))
               )}

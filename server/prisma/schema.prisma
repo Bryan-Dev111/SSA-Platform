@@ -91,6 +91,8 @@ model Supplier {
   name            String
   city            String?
   country         String?
+  status          SupplierStatus @default(Active)
+  notes           String?
   commodityTypeId String?
   commodityType   CommodityType? @relation(fields: [commodityTypeId], references: [id])
   userId          String?   @unique // for Supplier role login
@@ -106,6 +108,11 @@ model Supplier {
   riskSnapshots   RiskSnapshot[]
   opportunities   Opportunity[]
   shipmentSchedules ShipmentSchedule[]
+}
+
+enum SupplierStatus {
+  Active
+  Inactive
 }
 
 model BuyerSupplier {
