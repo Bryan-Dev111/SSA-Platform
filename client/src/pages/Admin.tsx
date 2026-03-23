@@ -19,6 +19,7 @@ type Tab =
   | 'disposition'
   | 'auditTypes'
   | 'riskWeights'
+  | 'users'
   | 'buyersSuppliers'
   | 'permissions';
 
@@ -301,6 +302,7 @@ export function Admin() {
             ['disposition', 'Disposition codes'],
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
+            ['users', 'Users'],
             ['buyersSuppliers', 'Buyers & suppliers'],
             ['permissions', 'Permissions'],
           ] as const
@@ -318,7 +320,24 @@ export function Admin() {
 
       {tab === 'auditTypes' && <AdminAuditTypesPanel token={token} toast={toast} />}
       {tab === 'riskWeights' && <AdminRiskWeightsPanel token={token} toast={toast} />}
-      {tab === 'buyersSuppliers' && <AdminBuyersSuppliersPanel token={token} toast={toast} />}
+      {tab === 'users' && (
+        <AdminBuyersSuppliersPanel
+          token={token}
+          toast={toast}
+          showCreateUser
+          showUsersTable
+          showBuyerSupplierSections={false}
+        />
+      )}
+      {tab === 'buyersSuppliers' && (
+        <AdminBuyersSuppliersPanel
+          token={token}
+          toast={toast}
+          showCreateUser={false}
+          showUsersTable={false}
+          showBuyerSupplierSections
+        />
+      )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
 
       {tab === 'commodity' && (

@@ -341,7 +341,19 @@ interface PermissionMatrixResponse {
   adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
 }
 
-export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+export function AdminBuyersSuppliersPanel({
+  token,
+  toast,
+  showCreateUser = true,
+  showUsersTable = true,
+  showBuyerSupplierSections = true,
+}: {
+  token: string | null;
+  toast: ToastApi;
+  showCreateUser?: boolean;
+  showUsersTable?: boolean;
+  showBuyerSupplierSections?: boolean;
+}) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [buyerId, setBuyerId] = useState('');
@@ -530,46 +542,49 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Create user</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
-            <div className="input-group">
-              <label className="input-label">First Name</label>
-              <input className="input" value={newUserFirstName} onChange={(e) => setNewUserFirstName(e.target.value)} />
+      {showCreateUser && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Create user</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
+              <div className="input-group">
+                <label className="input-label">First Name</label>
+                <input className="input" value={newUserFirstName} onChange={(e) => setNewUserFirstName(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Last Name</label>
+                <input className="input" value={newUserLastName} onChange={(e) => setNewUserLastName(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Email *</label>
+                <input className="input" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Password *</label>
+                <input className="input" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Role</label>
+                <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
+                  {availableRoleOptions.map((r) => (
+                    <option key={r} value={r}>
+                      {r === 'QualityEngineer' ? 'Quality Engineer' : r}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="input-group">
-              <label className="input-label">Last Name</label>
-              <input className="input" value={newUserLastName} onChange={(e) => setNewUserLastName(e.target.value)} />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Email *</label>
-              <input className="input" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Password *</label>
-              <input className="input" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Role</label>
-              <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
-                {availableRoleOptions.map((r) => (
-                  <option key={r} value={r}>
-                    {r === 'QualityEngineer' ? 'Quality Engineer' : r}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createUser} disabled={busy}>
+              Create user
+            </button>
           </div>
-          <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createUser} disabled={busy}>
-            Create user
-          </button>
         </div>
-      </div>
+      )}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Create supplier</h2>
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Create supplier</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
             <div className="input-group">
               <label className="input-label">Name *</label>
@@ -611,21 +626,23 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
               <input className="input" value={newSupNotes} onChange={(e) => setNewSupNotes(e.target.value)} />
             </div>
           </div>
-          <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
-            Create supplier (auto code)
-          </button>
+            <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
+              Create supplier (auto code)
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Users</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '0.75rem' }}>
-            All accounts. The Password column cannot show real values — they are stored only as a one-way hash on the server (not
-            retrievable).
-          </p>
-          <div className="table-wrap">
-            <table className="table">
+      {showUsersTable && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Users</h2>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '0.75rem' }}>
+              All accounts. The Password column cannot show real values — they are stored only as a one-way hash on the server (not
+              retrievable).
+            </p>
+            <div className="table-wrap">
+              <table className="table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -652,14 +669,16 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
                   ))
                 )}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Assign supplier → buyer</h2>
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Assign supplier → buyer</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">Buyer</label>
@@ -687,12 +706,14 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
               Assign
             </button>
           </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Buyer assignments</h2>
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Buyer assignments</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -739,12 +760,14 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
               </tbody>
             </table>
           </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="card">
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Suppliers (edit / delete)</h2>
+      {showBuyerSupplierSections && (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Suppliers (edit / delete)</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -867,7 +890,8 @@ export function AdminBuyersSuppliersPanel({ token, toast }: { token: string | nu
             </table>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!delSup}
