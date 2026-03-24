@@ -1,6 +1,6 @@
 /**
- * CARs API: CRUD; status flow DRAFT → RCCA → Waiting Approval → Follow-Up → Closed.
- * Required for Save (DRAFT → RCCA): Supplier, Audit #, Finding #, Severity, Summary, Discrepancy.
+ * CARs API: CRUD; status flow RCCA → Waiting Approval → FollowUp → Closed.
+ * Create starts at RCCA and gets a real CAR-xxxxx code immediately.
  * Process/Reverse; Approve/Reject (Waiting Approval: Admin, Buyer, QE). Only Admin can delete.
  */
 import { Router, Request, Response } from 'express';
@@ -17,6 +17,7 @@ const carInclude = {
   supplier: { select: { id: true, code: true, name: true } },
   audit: { select: { id: true, code: true, auditDate: true } },
   finding: { select: { id: true, code: true, severity: true } },
+  createdBy: { select: { id: true, name: true, email: true } },
   approvalLogs: {
     select: {
       id: true,
@@ -29,7 +30,7 @@ const carInclude = {
   },
 };
 
-const CAR_STATUS_ORDER: CARStatus[] = ['DRAFT', 'RCCA', 'WaitingApproval', 'FollowUp', 'Closed'];
+const CAR_STATUS_ORDER: CARStatus[] = ['RCCA', 'WaitingApproval', 'FollowUp', 'Closed'];
 
 function nextCarStatus(s: CARStatus): CARStatus | null {
   const i = CAR_STATUS_ORDER.indexOf(s);
@@ -201,7 +202,7 @@ router.get(
   })
 );
 
-/** POST /cars — create DRAFT CAR */
+/** POST /cars — create RCCA CAR */
 router.post(
   '/',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -264,13 +265,13 @@ router.post(
       res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });
       return;
     }
-    const code = `CAR-DRAFT-${Date.now()}`;
+    const code = await getNextCode('CAR');
     const createData = {
       code,
       ...(normalizedFindingId ? { findingId: normalizedFindingId } : {}),
       auditId: auditId as string,
       supplierId: supplierId as string,
-      status: 'DRAFT',
+      status: 'RCCA',
       severity: severity as FindingSeverity,
       summary: String(summary).trim(),
       discrepancy: String(discrepancy).trim(),
@@ -353,7 +354,7 @@ router.patch(
   })
 );
 
-/** POST /cars/:id/save — DRAFT → RCCA */
+/** POST /cars/:id/save — legacy DRAFT → RCCA migration helper */
 router.post(
   '/:id/save',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -377,7 +378,7 @@ router.post(
       return;
     }
     if (existing.status !== 'DRAFT') {
-      res.status(400).json({ error: 'Only draft CARs can be saved' });
+      res.status(400).json({ error: 'Only legacy draft CARs can be saved' });
       return;
     }
     if (!existing.summary?.trim() || !existing.discrepancy?.trim()) {
@@ -417,6 +418,30 @@ router.post(
       res.status(404).json({ error: 'CAR not found' });
       return;
     }
+    if (existing.status === 'DRAFT') {
+      res.status(400).json({ error: 'Legacy draft must be saved to RCCA first' });
+      return;
+    }
+    if (existing.status === 'RCCA') {
+      const requiredForApproval = [
+        ['discrepancy', existing.discrepancy],
+        ['containment', existing.containment],
+        ['occurrenceRootCause', existing.occurrenceRootCause],
+        ['escapeRootCause', existing.escapeRootCause],
+        ['correctiveAction', existing.correctiveAction],
+      ] as const;
+      const missing = requiredForApproval.filter(([, value]) => !value || !String(value).trim()).map(([name]) => name);
+      if (missing.length > 0) {
+        res.status(400).json({ error: `Complete required fields before Waiting Approval: ${missing.join(', ')}` });
+        return;
+      }
+    }
+    if (existing.status === 'FollowUp') {
+      if (!existing.verificationOfEffectiveness || !existing.verificationOfEffectiveness.trim()) {
+        res.status(400).json({ error: 'Verification of Effectiveness is required before closing' });
+        return;
+      }
+    }
     const next = nextCarStatus(existing.status);
     if (!next || existing.status === 'WaitingApproval') {
       res.status(400).json({ error: 'Process not available for current status' });
@@ -424,7 +449,16 @@ router.post(
     }
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
-      data: { status: next },
+      data: {
+        status: next,
+        approvalLogs: {
+          create: {
+            action: 'Processed',
+            comment: next,
+            userId: req.user.id,
+          },
+        },
+      },
       include: carInclude,
     });
     res.json(car);
@@ -461,7 +495,19 @@ router.post(
     }
     const car = await prisma.correctiveAction.update({
       where: { id: req.params.id },
-      data: { status: prev },
+      data: {
+        status: prev,
+        ...(existing.status === 'FollowUp' && prev === 'WaitingApproval'
+          ? { verificationOfEffectiveness: null }
+          : {}),
+        approvalLogs: {
+          create: {
+            action: 'Reversed',
+            comment: prev,
+            userId: req.user.id,
+          },
+        },
+      },
       include: carInclude,
     });
     res.json(car);

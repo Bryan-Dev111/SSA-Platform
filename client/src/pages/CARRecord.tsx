@@ -55,6 +55,7 @@ interface CAR {
   closingComments: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy?: { id: string; name: string | null; email: string | null } | null;
   approvalLogs?: Array<{
     id: string;
     action: 'Approved' | 'Rejected' | string;
@@ -68,24 +69,84 @@ interface StatusHistoryEntry {
   id: string;
   status: string;
   note: string;
+  user: string;
   at: string;
 }
 
 const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
+const FINDING_NONE_OPTION = '__NONE__';
+
+const CAR_STATUS_VALUES = new Set(['DRAFT', 'RCCA', 'WaitingApproval', 'FollowUp', 'Closed']);
+
+/** Required on CAR form before Process can move RCCA → Waiting Approval (matches server). */
+function getMissingRccaProcessLabels(f: {
+  discrepancy: string;
+  containment: string | null;
+  occurrenceRootCause: string | null;
+  escapeRootCause: string | null;
+  correctiveAction: string | null;
+}): string[] {
+  const missing: string[] = [];
+  if (!f.discrepancy.trim()) missing.push('Discrepancy');
+  if (!(f.containment ?? '').trim()) missing.push('Containment');
+  if (!(f.occurrenceRootCause ?? '').trim()) missing.push('Occurrence Root Cause');
+  if (!(f.escapeRootCause ?? '').trim()) missing.push('Escape Root Cause');
+  if (!(f.correctiveAction ?? '').trim()) missing.push('Corrective Action');
+  return missing;
+}
+
+function formatCarStatusForDisplay(status: string): string {
+  if (status === 'WaitingApproval') return 'Waiting Approval';
+  if (status === 'FollowUp') return 'Follow Up';
+  return status;
+}
+
+function approvalLogCommentDisplay(log: CAR['approvalLogs'] extends (infer E)[] | undefined ? E : never): string {
+  const a = log.action.trim().toLowerCase();
+  const c = log.comment?.trim() ?? '';
+  if ((a === 'processed' || a === 'reversed') && c && CAR_STATUS_VALUES.has(c)) {
+    return formatCarStatusForDisplay(c);
+  }
+  return log.comment?.trim() || '—';
+}
+
+function statusFromCarApprovalLog(
+  log: { action: string; comment: string | null },
+  carStatus: string
+): string {
+  const normalizedAction = log.action.trim().toLowerCase();
+  if (normalizedAction === 'approved') return 'FollowUp';
+  if (normalizedAction === 'rejected') return 'RCCA';
+  if (normalizedAction === 'processed' || normalizedAction === 'reversed') {
+    const c = log.comment?.trim() ?? '';
+    if (c && CAR_STATUS_VALUES.has(c)) return c;
+  }
+  return carStatus;
+}
 
 function buildCarStatusHistory(car: CAR): StatusHistoryEntry[] {
+  const createdBy = car.createdBy?.name || car.createdBy?.email || 'Unknown';
   const approvalEvents = (car.approvalLogs ?? [])
     .slice()
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .map((log) => {
       const actor = log.user?.name || log.user?.email || 'Unknown';
       const normalizedAction = log.action.trim().toLowerCase();
-      const statusFromAction = normalizedAction === 'approved' ? 'FollowUp' : normalizedAction === 'rejected' ? 'RCCA' : car.status;
-      const commentPart = log.comment?.trim() ? ` Comment: ${log.comment.trim()}` : '';
+      const statusFromAction = statusFromCarApprovalLog(log, car.status);
+      let note: string;
+      if (normalizedAction === 'processed') {
+        note = `Processed to ${formatCarStatusForDisplay(statusFromAction)} by ${actor}.`.trim();
+      } else if (normalizedAction === 'reversed') {
+        note = `Reversed to ${formatCarStatusForDisplay(statusFromAction)} by ${actor}.`.trim();
+      } else {
+        const commentPart = log.comment?.trim() ? ` Comment: ${log.comment.trim()}` : '';
+        note = `${log.action} by ${actor}.${commentPart}`.trim();
+      }
       return {
         id: `approval-${log.id}`,
-        status: statusFromAction,
-        note: `${log.action} by ${actor}.${commentPart}`.trim(),
+        status: formatCarStatusForDisplay(statusFromAction),
+        note,
+        user: actor,
         at: log.createdAt,
       } satisfies StatusHistoryEntry;
     });
@@ -93,19 +154,22 @@ function buildCarStatusHistory(car: CAR): StatusHistoryEntry[] {
   const seed: StatusHistoryEntry[] = [
     {
       id: `created-${car.id}`,
-      status: 'DRAFT',
+      status: formatCarStatusForDisplay('RCCA'),
       note: 'CAR created.',
+      user: createdBy,
       at: car.createdAt,
     },
     ...approvalEvents,
   ];
 
+  const carStatusDisplay = formatCarStatusForDisplay(car.status);
   const latest = seed[seed.length - 1];
-  if (!latest || latest.status !== car.status) {
+  if (!latest || latest.status !== carStatusDisplay) {
     seed.push({
       id: `current-${car.id}`,
-      status: car.status,
-      note: 'Latest status.',
+      status: carStatusDisplay,
+      note: 'Latest status (no workflow log for this change).',
+      user: 'Unknown',
       at: car.updatedAt,
     });
   }
@@ -159,20 +223,36 @@ export function CARRecord() {
   const [approvalComment, setApprovalComment] = useState('');
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const [carQuery, setCarQuery] = useState(codeParam ?? '');
+  const [createFindingChoice, setCreateFindingChoice] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canEdit = !!car && editMode && canEditDraft;
-  const canSave = !!car && canEditDraft;
-  const canProcess = canEditDraft && !!car && car.status !== 'WaitingApproval' && car.status !== 'Closed';
-  const canReverse = canEditDraft && !!car && car.status !== 'DRAFT' && car.status !== 'RCCA';
+  const canSave = !!car && canEditDraft && editMode;
+  /** Process stays clickable for RCCA / FollowUp with missing fields so we can show a warning toast. */
+  const processButtonDisabled =
+    actioning ||
+    !canEditDraft ||
+    !car ||
+    editMode ||
+    car.status === 'WaitingApproval' ||
+    car.status === 'Closed' ||
+    car.status === 'DRAFT';
+  /** Matches server: one step back, never to DRAFT (RCCA / DRAFT have no valid previous step). */
+  const reverseButtonDisabled =
+    actioning ||
+    !canEditDraft ||
+    !car ||
+    editMode ||
+    !['WaitingApproval', 'FollowUp', 'Closed'].includes(car.status);
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
   const statusHistory = car ? buildCarStatusHistory(car) : [];
 
   const resetCreateForm = () => {
+    setCreateFindingChoice('');
     setForm({
       findingId: '',
       auditId: '',
@@ -323,6 +403,7 @@ export function CARRecord() {
       { token }
     )
       .then((f) => {
+        setCreateFindingChoice(f.id);
         setForm((p) => ({
           ...p,
           findingId: f.id,
@@ -366,10 +447,65 @@ export function CARRecord() {
       syncFormFromCar(patched);
       setEditMode(false);
       setError(null);
-      toast.info('CAR updated');
+      if (patched.status === 'RCCA') {
+        const missing = getMissingRccaProcessLabels({
+          discrepancy: patched.discrepancy,
+          containment: patched.containment,
+          occurrenceRootCause: patched.occurrenceRootCause,
+          escapeRootCause: patched.escapeRootCause,
+          correctiveAction: patched.correctiveAction,
+        });
+        if (missing.length > 0) {
+          toast.warning(`CAR updated. To move to Waiting Approval, complete: ${missing.join(', ')}.`);
+        } else {
+          toast.info('CAR updated');
+        }
+      } else {
+        toast.info('CAR updated');
+      }
       navigate(`/car-record?id=${encodeURIComponent(patched.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const handleProcessClick = async () => {
+    if (!token || !car) return;
+    if (car.status === 'RCCA') {
+      const missing = getMissingRccaProcessLabels({
+        discrepancy: form.discrepancy,
+        containment: form.containment,
+        occurrenceRootCause: form.occurrenceRootCause,
+        escapeRootCause: form.escapeRootCause,
+        correctiveAction: form.correctiveAction,
+      });
+      if (missing.length > 0) {
+        toast.warning(`To move to Waiting Approval, complete: ${missing.join(', ')}.`);
+        return;
+      }
+    }
+    if (car.status === 'FollowUp' && !form.verificationOfEffectiveness.trim()) {
+      toast.warning('Verification of Effectiveness is required before closing.');
+      return;
+    }
+    await runAction(`/cars/${car.id}/process`, 'Process');
+  };
+
+  const handleReverseClick = async () => {
+    if (!token || !car) return;
+    setActioning(true);
+    setError(null);
+    try {
+      await apiJson<CAR>(`/cars/${car.id}/reverse`, { token, method: 'POST' });
+      const fresh = await apiJson<CAR>(`/cars/${encodeURIComponent(car.id)}`, { token });
+      setCar(fresh);
+      syncFormFromCar(fresh);
+      setEditMode(false);
+      toast.info('Reverse successful');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Reverse failed');
     } finally {
       setActioning(false);
     }
@@ -414,6 +550,11 @@ export function CARRecord() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (createFindingChoice === '') {
+      setError('Finding # is required');
+      toast.error('Finding # is required');
+      return;
+    }
     if (!token || !form.auditId || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
     setSaving(true);
     setError(null);
@@ -579,16 +720,19 @@ export function CARRecord() {
             <form onSubmit={handleCreate}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
                 <div className="input-group">
-                  <label className="input-label">Finding #</label>
+                  <label className="input-label">Finding # *</label>
                   <select
                     className="input"
-                    value={form.findingId}
+                    value={createFindingChoice}
                     onChange={(e) => {
                       const v = e.target.value;
-                      onFindingSelect(v);
+                      setCreateFindingChoice(v);
+                      onFindingSelect(v === FINDING_NONE_OPTION ? '' : v);
                     }}
+                    required
                   >
-                    <option value="">None / N/A</option>
+                    <option value="">Select...</option>
+                    <option value={FINDING_NONE_OPTION}>None</option>
                     {findings.map((f) => (
                       <option key={f.id} value={f.id}>{f.code}</option>
                     ))}
@@ -741,33 +885,30 @@ export function CARRecord() {
                     />
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', paddingBottom: 1 }}>
-                    {canSave && (
-                      <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                        {actioning ? 'Saving…' : 'Save'}
-                      </button>
-                    )}
+                    <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!canSave || actioning}>
+                      {actioning && canSave ? 'Saving…' : 'Save'}
+                    </button>
                     <button
                       type="button"
-                      className="btn btn-ghost"
+                      className={editMode ? 'btn btn-ghost' : 'btn btn-primary'}
                       onClick={() => setEditMode((v) => !v)}
-                      disabled={!canEditDraft || actioning}
-                      style={editMode ? { background: 'var(--color-primary)', color: '#fff', borderColor: 'var(--color-primary)' } : undefined}
+                      disabled={!canEditDraft || actioning || editMode}
                     >
-                      {editMode ? 'Editing' : 'Edit'}
+                      Edit
                     </button>
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={() => runAction(`/cars/${car.id}/process`, 'Process')}
-                      disabled={!canProcess || actioning}
+                      onClick={() => void handleProcessClick()}
+                      disabled={processButtonDisabled}
                     >
                       {actioning ? '…' : 'Process'}
                     </button>
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      onClick={() => runAction(`/cars/${car.id}/reverse`, 'Reverse')}
-                      disabled={!canReverse || actioning}
+                      onClick={() => void handleReverseClick()}
+                      disabled={reverseButtonDisabled}
                     >
                       {actioning ? '…' : 'Reverse'}
                     </button>
@@ -859,7 +1000,7 @@ export function CARRecord() {
                       <tr key={log.id}>
                         <td>{log.user?.name || log.user?.email || 'Unknown'}</td>
                         <td>{log.action}</td>
-                        <td>{log.comment || '—'}</td>
+                        <td>{approvalLogCommentDisplay(log)}</td>
                         <td>{new Date(log.createdAt).toLocaleString()}</td>
                       </tr>
                     ))
@@ -873,19 +1014,21 @@ export function CARRecord() {
                   <tr>
                     <th>Status</th>
                     <th>Note</th>
+                    <th>User</th>
                     <th>Date/Time</th>
                   </tr>
                 </thead>
                 <tbody>
                   {statusHistory.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="table-empty">No status history yet.</td>
+                      <td colSpan={4} className="table-empty">No status history yet.</td>
                     </tr>
                   ) : (
                     statusHistory.map((entry) => (
                       <tr key={entry.id}>
                         <td>{entry.status}</td>
                         <td>{entry.note}</td>
+                        <td>{entry.user}</td>
                         <td>{new Date(entry.at).toLocaleString()}</td>
                       </tr>
                     ))
