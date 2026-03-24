@@ -287,13 +287,15 @@ router.patch(
       severity?: FindingSeverity;
       summary?: string;
       discrepancy?: string;
+      defectCode?: string | null;
       dispositionCode?: string | null;
       closingComments?: string | null;
     } = {};
-    const allowed = ['summary', 'discrepancy', 'dispositionCode', 'closingComments'] as const;
+    const allowed = ['summary', 'discrepancy', 'defectCode', 'dispositionCode', 'closingComments'] as const;
     for (const k of allowed) {
       if (body[k] !== undefined) (data as Record<string, unknown>)[k] = typeof body[k] === 'string' ? body[k].trim() : body[k];
     }
+    if (data.defectCode === '') data.defectCode = null;
     if (data.dispositionCode === '') data.dispositionCode = null;
     if (body.severity !== undefined) {
       if (!['Critical', 'Major', 'Minor'].includes(body.severity as string)) {

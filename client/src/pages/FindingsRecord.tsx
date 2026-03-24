@@ -1,5 +1,5 @@
 /**
- * Findings Record: identify issue (Summary, Discrepancy, Disposition after create, Closing Comments).
+ * Findings Record: Summary, Discrepancy, Defect Code, Disposition (after create), Closing Comments.
  * Header layout aligned with CAR record; workflow Save / Process / Reverse / Approve / Reject.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -75,6 +75,7 @@ function formStateFromFinding(f: Finding) {
     severity: f.severity,
     summary: f.summary,
     discrepancy: f.discrepancy,
+    defectCode: f.defectCode ?? '',
     dispositionCode: f.dispositionCode ?? '',
     closingComments: f.closingComments ?? '',
   };
@@ -98,6 +99,7 @@ export function FindingsRecord() {
     severity: 'Major' as string,
     summary: '',
     discrepancy: '',
+    defectCode: '',
     dispositionCode: '',
     closingComments: '',
   });
@@ -108,6 +110,7 @@ export function FindingsRecord() {
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
   const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
+  const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
   const isEditableFindingStatus =
@@ -127,6 +130,7 @@ export function FindingsRecord() {
       severity: 'Major',
       summary: '',
       discrepancy: '',
+      defectCode: '',
       dispositionCode: '',
       closingComments: '',
     });
@@ -217,6 +221,13 @@ export function FindingsRecord() {
       .catch(() => setDispositionCodeOptions([]));
   }, [token]);
 
+  useEffect(() => {
+    if (!token) return;
+    apiJson<{ list: ReferenceCodeOption[] }>('/defect-codes', { token })
+      .then((r) => setDefectCodeOptions(r.list))
+      .catch(() => setDefectCodeOptions([]));
+  }, [token]);
+
   const handleSave = async () => {
     if (!token || !finding) return;
     setActioning(true);
@@ -228,6 +239,7 @@ export function FindingsRecord() {
           severity: form.severity,
           summary: form.summary,
           discrepancy: form.discrepancy,
+          defectCode: form.defectCode.trim() || null,
           dispositionCode: form.dispositionCode.trim() || null,
           closingComments: form.closingComments.trim() || null,
         }),
@@ -327,6 +339,7 @@ export function FindingsRecord() {
           severity: form.severity,
           summary: form.summary.trim(),
           discrepancy: form.discrepancy.trim(),
+          defectCode: form.defectCode.trim() || null,
         }),
       });
       setFinding(created);
@@ -502,6 +515,12 @@ export function FindingsRecord() {
                 <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} required />
               </div>
+              <ReferenceCodeSelect
+                label="Defect Code"
+                value={form.defectCode}
+                onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
+                options={defectCodeOptions}
+              />
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
@@ -606,6 +625,13 @@ export function FindingsRecord() {
                 <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} disabled={!canEdit} />
               </div>
+              <ReferenceCodeSelect
+                label="Defect Code"
+                value={form.defectCode}
+                onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
+                options={defectCodeOptions}
+                disabled={!canEdit}
+              />
               <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Decision or action taken</p>
               <ReferenceCodeSelect
                 label="Disposition"
