@@ -369,7 +369,7 @@ export function Admin() {
                 Audit load: use <strong>Internal Management</strong> to schedule new audits.
               </li>
               <li>
-                Shipment schedule load: use <strong>Shipments</strong> page schedule table to add/update planned rows.
+                Shipment schedule load: use <strong>Internal Management</strong> → Shipments tab to add/update planned rows.
               </li>
             </ul>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

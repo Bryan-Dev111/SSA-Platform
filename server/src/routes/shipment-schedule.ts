@@ -11,7 +11,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 const router = Router();
 
 router.use(authMiddleware);
-router.use(requirePageAccess('Shipments'));
+router.use(requirePageAccess('InternalManagement'));
 
 const adminOnly = requireRole(['Admin']);
 

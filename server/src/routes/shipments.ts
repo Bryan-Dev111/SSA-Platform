@@ -189,6 +189,10 @@ router.patch(
       res.status(404).json({ error: 'Not found' });
       return;
     }
+    if (existing.status !== 'WaitingInspection') {
+      res.status(400).json({ error: 'This inspection was already reviewed' });
+      return;
+    }
     const allowedIds = await getAllowedSupplierIds(req.user);
     if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
       res.status(403).json({ error: 'Supplier not in scope' });
@@ -196,9 +200,16 @@ router.patch(
     }
     const result = resultRaw as ShipmentResult;
     const status: ShipmentStatus = result === 'Passed' ? 'Passed' : 'Failed';
+    const notesRaw = req.body?.notes;
+    const data: { result: ShipmentResult; status: ShipmentStatus; notes?: string | null } = { result, status };
+    if (typeof notesRaw === 'string') {
+      data.notes = notesRaw.trim() || null;
+    } else if (result === 'Passed') {
+      data.notes = null;
+    }
     const updated = await prisma.shipment.update({
       where: { id },
-      data: { result, status },
+      data,
       include: { supplier: { select: { id: true, code: true, name: true } } },
     });
     if (updated.result === 'Failed') {

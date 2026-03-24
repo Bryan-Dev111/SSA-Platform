@@ -1,12 +1,12 @@
 /**
  * Reusable confirmation dialog: clean modal with message and Confirm/Cancel.
  */
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
 export interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  message: string;
+  message: string | ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
   variant?: 'default' | 'danger';
@@ -48,9 +48,9 @@ export function ConfirmDialog({
         <h3 id="confirm-dialog-title" className="confirm-dialog-title">
           {title}
         </h3>
-        <p id="confirm-dialog-desc" className="confirm-dialog-message">
-          {message}
-        </p>
+        <div id="confirm-dialog-desc" className="confirm-dialog-message">
+          {typeof message === 'string' ? <p style={{ margin: 0 }}>{message}</p> : message}
+        </div>
         <div className="confirm-dialog-actions">
           <button type="button" className="btn btn-ghost" onClick={onCancel}>
             {cancelLabel}

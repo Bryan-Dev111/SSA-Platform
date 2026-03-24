@@ -1,5 +1,5 @@
 /**
- * Day 10: Internal Management — contracts, SOW, etc. Admin only.
+ * Internal Management — Admin only: Audits, Shipments (schedule), Contracts (internal docs).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,8 @@ import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { Navigate } from 'react-router-dom';
 import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+
+type ImTab = 'audits' | 'shipments' | 'contracts';
 
 interface InternalRow {
   id: string;
@@ -32,25 +34,26 @@ interface AuditTypeOption {
   name: string | null;
 }
 
-interface InspectionRequestRow {
+interface ScheduleRow {
   id: string;
+  supplierId: string | null;
   purchaseOrder: string | null;
   partNumber: string | null;
-  lot: string | null;
   qty: number | null;
-  inspectionDate: string | null;
-  status: string;
-  supplier: { code: string; name: string };
-  createdAt?: string;
+  scheduledDate: string | null;
+  notes: string | null;
+  supplier: { id: string; code: string; name: string } | null;
 }
 
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const [tab, setTab] = useState<ImTab>('audits');
+
   const [rows, setRows] = useState<InternalRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [auditTypes, setAuditTypes] = useState<AuditTypeOption[]>([]);
-  const [inspectionRequests, setInspectionRequests] = useState<InspectionRequestRow[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +70,18 @@ export function InternalManagement() {
   const [submittingAudit, setSubmittingAudit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [scheduleForm, setScheduleForm] = useState({
+    supplierId: '',
+    purchaseOrder: '',
+    partNumber: '',
+    qty: '',
+    scheduledDate: '',
+    notes: '',
+  });
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
+  const [scheduleDeleteId, setScheduleDeleteId] = useState<string | null>(null);
+  const [scheduleBusyId, setScheduleBusyId] = useState<string | null>(null);
+
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
   const load = () => {
@@ -75,13 +90,13 @@ export function InternalManagement() {
       apiJson<InternalRow[]>('/internal-docs', { token }),
       apiJson<SupplierOption[]>('/suppliers', { token }),
       apiJson<AuditTypeOption[]>('/audits/types', { token }),
-      apiJson<InspectionRequestRow[]>('/shipments', { token }),
+      apiJson<ScheduleRow[]>('/shipment-schedule', { token }),
     ])
-      .then(([docs, supplierList, typeList, shipments]) => {
+      .then(([docs, supplierList, typeList, sched]) => {
         setRows(docs);
         setSuppliers(supplierList);
         setAuditTypes(typeList);
-        setInspectionRequests(shipments);
+        setSchedules(sched);
       })
       .catch((e) => setError(parseApiError(e)));
   };
@@ -94,13 +109,13 @@ export function InternalManagement() {
       apiJson<InternalRow[]>('/internal-docs', { token }),
       apiJson<SupplierOption[]>('/suppliers', { token }),
       apiJson<AuditTypeOption[]>('/audits/types', { token }),
-      apiJson<InspectionRequestRow[]>('/shipments', { token }),
+      apiJson<ScheduleRow[]>('/shipment-schedule', { token }),
     ])
-      .then(([docs, supplierList, typeList, shipments]) => {
+      .then(([docs, supplierList, typeList, sched]) => {
         setRows(docs);
         setSuppliers(supplierList);
         setAuditTypes(typeList);
-        setInspectionRequests(shipments);
+        setSchedules(sched);
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
@@ -163,6 +178,67 @@ export function InternalManagement() {
     } finally {
       setSubmitting(false);
       setUploadProgress(null);
+    }
+  };
+
+  const submitSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !scheduleForm.supplierId.trim() || !scheduleForm.scheduledDate.trim()) {
+      toast.error('Supplier and scheduled date are required');
+      return;
+    }
+    let qty: number | null = null;
+    if (scheduleForm.qty.trim() !== '') {
+      const n = Number(scheduleForm.qty);
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error('Qty must be a non-negative number');
+        return;
+      }
+      qty = Math.floor(n);
+    }
+    setScheduleSubmitting(true);
+    try {
+      await apiJson('/shipment-schedule', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          supplierId: scheduleForm.supplierId,
+          purchaseOrder: scheduleForm.purchaseOrder.trim() || null,
+          partNumber: scheduleForm.partNumber.trim() || null,
+          qty,
+          scheduledDate: scheduleForm.scheduledDate.trim(),
+          notes: scheduleForm.notes.trim() || null,
+        }),
+      });
+      toast.success('Schedule row added');
+      setScheduleForm({
+        supplierId: '',
+        purchaseOrder: '',
+        partNumber: '',
+        qty: '',
+        scheduledDate: '',
+        notes: '',
+      });
+      load();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setScheduleSubmitting(false);
+    }
+  };
+
+  const removeSchedule = async (id: string) => {
+    if (!token) return;
+    setScheduleDeleteId(null);
+    setScheduleBusyId(id);
+    try {
+      await apiJson(`/shipment-schedule/${id}`, { token, method: 'DELETE' });
+      toast.success('Removed');
+      load();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setScheduleBusyId(null);
     }
   };
 
@@ -233,290 +309,428 @@ export function InternalManagement() {
       <header className="page-header">
         <h1 className="page-title">Internal Management</h1>
         <p className="page-description">
-          Internal contracts, SOWs, shipment inspection requests from suppliers, and audit scheduling (Admin only).
+          Admin workspace: schedule audits, manage shipment schedules (planned dates vs supplier requests), and internal contracts
+          / documents.
         </p>
       </header>
 
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        {(
+          [
+            ['audits', 'Audits'],
+            ['shipments', 'Shipments'],
+            ['contracts', 'Contracts'],
+          ] as const
+        ).map(([t, label]) => (
+          <button
+            key={t}
+            type="button"
+            className={tab === t ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={() => setTab(t)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {error && <div className="alert-error">{error}</div>}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Shipment inspection requests</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-            Requests submitted by suppliers (e.g. from Supplier Profile). Manage outcomes on the Shipments page.
-          </p>
-          <div className="table-wrap">
-            {inspectionRequests.length === 0 ? (
-              <p className="table-empty">No inspection requests.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Supplier</th>
-                    <th>PO</th>
-                    <th>Part #</th>
-                    <th>Qty</th>
-                    <th>Lot</th>
-                    <th>Inspection date</th>
-                    <th>Status</th>
-                    <th>Submitted</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inspectionRequests.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.supplier.code} — {r.supplier.name}</td>
-                      <td>{r.purchaseOrder ?? '—'}</td>
-                      <td>{r.partNumber ?? '—'}</td>
-                      <td>{r.qty ?? '—'}</td>
-                      <td>{r.lot ?? '—'}</td>
-                      <td>{r.inspectionDate?.slice(0, 10) ?? '—'}</td>
-                      <td>{r.status}</td>
-                      <td>{r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+      {tab === 'audits' && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Schedule new audit</h2>
+            <form onSubmit={submitAudit}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Supplier *</label>
+                  <select
+                    className="input"
+                    value={newAudit.supplierId}
+                    onChange={(e) => setNewAudit((p) => ({ ...p, supplierId: e.target.value }))}
+                    required
+                  >
+                    <option value="">Select</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.code} — {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Audit date *</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={newAudit.auditDate}
+                    onChange={(e) => setNewAudit((p) => ({ ...p, auditDate: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Audit type</label>
+                  <select
+                    className="input"
+                    value={newAudit.auditTypeId}
+                    onChange={(e) => setNewAudit((p) => ({ ...p, auditTypeId: e.target.value }))}
+                  >
+                    <option value="">—</option>
+                    {auditTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.code}
+                        {t.name ? ` — ${t.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Auditor</label>
+                  <input
+                    className="input"
+                    value={newAudit.auditor}
+                    onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
+                    placeholder="Assigned auditor name/email"
+                  />
+                </div>
+              </div>
+              <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                <label className="input-label">Notes</label>
+                <input
+                  className="input"
+                  value={newAudit.notes}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, notes: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={submittingAudit}>
+                {submittingAudit ? 'Creating…' : 'Create audit'}
+              </button>
+            </form>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Schedule new audit</h2>
-          <form onSubmit={submitAudit}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Supplier *</label>
-                <select
-                  className="input"
-                  value={newAudit.supplierId}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, supplierId: e.target.value }))}
-                  required
-                >
-                  <option value="">Select</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Audit date *</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={newAudit.auditDate}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, auditDate: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Audit type</label>
-                <select
-                  className="input"
-                  value={newAudit.auditTypeId}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, auditTypeId: e.target.value }))}
-                >
-                  <option value="">—</option>
-                  {auditTypes.map((t) => (
-                    <option key={t.id} value={t.id}>{t.code}{t.name ? ` — ${t.name}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Auditor</label>
-                <input
-                  className="input"
-                  value={newAudit.auditor}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
-                  placeholder="Assigned auditor name/email"
-                />
-              </div>
-            </div>
-            <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-              <label className="input-label">Notes</label>
-              <input
-                className="input"
-                value={newAudit.notes}
-                onChange={(e) => setNewAudit((p) => ({ ...p, notes: e.target.value }))}
-                placeholder="Optional"
-              />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={submittingAudit}>
-              {submittingAudit ? 'Creating…' : 'Create Audit'}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Upload</h2>
-          <form onSubmit={submit}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
-                gap: '0.75rem',
-                alignItems: 'flex-end',
-                paddingBottom: 22,
-              }}
-            >
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Name *</label>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Type</label>
-                <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Note</label>
-                <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
-                <label className="input-label">File (optional)</label>
-                <input
-                  ref={fileInputRef}
-                  className="input"
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    setFile(e.target.files?.[0] ?? null);
-                    setUploadProgress(null);
-                  }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    type="button"
-                    className="btn file-picker-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    Choose File
-                  </button>
-                  <span
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-muted)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      display: 'inline-block',
-                      maxWidth: 170,
-                    }}
-                    title={file?.name || 'No file chosen'}
-                  >
-                    {file?.name || 'No file chosen'}
-                  </span>
-                </div>
+      {tab === 'shipments' && (
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Shipments</h2>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+                Planned shipment schedule (OTD / planning). Supplier inspection requests are reviewed on the Shipments page.
+              </p>
+              <form onSubmit={submitSchedule}>
                 <div
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: 4,
-                    minHeight: 18,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-text-muted)',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    gap: '0.75rem',
+                    marginBottom: '0.75rem',
                   }}
                 >
-                  <span>
-                    {file
-                      ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'}`
-                      : ''}
-                  </span>
-                  {uploadProgress !== null && file ? (
-                    <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
-                      <span>{uploadProgress}%</span>
-                    </span>
-                  ) : (
-                    <span />
-                  )}
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Supplier *</label>
+                    <select
+                      className="input"
+                      value={scheduleForm.supplierId}
+                      onChange={(e) => setScheduleForm((p) => ({ ...p, supplierId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.code} — {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">PO</label>
+                    <input
+                      className="input"
+                      value={scheduleForm.purchaseOrder}
+                      onChange={(e) => setScheduleForm((p) => ({ ...p, purchaseOrder: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Part #</label>
+                    <input
+                      className="input"
+                      value={scheduleForm.partNumber}
+                      onChange={(e) => setScheduleForm((p) => ({ ...p, partNumber: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Qty</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input"
+                      value={scheduleForm.qty}
+                      onChange={(e) => setScheduleForm((p) => ({ ...p, qty: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Scheduled date *</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={scheduleForm.scheduledDate}
+                      onChange={(e) => setScheduleForm((p) => ({ ...p, scheduledDate: e.target.value }))}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? '…' : 'Add'}
-              </button>
+                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="input-label">Notes</label>
+                  <input
+                    className="input"
+                    value={scheduleForm.notes}
+                    onChange={(e) => setScheduleForm((p) => ({ ...p, notes: e.target.value }))}
+                    placeholder="Optional"
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={scheduleSubmitting}>
+                  {scheduleSubmitting ? 'Adding…' : 'Add row'}
+                </button>
+              </form>
             </div>
-          </form>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Library</h2>
-          <div className="table-wrap">
-            {loading ? (
-              <p className="table-empty">Loading…</p>
-            ) : rows.length === 0 ? (
-              <p className="table-empty">No internal documents.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Note</th>
-                    <th>View</th>
-                    <th>Updated</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.name}</td>
-                      <td>{r.category ?? '—'}</td>
-                      <td>{r.note ?? '—'}</td>
-                      <td>
-                        {r.filePath ? (
-                          <button
-                            type="button"
-                            className="btn"
-                            onClick={() => download(r)}
-                            disabled={downloading[r.id] !== undefined}
-                            style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
-                          >
-                            {downloading[r.id] !== undefined ? (
-                              <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
-                                <span>{downloading[r.id]}%</span>
-                              </span>
-                            ) : (
-                              'Download'
-                            )}
-                          </button>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>{new Date(r.updatedAt).toLocaleString()}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          disabled={deletingId === r.id}
-                          onClick={() => setDeleteConfirmId(r.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </div>
-        </div>
-      </div>
+
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Shipment schedule</h2>
+              <div className="table-wrap">
+                {schedules.length === 0 ? (
+                  <p className="table-empty">No scheduled rows.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Supplier</th>
+                        <th>PO</th>
+                        <th>Part #</th>
+                        <th>Qty</th>
+                        <th>Scheduled</th>
+                        <th>Notes</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedules.map((r) => (
+                        <tr key={r.id}>
+                          <td>
+                            {r.supplier ? `${r.supplier.code} — ${r.supplier.name}` : '—'}
+                          </td>
+                          <td>{r.purchaseOrder ?? '—'}</td>
+                          <td>{r.partNumber ?? '—'}</td>
+                          <td>{r.qty ?? '—'}</td>
+                          <td>{r.scheduledDate ? String(r.scheduledDate).slice(0, 10) : '—'}</td>
+                          <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.notes?.trim() ? r.notes : '—'}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              disabled={scheduleBusyId === r.id}
+                              onClick={() => setScheduleDeleteId(r.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === 'contracts' && (
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Upload</h2>
+              <form onSubmit={submit}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
+                    gap: '0.75rem',
+                    alignItems: 'flex-end',
+                    paddingBottom: 22,
+                  }}
+                >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Name *</label>
+                    <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Type</label>
+                    <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Note</label>
+                    <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
+                    <label className="input-label">File (optional)</label>
+                    <input
+                      ref={fileInputRef}
+                      className="input"
+                      type="file"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        setFile(e.target.files?.[0] ?? null);
+                        setUploadProgress(null);
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn file-picker-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Choose file
+                      </button>
+                      <span
+                        style={{
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-text-muted)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                          maxWidth: 170,
+                        }}
+                        title={file?.name || 'No file chosen'}
+                      >
+                        {file?.name || 'No file chosen'}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        minHeight: 18,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
+                      <span>
+                        {file
+                          ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${
+                              file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'
+                            }`
+                          : ''}
+                      </span>
+                      {uploadProgress !== null && file ? (
+                        <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
+                          <span>{uploadProgress}%</span>
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  </div>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? '…' : 'Add'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Library</h2>
+              <div className="table-wrap">
+                {loading ? (
+                  <p className="table-empty">Loading…</p>
+                ) : rows.length === 0 ? (
+                  <p className="table-empty">No internal documents.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Note</th>
+                        <th>View</th>
+                        <th>Updated</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.name}</td>
+                          <td>{r.category ?? '—'}</td>
+                          <td>{r.note ?? '—'}</td>
+                          <td>
+                            {r.filePath ? (
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => download(r)}
+                                disabled={downloading[r.id] !== undefined}
+                                style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
+                              >
+                                {downloading[r.id] !== undefined ? (
+                                  <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
+                                    <span>{downloading[r.id]}%</span>
+                                  </span>
+                                ) : (
+                                  'Download'
+                                )}
+                              </button>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td>{new Date(r.updatedAt).toLocaleString()}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              disabled={deletingId === r.id}
+                              onClick={() => setDeleteConfirmId(r.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <ConfirmDialog
         open={deleteConfirmId !== null}
         title="Delete internal document"
@@ -528,6 +742,18 @@ export function InternalManagement() {
           void remove(deleteConfirmId);
         }}
         onCancel={() => setDeleteConfirmId(null)}
+      />
+      <ConfirmDialog
+        open={scheduleDeleteId !== null}
+        title="Delete schedule row"
+        message="Remove this planned shipment row?"
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (!scheduleDeleteId) return;
+          void removeSchedule(scheduleDeleteId);
+        }}
+        onCancel={() => setScheduleDeleteId(null)}
       />
     </div>
   );

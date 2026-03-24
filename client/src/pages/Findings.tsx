@@ -26,8 +26,16 @@ interface Finding {
   summary: string;
   discrepancy: string;
   defectCode: string | null;
+  createdAt: string;
   updatedAt: string;
   correctiveActions?: { id: string; code: string; status: string }[];
+}
+
+function formatFindingCreatedAt(iso: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 interface FindingsResponse {
@@ -62,7 +70,9 @@ export function Findings() {
   const [pageSize, setPageSize] = useState(10);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'code' | 'supplier' | 'audit' | 'severity' | 'status' | 'summary' | 'defectCode'>('code');
+  const [sortBy, setSortBy] = useState<
+    'code' | 'supplier' | 'createdAt' | 'audit' | 'severity' | 'status' | 'summary' | 'defectCode'
+  >('code');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const list = data?.list ?? [];
@@ -118,6 +128,8 @@ export function Findings() {
       switch (sortBy) {
         case 'code': return f.code;
         case 'supplier': return `${f.supplier.code} ${f.supplier.name}`;
+        case 'createdAt':
+          return f.createdAt ? new Date(f.createdAt).getTime() : 0;
         case 'audit': return f.audit?.code ?? '';
         case 'severity': return severityRank[f.severity] ?? 0;
         case 'status': return statusRank[f.status] ?? 999;
@@ -299,13 +311,14 @@ export function Findings() {
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('defectCode')}>Defect Code {sortIndicator('defectCode')}</th>
                 <th>CAR</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('createdAt')}>Date created {sortIndicator('createdAt')}</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={8 + (isAdmin ? 1 : 0)} className="table-empty">
+                  <td colSpan={9 + (isAdmin ? 1 : 0)} className="table-empty">
                     No findings in scope (or none past New yet).
                   </td>
                 </tr>
@@ -365,6 +378,9 @@ export function Findings() {
                           </Link>
                         )}
                       </div>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }} title={f.createdAt}>
+                      {formatFindingCreatedAt(f.createdAt)}
                     </td>
                     {isAdmin && (
                       <td>
