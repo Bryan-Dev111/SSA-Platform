@@ -7,6 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
+    "db:generate:clean": "node prisma/scripts/clean-prisma-generate.cjs",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:baseline-supabase": "tsx prisma/scripts/baseline-supabase.ts",
