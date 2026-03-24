@@ -111,21 +111,23 @@ router.get(
     const topRiskSuppliers = [...risks].sort((a, b) => b.score - a.score).slice(0, 5);
     const highRiskSuppliers = risks.filter((r) => r.level === 'High').length;
 
-    const monthlyTrends: Array<{ month: string; findings: number; cars: number; shipments: number }> = [];
+    const monthlyTrends: Array<{ month: string; findings: number; cars: number; audits: number; shipments: number }> = [];
     const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     for (let i = 5; i >= 0; i -= 1) {
       const start = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - i, 1));
       const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
       // eslint-disable-next-line no-await-in-loop
-      const [findings, cars, shipments] = await Promise.all([
+      const [findings, cars, audits, shipments] = await Promise.all([
         prisma.finding.count({ where: { ...whereInScope, createdAt: { gte: start, lt: end } } }),
         prisma.correctiveAction.count({ where: { ...whereInScope, createdAt: { gte: start, lt: end } } }),
+        prisma.audit.count({ where: { ...whereInScope, createdAt: { gte: start, lt: end } } }),
         prisma.shipment.count({ where: { ...whereInScope, createdAt: { gte: start, lt: end } } }),
       ]);
       monthlyTrends.push({
         month: start.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
         findings,
         cars,
+        audits,
         shipments,
       });
     }

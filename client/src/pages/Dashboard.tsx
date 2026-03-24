@@ -38,6 +38,7 @@ interface DashboardResponse {
       month: string;
       findings: number;
       cars: number;
+      audits: number;
       shipments: number;
     }>;
   };
@@ -100,7 +101,7 @@ export function Dashboard() {
 
   const trendMax = useMemo(() => {
     const rows = data?.charts.monthlyTrends ?? [];
-    return Math.max(1, ...rows.map((r) => Math.max(r.findings, r.cars, r.shipments)));
+    return Math.max(1, ...rows.map((r) => Math.max(r.findings, r.cars, r.audits, r.shipments)));
   }, [data]);
 
   if (loading && !data) {
@@ -267,36 +268,7 @@ export function Dashboard() {
           {monthly.length === 0 ? (
             <p className="table-empty">No trend data yet.</p>
           ) : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Findings</th>
-                    <th>CARs</th>
-                    <th>Shipments</th>
-                    <th>Trend bars</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthly.map((row) => (
-                    <tr key={row.month}>
-                      <td>{row.month}</td>
-                      <td>{row.findings}</td>
-                      <td>{row.cars}</td>
-                      <td>{row.shipments}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 36 }}>
-                          <span title="Findings" style={{ width: 10, height: `${Math.max(4, (row.findings / trendMax) * 36)}px`, background: '#ef4444', borderRadius: 2 }} />
-                          <span title="CARs" style={{ width: 10, height: `${Math.max(4, (row.cars / trendMax) * 36)}px`, background: '#f59e0b', borderRadius: 2 }} />
-                          <span title="Shipments" style={{ width: 10, height: `${Math.max(4, (row.shipments / trendMax) * 36)}px`, background: '#4f46e5', borderRadius: 2 }} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <MonthlyTrendsLineChart rows={monthly} maxY={trendMax} />
           )}
         </div>
       </div>
@@ -396,4 +368,135 @@ function formatAlertCategory(category: AlertCategory): string {
     default:
       return category;
   }
+}
+
+function MonthlyTrendsLineChart({
+  rows,
+  maxY,
+}: {
+  rows: Array<{ month: string; findings: number; cars: number; audits: number; shipments: number }>;
+  maxY: number;
+}) {
+  const width = 960;
+  const height = 320;
+  const padLeft = 52;
+  const padRight = 24;
+  const padTop = 18;
+  const padBottom = 44;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+  const safeMax = Math.max(1, maxY);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  const xAt = (i: number) => padLeft + (rows.length <= 1 ? 0 : (i / (rows.length - 1)) * plotW);
+  const yAt = (v: number) => padTop + plotH - (v / safeMax) * plotH;
+
+  const toPath = (values: number[]): string => {
+    return values
+      .map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(v).toFixed(2)}`)
+      .join(' ');
+  };
+
+  const findingsVals = rows.map((r) => r.findings);
+  const carsVals = rows.map((r) => r.cars);
+  const auditsVals = rows.map((r) => r.audits);
+  const shipmentsVals = rows.map((r) => r.shipments);
+
+  const hovered = hoverIndex === null ? null : rows[hoverIndex];
+  const hoverX = hoverIndex === null ? null : xAt(hoverIndex);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.5rem', fontSize: 'var(--text-sm)' }}>
+        <LegendItem color="#2563eb" label="Findings" />
+        <LegendItem color="#f59e0b" label="CARs" />
+        <LegendItem color="#16a34a" label="Audits" />
+        <LegendItem color="#7c3aed" label="Shipments" />
+      </div>
+      <div className="table-wrap" style={{ overflowX: 'auto' }}>
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ width: '100%', minWidth: 680, height: 'auto', display: 'block' }}
+          onMouseLeave={() => setHoverIndex(null)}
+          role="img"
+          aria-label="Monthly trends line chart for Findings, CARs, Audits, and Shipments"
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
+            const y = padTop + plotH * f;
+            const val = Math.round(safeMax * (1 - f));
+            return (
+              <g key={`grid-${idx}`}>
+                <line x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke="#e5e7eb" strokeWidth="1" />
+                <text x={padLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">
+                  {val}
+                </text>
+              </g>
+            );
+          })}
+
+          <line x1={padLeft} y1={padTop + plotH} x2={width - padRight} y2={padTop + plotH} stroke="#9ca3af" />
+          <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + plotH} stroke="#9ca3af" />
+
+          <path d={toPath(findingsVals)} fill="none" stroke="#2563eb" strokeWidth="2.5" />
+          <path d={toPath(carsVals)} fill="none" stroke="#f59e0b" strokeWidth="2.5" />
+          <path d={toPath(auditsVals)} fill="none" stroke="#16a34a" strokeWidth="2.5" />
+          <path d={toPath(shipmentsVals)} fill="none" stroke="#7c3aed" strokeWidth="2.5" />
+
+          {rows.map((r, i) => (
+            <g key={`x-${r.month}`}>
+              <line
+                x1={xAt(i)}
+                y1={padTop}
+                x2={xAt(i)}
+                y2={padTop + plotH}
+                stroke="transparent"
+                strokeWidth="18"
+                onMouseMove={() => setHoverIndex(i)}
+              />
+              <text x={xAt(i)} y={height - 16} textAnchor="middle" fontSize="11" fill="#6b7280">
+                {r.month}
+              </text>
+            </g>
+          ))}
+
+          {hovered && hoverX !== null ? (
+            <>
+              <line x1={hoverX} y1={padTop} x2={hoverX} y2={padTop + plotH} stroke="#9ca3af" strokeDasharray="4 3" />
+              <circle cx={hoverX} cy={yAt(hovered.findings)} r="3.8" fill="#2563eb" />
+              <circle cx={hoverX} cy={yAt(hovered.cars)} r="3.8" fill="#f59e0b" />
+              <circle cx={hoverX} cy={yAt(hovered.audits)} r="3.8" fill="#16a34a" />
+              <circle cx={hoverX} cy={yAt(hovered.shipments)} r="3.8" fill="#7c3aed" />
+              <g transform={`translate(${Math.min(hoverX + 10, width - 220)}, ${padTop + 8})`}>
+                <rect width="200" height="92" rx="8" fill="#111827" opacity="0.93" />
+                <text x="10" y="18" fill="#ffffff" fontSize="12" fontWeight="700">
+                  {hovered.month}
+                </text>
+                <text x="10" y="36" fill="#93c5fd" fontSize="12">
+                  Findings: {hovered.findings}
+                </text>
+                <text x="10" y="52" fill="#fcd34d" fontSize="12">
+                  CARs: {hovered.cars}
+                </text>
+                <text x="10" y="68" fill="#86efac" fontSize="12">
+                  Audits: {hovered.audits}
+                </text>
+                <text x="10" y="84" fill="#c4b5fd" fontSize="12">
+                  Shipments: {hovered.shipments}
+                </text>
+              </g>
+            </>
+          ) : null}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ width: 14, height: 2.5, background: color, display: 'inline-block' }} />
+      {label}
+    </span>
+  );
 }
