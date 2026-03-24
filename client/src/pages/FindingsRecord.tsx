@@ -98,7 +98,7 @@ export function FindingsRecord() {
   });
   const [saving, setSaving] = useState(false);
   const [actioning, setActioning] = useState(false);
-  const [findingQuery, setFindingQuery] = useState(codeParam ?? idParam ?? '');
+  const [findingQuery, setFindingQuery] = useState(codeParam ?? '');
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
@@ -164,8 +164,8 @@ export function FindingsRecord() {
   };
 
   useEffect(() => {
-    setFindingQuery(codeParam ?? idParam ?? '');
-  }, [codeParam, idParam]);
+    setFindingQuery(codeParam ?? '');
+  }, [codeParam]);
 
   useEffect(() => {
     if (!token) return;

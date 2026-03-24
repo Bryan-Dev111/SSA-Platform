@@ -313,7 +313,12 @@ export function Findings() {
                 paginatedList.map((f) => (
                   <tr key={f.id} className={`finding-row finding-row--${getStatusBadgeSlug(f.status)}`}>
                     <td>
-                      <Link to={`/findings-record?id=${encodeURIComponent(f.id)}`} className="finding-code-link">
+                      <Link
+                        to={`/findings-record?id=${encodeURIComponent(f.id)}`}
+                        className="finding-code-link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         {f.code}
                       </Link>
                     </td>
