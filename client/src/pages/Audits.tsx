@@ -2,7 +2,7 @@
  * Audits page: table (schedule, results, notes); only assigned Auditor/Admin/QE set result;
  * column with finding #s (clickable → Findings Record). Only Admin can delete.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -70,6 +70,10 @@ export function Audits() {
     auditId: string;
     result: 'Passed' | 'Failed' | 'Cancelled';
   } | null>(null);
+  const [sortBy, setSortBy] = useState<
+    'code' | 'supplier' | 'date' | 'type' | 'auditor' | 'status' | 'result' | 'findings' | 'notes' | 'records'
+  >('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const roleNames = user?.roleNames ?? [];
   const isAdmin = roleNames.includes('Admin');
   const canSetResultForAudit = (audit: Audit): boolean => {
@@ -88,10 +92,51 @@ export function Audits() {
     if (page > maxPage) setPage(maxPage);
   }, [audits.length, pageSize, page]);
 
-  const totalCount = audits.length;
+  const statusRank: Record<string, number> = {
+    Scheduled: 1,
+    'In Process': 2,
+    Overdue: 3,
+    Complete: 4,
+    Cancelled: 5,
+  };
+  const resultRank: Record<string, number> = { Passed: 1, Failed: 2, Cancelled: 3, '': 999 };
+  const sortedAudits = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const getValue = (a: Audit): string | number => {
+      switch (sortBy) {
+        case 'code': return a.code;
+        case 'supplier': return `${a.supplier.code} ${a.supplier.name}`;
+        case 'date': return new Date(a.auditDate).getTime();
+        case 'type': return a.auditType?.code ?? '';
+        case 'auditor': return a.auditor ?? '';
+        case 'status': return statusRank[a.derivedStatus] ?? 999;
+        case 'result': return resultRank[a.result ?? ''] ?? 999;
+        case 'findings': return a.findingCodes.join(',');
+        case 'notes': return a.notes ?? '';
+        case 'records': return a.records.length;
+      }
+    };
+    return [...audits].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [audits, sortBy, sortDir]);
+  const onSort = (key: typeof sortBy) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    setPage(1);
+  };
+  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '↕' : sortDir === 'asc' ? '↑' : '↓');
+
+  const totalCount = sortedAudits.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
-  const paginatedAudits = audits.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const paginatedAudits = sortedAudits.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   useEffect(() => {
     if (!token) return;
@@ -236,17 +281,17 @@ export function Audits() {
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Supplier</th>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Auditor</th>
-                <th>Status</th>
-                <th>Result</th>
-                <th>Findings</th>
-                <th>Notes</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('date')}>Date {sortIndicator('date')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('type')}>Type {sortIndicator('type')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('auditor')}>Auditor {sortIndicator('auditor')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('result')}>Result {sortIndicator('result')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('findings')}>Findings {sortIndicator('findings')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('notes')}>Notes {sortIndicator('notes')}</th>
                 {isAdmin && <th>Delete</th>}
-                <th>Records</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>Records {sortIndicator('records')}</th>
               </tr>
             </thead>
             <tbody>

@@ -3,7 +3,7 @@
  * table of CARs, supplier filter. Click CAR code → CAR Record.
  * Pagination, Admin-only delete, status-based row colors.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -56,10 +56,23 @@ export function CorrectiveActions() {
   const [pageSize, setPageSize] = useState(10);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<
+    'code' | 'supplier' | 'audit' | 'finding' | 'severity' | 'status' | 'owner' | 'created' | 'updated'
+  >('updated');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const list = data?.list ?? [];
   const stats = data?.stats ?? { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 };
-  const defectCodeCounts = data?.defectCodeCounts ?? [];
+  const defectCodeCounts = useMemo(
+    () => [...(data?.defectCodeCounts ?? [])].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
+    [data?.defectCodeCounts]
+  );
+  const maxDefectCount = Math.max(1, ...defectCodeCounts.map((d) => d.count));
+  const defectTotal = defectCodeCounts.reduce((sum, d) => sum + d.count, 0);
+  const defectPareto = defectCodeCounts.map((row, idx) => {
+    const cumulative = defectCodeCounts.slice(0, idx + 1).reduce((sum, d) => sum + d.count, 0);
+    return { ...row, cumulativePercent: defectTotal > 0 ? Math.round((cumulative / defectTotal) * 100) : 0 };
+  });
   const severityCounts = data?.severityCounts ?? [
     { severity: 'Critical', count: 0 },
     { severity: 'Major', count: 0 },
@@ -118,10 +131,44 @@ export function CorrectiveActions() {
     if (page > maxPage) setPage(maxPage);
   }, [list.length, pageSize, page]);
 
-  const totalCount = list.length;
+  const severityRank: Record<string, number> = { Critical: 3, Major: 2, Minor: 1 };
+  const statusRank: Record<string, number> = { RCCA: 1, WaitingApproval: 2, FollowUp: 3, Closed: 4, DRAFT: 0 };
+  const sortedList = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const getValue = (c: CAR): string | number => {
+      switch (sortBy) {
+        case 'code': return c.code;
+        case 'supplier': return `${c.supplier.code} ${c.supplier.name}`;
+        case 'audit': return c.audit.code;
+        case 'finding': return c.finding?.code ?? '';
+        case 'severity': return severityRank[c.severity] ?? 0;
+        case 'status': return statusRank[c.status] ?? 999;
+        case 'owner': return c.carOwner ?? '';
+        case 'created': return new Date(c.createdAt).getTime();
+        case 'updated': return new Date(c.updatedAt).getTime();
+      }
+    };
+    return [...list].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [list, sortBy, sortDir]);
+  const onSort = (key: typeof sortBy) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    setPage(1);
+  };
+  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '↕' : sortDir === 'asc' ? '↑' : '↓');
+
+  const totalCount = sortedList.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
-  const paginatedList = list.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const paginatedList = sortedList.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const fetchData = () => {
     if (!token) return;
@@ -243,20 +290,26 @@ export function CorrectiveActions() {
           {defectCodeCounts.length > 0 && (
             <div className="card">
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Top defect codes (CARs)</h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {defectCodeCounts.map(({ code, count }) => (
-                    <span
-                      key={code}
-                      style={{
-                        padding: '0.25rem 0.5rem',
-                        background: 'var(--color-border-subtle)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: 'var(--text-sm)',
-                      }}
-                    >
-                      {code}: {count}
-                    </span>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Defect codes Pareto (CARs)</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {defectPareto.map(({ code, count, cumulativePercent }) => (
+                    <div key={code}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.5rem' }}>
+                        <span>{code}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{count} ({cumulativePercent}% cumulative)</span>
+                      </div>
+                      <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${(count / maxDefectCount) * 100}%`,
+                            height: '100%',
+                            background: '#4f46e5',
+                            borderRadius: 4,
+                            minWidth: count > 0 ? 4 : 0,
+                          }}
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -412,16 +465,16 @@ export function CorrectiveActions() {
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Supplier</th>
-                <th>Audit</th>
-                <th>Finding</th>
-                <th>Severity</th>
-                <th>Status</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('finding')}>Finding {sortIndicator('finding')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
                 <th>Summary</th>
-                <th>Owner</th>
-                <th>Created</th>
-                <th>Updated</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('owner')}>Owner {sortIndicator('owner')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>Created {sortIndicator('created')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('updated')}>Updated {sortIndicator('updated')}</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
             </thead>

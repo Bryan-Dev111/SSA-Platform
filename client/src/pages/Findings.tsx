@@ -2,7 +2,7 @@
  * Findings page: stats, chart, table, supplier filter.
  * "New finding" and opening a finding navigate to Findings Record page (no sidebar tab for Record).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -62,6 +62,8 @@ export function Findings() {
   const [pageSize, setPageSize] = useState(10);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'code' | 'supplier' | 'audit' | 'severity' | 'status' | 'summary' | 'defectCode'>('code');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const list = data?.list ?? [];
   const statsFromApi = data?.stats;
@@ -108,10 +110,42 @@ export function Findings() {
     if (page > maxPage) setPage(maxPage);
   }, [list.length, pageSize, page]);
 
-  const totalCount = list.length;
+  const severityRank: Record<string, number> = { Critical: 3, Major: 2, Minor: 1 };
+  const statusRank: Record<string, number> = { New: 1, DRAFT: 2, WaitingDisposition: 3, WaitingApproval: 4, Closed: 5 };
+  const sortedList = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const getValue = (f: Finding): string | number => {
+      switch (sortBy) {
+        case 'code': return f.code;
+        case 'supplier': return `${f.supplier.code} ${f.supplier.name}`;
+        case 'audit': return f.audit?.code ?? '';
+        case 'severity': return severityRank[f.severity] ?? 0;
+        case 'status': return statusRank[f.status] ?? 999;
+        case 'summary': return f.summary;
+        case 'defectCode': return f.defectCode ?? '';
+      }
+    };
+    return [...list].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [list, sortBy, sortDir]);
+  const onSort = (key: typeof sortBy) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    setPage(1);
+  };
+  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '↕' : sortDir === 'asc' ? '↑' : '↓');
+
+  const totalCount = sortedList.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
-  const paginatedList = list.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const paginatedList = sortedList.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const handleDelete = async (findingId: string) => {
     if (!token || !isAdmin) return;
@@ -257,13 +291,13 @@ export function Findings() {
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Supplier</th>
-                <th>Audit</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Summary</th>
-                <th>Defect Code</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('defectCode')}>Defect Code {sortIndicator('defectCode')}</th>
                 <th>CAR</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
