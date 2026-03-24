@@ -11,12 +11,20 @@ CREATE TABLE IF NOT EXISTS "CarApprovalLog" (
 
 CREATE INDEX IF NOT EXISTS "CarApprovalLog_carId_createdAt_idx" ON "CarApprovalLog"("carId", "createdAt");
 
-ALTER TABLE "CarApprovalLog"
-  ADD CONSTRAINT "CarApprovalLog_carId_fkey"
-  FOREIGN KEY ("carId") REFERENCES "CorrectiveAction"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CarApprovalLog"
+    ADD CONSTRAINT "CarApprovalLog_carId_fkey"
+    FOREIGN KEY ("carId") REFERENCES "CorrectiveAction"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-ALTER TABLE "CarApprovalLog"
-  ADD CONSTRAINT "CarApprovalLog_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "User"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CarApprovalLog"
+    ADD CONSTRAINT "CarApprovalLog_userId_fkey"
+    FOREIGN KEY ("userId") REFERENCES "User"("id")
+    ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
