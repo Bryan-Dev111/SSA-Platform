@@ -12,6 +12,7 @@ interface Supplier {
   name: string;
   city: string | null;
   country: string | null;
+  status: string;
   commodityTypeId: string | null;
   commodityType: { id: string; name: string } | null;
 }
@@ -20,6 +21,12 @@ interface RiskCurrentRow {
   supplier: { id: string };
   level: 'Low' | 'Medium' | 'High';
   score: number;
+}
+
+function supplierStatusLabel(status: string | undefined): string {
+  const s = (status ?? '').trim().toLowerCase();
+  if (s === 'inactive') return 'Inactive';
+  return 'Active';
 }
 
 export function SupplierList() {
@@ -92,6 +99,7 @@ export function SupplierList() {
               <tr>
                 <th>Code</th>
                 <th>Name</th>
+                <th>Status</th>
                 <th>City</th>
                 <th>Country</th>
                 <th>Risk level</th>
@@ -101,7 +109,7 @@ export function SupplierList() {
             <tbody>
               {suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="table-empty">
+                  <td colSpan={7} className="table-empty">
                     No suppliers in scope.
                   </td>
                 </tr>
@@ -110,6 +118,15 @@ export function SupplierList() {
                   <tr key={s.id}>
                     <td><strong>{s.code}</strong></td>
                     <td>{s.name}</td>
+                    <td>
+                      <span
+                        className={supplierStatusLabel(s.status) === 'Inactive' ? 'audit-status-badge audit-status-badge--cancelled' : 'audit-status-badge audit-status-badge--complete'}
+                        style={{ fontSize: 'var(--text-xs)' }}
+                        title={supplierStatusLabel(s.status)}
+                      >
+                        {supplierStatusLabel(s.status)}
+                      </span>
+                    </td>
                     <td>{s.city ?? '—'}</td>
                     <td>{s.country ?? '—'}</td>
                     <td>
