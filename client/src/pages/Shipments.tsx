@@ -18,6 +18,7 @@ interface ShipmentRow {
   supplierId: string;
   purchaseOrder: string | null;
   partNumber: string | null;
+  lot: string | null;
   qty: number | null;
   inspectionDate: string | null;
   status: string;
@@ -297,6 +298,7 @@ export function Shipments() {
                     <th>PO</th>
                     <th>Part #</th>
                     <th>Qty</th>
+                    <th>Lot</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('inspectionDate')}>Inspection date {sortIndicator('inspectionDate')}</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
                     <th>Result</th>
@@ -311,6 +313,7 @@ export function Shipments() {
                       <td>{r.purchaseOrder ?? '—'}</td>
                       <td>{r.partNumber ?? '—'}</td>
                       <td>{r.qty ?? '—'}</td>
+                      <td>{r.lot ?? '—'}</td>
                       <td>{r.inspectionDate?.slice(0, 10) ?? '—'}</td>
                       <td>{r.status}</td>
                       <td>{r.result ?? '—'}</td>

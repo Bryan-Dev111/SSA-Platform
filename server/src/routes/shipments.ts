@@ -93,20 +93,33 @@ router.post(
       return;
     }
     const supplierId = typeof req.body?.supplierId === 'string' ? req.body.supplierId : '';
-    const purchaseOrder = typeof req.body?.purchaseOrder === 'string' ? req.body.purchaseOrder.trim() || null : null;
-    const partNumber = typeof req.body?.partNumber === 'string' ? req.body.partNumber.trim() || null : null;
+    const purchaseOrder = typeof req.body?.purchaseOrder === 'string' ? req.body.purchaseOrder.trim() : '';
+    const partNumber = typeof req.body?.partNumber === 'string' ? req.body.partNumber.trim() : '';
+    const lot = typeof req.body?.lot === 'string' ? req.body.lot.trim() : '';
     const qtyRaw = req.body?.qty;
-    const qty = qtyRaw === undefined || qtyRaw === null || qtyRaw === '' ? null : Number(qtyRaw);
+    const qty = qtyRaw === undefined || qtyRaw === null || qtyRaw === '' ? NaN : Number(qtyRaw);
     const inspectionDateStr = typeof req.body?.inspectionDate === 'string' ? req.body.inspectionDate.trim() : '';
     if (!supplierId) {
       res.status(400).json({ error: 'supplierId is required' });
+      return;
+    }
+    if (!purchaseOrder) {
+      res.status(400).json({ error: 'purchaseOrder is required' });
+      return;
+    }
+    if (!partNumber) {
+      res.status(400).json({ error: 'partNumber is required' });
+      return;
+    }
+    if (!lot) {
+      res.status(400).json({ error: 'lot is required' });
       return;
     }
     if (!inspectionDateStr) {
       res.status(400).json({ error: 'inspectionDate is required (YYYY-MM-DD)' });
       return;
     }
-    if (qty !== null && (Number.isNaN(qty) || qty < 0)) {
+    if (Number.isNaN(qty) || qty < 0 || !Number.isFinite(qty)) {
       res.status(400).json({ error: 'qty must be a non-negative number' });
       return;
     }
@@ -137,7 +150,8 @@ router.post(
         supplierId,
         purchaseOrder,
         partNumber,
-        qty,
+        lot,
+        qty: Math.floor(qty),
         inspectionDate,
       },
       include: { supplier: { select: { id: true, code: true, name: true } } },

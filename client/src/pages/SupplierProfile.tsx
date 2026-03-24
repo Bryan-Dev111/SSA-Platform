@@ -6,9 +6,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
-import { parseApiError, readFileAsBase64 } from '../utils/apiHelpers';
+import { parseApiError } from '../utils/apiHelpers';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 import { Link } from 'react-router-dom';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const MAX_RECORD_UPLOAD_BYTES = 75 * 1024 * 1024;
 
 interface Buyer {
   id: string;
@@ -45,6 +48,7 @@ interface PortalData {
   records: Array<{
     id: string;
     name: string;
+    notes: string | null;
     internalOrSupplier: string;
     status: string;
     createdAt: string;
@@ -54,6 +58,7 @@ interface PortalData {
     id: string;
     purchaseOrder: string | null;
     partNumber: string | null;
+    lot: string | null;
     qty: number | null;
     inspectionDate: string | null;
     status: string;
@@ -77,9 +82,11 @@ export function SupplierProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recordName, setRecordName] = useState('');
+  const [recordNotes, setRecordNotes] = useState('');
   const [recordFile, setRecordFile] = useState<File | null>(null);
   const [shipPo, setShipPo] = useState('');
   const [shipPart, setShipPart] = useState('');
+  const [shipLot, setShipLot] = useState('');
   const [shipQty, setShipQty] = useState('');
   const [shipDate, setShipDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -144,29 +151,40 @@ export function SupplierProfile() {
   const submitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !data || !recordName.trim()) return;
-    if (recordFile && recordFile.size > 8 * 1024 * 1024) {
-      toast.error('File must be 8MB or smaller');
+    if (!recordFile) {
+      toast.error('File is required');
+      return;
+    }
+    if (recordFile.size > MAX_RECORD_UPLOAD_BYTES) {
+      toast.error('File exceeds current upload limit (75MB)');
       return;
     }
     setSubmitting(true);
     try {
-      let fileBase64: string | undefined;
-      let fileName: string | undefined;
-      if (recordFile) {
-        fileBase64 = await readFileAsBase64(recordFile);
-        fileName = recordFile.name;
-      }
-      await apiJson('/records', {
-        token,
+      const form = new FormData();
+      form.append('name', recordName.trim());
+      form.append('notes', recordNotes.trim());
+      form.append('internalOrSupplier', 'supplier');
+      form.append('supplierId', data.supplier.id);
+      form.append('file', recordFile);
+      const res = await fetch(`${API_BASE}/records`, {
         method: 'POST',
-        body: JSON.stringify({
-          name: recordName.trim(),
-          supplierId: data.supplier.id,
-          internalOrSupplier: 'supplier',
-          ...(fileBase64 ? { fileBase64, fileName } : {}),
-        }),
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
       });
+      const text = await res.text();
+      if (!res.ok) {
+        let msg = text || `HTTP ${res.status}`;
+        try {
+          const j = JSON.parse(text) as { error?: string };
+          if (j?.error) msg = j.error;
+        } catch {
+          /* keep msg */
+        }
+        throw new Error(msg);
+      }
       setRecordName('');
+      setRecordNotes('');
       setRecordFile(null);
       toast.success('Record submitted (pending review)');
       refresh();
@@ -179,7 +197,16 @@ export function SupplierProfile() {
 
   const submitShipment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !data || !shipDate.trim()) return;
+    if (!token || !data) return;
+    if (!shipPo.trim() || !shipPart.trim() || !shipLot.trim() || !shipQty.trim() || !shipDate.trim()) {
+      toast.error('Purchase order, part number, lot, quantity, and inspection date are required');
+      return;
+    }
+    const qtyNum = Number(shipQty);
+    if (Number.isNaN(qtyNum) || qtyNum < 0) {
+      toast.error('Quantity must be a valid non-negative number');
+      return;
+    }
     setSubmitting(true);
     try {
       await apiJson('/shipments', {
@@ -187,14 +214,16 @@ export function SupplierProfile() {
         method: 'POST',
         body: JSON.stringify({
           supplierId: data.supplier.id,
-          purchaseOrder: shipPo.trim() || null,
-          partNumber: shipPart.trim() || null,
-          qty: shipQty.trim() ? Number(shipQty) : null,
+          purchaseOrder: shipPo.trim(),
+          partNumber: shipPart.trim(),
+          lot: shipLot.trim(),
+          qty: qtyNum,
           inspectionDate: shipDate.trim(),
         }),
       });
       setShipPo('');
       setShipPart('');
+      setShipLot('');
       setShipQty('');
       setShipDate('');
       toast.success('Inspection request submitted');
@@ -360,6 +389,77 @@ export function SupplierProfile() {
         </div>
       </div>
 
+      {isSupplier && (
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Upload record</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            Submit a document for review. Your organization is linked automatically (no supplier picker).
+          </p>
+          <form onSubmit={submitRecord}>
+            <div className="input-group">
+              <label className="input-label">Name *</label>
+              <input className="input" value={recordName} onChange={(e) => setRecordName(e.target.value)} required />
+            </div>
+            <div className="input-group">
+              <label className="input-label">File *</label>
+              <input
+                className="input"
+                type="file"
+                onChange={(e) => setRecordFile(e.target.files?.[0] ?? null)}
+                required
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Notes (optional)</label>
+              <textarea className="input" rows={2} value={recordNotes} onChange={(e) => setRecordNotes(e.target.value)} />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? '…' : 'Submit'}
+            </button>
+          </form>
+        </div>
+      </div>
+      )}
+
+      {isSupplier && (
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Upload shipment</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+            Request a shipment inspection. Appears on Shipments and Internal Management for your team.
+          </p>
+          <form onSubmit={submitShipment}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
+              <div className="input-group">
+                <label className="input-label">Purchase order *</label>
+                <input className="input" value={shipPo} onChange={(e) => setShipPo(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Part number *</label>
+                <input className="input" value={shipPart} onChange={(e) => setShipPart(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Quantity *</label>
+                <input className="input" type="number" min={0} step="1" value={shipQty} onChange={(e) => setShipQty(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Lot *</label>
+                <input className="input" value={shipLot} onChange={(e) => setShipLot(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Requested inspection date *</label>
+                <input className="input" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} required />
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ marginTop: '0.75rem' }} disabled={submitting}>
+              {submitting ? '…' : 'Submit'}
+            </button>
+          </form>
+        </div>
+      </div>
+      )}
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Assigned buyers</h2>
@@ -380,84 +480,10 @@ export function SupplierProfile() {
         </div>
       </div>
 
-      {isSupplier && (
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Upload record (supplier)</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Submit a record name for review. Optional file attachment (max 8MB) is stored on the server.
-          </p>
-          <form onSubmit={submitRecord} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
-            <div className="input-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-              <label className="input-label">Record name *</label>
-              <input className="input" value={recordName} onChange={(e) => setRecordName(e.target.value)} required />
-            </div>
-            <div className="input-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-              <label className="input-label">File (optional)</label>
-              <input
-                className="input"
-                type="file"
-                onChange={(e) => setRecordFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? '…' : 'Submit record'}
-            </button>
-          </form>
-        </div>
-      </div>
-      )}
-
-      {isSupplier && (
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Request shipment inspection</h2>
-          <form onSubmit={submitShipment}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
-              <div className="input-group">
-                <label className="input-label">Purchase order</label>
-                <input className="input" value={shipPo} onChange={(e) => setShipPo(e.target.value)} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Part #</label>
-                <input className="input" value={shipPart} onChange={(e) => setShipPart(e.target.value)} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Qty</label>
-                <input className="input" type="number" min={0} value={shipQty} onChange={(e) => setShipQty(e.target.value)} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Inspection date *</label>
-                <input className="input" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} required />
-              </div>
-            </div>
-            <button type="submit" className="btn btn-primary" style={{ marginTop: '0.75rem' }} disabled={submitting}>
-              {submitting ? '…' : 'Submit request'}
-            </button>
-          </form>
-        </div>
-      </div>
-      )}
-
       <SectionTable
         title="Audits"
         empty="No audits."
         rowCount={data.audits.length}
-        excelExport={{
-          filename: `${safeExportFilePart(supplier.code)}_Audits`,
-          sheetName: 'Audits',
-          getRows: () =>
-            data.audits.map(
-              (a): ExportRow => ({
-                Code: a.code,
-                Date: a.auditDate?.slice(0, 10) ?? '',
-                Type: a.auditType
-                  ? `${a.auditType.code}${a.auditType.name ? ` — ${a.auditType.name}` : ''}`
-                  : '',
-                Result: a.result ?? '',
-              })
-            ),
-        }}
       >
         <table className="table">
           <thead>
@@ -485,19 +511,6 @@ export function SupplierProfile() {
         title="Findings"
         empty="No findings."
         rowCount={data.findings.length}
-        excelExport={{
-          filename: `${safeExportFilePart(supplier.code)}_Findings`,
-          sheetName: 'Findings',
-          getRows: () =>
-            data.findings.map(
-              (f): ExportRow => ({
-                Code: f.code,
-                Status: f.status,
-                Severity: f.severity,
-                Summary: f.summary,
-              })
-            ),
-        }}
       >
         <table className="table">
           <thead>
@@ -527,19 +540,6 @@ export function SupplierProfile() {
         title="Corrective actions (CARs)"
         empty="No CARs."
         rowCount={data.cars.length}
-        excelExport={{
-          filename: `${safeExportFilePart(supplier.code)}_CARs`,
-          sheetName: 'CARs',
-          getRows: () =>
-            data.cars.map(
-              (c): ExportRow => ({
-                Code: c.code,
-                Status: c.status,
-                Severity: c.severity,
-                Summary: c.summary,
-              })
-            ),
-        }}
       >
         <table className="table">
           <thead>
@@ -569,18 +569,6 @@ export function SupplierProfile() {
         title="Risk history"
         empty="No risk snapshots."
         rowCount={data.riskSnapshots.length}
-        excelExport={{
-          filename: `${safeExportFilePart(supplier.code)}_Risk_history`,
-          sheetName: 'Risk history',
-          getRows: () =>
-            data.riskSnapshots.map(
-              (r): ExportRow => ({
-                Date: new Date(r.createdAt).toLocaleString(),
-                Level: r.level,
-                Score: r.score ?? '',
-              })
-            ),
-        }}
       >
         <table className="table">
           <thead>
@@ -613,6 +601,7 @@ export function SupplierProfile() {
             data.records.map(
               (r): ExportRow => ({
                 Name: r.name,
+                Notes: r.notes ?? '',
                 File: r.filePath ? 'Yes' : '',
                 Source: r.internalOrSupplier,
                 Status: r.status,
@@ -625,6 +614,7 @@ export function SupplierProfile() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Notes</th>
               <th>File</th>
               <th>Source</th>
               <th>Status</th>
@@ -635,6 +625,9 @@ export function SupplierProfile() {
             {data.records.map((r) => (
               <tr key={r.id}>
                 <td>{r.name}</td>
+                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes ?? ''}>
+                  {r.notes?.trim() ? r.notes : '—'}
+                </td>
                 <td>{r.filePath ? 'Yes' : '—'}</td>
                 <td>{r.internalOrSupplier}</td>
                 <td>{r.status}</td>
@@ -652,6 +645,7 @@ export function SupplierProfile() {
               <th>PO</th>
               <th>Part #</th>
               <th>Qty</th>
+              <th>Lot</th>
               <th>Inspection date</th>
               <th>Status</th>
             </tr>
@@ -662,6 +656,7 @@ export function SupplierProfile() {
                 <td>{s.purchaseOrder ?? '—'}</td>
                 <td>{s.partNumber ?? '—'}</td>
                 <td>{s.qty ?? '—'}</td>
+                <td>{s.lot ?? '—'}</td>
                 <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
                 <td>{s.status}</td>
               </tr>

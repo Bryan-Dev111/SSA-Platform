@@ -17,15 +17,10 @@ interface Supplier {
   name: string;
 }
 
-interface AuditOption {
-  id: string;
-  code: string;
-  supplierId: string;
-}
-
 interface RecordRow {
   id: string;
   name: string;
+  notes: string | null;
   internalOrSupplier: string;
   status: string;
   filePath: string | null;
@@ -52,7 +47,14 @@ function getRecordRowSlug(status: string): 'pending' | 'approved' | 'rejected' {
 }
 
 function postRecordWithProgress(
-  payload: { name: string; supplierId: string | null; auditId: string | null; internalOrSupplier: 'supplier' | 'internal'; file: File | null },
+  payload: {
+    name: string;
+    supplierId: string | null;
+    auditId: string | null;
+    internalOrSupplier: 'supplier' | 'internal';
+    file: File | null;
+    notes: string;
+  },
   token: string,
   onProgress: (percent: number) => void
 ): Promise<void> {
@@ -86,6 +88,7 @@ function postRecordWithProgress(
     form.append('internalOrSupplier', payload.internalOrSupplier);
     form.append('supplierId', payload.supplierId ?? '');
     form.append('auditId', payload.auditId ?? '');
+    form.append('notes', payload.notes);
     if (payload.file) form.append('file', payload.file);
     xhr.send(form);
   });
@@ -96,14 +99,12 @@ export function Records() {
   const toast = useToast();
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [audits, setAudits] = useState<AuditOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState('');
-  const [supplierId, setSupplierId] = useState('');
-  const [auditId, setAuditId] = useState('');
+  const [uploadNotes, setUploadNotes] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -171,17 +172,9 @@ export function Records() {
   useEffect(() => {
     if (!token) return;
     apiJson<Supplier[]>('/suppliers', { token })
-      .then((list) => {
-        setSuppliers(list);
-        if (isSupplier && list.length === 1) {
-          setSupplierId(list[0].id);
-        }
-      })
+      .then((list) => setSuppliers(list))
       .catch(() => setSuppliers([]));
-    apiJson<AuditOption[]>('/audits', { token })
-      .then((list) => setAudits(list))
-      .catch(() => setAudits([]));
-  }, [token, isSupplier]);
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -202,23 +195,32 @@ export function Records() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !name.trim()) return;
-    if (file && file.size > MAX_UPLOAD_BYTES) {
+    if (!filterSupplierId) {
+      toast.error('Choose a supplier in the filter above. The record will be linked to that supplier.');
+      return;
+    }
+    if (!file) {
+      toast.error('File is required');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
       toast.error('File exceeds current upload limit (75MB)');
       return;
     }
     setSubmitting(true);
-    setUploadProgress(file ? 0 : null);
+    setUploadProgress(0);
     try {
       const payload = {
         name: name.trim(),
-        supplierId: supplierId || null,
-        auditId: auditId || null,
+        supplierId: filterSupplierId,
+        auditId: null as string | null,
         internalOrSupplier: 'internal' as const,
-        file: file ?? null,
+        file,
+        notes: uploadNotes.trim(),
       };
       await postRecordWithProgress(payload, token, (p) => setUploadProgress(p));
       setName('');
-      setAuditId('');
+      setUploadNotes('');
       setFile(null);
       setUploadProgress(null);
       toast.success('Record submitted');
@@ -320,127 +322,85 @@ export function Records() {
 
       {error && <div className="alert-error">{error}</div>}
 
-      {canUpload && (
+      {canUpload && !isSupplier && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Upload record</h2>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+              Supplier is taken from <strong>Filter by supplier</strong> above (not shown here). Choose one supplier before uploading.
+            </p>
             <form onSubmit={submit}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: isSupplier
-                    ? 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(220px, 1fr) auto'
-                    : 'minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(240px, 1.2fr) auto',
-                  gap: '0.75rem',
-                  alignItems: 'flex-end',
-                  paddingBottom: 22,
-                }}
-              >
-                <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
-                  <label className="input-label">Name *</label>
-                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
-                {!isSupplier && (
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Supplier</label>
-                    <select
-                      className="input"
-                      value={supplierId}
-                      onChange={(e) => {
-                        setSupplierId(e.target.value);
-                        setAuditId('');
-                      }}
-                    >
-                      <option value="">None</option>
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Audit</label>
-                  <select className="input" value={auditId} onChange={(e) => setAuditId(e.target.value)}>
-                    <option value="">None</option>
-                    {audits
-                      .filter((a) => !supplierId || a.supplierId === supplierId)
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.code}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
-                  <label className="input-label">File (optional)</label>
-                  <input
-                    ref={fileInputRef}
-                    className="input"
-                    type="file"
-                    style={{ display: 'none' }}
-                    onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button
-                      type="button"
-                      className="btn file-picker-btn"
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{ whiteSpace: 'nowrap' }}
-                    >
-                      Choose File
-                    </button>
-                    <span
-                      style={{
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        display: 'inline-block',
-                        maxWidth: 170,
-                      }}
-                      title={file?.name || 'No file chosen'}
-                    >
-                      {file?.name || 'No file chosen'}
-                    </span>
-                  </div>
-                  <div
+              <div className="input-group">
+                <label className="input-label">Name *</label>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="input-group" style={{ position: 'relative' }}>
+                <label className="input-label">File *</label>
+                <input
+                  ref={fileInputRef}
+                  className="input"
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn file-picker-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    Choose File
+                  </button>
+                  <span
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      marginTop: 4,
-                      minHeight: 18,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 8,
                       fontSize: 'var(--text-xs)',
                       color: 'var(--color-text-muted)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'inline-block',
+                      maxWidth: 280,
                     }}
+                    title={file?.name || 'No file chosen'}
                   >
-                    <span>
-                      {file
-                        ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'}`
-                        : ''}
-                    </span>
-                    {uploadProgress !== null && file ? (
-                      <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
-                        <span>{uploadProgress}%</span>
-                      </span>
-                    ) : (
-                      <span />
-                    )}
-                  </div>
+                    {file?.name || 'No file chosen'}
+                  </span>
                 </div>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? '…' : 'Submit'}
-                </button>
+                <div
+                  style={{
+                    marginTop: 8,
+                    minHeight: 18,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <span>
+                    {file
+                      ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'}`
+                      : ''}
+                  </span>
+                  {uploadProgress !== null && file ? (
+                    <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
+                      <span>{uploadProgress}%</span>
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                </div>
               </div>
+              <div className="input-group">
+                <label className="input-label">Notes (optional)</label>
+                <textarea className="input" rows={2} value={uploadNotes} onChange={(e) => setUploadNotes(e.target.value)} />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? '…' : 'Submit'}
+              </button>
             </form>
           </div>
         </div>
@@ -459,6 +419,7 @@ export function Records() {
                 <thead>
                   <tr>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('name')}>Name {sortIndicator('name')}</th>
+                    <th>Notes</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
                     <th>Audit</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
@@ -472,6 +433,9 @@ export function Records() {
                   {paginatedRows.map((r) => (
                     <tr key={r.id} className={`record-row record-row--${getRecordRowSlug(r.status)}`}>
                       <td>{r.name}</td>
+                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes ?? ''}>
+                        {r.notes?.trim() ? r.notes : '—'}
+                      </td>
                       <td>{r.supplier?.code ?? 'None'}</td>
                       <td>{r.audit?.code ?? 'None'}</td>
                       <td>{getRecordReviewLabel(r.status)}</td>

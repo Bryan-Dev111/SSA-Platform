@@ -263,6 +263,7 @@ model Shipment {
   supplier        Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   purchaseOrder   String?
   partNumber      String?
+  lot             String?
   qty             Int?
   inspectionDate  DateTime?       @db.Date
   status          ShipmentStatus @default(WaitingInspection)
@@ -299,6 +300,7 @@ model ShipmentSchedule {
 model Record {
   id               String      @id @default(cuid())
   name             String
+  notes            String?
   internalOrSupplier RecordSource
   supplierId       String?
   supplier         Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)

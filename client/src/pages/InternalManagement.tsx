@@ -32,12 +32,25 @@ interface AuditTypeOption {
   name: string | null;
 }
 
+interface InspectionRequestRow {
+  id: string;
+  purchaseOrder: string | null;
+  partNumber: string | null;
+  lot: string | null;
+  qty: number | null;
+  inspectionDate: string | null;
+  status: string;
+  supplier: { code: string; name: string };
+  createdAt?: string;
+}
+
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
   const [rows, setRows] = useState<InternalRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [auditTypes, setAuditTypes] = useState<AuditTypeOption[]>([]);
+  const [inspectionRequests, setInspectionRequests] = useState<InspectionRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,11 +75,13 @@ export function InternalManagement() {
       apiJson<InternalRow[]>('/internal-docs', { token }),
       apiJson<SupplierOption[]>('/suppliers', { token }),
       apiJson<AuditTypeOption[]>('/audits/types', { token }),
+      apiJson<InspectionRequestRow[]>('/shipments', { token }),
     ])
-      .then(([docs, supplierList, typeList]) => {
+      .then(([docs, supplierList, typeList, shipments]) => {
         setRows(docs);
         setSuppliers(supplierList);
         setAuditTypes(typeList);
+        setInspectionRequests(shipments);
       })
       .catch((e) => setError(parseApiError(e)));
   };
@@ -79,11 +94,13 @@ export function InternalManagement() {
       apiJson<InternalRow[]>('/internal-docs', { token }),
       apiJson<SupplierOption[]>('/suppliers', { token }),
       apiJson<AuditTypeOption[]>('/audits/types', { token }),
+      apiJson<InspectionRequestRow[]>('/shipments', { token }),
     ])
-      .then(([docs, supplierList, typeList]) => {
+      .then(([docs, supplierList, typeList, shipments]) => {
         setRows(docs);
         setSuppliers(supplierList);
         setAuditTypes(typeList);
+        setInspectionRequests(shipments);
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
@@ -215,10 +232,55 @@ export function InternalManagement() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Internal Management</h1>
-        <p className="page-description">Internal contracts, SOWs, and other non-supplier documents (Admin only).</p>
+        <p className="page-description">
+          Internal contracts, SOWs, shipment inspection requests from suppliers, and audit scheduling (Admin only).
+        </p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Shipment inspection requests</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+            Requests submitted by suppliers (e.g. from Supplier Profile). Manage outcomes on the Shipments page.
+          </p>
+          <div className="table-wrap">
+            {inspectionRequests.length === 0 ? (
+              <p className="table-empty">No inspection requests.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>PO</th>
+                    <th>Part #</th>
+                    <th>Qty</th>
+                    <th>Lot</th>
+                    <th>Inspection date</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inspectionRequests.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.supplier.code} — {r.supplier.name}</td>
+                      <td>{r.purchaseOrder ?? '—'}</td>
+                      <td>{r.partNumber ?? '—'}</td>
+                      <td>{r.qty ?? '—'}</td>
+                      <td>{r.lot ?? '—'}</td>
+                      <td>{r.inspectionDate?.slice(0, 10) ?? '—'}</td>
+                      <td>{r.status}</td>
+                      <td>{r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">

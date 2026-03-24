@@ -199,6 +199,11 @@ router.post(
         ? null
         : String(auditIdRaw);
     const internalOrSupplier = req.body?.internalOrSupplier === 'internal' ? 'internal' : 'supplier';
+    const notesRaw = req.body?.notes;
+    const notes =
+      notesRaw === null || notesRaw === undefined || notesRaw === ''
+        ? null
+        : String(notesRaw).trim() || null;
     const fileBase64Raw =
       typeof req.body?.fileBase64 === 'string' && req.body.fileBase64.trim() !== ''
         ? req.body.fileBase64.trim()
@@ -304,9 +309,15 @@ router.post(
       }
     }
 
+    if (!filePath && !fileData) {
+      res.status(400).json({ error: 'file is required' });
+      return;
+    }
+
     const record = await prisma.record.create({
       data: {
         name,
+        notes,
         supplierId,
         auditId,
         internalOrSupplier: internalOrSupplier as RecordSource,
