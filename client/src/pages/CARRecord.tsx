@@ -158,7 +158,7 @@ export function CARRecord() {
   const [editMode, setEditMode] = useState(false);
   const [approvalComment, setApprovalComment] = useState('');
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
-  const [carQuery, setCarQuery] = useState(codeParam ?? idParam ?? '');
+  const [carQuery, setCarQuery] = useState(codeParam ?? '');
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
@@ -193,8 +193,8 @@ export function CARRecord() {
   };
 
   useEffect(() => {
-    setCarQuery(codeParam ?? idParam ?? '');
-  }, [codeParam, idParam]);
+    setCarQuery(codeParam ?? '');
+  }, [codeParam]);
 
   const syncFormFromCar = (c: CAR) => {
     setForm((p) => ({
@@ -273,6 +273,7 @@ export function CARRecord() {
       .then((c: CAR) => {
         if (!isActive()) return;
         setCar(c);
+        setCarQuery(c.code);
         setError(null);
         setForm({
           findingId: c.findingId ?? '',
