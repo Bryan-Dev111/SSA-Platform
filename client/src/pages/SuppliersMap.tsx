@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { Link } from 'react-router-dom';
+import L from 'leaflet';
+import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
 import { apiJson } from '../api/client';
@@ -10,6 +12,7 @@ interface SupplierRow {
   name: string;
   city: string | null;
   country: string | null;
+  status: string;
 }
 
 interface RiskCurrentRow {
@@ -21,11 +24,27 @@ interface RiskCurrentRow {
 type RiskColor = 'red' | 'orange' | 'yellow' | 'green' | 'gray';
 type GeoPoint = { lat: number; lon: number };
 
+function supplierStatusLabel(status: string | undefined): string {
+  const s = (status ?? '').trim().toLowerCase();
+  if (s === 'inactive') return 'Inactive';
+  return 'Active';
+}
+
+/**
+ * Clamp panning to a single world copy. Do not use TileLayer `noWrap`: it causes invalid tile requests (negative x)
+ * and OSM returns 400. maxBounds + viscosity is enough to stop “infinite” horizontal panning.
+ */
+const WORLD_BOUNDS: [[number, number], [number, number]] = [
+  [-85, -180],
+  [85, 180],
+];
+
 export function SuppliersMap() {
   const { token } = useAuth();
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [riskBySupplierId, setRiskBySupplierId] = useState<Record<string, { level: string; score: number }>>({});
   const [geoBySupplierId, setGeoBySupplierId] = useState<Record<string, GeoPoint>>({});
+  const [geoLoading, setGeoLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,25 +69,38 @@ export function SuppliersMap() {
   }, [token]);
 
   useEffect(() => {
+    if (!token) return;
+
     const withLocationText = suppliers
       .filter((s) => Boolean(s.city || s.country))
       .map((s) => ({ id: s.id, q: [s.city, s.country].filter(Boolean).join(', ') }));
-    if (withLocationText.length === 0) return;
+
+    if (withLocationText.length === 0) {
+      setGeoBySupplierId({});
+      return;
+    }
 
     let active = true;
+    setGeoLoading(true);
     (async () => {
-      const next: Record<string, GeoPoint> = {};
-      for (const row of withLocationText) {
-        // eslint-disable-next-line no-await-in-loop
-        const point = await geocodeLocation(row.q);
-        if (point) next[row.id] = point;
+      try {
+        const next = await apiJson<Record<string, GeoPoint>>('/geocode/batch', {
+          method: 'POST',
+          token,
+          body: JSON.stringify({ items: withLocationText }),
+        });
+        if (active) setGeoBySupplierId(next && typeof next === 'object' ? next : {});
+      } catch {
+        if (active) setGeoBySupplierId({});
+      } finally {
+        if (active) setGeoLoading(false);
       }
-      if (active) setGeoBySupplierId(next);
     })();
+
     return () => {
       active = false;
     };
-  }, [suppliers]);
+  }, [suppliers, token]);
 
   const mapPins = useMemo(() => {
     return suppliers.map((s) => {
@@ -90,6 +122,17 @@ export function SuppliersMap() {
   }, [mapPins]);
 
   const markerPins = mapPins.filter((p) => Boolean(p.geo));
+  const suppliersWithAddress = suppliers.some((s) => Boolean(s.city || s.country));
+  const showGeoHint =
+    !geoLoading && suppliersWithAddress && markerPins.length === 0 && suppliers.length > 0;
+  const showNoAddressHint =
+    !geoLoading && !suppliersWithAddress && suppliers.length > 0;
+
+  const markerPositions = useMemo(
+    () => markerPins.map((p) => [p.geo!.lat, p.geo!.lon] as [number, number]),
+    [markerPins]
+  );
+
   const mapCenter: [number, number] =
     markerPins.length > 0
       ? [
@@ -140,35 +183,92 @@ export function SuppliersMap() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Map view</h2>
-          <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-            <MapContainer center={mapCenter} zoom={markerPins.length > 0 ? 2 : 1} style={{ height: 460, width: '100%' }} scrollWheelZoom>
+          <div className="suppliers-map-frame" style={{ border: '1px solid var(--color-border)', borderRadius: 10 }}>
+            <MapContainer
+              center={mapCenter}
+              zoom={markerPins.length > 0 ? 2 : 1}
+              style={{ height: 460, width: '100%', borderRadius: 10 }}
+              scrollWheelZoom
+              maxBounds={WORLD_BOUNDS}
+              maxBoundsViscosity={1}
+            >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+              <MapFitBounds points={markerPositions} />
               {markerPins.map((pin) => (
                 <CircleMarker
                   key={pin.id}
                   center={[pin.geo!.lat, pin.geo!.lon]}
                   pathOptions={{
-                    color: '#ffffff',
+                    color: '#1e293b',
                     weight: 2,
                     fillColor: riskColorHex(pin.color),
-                    fillOpacity: 0.95,
+                    fillOpacity: 1,
                   }}
-                  radius={8}
+                  radius={11}
                 >
-                  <Popup>
-                    <div style={{ minWidth: 180 }}>
-                      <strong>{pin.code} — {pin.name}</strong>
-                      <div>{pin.city ?? 'N/A'}{pin.city && pin.country ? ', ' : ''}{pin.country ?? ''}</div>
-                      <div>Risk: {pin.risk ? `${pin.risk.level} (${pin.risk.score})` : 'N/A'}</div>
+                  <Tooltip direction="top" opacity={1} className="suppliers-map-tooltip">
+                    <span>
+                      {pin.code}
+                      {pin.risk ? ` · ${pin.risk.level}` : ''}
+                    </span>
+                  </Tooltip>
+                  <Popup className="suppliers-map-popup" maxWidth={280} minWidth={240} keepInView autoPan>
+                    <div className="suppliers-map-callout">
+                      <div className="suppliers-map-callout-tab">
+                        <span
+                          className="suppliers-map-callout-tab-dot"
+                          style={{ background: riskColorHex(pin.color) }}
+                          aria-hidden
+                        />
+                        <span>Supplier</span>
+                        <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--color-text)' }}>{pin.code}</span>
+                      </div>
+                      <div className="suppliers-map-callout-body">
+                        <h3 className="suppliers-map-callout-title">{pin.name}</h3>
+                        <p className="suppliers-map-callout-row">
+                          {pin.city || pin.country
+                            ? [pin.city, pin.country].filter(Boolean).join(', ')
+                            : 'Location not on file'}
+                        </p>
+                        <p className="suppliers-map-callout-row">
+                          <strong>Status:</strong>{' '}
+                          {supplierStatusLabel(pin.status)}
+                        </p>
+                        <p className="suppliers-map-callout-row">
+                          <strong>Risk:</strong>{' '}
+                          {pin.risk ? `${pin.risk.level} (score ${pin.risk.score})` : 'N/A'}
+                        </p>
+                        <Link
+                          className="suppliers-map-callout-link"
+                          to={`/supplier-profile?supplierId=${encodeURIComponent(pin.id)}`}
+                        >
+                          Open supplier profile →
+                        </Link>
+                      </div>
                     </div>
                   </Popup>
                 </CircleMarker>
               ))}
             </MapContainer>
           </div>
+          {geoLoading && (
+            <p style={{ marginTop: '0.75rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              Placing suppliers on the map…
+            </p>
+          )}
+          {showGeoHint && (
+            <p className="alert-error" style={{ marginTop: '0.75rem', fontSize: 'var(--text-sm)' }}>
+              No map pins yet: geocoding did not return coordinates. Check city and country values, or try again later.
+            </p>
+          )}
+          {showNoAddressHint && (
+            <p style={{ marginTop: '0.75rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              Map pins need at least a city or country on each supplier record.
+            </p>
+          )}
           <p style={{ marginTop: '0.75rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
             Real map tiles with supplier markers. Pins are color-coded by supplier risk: red/orange/yellow/green.
           </p>
@@ -237,21 +337,22 @@ function riskColorHex(color: RiskColor): string {
   return '#94a3b8';
 }
 
-async function geocodeLocation(query: string): Promise<GeoPoint | null> {
-  if (!query.trim()) return null;
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ lat: string; lon: string }>;
-    if (!rows.length) return null;
-    const lat = Number(rows[0].lat);
-    const lon = Number(rows[0].lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    return { lat, lon };
-  } catch {
-    return null;
-  }
+function MapFitBounds({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  const boundsKey = useMemo(
+    () => points.map((p) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`).join('|'),
+    [points]
+  );
+
+  useEffect(() => {
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], Math.max(map.getZoom(), 6));
+      return;
+    }
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, { padding: [52, 52], maxZoom: 10 });
+  }, [map, boundsKey, points]);
+
+  return null;
 }

@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const MAX_RECORD_UPLOAD_BYTES = 75 * 1024 * 1024;
@@ -76,6 +76,8 @@ interface PortalData {
 export function SupplierProfile() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const supplierIdFromUrl = searchParams.get('supplierId');
   const [data, setData] = useState<PortalData | null>(null);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -94,6 +96,12 @@ export function SupplierProfile() {
   const isSupplier = user?.roleNames?.includes('Supplier');
   const roleNames = user?.roleNames ?? [];
   const canSelectSupplier = !isSupplier && roleNames.some((r) => ['Admin', 'Buyer', 'QualityEngineer'].includes(r));
+
+  useEffect(() => {
+    if (supplierIdFromUrl && canSelectSupplier) {
+      setSelectedSupplierId(supplierIdFromUrl);
+    }
+  }, [supplierIdFromUrl, canSelectSupplier]);
 
   useEffect(() => {
     if (!token) {

@@ -35,6 +35,7 @@ import riskSnapshotsRoutes from './routes/risk-snapshots';
 import riskActionsRoutes from './routes/risk-actions';
 import dashboardRoutes from './routes/dashboard';
 import alertsRoutes from './routes/alerts';
+import geocodeRoutes from './routes/geocode';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -71,6 +72,9 @@ app.use('/risk-snapshots', riskSnapshotsRoutes);
 app.use('/risk-actions', riskActionsRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/alerts', alertsRoutes);
+app.use('/geocode', geocodeRoutes);
+/** Same router: supports clients whose VITE_API_URL includes /api while hitting Express directly (no Vercel strip). */
+app.use('/api/geocode', geocodeRoutes);
 
 app.use(errorHandler);
 

@@ -7,8 +7,10 @@ const appPath = path.resolve(__dirname, '../server/dist/app.js');
 const app = require(appPath).default;
 
 module.exports = (req, res) => {
-  // Strip /api prefix so Express sees /auth/login, /cars, etc.
-  const path = req.url.replace(/^\/api/, '') || '/';
-  req.url = path;
+  // Strip /api prefix so Express sees /auth/login, /geocode/batch, etc.
+  let reqPath = typeof req.url === 'string' ? req.url : '/';
+  if (!reqPath.startsWith('/')) reqPath = `/${reqPath}`;
+  if (reqPath.startsWith('/api')) reqPath = reqPath.slice(4) || '/';
+  req.url = reqPath;
   app(req, res);
 };
