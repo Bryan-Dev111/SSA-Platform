@@ -48,6 +48,7 @@ model User {
   carsCreated  CorrectiveAction[]
   carApprovalLogs CarApprovalLog[]
   opportunitiesCreated Opportunity[]
+  riskActionsCreated RiskAction[]
   alerts       Alert[]
   alertPrefs   UserAlertPreference[]
 }
@@ -110,6 +111,7 @@ model Supplier {
   records         Record[]
   riskSnapshots   RiskSnapshot[]
   opportunities   Opportunity[]
+  riskActions     RiskAction[]
   shipmentSchedules ShipmentSchedule[]
 }
 
@@ -383,6 +385,7 @@ enum RiskLevel {
 
 model Opportunity {
   id          String   @id @default(cuid())
+  code        String   @unique
   supplierId  String
   supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   type        RiskItemType
@@ -393,8 +396,29 @@ model Opportunity {
   status      RiskStatus @default(Open)
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id])
+  actions     RiskAction[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model RiskAction {
+  id                 String           @id @default(cuid())
+  code               String           @unique
+  supplierId         String
+  supplier           Supplier         @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  riskId             String
+  risk               Opportunity      @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  description        String
+  owner              String?
+  dueDate            DateTime?        @db.Date
+  status             RiskActionStatus @default(Open)
+  residualLikelihood RiskLikelihood?
+  residualSeverity   RiskSeverity?
+  residualRiskLevel  RiskLevel?
+  createdById        String?
+  createdBy          User?            @relation(fields: [createdById], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 }
 
 enum RiskItemType {
@@ -422,6 +446,12 @@ enum RiskSeverity {
   Moderate
   Significant
   Severe
+}
+
+enum RiskActionStatus {
+  Open
+  InProgress
+  Mitigated
 }
 
 // ============== Alerts ==============
@@ -455,6 +485,6 @@ model UserAlertPreference {
 
 // For application-level code generation (SUP-00001, AUD-00001, etc.)
 model IdSequence {
-  prefix    String @id // SUP, AUD, TYP, FIN, CAR
+  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT
   lastValue Int    @default(0)
 }

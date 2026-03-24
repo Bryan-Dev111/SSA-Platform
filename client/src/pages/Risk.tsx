@@ -9,21 +9,9 @@ interface Supplier {
   name: string;
 }
 
-interface RiskCurrent {
-  supplier: Supplier;
-  score: number;
-  level: 'Low' | 'Medium' | 'High';
-  factors: {
-    quality: number;
-    audit: number;
-    delivery: number;
-    carClosure: number;
-    documentation: number;
-  };
-}
-
 interface OpportunityRow {
   id: string;
+  code: string;
   supplierId: string;
   supplier: Supplier;
   createdBy?: { id: string; name: string | null; email: string } | null;
@@ -40,8 +28,35 @@ interface RiskSnapshotRow {
   id: string;
   supplierId: string;
   score: number | null;
-  level: 'Low' | 'Medium' | 'High';
   createdAt: string;
+}
+
+interface RiskActionRow {
+  id: string;
+  code: string;
+  supplierId: string;
+  supplier: Supplier;
+  riskId: string;
+  risk: { id: string; code: string; description: string; riskLevel: 'Low' | 'Medium' | 'High' | null };
+  description: string;
+  owner: string | null;
+  dueDate: string | null;
+  status: 'Open' | 'InProgress' | 'Mitigated';
+  residualLikelihood: 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely' | null;
+  residualSeverity: 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe' | null;
+  residualRiskLevel: 'Low' | 'Medium' | 'High' | null;
+  createdBy?: { id: string; name: string | null; email: string } | null;
+  createdAt: string;
+}
+
+type RiskLikelihood = NonNullable<OpportunityRow['likelihood']>;
+type RiskSeverity = NonNullable<OpportunityRow['severity']>;
+
+function levelWeight(level: string | null): number {
+  if (level === 'High') return 90;
+  if (level === 'Medium') return 60;
+  if (level === 'Low') return 30;
+  return 0;
 }
 
 export function Risk() {
@@ -49,23 +64,32 @@ export function Risk() {
   const toast = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
-  const [currents, setCurrents] = useState<RiskCurrent[]>([]);
   const [snapshots, setSnapshots] = useState<RiskSnapshotRow[]>([]);
   const [items, setItems] = useState<OpportunityRow[]>([]);
+  const [actions, setActions] = useState<RiskActionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newType, setNewType] = useState<'risk' | 'opportunity'>('risk');
   const [newSupplierId, setNewSupplierId] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [newLikelihood, setNewLikelihood] = useState<'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely'>('Possible');
-  const [newSeverity, setNewSeverity] = useState<'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe'>('Moderate');
+  const [newLikelihood, setNewLikelihood] = useState<RiskLikelihood>('Possible');
+  const [newSeverity, setNewSeverity] = useState<RiskSeverity>('Moderate');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editType, setEditType] = useState<'risk' | 'opportunity'>('risk');
   const [editDescription, setEditDescription] = useState('');
-  const [editLikelihood, setEditLikelihood] = useState<'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely'>('Possible');
-  const [editSeverity, setEditSeverity] = useState<'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe'>('Moderate');
+  const [editLikelihood, setEditLikelihood] = useState<RiskLikelihood>('Possible');
+  const [editSeverity, setEditSeverity] = useState<RiskSeverity>('Moderate');
   const [editStatus, setEditStatus] = useState<'Open' | 'Mitigated' | 'Closed'>('Open');
+
+  const [newActionSupplierId, setNewActionSupplierId] = useState('');
+  const [newActionRiskId, setNewActionRiskId] = useState('');
+  const [newActionDescription, setNewActionDescription] = useState('');
+  const [newActionOwner, setNewActionOwner] = useState('');
+  const [newActionDueDate, setNewActionDueDate] = useState('');
+  const [newActionStatus, setNewActionStatus] = useState<'Open' | 'InProgress' | 'Mitigated'>('Open');
+  const [newResidualLikelihood, setNewResidualLikelihood] = useState<RiskLikelihood>('Possible');
+  const [newResidualSeverity, setNewResidualSeverity] = useState<RiskSeverity>('Moderate');
 
   const roleNames = user?.roleNames ?? [];
   const canEditRiskItems =
@@ -76,21 +100,18 @@ export function Risk() {
     if (showLoader) setLoading(true);
     setError(null);
     try {
-      const currentQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
-      const listQ = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
-      const [supplierList, currentList, snapshotList, allItems] = await Promise.all([
+      const q = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
+      const [supplierList, snapshotList, allItems, allActions] = await Promise.all([
         apiJson<Supplier[]>('/suppliers', { token }),
-        apiJson<RiskCurrent[]>(`/risk-snapshots/current${currentQ}`, { token }),
-        apiJson<RiskSnapshotRow[]>(`/risk-snapshots${currentQ}`, { token }),
-        apiJson<OpportunityRow[]>(`/opportunities${listQ}`, { token }),
+        apiJson<RiskSnapshotRow[]>(`/risk-snapshots${q}`, { token }),
+        apiJson<OpportunityRow[]>(`/opportunities${q}`, { token }),
+        apiJson<RiskActionRow[]>(`/risk-actions${q}`, { token }),
       ]);
       setSuppliers(supplierList);
-      setCurrents(currentList);
       setSnapshots(snapshotList);
       setItems(allItems.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
-      if (!newSupplierId && supplierList.length === 1) {
-        setNewSupplierId(supplierList[0].id);
-      }
+      setActions(allActions.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
+      if (!newSupplierId && supplierList.length === 1) setNewSupplierId(supplierList[0].id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load risk data');
     } finally {
@@ -103,36 +124,36 @@ export function Risk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, filterSupplierId]);
 
-  const stats = useMemo(() => {
-    const rows = currents;
-    const avgScore =
-      rows.length === 0 ? 0 : Math.round((rows.reduce((sum, r) => sum + r.score, 0) / rows.length) * 100) / 100;
-    const openRisks = items.filter((x) => x.type === 'risk' && x.status === 'Open').length;
-    const mitigatedRisks = items.filter((x) => x.type === 'risk' && x.status === 'Mitigated').length;
-    const opportunities = items.filter((x) => x.type === 'opportunity').length;
-    return { avgScore, openRisks, mitigatedRisks, opportunities };
-  }, [currents, items]);
+  const latestActionByRisk = useMemo(() => {
+    const m = new Map<string, RiskActionRow>();
+    for (const action of actions) {
+      if (!m.has(action.riskId)) m.set(action.riskId, action);
+    }
+    return m;
+  }, [actions]);
+
+  const effectiveRisks = useMemo(() => {
+    return items
+      .filter((r) => r.type === 'risk')
+      .map((r) => {
+        const action = latestActionByRisk.get(r.id);
+        const useResidual =
+          action?.status === 'Mitigated' && !!action.residualLikelihood && !!action.residualSeverity && !!action.residualRiskLevel;
+        return {
+          ...r,
+          effectiveLikelihood: (useResidual ? action!.residualLikelihood : r.likelihood) as OpportunityRow['likelihood'],
+          effectiveSeverity: (useResidual ? action!.residualSeverity : r.severity) as OpportunityRow['severity'],
+          effectiveRiskLevel: useResidual ? action!.residualRiskLevel : r.riskLevel,
+        };
+      });
+  }, [items, latestActionByRisk]);
 
   const distribution = useMemo(() => {
-    const low = currents.filter((r) => r.level === 'Low').length;
-    const medium = currents.filter((r) => r.level === 'Medium').length;
-    const high = currents.filter((r) => r.level === 'High').length;
+    const low = effectiveRisks.filter((r) => r.effectiveRiskLevel === 'Low').length;
+    const medium = effectiveRisks.filter((r) => r.effectiveRiskLevel === 'Medium').length;
+    const high = effectiveRisks.filter((r) => r.effectiveRiskLevel === 'High').length;
     return { low, medium, high };
-  }, [currents]);
-
-  const topRiskSuppliers = useMemo(
-    () => [...currents].sort((a, b) => b.score - a.score).slice(0, 5),
-    [currents]
-  );
-  const maxTopRiskScore = Math.max(1, ...topRiskSuppliers.map((r) => r.score));
-  const topRiskTotalScore = topRiskSuppliers.reduce((sum, r) => sum + r.score, 0);
-  const topRiskPareto = topRiskSuppliers.map((row, idx) => {
-    const cumulative = topRiskSuppliers.slice(0, idx + 1).reduce((sum, r) => sum + r.score, 0);
-    return {
-      ...row,
-      cumulativePercent: topRiskTotalScore > 0 ? Math.round((cumulative / topRiskTotalScore) * 100) : 0,
-    };
-  });
+  }, [effectiveRisks]);
 
   const distributionSlices = [
     { label: 'Low', count: distribution.low, color: '#22c55e' },
@@ -187,20 +208,35 @@ export function Risk() {
     return Math.round(avg * 100) / 100;
   }, [trendBySupplier]);
 
-  const matrixLikelihoodOrder: Array<OpportunityRow['likelihood']> = [
-    'VeryLikely',
-    'Likely',
-    'Possible',
-    'Unlikely',
-    'VeryUnlikely',
-  ];
-  const matrixSeverityOrder: Array<OpportunityRow['severity']> = [
-    'Negligible',
-    'Minor',
-    'Moderate',
-    'Significant',
-    'Severe',
-  ];
+  const stats = useMemo(() => {
+    const avgScore =
+      effectiveRisks.length === 0
+        ? 0
+        : Math.round((effectiveRisks.reduce((sum, r) => sum + levelWeight(r.effectiveRiskLevel), 0) / effectiveRisks.length) * 100) / 100;
+    const openRisks = effectiveRisks.filter((x) => x.status === 'Open').length;
+    const mitigatedRisks = actions.filter((x) => x.status === 'Mitigated').length;
+    const opportunities = items.filter((x) => x.type === 'opportunity').length;
+    return { avgScore, openRisks, mitigatedRisks, opportunities };
+  }, [effectiveRisks, actions, items]);
+
+  const topRiskSuppliers = useMemo(() => {
+    const bySupplier = new Map<string, { supplier: Supplier; score: number }>();
+    for (const risk of effectiveRisks) {
+      const existing = bySupplier.get(risk.supplierId) ?? { supplier: risk.supplier, score: 0 };
+      existing.score += levelWeight(risk.effectiveRiskLevel);
+      bySupplier.set(risk.supplierId, existing);
+    }
+    return [...bySupplier.values()].sort((a, b) => b.score - a.score).slice(0, 5);
+  }, [effectiveRisks]);
+  const maxTopRiskScore = Math.max(1, ...topRiskSuppliers.map((r) => r.score));
+  const topRiskTotalScore = topRiskSuppliers.reduce((sum, r) => sum + r.score, 0);
+  const topRiskPareto = topRiskSuppliers.map((row, idx) => {
+    const cumulative = topRiskSuppliers.slice(0, idx + 1).reduce((sum, r) => sum + r.score, 0);
+    return { ...row, cumulativePercent: topRiskTotalScore > 0 ? Math.round((cumulative / topRiskTotalScore) * 100) : 0 };
+  });
+
+  const matrixLikelihoodOrder: Array<OpportunityRow['likelihood']> = ['VeryLikely', 'Likely', 'Possible', 'Unlikely', 'VeryUnlikely'];
+  const matrixSeverityOrder: Array<OpportunityRow['severity']> = ['Negligible', 'Minor', 'Moderate', 'Significant', 'Severe'];
   const matrixLabelGrid: string[][] = [
     ['Low Med', 'Medium', 'Med Hi', 'High', 'High'],
     ['Low', 'Low Med', 'Medium', 'Med Hi', 'High'],
@@ -217,39 +253,16 @@ export function Risk() {
   };
 
   const riskPinsByCell = useMemo(() => {
-    const map = new Map<string, OpportunityRow[]>();
-    for (const row of items) {
-      if (row.type !== 'risk' || !row.likelihood || !row.severity) continue;
-      const key = `${row.likelihood}|${row.severity}`;
+    const map = new Map<string, typeof effectiveRisks>();
+    for (const row of effectiveRisks) {
+      if (!row.effectiveLikelihood || !row.effectiveSeverity) continue;
+      const key = `${row.effectiveLikelihood}|${row.effectiveSeverity}`;
       const existing = map.get(key) ?? [];
       existing.push(row);
       map.set(key, existing);
     }
     return map;
-  }, [items]);
-
-  const actionRows = useMemo(
-    () =>
-      items
-        .filter((r) => r.type === 'risk' && r.status !== 'Closed')
-        .map((r) => {
-          const actionText =
-            r.riskLevel === 'High'
-              ? 'Immediate containment and corrective plan'
-              : r.riskLevel === 'Medium'
-                ? 'Define mitigation plan and weekly review'
-                : 'Monitor trend and review monthly';
-          const dueDays = r.riskLevel === 'High' ? 7 : r.riskLevel === 'Medium' ? 14 : 30;
-          const dueDate = new Date(new Date(r.createdAt).getTime() + dueDays * 24 * 60 * 60 * 1000);
-          return {
-            ...r,
-            actionText,
-            dueDate: dueDate.toLocaleDateString(),
-            trend: trendBySupplier.get(r.supplierId) ?? null,
-          };
-        }),
-    [items, trendBySupplier]
-  );
+  }, [effectiveRisks]);
 
   const matchesActiveFilters = (row: OpportunityRow): boolean => !filterSupplierId || row.supplierId === filterSupplierId;
 
@@ -274,13 +287,48 @@ export function Risk() {
       setNewLikelihood('Possible');
       setNewSeverity('Moderate');
       toast.success('Risk/opportunity item added');
-      if (matchesActiveFilters(created)) {
-        setItems((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
-      } else {
-        await load(false);
-      }
+      if (matchesActiveFilters(created)) setItems((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
+      else await load(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create item');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !newActionSupplierId || !newActionRiskId || !newActionDescription.trim()) return;
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        supplierId: newActionSupplierId,
+        riskId: newActionRiskId,
+        description: newActionDescription.trim(),
+        owner: newActionOwner.trim() || null,
+        dueDate: newActionDueDate || null,
+        status: newActionStatus,
+      };
+      if (newActionStatus === 'Mitigated') {
+        payload.residualLikelihood = newResidualLikelihood;
+        payload.residualSeverity = newResidualSeverity;
+      }
+      const created = await apiJson<RiskActionRow>('/risk-actions', {
+        token,
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setActions((prev) => [created, ...prev.filter((a) => a.id !== created.id)]);
+      setNewActionSupplierId('');
+      setNewActionRiskId('');
+      setNewActionDescription('');
+      setNewActionOwner('');
+      setNewActionDueDate('');
+      setNewActionStatus('Open');
+      toast.success('Action added');
+      await load(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create action');
     } finally {
       setSaving(false);
     }
@@ -302,11 +350,8 @@ export function Risk() {
       });
       setEditingId(null);
       toast.success('Risk/opportunity item updated');
-      if (matchesActiveFilters(updated)) {
-        setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
-      } else {
-        setItems((prev) => prev.filter((row) => row.id !== updated.id));
-      }
+      if (matchesActiveFilters(updated)) setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      else setItems((prev) => prev.filter((row) => row.id !== updated.id));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update item');
     } finally {
@@ -327,7 +372,7 @@ export function Risk() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading risk data…</p>
+          <p style={{ marginTop: 12 }}>Loading risk data...</p>
         </div>
       </div>
     );
@@ -337,9 +382,7 @@ export function Risk() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Risk</h1>
-        <p className="page-description">
-          Supplier risk score, distribution, and risk/opportunity tracking. Buyers see assigned suppliers only.
-        </p>
+        <p className="page-description">Supplier risk score, distribution, risk matrix, and action tracking.</p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}
@@ -347,69 +390,37 @@ export function Risk() {
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <label>
           <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
-          <select
-            className="input"
-            style={{ minWidth: 220, width: 'auto' }}
-            value={filterSupplierId}
-            onChange={(e) => setFilterSupplierId(e.target.value)}
-          >
+          <select className="input" style={{ minWidth: 220, width: 'auto' }} value={filterSupplierId} onChange={(e) => setFilterSupplierId(e.target.value)}>
             <option value="">All in scope</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
+                {s.code} - {s.name}
               </option>
             ))}
           </select>
         </label>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '0.75rem',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          marginBottom: '1rem',
-        }}
-      >
+      <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: '1rem' }}>
         <MetricCard title="Risk score (avg)" value={String(stats.avgScore)} />
-        <MetricCard
-          title="Risk trend (avg)"
-          value={avgTrendPercent === null ? 'N/A' : `${avgTrendPercent > 0 ? '+' : ''}${avgTrendPercent}%`}
-        />
+        <MetricCard title="Risk trend (avg)" value={avgTrendPercent === null ? 'N/A' : `${avgTrendPercent > 0 ? '+' : ''}${avgTrendPercent}%`} />
         <MetricCard title="Open risks" value={String(stats.openRisks)} />
         <MetricCard title="Mitigated risks" value={String(stats.mitigatedRisks)} />
         <MetricCard title="Open opportunities" value={String(stats.opportunities)} />
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          marginBottom: '1rem',
-        }}
-      >
+      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', marginBottom: '1rem' }}>
         <div className="card">
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Risk distribution</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <div
                 aria-label="Risk distribution pie chart"
-                style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: '50%',
-                  background: distributionPieBackground,
-                  border: '1px solid var(--color-border)',
-                  flex: '0 0 auto',
-                }}
+                style={{ width: 140, height: 140, borderRadius: '50%', background: distributionPieBackground, border: '1px solid var(--color-border)', flex: '0 0 auto' }}
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 160 }}>
                 {distributionSlices.map((s) => (
-                  <div
-                    key={s.label}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}
-                  >
+                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
                       {s.label}
@@ -431,31 +442,13 @@ export function Risk() {
                 {topRiskPareto.map((r) => (
                   <div key={r.supplier.id}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {r.supplier.code} — {r.supplier.name}
-                      </span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.supplier.code} - {r.supplier.name}</span>
                       <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                         {r.score} ({r.cumulativePercent}% cumulative)
                       </span>
                     </div>
-                    <div
-                      style={{
-                        height: 8,
-                        background: 'var(--color-border-subtle)',
-                        borderRadius: 4,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${(r.score / maxTopRiskScore) * 100}%`,
-                          height: '100%',
-                          background: '#4f46e5',
-                          borderRadius: 4,
-                          minWidth: r.score > 0 ? 4 : 0,
-                          transition: 'width 0.2s ease',
-                        }}
-                      />
+                    <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ width: `${(r.score / maxTopRiskScore) * 100}%`, height: '100%', background: '#4f46e5', borderRadius: 4, minWidth: r.score > 0 ? 4 : 0, transition: 'width 0.2s ease' }} />
                     </div>
                   </div>
                 ))}
@@ -474,7 +467,7 @@ export function Risk() {
                 <tr>
                   <th>Likelihood \ Impact</th>
                   {matrixSeverityOrder.map((severity) => (
-                    <th key={severity}>{severity === 'Negligible' ? 'Negligible' : severity}</th>
+                    <th key={severity}>{severity}</th>
                   ))}
                 </tr>
               </thead>
@@ -490,21 +483,8 @@ export function Risk() {
                       return (
                         <td
                           key={`${likelihood}-${severity}`}
-                          style={{
-                            background: cellColor,
-                            color: cellLabel === 'High' ? '#ffffff' : '#111827',
-                            fontWeight: 700,
-                            minWidth: 120,
-                            verticalAlign: 'top',
-                          }}
-                          title={
-                            cellRisks.length > 0
-                              ? cellRisks
-                                  .slice(0, 5)
-                                  .map((r) => `${r.supplier.code}: ${r.description}`)
-                                  .join('\n')
-                              : ''
-                          }
+                          style={{ background: cellColor, color: cellLabel === 'High' ? '#ffffff' : '#111827', fontWeight: 700, minWidth: 120, verticalAlign: 'top' }}
+                          title={cellRisks.length > 0 ? cellRisks.slice(0, 8).map((r) => r.code).join(', ') : ''}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                             <span>{cellLabel}</span>
@@ -522,7 +502,7 @@ export function Risk() {
                                   fontWeight: 700,
                                 }}
                               >
-                                Pin {cellRisks.length}
+                                {cellRisks.length}
                               </span>
                             ) : null}
                           </div>
@@ -535,56 +515,8 @@ export function Risk() {
             </table>
           </div>
           <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-            Pins show how many current risk records fall into each likelihood-impact cell.
+            Hover each pin cell to see risk IDs (example: RISK-0005).
           </p>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risk scores by supplier</h2>
-          <div className="table-wrap">
-            {currents.length === 0 ? (
-              <p className="table-empty">No suppliers in scope.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Supplier</th>
-                    <th>Score</th>
-                    <th>Level</th>
-                    <th>Quality</th>
-                    <th>Audit</th>
-                    <th>Delivery</th>
-                    <th>CAR closure</th>
-                    <th>Documentation</th>
-                    <th>Trend</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currents.map((r) => (
-                    <tr key={r.supplier.id}>
-                      <td>
-                        {r.supplier.code} — {r.supplier.name}
-                      </td>
-                      <td>{r.score}</td>
-                      <td>{r.level}</td>
-                      <td>{r.factors.quality}</td>
-                      <td>{r.factors.audit}</td>
-                      <td>{r.factors.delivery}</td>
-                      <td>{r.factors.carClosure}</td>
-                      <td>{r.factors.documentation}</td>
-                      <td>
-                        {trendBySupplier.get(r.supplier.id) === null || trendBySupplier.get(r.supplier.id) === undefined
-                          ? 'N/A'
-                          : `${(trendBySupplier.get(r.supplier.id) ?? 0) > 0 ? '+' : ''}${trendBySupplier.get(r.supplier.id)}%`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
         </div>
       </div>
 
@@ -597,7 +529,7 @@ export function Risk() {
                 <option value="">Supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
+                    {s.code} - {s.name}
                   </option>
                 ))}
               </select>
@@ -605,23 +537,17 @@ export function Risk() {
                 <option value="risk">Risk</option>
                 <option value="opportunity">Opportunity</option>
               </select>
-              <input
-                className="input"
-                placeholder="Description"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                required
-              />
+              <input className="input" placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} required />
               {newType === 'risk' ? (
                 <>
-                  <select className="input" value={newLikelihood} onChange={(e) => setNewLikelihood(e.target.value as 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely')}>
+                  <select className="input" value={newLikelihood} onChange={(e) => setNewLikelihood(e.target.value as RiskLikelihood)}>
                     <option value="VeryUnlikely">Very Unlikely</option>
                     <option value="Unlikely">Unlikely</option>
                     <option value="Possible">Possible</option>
                     <option value="Likely">Likely</option>
                     <option value="VeryLikely">Very Likely</option>
                   </select>
-                  <select className="input" value={newSeverity} onChange={(e) => setNewSeverity(e.target.value as 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe')}>
+                  <select className="input" value={newSeverity} onChange={(e) => setNewSeverity(e.target.value as RiskSeverity)}>
                     <option value="Negligible">Negligible</option>
                     <option value="Minor">Minor</option>
                     <option value="Moderate">Moderate</option>
@@ -636,7 +562,60 @@ export function Risk() {
                 </>
               )}
               <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving ? 'Saving…' : 'Add'}
+                {saving ? 'Saving...' : 'Add'}
+              </button>
+            </form>
+
+            <h2 style={{ marginTop: '1rem' }}>Add action</h2>
+            <form onSubmit={createAction} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr 1fr 1fr auto', gap: '0.75rem' }}>
+              <select className="input" value={newActionSupplierId} onChange={(e) => setNewActionSupplierId(e.target.value)} required>
+                <option value="">Supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} - {s.name}
+                  </option>
+                ))}
+              </select>
+              <select className="input" value={newActionRiskId} onChange={(e) => setNewActionRiskId(e.target.value)} required>
+                <option value="">Related Risk</option>
+                {items
+                  .filter((i) => i.type === 'risk' && (!newActionSupplierId || i.supplierId === newActionSupplierId))
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.code}
+                    </option>
+                  ))}
+              </select>
+              <input className="input" placeholder="Action description" value={newActionDescription} onChange={(e) => setNewActionDescription(e.target.value)} required />
+              <input className="input" placeholder="Owner" value={newActionOwner} onChange={(e) => setNewActionOwner(e.target.value)} />
+              <input className="input" type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} />
+              <select className="input" value={newActionStatus} onChange={(e) => setNewActionStatus(e.target.value as 'Open' | 'InProgress' | 'Mitigated')}>
+                <option value="Open">Open</option>
+                <option value="InProgress">In Progress</option>
+                <option value="Mitigated">Mitigated</option>
+              </select>
+              {newActionStatus === 'Mitigated' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <select className="input" value={newResidualLikelihood} onChange={(e) => setNewResidualLikelihood(e.target.value as RiskLikelihood)}>
+                    <option value="VeryUnlikely">Very Unlikely</option>
+                    <option value="Unlikely">Unlikely</option>
+                    <option value="Possible">Possible</option>
+                    <option value="Likely">Likely</option>
+                    <option value="VeryLikely">Very Likely</option>
+                  </select>
+                  <select className="input" value={newResidualSeverity} onChange={(e) => setNewResidualSeverity(e.target.value as RiskSeverity)}>
+                    <option value="Negligible">Negligible</option>
+                    <option value="Minor">Minor</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Significant">Significant</option>
+                    <option value="Severe">Severe</option>
+                  </select>
+                </div>
+              ) : (
+                <div />
+              )}
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Create Action'}
               </button>
             </form>
           </div>
@@ -647,33 +626,39 @@ export function Risk() {
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Actions table</h2>
           <div className="table-wrap" style={{ marginBottom: '1rem' }}>
-            {actionRows.length === 0 ? (
-              <p className="table-empty">No active risk actions.</p>
+            {actions.length === 0 ? (
+              <p className="table-empty">No actions yet.</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
                     <th>Supplier</th>
-                    <th>Risk description</th>
-                    <th>Risk level</th>
-                    <th>Recommended action</th>
+                    <th>Risk</th>
+                    <th>Description</th>
+                    <th>Risk Level</th>
+                    <th>Action</th>
                     <th>Owner</th>
-                    <th>Due date</th>
+                    <th>Due Date</th>
                     <th>Status</th>
-                    <th>Trend</th>
+                    <th>Residual Likelihood</th>
+                    <th>Residual Severity</th>
+                    <th>Residual Risk Level</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {actionRows.map((row) => (
-                    <tr key={`action-${row.id}`}>
-                      <td>{row.supplier.code} — {row.supplier.name}</td>
+                  {actions.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.supplier.code} - {row.supplier.name}</td>
+                      <td>{row.risk.code}</td>
+                      <td>{row.risk.description}</td>
+                      <td>{row.risk.riskLevel ?? 'TBD'}</td>
                       <td>{row.description}</td>
-                      <td>{row.riskLevel ?? 'TBD'}</td>
-                      <td>{row.actionText}</td>
-                      <td>{row.createdBy?.name || row.createdBy?.email || 'Buyer / QE'}</td>
-                      <td>{row.dueDate}</td>
+                      <td>{row.owner || row.createdBy?.name || row.createdBy?.email || 'Unassigned'}</td>
+                      <td>{row.dueDate ? new Date(row.dueDate).toLocaleDateString() : '—'}</td>
                       <td>{row.status}</td>
-                      <td>{row.trend === null ? 'N/A' : `${row.trend > 0 ? '+' : ''}${row.trend}%`}</td>
+                      <td>{row.residualLikelihood ?? '—'}</td>
+                      <td>{row.residualSeverity ?? '—'}</td>
+                      <td>{row.residualRiskLevel ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -689,6 +674,7 @@ export function Risk() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th>ID</th>
                     <th>Supplier</th>
                     <th>Type</th>
                     <th>Description</th>
@@ -703,9 +689,8 @@ export function Risk() {
                 <tbody>
                   {items.map((row) => (
                     <tr key={row.id}>
-                      <td>
-                        {row.supplier.code} — {row.supplier.name}
-                      </td>
+                      <td>{row.code}</td>
+                      <td>{row.supplier.code} - {row.supplier.name}</td>
                       <td>{row.type}</td>
                       <td>{row.description}</td>
                       <td>{row.likelihood ?? '—'}</td>
@@ -752,14 +737,14 @@ export function Risk() {
               <input className="input" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
               {editType === 'risk' ? (
                 <>
-                  <select className="input" value={editLikelihood} onChange={(e) => setEditLikelihood(e.target.value as 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely')}>
+                  <select className="input" value={editLikelihood} onChange={(e) => setEditLikelihood(e.target.value as RiskLikelihood)}>
                     <option value="VeryUnlikely">Very Unlikely</option>
                     <option value="Unlikely">Unlikely</option>
                     <option value="Possible">Possible</option>
                     <option value="Likely">Likely</option>
                     <option value="VeryLikely">Very Likely</option>
                   </select>
-                  <select className="input" value={editSeverity} onChange={(e) => setEditSeverity(e.target.value as 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe')}>
+                  <select className="input" value={editSeverity} onChange={(e) => setEditSeverity(e.target.value as RiskSeverity)}>
                     <option value="Negligible">Negligible</option>
                     <option value="Minor">Minor</option>
                     <option value="Moderate">Moderate</option>
@@ -781,7 +766,7 @@ export function Risk() {
                 <option value="Closed">Closed</option>
               </select>
               <button className="btn btn-primary" type="button" onClick={saveEdit} disabled={saving}>
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? 'Saving...' : 'Save'}
               </button>
               <button className="btn btn-ghost" type="button" onClick={closeEditModal} disabled={saving}>
                 Cancel

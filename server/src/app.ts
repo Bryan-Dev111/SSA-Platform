@@ -32,6 +32,7 @@ import documentsRoutes from './routes/documents';
 import internalDocsRoutes from './routes/internal-docs';
 import opportunitiesRoutes from './routes/opportunities';
 import riskSnapshotsRoutes from './routes/risk-snapshots';
+import riskActionsRoutes from './routes/risk-actions';
 import dashboardRoutes from './routes/dashboard';
 import alertsRoutes from './routes/alerts';
 import { errorHandler } from './middleware/errorHandler';
@@ -67,6 +68,7 @@ app.use('/documents', documentsRoutes);
 app.use('/internal-docs', internalDocsRoutes);
 app.use('/opportunities', opportunitiesRoutes);
 app.use('/risk-snapshots', riskSnapshotsRoutes);
+app.use('/risk-actions', riskActionsRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/alerts', alertsRoutes);
 

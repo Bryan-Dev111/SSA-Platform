@@ -10,6 +10,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { getNextCode } from '../services/idGenerator';
 
 const router = Router();
 
@@ -120,6 +121,7 @@ router.post(
     }
     const created = await prisma.opportunity.create({
       data: {
+        code: type === 'risk' ? await getNextCode('RISK', 4) : await getNextCode('OPP', 4),
         supplierId,
         type,
         description,
