@@ -71,6 +71,7 @@ function main() {
     .readdirSync(migrationsRoot, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
+    .filter((name) => fs.existsSync(path.join(migrationsRoot, name, 'migration.sql')))
     .sort();
 
   console.log(`Marking ${names.length} migration(s) as already applied…\n`);
