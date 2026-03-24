@@ -1,7 +1,6 @@
 /**
- * Findings Record: form (Supplier, Audit #, Severity, Summary, Defect Code, Discrepancy,
- * Containment, Occurrence/Escape Root Cause, Corrective Action, VOE, Closing Comments);
- * approval/status history; workflow buttons Save and Process.
+ * Findings Record: identify issue (Summary, Discrepancy, Disposition after create, Closing Comments).
+ * Header layout aligned with CAR record; workflow Save / Process / Reverse / Approve / Reject.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Navigate, Link } from 'react-router-dom';
@@ -69,6 +68,18 @@ function isFindingNotFoundErrorMessage(message: string): boolean {
   );
 }
 
+function formStateFromFinding(f: Finding) {
+  return {
+    supplierId: f.supplierId,
+    auditId: f.auditId ?? '',
+    severity: f.severity,
+    summary: f.summary,
+    discrepancy: f.discrepancy,
+    dispositionCode: f.dispositionCode ?? '',
+    closingComments: f.closingComments ?? '',
+  };
+}
+
 export function FindingsRecord() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -87,12 +98,7 @@ export function FindingsRecord() {
     severity: 'Major' as string,
     summary: '',
     discrepancy: '',
-    defectCode: '',
-    containment: '',
-    occurrenceRootCause: '',
-    escapeRootCause: '',
-    correctiveAction: '',
-    verificationOfEffectiveness: '',
+    dispositionCode: '',
     closingComments: '',
   });
   const [saving, setSaving] = useState(false);
@@ -101,12 +107,13 @@ export function FindingsRecord() {
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
-  const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
+  const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
-  const isNewLike = finding?.status === 'New' || finding?.status === 'DRAFT';
-  const canEdit = !!finding && isNewLike && canEditDraft;
-  const canSave = !!finding && isNewLike && canEditDraft;
+  const isEditableFindingStatus =
+    !!finding && ['New', 'DRAFT', 'WaitingDisposition'].includes(finding.status);
+  const canEdit = isEditableFindingStatus && canEditDraft;
+  const canSave = canEdit;
   const canProcess = canEditDraft && !!finding && (finding.status === 'New' || finding.status === 'DRAFT' || finding.status === 'WaitingDisposition');
   const canReverse = canEditDraft && !!finding && finding.status !== 'New' && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
   const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
@@ -120,12 +127,7 @@ export function FindingsRecord() {
       severity: 'Major',
       summary: '',
       discrepancy: '',
-      defectCode: '',
-      containment: '',
-      occurrenceRootCause: '',
-      escapeRootCause: '',
-      correctiveAction: '',
-      verificationOfEffectiveness: '',
+      dispositionCode: '',
       closingComments: '',
     });
   };
@@ -184,20 +186,7 @@ export function FindingsRecord() {
       .then((f) => {
         if (!isActive()) return;
         setFinding(f);
-        setForm({
-          supplierId: f.supplierId,
-          auditId: f.auditId ?? '',
-          severity: f.severity,
-          summary: f.summary,
-          discrepancy: f.discrepancy,
-          defectCode: f.defectCode ?? '',
-          containment: f.containment ?? '',
-          occurrenceRootCause: f.occurrenceRootCause ?? '',
-          escapeRootCause: f.escapeRootCause ?? '',
-          correctiveAction: f.correctiveAction ?? '',
-          verificationOfEffectiveness: f.verificationOfEffectiveness ?? '',
-          closingComments: f.closingComments ?? '',
-        });
+        setForm(formStateFromFinding(f));
       })
       .catch((e) => {
         if (!isActive()) return;
@@ -223,36 +212,35 @@ export function FindingsRecord() {
 
   useEffect(() => {
     if (!token) return;
-    apiJson<{ list: ReferenceCodeOption[] }>('/defect-codes', { token })
-      .then((r) => setDefectCodeOptions(r.list))
-      .catch(() => setDefectCodeOptions([]));
+    apiJson<{ list: ReferenceCodeOption[] }>('/disposition-codes', { token })
+      .then((r) => setDispositionCodeOptions(r.list))
+      .catch(() => setDispositionCodeOptions([]));
   }, [token]);
 
   const handleSave = async () => {
     if (!token || !finding) return;
     setActioning(true);
     try {
-      await apiJson<Finding>(`/findings/${finding.id}`, {
+      const patched = await apiJson<Finding>(`/findings/${finding.id}`, {
         token,
         method: 'PATCH',
         body: JSON.stringify({
           severity: form.severity,
           summary: form.summary,
           discrepancy: form.discrepancy,
-          defectCode: form.defectCode || null,
-          containment: form.containment || null,
-          occurrenceRootCause: form.occurrenceRootCause || null,
-          escapeRootCause: form.escapeRootCause || null,
-          correctiveAction: form.correctiveAction || null,
-          verificationOfEffectiveness: form.verificationOfEffectiveness || null,
-          closingComments: form.closingComments || null,
+          dispositionCode: form.dispositionCode.trim() || null,
+          closingComments: form.closingComments.trim() || null,
         }),
       });
-      const updated = await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' });
+      /** POST /save only applies to New/DRAFT (assigns FIN code). WaitingDisposition etc. use PATCH only. */
+      const updated =
+        finding.status === 'New' || finding.status === 'DRAFT'
+          ? await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' })
+          : patched;
       setFinding(updated);
+      setForm(formStateFromFinding(updated));
       setError(null);
       toast.info('Finding saved');
-      // Ensure the record is addressable and reloadable after save/refresh.
       navigate(`/findings-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
@@ -267,6 +255,7 @@ export function FindingsRecord() {
     try {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/process`, { token, method: 'POST' });
       setFinding(updated);
+      setForm(formStateFromFinding(updated));
       setError(null);
       toast.info('Process successful');
     } catch (e) {
@@ -282,6 +271,7 @@ export function FindingsRecord() {
     try {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reverse`, { token, method: 'POST' });
       setFinding(updated);
+      setForm(formStateFromFinding(updated));
       setError(null);
       toast.info('Reverse successful');
     } catch (e) {
@@ -297,6 +287,7 @@ export function FindingsRecord() {
     try {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/approve`, { token, method: 'POST' });
       setFinding(updated);
+      setForm(formStateFromFinding(updated));
       setError(null);
       toast.info('Approved');
     } catch (e) {
@@ -312,6 +303,7 @@ export function FindingsRecord() {
     try {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reject`, { token, method: 'POST' });
       setFinding(updated);
+      setForm(formStateFromFinding(updated));
       setError(null);
       toast.info('Rejected');
     } catch (e) {
@@ -335,18 +327,10 @@ export function FindingsRecord() {
           severity: form.severity,
           summary: form.summary.trim(),
           discrepancy: form.discrepancy.trim(),
-          defectCode: form.defectCode.trim() || null,
-          dispositionCode: null,
-          containment: form.containment.trim() || null,
-          occurrenceRootCause: form.occurrenceRootCause.trim() || null,
-          escapeRootCause: form.escapeRootCause.trim() || null,
-          correctiveAction: form.correctiveAction.trim() || null,
-          verificationOfEffectiveness: form.verificationOfEffectiveness.trim() || null,
-          closingComments: form.closingComments.trim() || null,
         }),
       });
       setFinding(created);
-      resetCreateForm();
+      setForm(formStateFromFinding(created));
       setError(null);
       toast.success('Finding created');
       // Move to a stable URL so refresh/navigation keeps showing the saved record.
@@ -375,20 +359,7 @@ export function FindingsRecord() {
       const found = await fetchFindingByQuery(q);
       if (!isActive()) return;
       setFinding(found);
-      setForm({
-        supplierId: found.supplierId,
-        auditId: found.auditId ?? '',
-        severity: found.severity,
-        summary: found.summary,
-        discrepancy: found.discrepancy,
-        defectCode: found.defectCode ?? '',
-        containment: found.containment ?? '',
-        occurrenceRootCause: found.occurrenceRootCause ?? '',
-        escapeRootCause: found.escapeRootCause ?? '',
-        correctiveAction: found.correctiveAction ?? '',
-        verificationOfEffectiveness: found.verificationOfEffectiveness ?? '',
-        closingComments: found.closingComments ?? '',
-      });
+      setForm(formStateFromFinding(found));
     } catch (err) {
       if (!isActive()) return;
       setFinding(null);
@@ -523,18 +494,14 @@ export function FindingsRecord() {
               </div>
               <div className="input-group">
                 <label className="input-label">Summary *</label>
+                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Brief description of the issue</p>
                 <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} required />
               </div>
               <div className="input-group">
                 <label className="input-label">Discrepancy *</label>
+                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} required />
               </div>
-              <ReferenceCodeSelect
-                label="Defect Code"
-                value={form.defectCode}
-                onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
-                options={defectCodeOptions}
-              />
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
@@ -547,22 +514,28 @@ export function FindingsRecord() {
             <div className="card-body">
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(220px, 1fr) minmax(180px, 0.9fr) minmax(160px, 0.8fr) auto',
-                  gap: '1rem',
-                  alignItems: 'end',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem 1rem',
+                  alignItems: 'flex-end',
                 }}
               >
-                <div className="input-group" style={{ marginBottom: 0 }}>
+                <div className="input-group" style={{ marginBottom: 0, flex: '0 1 8.5rem', minWidth: '7rem' }}>
+                  <label className="input-label">Finding #</label>
+                  <input className="input" value={finding.code} readOnly disabled />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0, flex: '1 1 12rem', minWidth: '10rem' }}>
                   <label className="input-label">Supplier</label>
                   <input
                     className="input"
                     value={finding.supplier ? `${finding.supplier.code} — ${finding.supplier.name}` : ''}
                     readOnly
                     disabled
+                    title={finding.supplier ? `${finding.supplier.code} — ${finding.supplier.name}` : undefined}
                   />
                 </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
+                <div className="input-group" style={{ marginBottom: 0, flex: '0 1 7rem', minWidth: '6rem' }}>
                   <label className="input-label">Audit #</label>
                   {finding.audit?.code ? (
                     <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
@@ -572,7 +545,7 @@ export function FindingsRecord() {
                     <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
                   )}
                 </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
+                <div className="input-group" style={{ marginBottom: 0, flex: '0 1 8rem', minWidth: '7rem' }}>
                   <label className="input-label">Severity</label>
                   <select
                     className="input"
@@ -585,76 +558,66 @@ export function FindingsRecord() {
                     ))}
                   </select>
                 </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '0.5rem' }}>
-                    {canSave && (
-                      <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                        {actioning ? 'Saving…' : 'Save'}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem',
+                    alignItems: 'center',
+                    flex: '0 0 auto',
+                    marginLeft: 'auto',
+                  }}
+                >
+                  {canSave && (
+                    <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
+                      {actioning ? 'Saving…' : 'Save'}
+                    </button>
+                  )}
+                  {canProcess && (
+                    <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
+                      Process
+                    </button>
+                  )}
+                  {canReverse && (
+                    <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
+                      Reverse
+                    </button>
+                  )}
+                  {canApproveReject && (
+                    <>
+                      <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
+                        Approve
                       </button>
-                    )}
-                    {canProcess && (
-                      <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
-                        Process
+                      <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
+                        Reject
                       </button>
-                    )}
-                    {canReverse && (
-                      <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
-                        Reverse
-                      </button>
-                    )}
-                    {canApproveReject && (
-                      <>
-                        <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
-                          Approve
-                        </button>
-                        <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
-                          Reject
-                        </button>
-                      </>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="input-group">
+
+              <div className="input-group" style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
                 <label className="input-label">Summary</label>
+                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Brief description of the issue</p>
                 <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} disabled={!canEdit} />
               </div>
-              <ReferenceCodeSelect
-                label="Defect Code"
-                value={form.defectCode}
-                onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
-                options={defectCodeOptions}
-                disabled={!canEdit}
-              />
               <div className="input-group">
                 <label className="input-label">Discrepancy</label>
+                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} disabled={!canEdit} />
               </div>
-              <div className="input-group">
-                <label className="input-label">Containment</label>
-                <textarea className="input" rows={2} value={form.containment} onChange={(e) => setForm((p) => ({ ...p, containment: e.target.value }))} disabled={!canEdit} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Occurrence Root Cause</label>
-                <textarea className="input" rows={2} value={form.occurrenceRootCause} onChange={(e) => setForm((p) => ({ ...p, occurrenceRootCause: e.target.value }))} disabled={!canEdit} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Escape Root Cause</label>
-                <textarea className="input" rows={2} value={form.escapeRootCause} onChange={(e) => setForm((p) => ({ ...p, escapeRootCause: e.target.value }))} disabled={!canEdit} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Corrective Action</label>
-                <textarea className="input" rows={2} value={form.correctiveAction} onChange={(e) => setForm((p) => ({ ...p, correctiveAction: e.target.value }))} disabled={!canEdit} />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Verification of Effectiveness</label>
-                <textarea className="input" rows={2} value={form.verificationOfEffectiveness} onChange={(e) => setForm((p) => ({ ...p, verificationOfEffectiveness: e.target.value }))} disabled={!canEdit} />
-              </div>
+              <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Decision or action taken</p>
+              <ReferenceCodeSelect
+                label="Disposition"
+                value={form.dispositionCode}
+                onChange={(v) => setForm((p) => ({ ...p, dispositionCode: v }))}
+                options={dispositionCodeOptions}
+                disabled={!canEdit}
+              />
               <div className="input-group">
                 <label className="input-label">Closing Comments</label>
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
               </div>
-
             </div>
           </div>
 

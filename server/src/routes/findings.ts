@@ -278,8 +278,8 @@ router.patch(
       res.status(404).json({ error: 'Finding not found' });
       return;
     }
-    if (!['New', 'DRAFT'].includes(existing.status)) {
-      res.status(400).json({ error: 'Only New findings can be updated via PATCH' });
+    if (!['New', 'DRAFT', 'WaitingDisposition'].includes(existing.status)) {
+      res.status(400).json({ error: 'This finding cannot be updated in its current status' });
       return;
     }
     const body = req.body as Record<string, unknown>;
@@ -287,31 +287,13 @@ router.patch(
       severity?: FindingSeverity;
       summary?: string;
       discrepancy?: string;
-      defectCode?: string | null;
       dispositionCode?: string | null;
-      containment?: string | null;
-      occurrenceRootCause?: string | null;
-      escapeRootCause?: string | null;
-      correctiveAction?: string | null;
-      verificationOfEffectiveness?: string | null;
       closingComments?: string | null;
     } = {};
-    const allowed = [
-      'summary',
-      'discrepancy',
-      'defectCode',
-      'dispositionCode',
-      'containment',
-      'occurrenceRootCause',
-      'escapeRootCause',
-      'correctiveAction',
-      'verificationOfEffectiveness',
-      'closingComments',
-    ] as const;
+    const allowed = ['summary', 'discrepancy', 'dispositionCode', 'closingComments'] as const;
     for (const k of allowed) {
       if (body[k] !== undefined) (data as Record<string, unknown>)[k] = typeof body[k] === 'string' ? body[k].trim() : body[k];
     }
-    if (data.defectCode === '') data.defectCode = null;
     if (data.dispositionCode === '') data.dispositionCode = null;
     if (body.severity !== undefined) {
       if (!['Critical', 'Major', 'Minor'].includes(body.severity as string)) {
