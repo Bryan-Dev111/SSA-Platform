@@ -88,7 +88,6 @@ export function FindingsRecord() {
     summary: '',
     discrepancy: '',
     defectCode: '',
-    dispositionCode: '',
     containment: '',
     occurrenceRootCause: '',
     escapeRootCause: '',
@@ -103,7 +102,6 @@ export function FindingsRecord() {
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
-  const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
   const isNewLike = finding?.status === 'New' || finding?.status === 'DRAFT';
@@ -123,7 +121,6 @@ export function FindingsRecord() {
       summary: '',
       discrepancy: '',
       defectCode: '',
-      dispositionCode: '',
       containment: '',
       occurrenceRootCause: '',
       escapeRootCause: '',
@@ -194,7 +191,6 @@ export function FindingsRecord() {
           summary: f.summary,
           discrepancy: f.discrepancy,
           defectCode: f.defectCode ?? '',
-          dispositionCode: f.dispositionCode ?? '',
           containment: f.containment ?? '',
           occurrenceRootCause: f.occurrenceRootCause ?? '',
           escapeRootCause: f.escapeRootCause ?? '',
@@ -230,9 +226,6 @@ export function FindingsRecord() {
     apiJson<{ list: ReferenceCodeOption[] }>('/defect-codes', { token })
       .then((r) => setDefectCodeOptions(r.list))
       .catch(() => setDefectCodeOptions([]));
-    apiJson<{ list: ReferenceCodeOption[] }>('/disposition-codes', { token })
-      .then((r) => setDispositionCodeOptions(r.list))
-      .catch(() => setDispositionCodeOptions([]));
   }, [token]);
 
   const handleSave = async () => {
@@ -247,7 +240,6 @@ export function FindingsRecord() {
           summary: form.summary,
           discrepancy: form.discrepancy,
           defectCode: form.defectCode || null,
-          dispositionCode: form.dispositionCode || null,
           containment: form.containment || null,
           occurrenceRootCause: form.occurrenceRootCause || null,
           escapeRootCause: form.escapeRootCause || null,
@@ -344,7 +336,7 @@ export function FindingsRecord() {
           summary: form.summary.trim(),
           discrepancy: form.discrepancy.trim(),
           defectCode: form.defectCode.trim() || null,
-          dispositionCode: form.dispositionCode.trim() || null,
+          dispositionCode: null,
           containment: form.containment.trim() || null,
           occurrenceRootCause: form.occurrenceRootCause.trim() || null,
           escapeRootCause: form.escapeRootCause.trim() || null,
@@ -390,7 +382,6 @@ export function FindingsRecord() {
         summary: found.summary,
         discrepancy: found.discrepancy,
         defectCode: found.defectCode ?? '',
-        dispositionCode: found.dispositionCode ?? '',
         containment: found.containment ?? '',
         occurrenceRootCause: found.occurrenceRootCause ?? '',
         escapeRootCause: found.escapeRootCause ?? '',
@@ -544,12 +535,6 @@ export function FindingsRecord() {
                 onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
                 options={defectCodeOptions}
               />
-              <ReferenceCodeSelect
-                label="Disposition Code"
-                value={form.dispositionCode}
-                onChange={(v) => setForm((p) => ({ ...p, dispositionCode: v }))}
-                options={dispositionCodeOptions}
-              />
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </form>
           </div>
@@ -639,13 +624,6 @@ export function FindingsRecord() {
                 value={form.defectCode}
                 onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
                 options={defectCodeOptions}
-                disabled={!canEdit}
-              />
-              <ReferenceCodeSelect
-                label="Disposition Code"
-                value={form.dispositionCode}
-                onChange={(v) => setForm((p) => ({ ...p, dispositionCode: v }))}
-                options={dispositionCodeOptions}
                 disabled={!canEdit}
               />
               <div className="input-group">
