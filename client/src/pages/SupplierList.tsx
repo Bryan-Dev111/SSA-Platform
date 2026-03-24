@@ -99,11 +99,11 @@ export function SupplierList() {
               <tr>
                 <th>Code</th>
                 <th>Name</th>
-                <th>Status</th>
                 <th>City</th>
                 <th>Country</th>
                 <th>Risk level</th>
                 <th>Commodity</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -118,6 +118,14 @@ export function SupplierList() {
                   <tr key={s.id}>
                     <td><strong>{s.code}</strong></td>
                     <td>{s.name}</td>
+                    <td>{s.city ?? '—'}</td>
+                    <td>{s.country ?? '—'}</td>
+                    <td>
+                      {riskBySupplierId[s.id]
+                        ? `${riskBySupplierId[s.id].level} (${riskBySupplierId[s.id].score})`
+                        : '—'}
+                    </td>
+                    <td>{s.commodityType?.name ?? '—'}</td>
                     <td>
                       <span
                         className={supplierStatusLabel(s.status) === 'Inactive' ? 'audit-status-badge audit-status-badge--cancelled' : 'audit-status-badge audit-status-badge--complete'}
@@ -127,14 +135,6 @@ export function SupplierList() {
                         {supplierStatusLabel(s.status)}
                       </span>
                     </td>
-                    <td>{s.city ?? '—'}</td>
-                    <td>{s.country ?? '—'}</td>
-                    <td>
-                      {riskBySupplierId[s.id]
-                        ? `${riskBySupplierId[s.id].level} (${riskBySupplierId[s.id].score})`
-                        : '—'}
-                    </td>
-                    <td>{s.commodityType?.name ?? '—'}</td>
                   </tr>
                 ))
               )}
