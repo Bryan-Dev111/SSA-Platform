@@ -33,6 +33,26 @@ function run(cmd: string) {
   execSync(cmd, { stdio: 'inherit', cwd: serverRoot, env: process.env, shell: process.platform === 'win32' });
 }
 
+function resolveAppliedAllowDuplicates(migrationName: string) {
+  try {
+    execSync(`npx prisma migrate resolve --applied "${migrationName}"`, {
+      cwd: serverRoot,
+      env: process.env,
+      shell: process.platform === 'win32',
+      encoding: 'utf-8',
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+  } catch (e: unknown) {
+    const err = e as { stderr?: Buffer; message?: string };
+    const errText = `${err.message ?? ''}\n${err.stderr?.toString?.() ?? ''}`;
+    if (/already (been )?applied|already recorded|P3008|P3014/i.test(errText)) {
+      console.log(`  (already applied — skip)`);
+      return;
+    }
+    throw e;
+  }
+}
+
 function main() {
   const resolveOnly = process.argv.includes('--resolve-only');
 
@@ -77,7 +97,7 @@ function main() {
   console.log(`Marking ${names.length} migration(s) as already applied…\n`);
   for (const name of names) {
     console.log(`  resolve --applied ${name}`);
-    run(`npx prisma migrate resolve --applied "${name}"`);
+    resolveAppliedAllowDuplicates(name);
   }
 
   console.log('\nRunning prisma migrate deploy…\n');
