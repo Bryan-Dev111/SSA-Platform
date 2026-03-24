@@ -31,13 +31,10 @@ function supplierStatusLabel(status: string | undefined): string {
 }
 
 /**
- * Clamp panning to a single world copy. Do not use TileLayer `noWrap`: it causes invalid tile requests (negative x)
- * and OSM returns 400. maxBounds + viscosity is enough to stop “infinite” horizontal panning.
+ * Suppliers Map — pan limits: maxBounds + worldCopyJump off, TileLayer bounds (no noWrap: avoids OSM 400 on invalid x).
+ * Map fills the card: full width × fixed height inside .suppliers-map-frame.
  */
-const WORLD_BOUNDS: [[number, number], [number, number]] = [
-  [-85, -180],
-  [85, 180],
-];
+const WORLD_BOUNDS = L.latLngBounds([-85, -180], [85, 180]);
 
 export function SuppliersMap() {
   const { token } = useAuth();
@@ -187,15 +184,19 @@ export function SuppliersMap() {
             <MapContainer
               center={mapCenter}
               zoom={markerPins.length > 0 ? 2 : 1}
-              style={{ height: 460, width: '100%', borderRadius: 10 }}
+              style={{ height: 460, width: '100%', minHeight: 460, borderRadius: 10 }}
               scrollWheelZoom
               maxBounds={WORLD_BOUNDS}
               maxBoundsViscosity={1}
+              worldCopyJump={false}
+              inertia={false}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                bounds={WORLD_BOUNDS}
               />
+              <MapLockSingleWorld />
               <MapFitBounds points={markerPositions} />
               {markerPins.map((pin) => (
                 <CircleMarker
@@ -335,6 +336,19 @@ function riskColorHex(color: RiskColor): string {
   if (color === 'yellow') return '#eab308';
   if (color === 'green') return '#22c55e';
   return '#94a3b8';
+}
+
+/** Hard-apply Leaflet options so the map does not jump to wrapped world copies or loosen bounds. */
+function MapLockSingleWorld() {
+  const map = useMap();
+  useEffect(() => {
+    map.setMaxBounds(WORLD_BOUNDS);
+    map.options.maxBounds = WORLD_BOUNDS;
+    map.options.maxBoundsViscosity = 1;
+    map.options.worldCopyJump = false;
+    map.options.inertia = false;
+  }, [map]);
+  return null;
 }
 
 function MapFitBounds({ points }: { points: [number, number][] }) {

@@ -1118,9 +1118,14 @@ body.sidebar-open {
 /* ----- Suppliers map — pin tooltip & click callout ----- */
 .suppliers-map-frame {
   position: relative;
+  width: 100%;
+  overflow: hidden;
 }
 
 .suppliers-map-frame .leaflet-container {
+  width: 100% !important;
+  max-width: 100%;
+  min-height: 460px;
   background: var(--color-border-subtle);
 }
 
