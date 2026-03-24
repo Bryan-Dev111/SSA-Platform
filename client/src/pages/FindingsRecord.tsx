@@ -88,9 +88,13 @@ export function FindingsRecord() {
   const [searchParams] = useSearchParams();
   const idParam = searchParams.get('id');
   const codeParam = searchParams.get('findingId');
+  /** Deep link from Audits: audit code (e.g. AUD-00029) or audit row id; optional supplier UUID */
+  const auditSeedParam = searchParams.get('auditId');
+  const supplierSeedParam = searchParams.get('supplierId');
   const [finding, setFinding] = useState<Finding | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
+  const [auditsHydrated, setAuditsHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -109,6 +113,8 @@ export function FindingsRecord() {
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
   const activeLoadIdRef = useRef(0);
+  const prefillFromAuditDoneRef = useRef(false);
+  const prefillInvalidAuditToastRef = useRef(false);
   const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
@@ -208,11 +214,73 @@ export function FindingsRecord() {
   }, [token, idParam, codeParam]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setAuditsHydrated(false);
+      return;
+    }
+    setAuditsHydrated(false);
     apiJson<AuditOption[]>('/audits', { token })
       .then((list) => setAudits(list))
-      .catch(() => setAudits([]));
+      .catch(() => setAudits([]))
+      .finally(() => setAuditsHydrated(true));
   }, [token]);
+
+  /** Pre-fill create form from /findings/create?auditId=AUD-…&supplierId=… (from Audits row) */
+  useEffect(() => {
+    if (prefillFromAuditDoneRef.current) return;
+    if (!token) return;
+    if (finding || idParam || codeParam || searchMissNoCreate) return;
+    const seedAudit = auditSeedParam?.trim() ?? '';
+    const seedSupplier = supplierSeedParam?.trim() ?? '';
+    if (!seedAudit && !seedSupplier) return;
+
+    if (seedAudit && !auditsHydrated) return;
+
+    let nextAuditId = '';
+    let nextSupplierId = '';
+
+    if (seedAudit) {
+      const byId = audits.find((x) => x.id === seedAudit);
+      const byCode = audits.find((x) => x.code.toUpperCase() === seedAudit.toUpperCase());
+      const match = byId ?? byCode;
+      if (match) {
+        nextAuditId = match.id;
+        nextSupplierId = match.supplierId;
+      } else {
+        if (!prefillInvalidAuditToastRef.current) {
+          prefillInvalidAuditToastRef.current = true;
+          toast.info('Could not find that audit in your scope; choose supplier and audit on the form if needed.');
+        }
+        prefillFromAuditDoneRef.current = true;
+        if (seedSupplier) {
+          setForm((p) => ({ ...p, supplierId: seedSupplier, auditId: '' }));
+        }
+        return;
+      }
+    } else if (seedSupplier) {
+      nextSupplierId = seedSupplier;
+    }
+
+    if (!nextAuditId && !nextSupplierId) return;
+
+    prefillFromAuditDoneRef.current = true;
+    setForm((p) => ({
+      ...p,
+      supplierId: nextSupplierId || p.supplierId,
+      auditId: nextAuditId || p.auditId,
+    }));
+  }, [
+    token,
+    finding,
+    idParam,
+    codeParam,
+    searchMissNoCreate,
+    auditSeedParam,
+    supplierSeedParam,
+    audits,
+    auditsHydrated,
+    toast,
+  ]);
 
   useEffect(() => {
     if (!token) return;
@@ -386,6 +454,8 @@ export function FindingsRecord() {
   };
 
   const handleStartCreateFinding = () => {
+    prefillFromAuditDoneRef.current = false;
+    prefillInvalidAuditToastRef.current = false;
     setFinding(null);
     setError(null);
     setSearching(false);

@@ -76,6 +76,7 @@ export function Audits() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const roleNames = user?.roleNames ?? [];
   const isAdmin = roleNames.includes('Admin');
+  const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
   const canSetResultForAudit = (audit: Audit): boolean => {
     if (roleNames.includes('Admin') || roleNames.includes('QualityEngineer')) return true;
     if (!roleNames.includes('Auditor')) return false;
@@ -339,9 +340,11 @@ export function Audits() {
                       )}
                     </td>
                     <td>
-                      {a.findingCodes.length === 0
-                        ? '—'
-                        : a.findingCodes.map((code) => (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                        {a.findingCodes.length === 0 ? (
+                          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>—</span>
+                        ) : (
+                          a.findingCodes.map((code) => (
                             <Link
                               key={code}
                               to={`/findings-record?findingId=${encodeURIComponent(code)}`}
@@ -351,7 +354,20 @@ export function Audits() {
                             >
                               {code}
                             </Link>
-                          ))}
+                          ))
+                        )}
+                        {canCreateFinding && (
+                          <Link
+                            to={`/findings/create?auditId=${encodeURIComponent(a.code)}&supplierId=${encodeURIComponent(a.supplierId)}`}
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            + New Finding
+                          </Link>
+                        )}
+                      </div>
                     </td>
                     <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.notes ?? ''}>
                       {a.notes ?? '—'}

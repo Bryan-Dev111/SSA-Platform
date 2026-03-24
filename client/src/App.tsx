@@ -53,6 +53,7 @@ function App() {
             <Route path="corrective-actions" element={<ProtectedRoute path="/corrective-actions"><CorrectiveActions /></ProtectedRoute>} />
             <Route path="car-record" element={<ProtectedRoute path="/car-record"><CARRecord /></ProtectedRoute>} />
             <Route path="findings" element={<ProtectedRoute path="/findings"><Findings /></ProtectedRoute>} />
+            <Route path="findings/create" element={<ProtectedRoute path="/findings/create"><FindingsRecord /></ProtectedRoute>} />
             <Route path="findings-record" element={<ProtectedRoute path="/findings-record"><FindingsRecord /></ProtectedRoute>} />
             <Route path="audits" element={<ProtectedRoute path="/audits"><Audits /></ProtectedRoute>} />
             <Route path="audit-record" element={<ProtectedRoute path="/audits"><AuditRecord /></ProtectedRoute>} />
