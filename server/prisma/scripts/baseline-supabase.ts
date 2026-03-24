@@ -18,7 +18,7 @@ import 'dotenv/config';
  *
  * Usage (from server/):  npm run db:baseline-supabase
  */
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,23 +34,23 @@ function run(cmd: string) {
 }
 
 function resolveAppliedAllowDuplicates(migrationName: string) {
-  try {
-    execSync(`npx prisma migrate resolve --applied "${migrationName}"`, {
-      cwd: serverRoot,
-      env: process.env,
-      shell: process.platform === 'win32',
-      encoding: 'utf-8',
-      stdio: ['inherit', 'pipe', 'pipe'],
-    });
-  } catch (e: unknown) {
-    const err = e as { stderr?: Buffer; message?: string };
-    const errText = `${err.message ?? ''}\n${err.stderr?.toString?.() ?? ''}`;
-    if (/already (been )?applied|already recorded|P3008|P3014/i.test(errText)) {
-      console.log(`  (already applied — skip)`);
-      return;
-    }
-    throw e;
+  const r = spawnSync('npx', ['prisma', 'migrate', 'resolve', '--applied', migrationName], {
+    cwd: serverRoot,
+    env: process.env,
+    shell: process.platform === 'win32',
+    encoding: 'utf-8',
+  });
+  const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+  if (r.status === 0) {
+    if (out.trim()) console.log(out.trimEnd());
+    return;
   }
+  if (/already (been )?applied|already recorded|P3008|P3014|No migration found to resolve/i.test(out)) {
+    console.log(`  (already applied — skip)`);
+    return;
+  }
+  console.error(out);
+  process.exit(r.status ?? 1);
 }
 
 function main() {
