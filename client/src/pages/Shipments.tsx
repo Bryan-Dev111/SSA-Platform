@@ -1,7 +1,7 @@
 /**
  * Day 10: Inspection requests + Admin schedule; metrics (OTD, FPY); Admin/QE record Passed/Failed.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -23,6 +23,7 @@ interface ShipmentRow {
   status: string;
   result: string | null;
   supplier: { id: string; code: string; name: string };
+  createdAt?: string;
 }
 
 interface ScheduleRow {
@@ -57,6 +58,8 @@ export function Shipments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'supplier' | 'date' | 'status' | 'inspectionDate'>('inspectionDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
@@ -85,6 +88,36 @@ export function Shipments() {
       })
       .catch((e) => setError(parseApiError(e)));
   };
+
+  const sortedShipments = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const getValue = (r: ShipmentRow): string | number => {
+      switch (sortBy) {
+        case 'supplier':
+          return `${r.supplier.code} ${r.supplier.name}`;
+        case 'date':
+          return r.createdAt ? new Date(r.createdAt).getTime() : 0;
+        case 'status':
+          return r.status;
+        case 'inspectionDate':
+          return r.inspectionDate ? new Date(r.inspectionDate).getTime() : 0;
+      }
+    };
+    return [...shipments].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [shipments, sortBy, sortDir]);
+  const onSort = (key: typeof sortBy) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+  };
+  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '▲▼' : sortDir === 'asc' ? '↑' : '↓');
 
   useEffect(() => {
     if (!token) return;
@@ -259,20 +292,22 @@ export function Shipments() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Supplier</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('date')}>Date {sortIndicator('date')}</th>
                     <th>PO</th>
                     <th>Part #</th>
                     <th>Qty</th>
-                    <th>Inspection date</th>
-                    <th>Status</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('inspectionDate')}>Inspection date {sortIndicator('inspectionDate')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
                     <th>Result</th>
                     {canRecordResult ? <th>Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {shipments.map((r) => (
+                  {sortedShipments.map((r) => (
                     <tr key={r.id}>
                       <td>{r.supplier?.code ?? '—'}</td>
+                      <td>{r.createdAt?.slice(0, 10) ?? '—'}</td>
                       <td>{r.purchaseOrder ?? '—'}</td>
                       <td>{r.partNumber ?? '—'}</td>
                       <td>{r.qty ?? '—'}</td>

@@ -140,7 +140,7 @@ export function Findings() {
     }
     setPage(1);
   };
-  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '↕' : sortDir === 'asc' ? '↑' : '↓');
+  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '▲▼' : sortDir === 'asc' ? '↑' : '↓');
 
   const totalCount = sortedList.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));

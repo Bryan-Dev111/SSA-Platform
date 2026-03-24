@@ -1,7 +1,7 @@
 /**
  * Day 10: Records list (scoped); upload Supplier/Auditor/Buyer/Admin/QE; Admin/QE approve-reject; download.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -112,6 +112,8 @@ export function Records() {
   const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState<'name' | 'supplier' | 'status' | 'created'>('created');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
@@ -124,10 +126,41 @@ export function Records() {
     user?.roleNames?.includes('Auditor') ||
     user?.roleNames?.includes('Buyer');
 
-  const totalCount = rows.length;
+  const sortedRows = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const getValue = (r: RecordRow): string | number => {
+      switch (sortBy) {
+        case 'name':
+          return r.name;
+        case 'supplier':
+          return r.supplier?.code ?? '';
+        case 'status':
+          return getRecordReviewLabel(r.status);
+        case 'created':
+          return new Date(r.createdAt).getTime();
+      }
+    };
+    return [...rows].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [rows, sortBy, sortDir]);
+  const onSort = (key: typeof sortBy) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    setPage(1);
+  };
+  const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '▲▼' : sortDir === 'asc' ? '↑' : '↓');
+
+  const totalCount = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
-  const paginatedRows = rows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const paginatedRows = sortedRows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const load = () => {
     if (!token) return;
@@ -425,13 +458,13 @@ export function Records() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Supplier</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('name')}>Name {sortIndicator('name')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
                     <th>Audit</th>
-                    <th>Review</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
                     <th>File</th>
                     <th>Uploaded by</th>
-                    <th>Created</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>Created {sortIndicator('created')}</th>
                     {canReview ? <th>Review</th> : null}
                   </tr>
                 </thead>
