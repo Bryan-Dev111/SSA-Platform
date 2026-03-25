@@ -387,9 +387,9 @@ export function Audits() {
                       </td>
                     )}
                     <td>
-                      {a.records.length === 0
+                      {(a.records?.length ?? 0) === 0
                         ? '—'
-                        : a.records.map((r) => (
+                        : (a.records ?? []).map((r) => (
                             <button
                               key={r.id}
                               type="button"

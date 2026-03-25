@@ -214,11 +214,6 @@ router.patch(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canCreateOrEdit = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
-    if (!canCreateOrEdit) {
-      res.status(403).json({ error: 'Viewer and other roles are read-only for audits' });
-      return;
-    }
     const allowedIds = await getAllowedSupplierIds(req.user);
     const existing = await prisma.audit.findUnique({ where: { id: req.params.id } });
     if (!existing) {
@@ -236,6 +231,20 @@ router.patch(
       auditTypeId?: string | null;
       auditor?: string | null;
     };
+
+    const isAdminOrQe = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
+    if (!isAdminOrQe) {
+      // Auditors are allowed to submit only `result` for audits they are assigned to.
+      const triesToEditOtherFields =
+        auditDate !== undefined ||
+        notes !== undefined ||
+        auditTypeId !== undefined ||
+        auditor !== undefined;
+      if (triesToEditOtherFields) {
+        res.status(403).json({ error: 'Viewer and other roles are read-only for audits' });
+        return;
+      }
+    }
     const canSetResult =
       req.user.roleNames.includes('Admin') ||
       req.user.roleNames.includes('QualityEngineer') ||
@@ -282,12 +291,14 @@ router.patch(
         supplier: { select: { id: true, code: true, name: true } },
         auditType: { select: { id: true, code: true, name: true } },
         findings: { select: { id: true, code: true } },
+        records: { select: { id: true, name: true, filePath: true }, orderBy: { createdAt: 'desc' } },
       },
     });
     res.json({
       ...audit,
       derivedStatus: getDerivedStatus(audit.result, audit.auditDate),
       findingCodes: audit.findings.map((f) => f.code),
+      records: audit.records.map((r) => ({ id: r.id, name: r.name, hasFile: Boolean(r.filePath) })),
     });
   })
 );
