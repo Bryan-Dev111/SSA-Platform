@@ -322,6 +322,7 @@ interface UserRow {
   passwordPlain: string | null;
   assignedSupplierIds: string[];
   qeAssignedSupplierIds?: string[];
+  supplier?: { id: string; code: string; name: string };
 }
 
 interface CommodityTypeRow {
@@ -339,6 +340,8 @@ interface SupplierRow {
   notes: string | null;
   commodityTypeId: string | null;
   commodityType: { id: string; name: string } | null;
+  userId?: string | null;
+  user?: { id: string; email: string; name: string | null } | null;
 }
 
 const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'Auditor'] as const;
@@ -382,6 +385,8 @@ export function AdminBuyersSuppliersPanel({
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [buyerId, setBuyerId] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [supplierLinkSupplierId, setSupplierLinkSupplierId] = useState('');
+  const [supplierLinkUserId, setSupplierLinkUserId] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
@@ -428,6 +433,7 @@ export function AdminBuyersSuppliersPanel({
   }, [load]);
 
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
+  const supplierUsers = users.filter((u) => u.roleNames.includes('Supplier'));
   const visibleUsers = usersOnlyEmployees ? users.filter((u) => u.isEmployee === true) : users;
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
 
@@ -459,6 +465,41 @@ export function AdminBuyersSuppliersPanel({
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const linkSupplierUser = async () => {
+    if (!token || !supplierLinkSupplierId || !supplierLinkUserId) return;
+    setBusy(true);
+    try {
+      await apiJson(`/suppliers/${supplierLinkSupplierId}/link-user`, {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ userId: supplierLinkUserId }),
+      });
+      toast.success('Supplier user linked');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Link failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unlinkSupplierUser = async (supplierIdToUnlink: string) => {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await apiJson(`/suppliers/${supplierIdToUnlink}/link-user`, {
+        token,
+        method: 'DELETE',
+      });
+      toast.info('Supplier user unlinked');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Unlink failed');
     } finally {
       setBusy(false);
     }
@@ -811,6 +852,96 @@ export function AdminBuyersSuppliersPanel({
               </tbody>
             </table>
           </div>
+          </div>
+        </div>
+      )}
+
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Link supplier user account</h2>
+            <p style={{ marginTop: 0, color: 'var(--color-text-muted)' }}>
+              Link a user with Supplier role to a supplier company so they see that company data after login.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Supplier company</label>
+                <select
+                  className="input"
+                  value={supplierLinkSupplierId}
+                  onChange={(e) => setSupplierLinkSupplierId(e.target.value)}
+                  style={{ minWidth: 240 }}
+                >
+                  <option value="">Select supplier</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.code} — {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Supplier user account</label>
+                <select
+                  className="input"
+                  value={supplierLinkUserId}
+                  onChange={(e) => setSupplierLinkUserId(e.target.value)}
+                  style={{ minWidth: 300 }}
+                >
+                  <option value="">Select supplier user</option>
+                  {supplierUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name?.trim() ? `${u.name} (${u.email})` : u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={linkSupplierUser}
+                disabled={busy || !supplierLinkSupplierId || !supplierLinkUserId}
+              >
+                Link
+              </button>
+            </div>
+
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Supplier</th>
+                    <th>Linked supplier user</th>
+                    <th style={{ width: 100 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suppliers.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="table-empty">
+                        No suppliers.
+                      </td>
+                    </tr>
+                  ) : (
+                    suppliers.map((s) => (
+                      <tr key={`link-${s.id}`}>
+                        <td>{s.code} — {s.name}</td>
+                        <td>{s.user ? (s.user.name?.trim() ? `${s.user.name} (${s.user.email})` : s.user.email) : '—'}</td>
+                        <td>
+                          {s.user ? (
+                            <button type="button" className="btn btn-ghost" onClick={() => unlinkSupplierUser(s.id)} disabled={busy}>
+                              Unlink
+                            </button>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

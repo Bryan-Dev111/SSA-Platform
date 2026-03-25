@@ -35,6 +35,8 @@ router.get(
         notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
+        userId: true,
+        user: { select: { id: true, email: true, name: true } },
       },
       orderBy: { code: 'asc' },
     });
@@ -85,6 +87,8 @@ router.post(
         notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
+        userId: true,
+        user: { select: { id: true, email: true, name: true } },
       },
     });
     res.status(201).json(created);
@@ -108,6 +112,7 @@ router.patch(
       status?: 'Active' | 'Inactive';
       notes?: string | null;
       commodityTypeId?: string | null;
+      userId?: string | null;
     } = {};
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -148,7 +153,7 @@ router.patch(
       data.commodityTypeId = commodityTypeId;
     }
     if (Object.keys(data).length === 0) {
-      res.status(400).json({ error: 'Provide at least one of: name, city, country, status, notes, commodityTypeId' });
+      res.status(400).json({ error: 'Provide at least one of: name, city, country, status, notes, commodityTypeId, userId' });
       return;
     }
     const existing = await prisma.supplier.findUnique({ where: { id: req.params.id } });
@@ -169,6 +174,96 @@ router.patch(
         notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
+        userId: true,
+        user: { select: { id: true, email: true, name: true } },
+      },
+    });
+    res.json(updated);
+  })
+);
+
+/** POST /suppliers/:id/link-user — Admin: link a Supplier-role user to supplier */
+router.post(
+  '/:id/link-user',
+  requireRole(['Admin']),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const supplierId = req.params.id;
+    const userId = typeof req.body?.userId === 'string' ? req.body.userId : '';
+    if (!userId) {
+      res.status(400).json({ error: 'userId is required' });
+      return;
+    }
+
+    const [supplier, user, roleRows] = await Promise.all([
+      prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true } }),
+      prisma.userRole.findMany({ where: { userId }, include: { role: true } }),
+    ]);
+
+    if (!supplier) {
+      res.status(404).json({ error: 'Supplier not found' });
+      return;
+    }
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (!roleRows.some((ur) => ur.role.name === 'Supplier')) {
+      res.status(400).json({ error: 'User must have Supplier role' });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.supplier.updateMany({ where: { userId }, data: { userId: null } }),
+      prisma.supplier.update({ where: { id: supplierId }, data: { userId } }),
+    ]);
+
+    const updated = await prisma.supplier.findUnique({
+      where: { id: supplierId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        city: true,
+        country: true,
+        status: true,
+        notes: true,
+        commodityTypeId: true,
+        commodityType: { select: { id: true, name: true } },
+        userId: true,
+        user: { select: { id: true, email: true, name: true } },
+      },
+    });
+    res.json(updated);
+  })
+);
+
+/** DELETE /suppliers/:id/link-user — Admin: unlink supplier from its user */
+router.delete(
+  '/:id/link-user',
+  requireRole(['Admin']),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const supplierId = req.params.id;
+    const supplier = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true } });
+    if (!supplier) {
+      res.status(404).json({ error: 'Supplier not found' });
+      return;
+    }
+    const updated = await prisma.supplier.update({
+      where: { id: supplierId },
+      data: { userId: null },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        city: true,
+        country: true,
+        status: true,
+        notes: true,
+        commodityTypeId: true,
+        commodityType: { select: { id: true, name: true } },
+        userId: true,
+        user: { select: { id: true, email: true, name: true } },
       },
     });
     res.json(updated);
