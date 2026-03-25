@@ -25,6 +25,8 @@ type Tab =
   | 'employees'
   | 'buyersSuppliers'
   | 'employeeAssignments'
+  | 'workLogs'
+  | 'laborCosts'
   | 'permissions';
 
 interface CommodityType {
@@ -301,16 +303,18 @@ export function Admin() {
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         {(
           [
+            ['users', 'Users'],
+            ['employees', 'Employees'],
+            ['employeeAssignments', 'Employee Assignments'],
+            ['buyersSuppliers', 'Buyers & Suppliers'],
+            ['workLogs', 'Work Logs'],
+            ['laborCosts', 'Labor Costs'],
+            ['permissions', 'Permissions'],
             ['commodity', 'Commodity types'],
             ['defect', 'Defect codes'],
             ['disposition', 'Disposition codes'],
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
-            ['users', 'Users'],
-            ['employees', 'Employees'],
-            ['buyersSuppliers', 'Buyers & suppliers'],
-            ['employeeAssignments', 'Employee Assignments'],
-            ['permissions', 'Permissions'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -359,6 +363,22 @@ export function Admin() {
       )}
       {tab === 'employeeAssignments' && (
         <AdminEmployeeAssignmentsPanel token={token} toast={toast} />
+      )}
+      {tab === 'workLogs' && (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Work Logs</h2>
+            <p className="table-empty">No work log module is configured in this build yet.</p>
+          </div>
+        </div>
+      )}
+      {tab === 'laborCosts' && (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Labor Costs</h2>
+            <p className="table-empty">No labor cost module is configured in this build yet.</p>
+          </div>
+        </div>
       )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
 
