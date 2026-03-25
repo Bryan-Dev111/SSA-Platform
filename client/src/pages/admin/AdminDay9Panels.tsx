@@ -318,6 +318,10 @@ interface UserRow {
   name: string | null;
   isEmployee?: boolean;
   isContractor?: boolean;
+  employmentStatus?: 'Active' | 'Inactive';
+  hourlyRate?: number | null;
+  currency?: string | null;
+  country?: string | null;
   roleNames: string[];
   passwordPlain: string | null;
   assignedSupplierIds: string[];
@@ -393,6 +397,10 @@ export function AdminBuyersSuppliersPanel({
   const [newUserLastName, setNewUserLastName] = useState('');
   const [newUserRole, setNewUserRole] = useState<string>('Viewer');
   const [newUserIsEmployee, setNewUserIsEmployee] = useState<'Yes' | 'No' | 'Contractor'>('No');
+  const [newUserEmploymentStatus, setNewUserEmploymentStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [newUserHourlyRate, setNewUserHourlyRate] = useState('');
+  const [newUserCurrency, setNewUserCurrency] = useState('');
+  const [newUserCountry, setNewUserCountry] = useState('');
   /** Role names from server (includes custom roles); matrix UI lives only on Permissions tab. */
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [newSupName, setNewSupName] = useState('');
@@ -520,6 +528,10 @@ export function AdminBuyersSuppliersPanel({
           password: newUserPassword,
             isEmployee: newUserIsEmployee === 'Yes',
             isContractor: newUserIsEmployee === 'Contractor',
+          employmentStatus: newUserEmploymentStatus,
+          hourlyRate: newUserHourlyRate.trim() === '' ? null : Number(newUserHourlyRate),
+          currency: newUserCurrency.trim() || null,
+          country: newUserCountry.trim() || null,
           roleNames,
         }),
       });
@@ -529,6 +541,10 @@ export function AdminBuyersSuppliersPanel({
       setNewUserLastName('');
       setNewUserRole('Viewer');
       setNewUserIsEmployee('No');
+      setNewUserEmploymentStatus('Active');
+      setNewUserHourlyRate('');
+      setNewUserCurrency('');
+      setNewUserCountry('');
       toast.success('User created');
       await load();
     } catch (e) {
@@ -655,8 +671,40 @@ export function AdminBuyersSuppliersPanel({
                   <option value="Contractor">Contractor</option>
                 </select>
               </div>
+              <div className="input-group">
+                <label className="input-label">Status</label>
+                <select className="input" value={newUserEmploymentStatus} onChange={(e) => setNewUserEmploymentStatus(e.target.value as 'Active' | 'Inactive')}>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Hourly Rate</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={newUserHourlyRate}
+                  onChange={(e) => setNewUserHourlyRate(e.target.value)}
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Currency</label>
+                <input className="input" value={newUserCurrency} onChange={(e) => setNewUserCurrency(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Country</label>
+                <input className="input" value={newUserCountry} onChange={(e) => setNewUserCountry(e.target.value)} />
+              </div>
             </div>
-            <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createUser} disabled={busy}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginTop: '0.75rem' }}
+              onClick={createUser}
+              disabled={busy}
+            >
               Create user
             </button>
           </div>
@@ -730,6 +778,10 @@ export function AdminBuyersSuppliersPanel({
                   <th>Name</th>
                   <th>Email</th>
                   <th>Employee</th>
+                  {usersOnlyEmployees && <th>Status</th>}
+                  {usersOnlyEmployees && <th>Hourly Rate</th>}
+                  {usersOnlyEmployees && <th>Currency</th>}
+                  {usersOnlyEmployees && <th>Country</th>}
                   <th>Password</th>
                   <th>Role</th>
                 </tr>
@@ -737,7 +789,7 @@ export function AdminBuyersSuppliersPanel({
               <tbody>
                 {visibleUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="table-empty">
+                    <td colSpan={usersOnlyEmployees ? 9 : 5} className="table-empty">
                       No users yet.
                     </td>
                   </tr>
@@ -753,6 +805,10 @@ export function AdminBuyersSuppliersPanel({
                             ? 'Yes'
                             : 'No'}
                       </td>
+                      {usersOnlyEmployees && <td>{u.employmentStatus ?? 'Active'}</td>}
+                      {usersOnlyEmployees && <td>{u.hourlyRate != null ? u.hourlyRate : '—'}</td>}
+                      {usersOnlyEmployees && <td>{u.currency ?? '—'}</td>}
+                      {usersOnlyEmployees && <td>{u.country ?? '—'}</td>}
                       <td style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 'var(--text-xs)' }}>
                         {u.passwordPlain ?? '—'}
                       </td>

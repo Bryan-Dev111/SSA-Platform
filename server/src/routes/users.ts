@@ -183,6 +183,10 @@ router.get(
         passwordEncrypted: true,
         isEmployee: true,
         isContractor: true,
+        employmentStatus: true,
+        hourlyRate: true,
+        currency: true,
+        country: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -201,6 +205,10 @@ router.get(
         name: u.name,
         isEmployee: u.isEmployee,
         isContractor: u.isContractor,
+        employmentStatus: u.employmentStatus,
+        hourlyRate: u.hourlyRate,
+        currency: u.currency,
+        country: u.country,
         createdAt: u.createdAt,
         passwordPlain: decryptPassword(u.passwordEncrypted),
         roleNames: u.userRoles.map((ur) => ur.role.name),
@@ -227,6 +235,13 @@ router.post(
     const name = nameFromParts || nameLegacy || null;
     const isEmployee = parseIsEmployee(req.body?.isEmployee);
     const isContractor = parseIsContractor(req.body?.isContractor);
+    const employmentStatusRaw = typeof req.body?.employmentStatus === 'string' ? req.body.employmentStatus.trim() : '';
+    const employmentStatus = employmentStatusRaw.toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
+    const hourlyRateRaw = req.body?.hourlyRate;
+    const hourlyRate =
+      hourlyRateRaw === undefined || hourlyRateRaw === null || hourlyRateRaw === '' ? null : Number(hourlyRateRaw);
+    const currency = typeof req.body?.currency === 'string' ? req.body.currency.trim() || null : null;
+    const country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
     const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : [];
     const roleNames = [...new Set(roleNamesRaw)];
     if (!emailRaw || !password) {
@@ -235,6 +250,10 @@ router.post(
     }
     if (roleNames.length === 0) {
       res.status(400).json({ error: 'roleNames must include at least one role' });
+      return;
+    }
+    if (hourlyRate !== null && (!Number.isFinite(hourlyRate) || hourlyRate < 0)) {
+      res.status(400).json({ error: 'hourlyRate must be a non-negative number' });
       return;
     }
     const existing = await prisma.user.findUnique({ where: { email: emailRaw } });
@@ -257,6 +276,10 @@ router.post(
         name,
         isEmployee,
         isContractor,
+        employmentStatus,
+        hourlyRate,
+        currency,
+        country,
         userRoles: {
           create: roleRows.map((r) => ({ roleId: r.id })),
         },
@@ -267,6 +290,10 @@ router.post(
         name: true,
         isEmployee: true,
         isContractor: true,
+        employmentStatus: true,
+        hourlyRate: true,
+        currency: true,
+        country: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -280,6 +307,10 @@ router.post(
       name: user.name,
       isEmployee: user.isEmployee,
       isContractor: user.isContractor,
+      employmentStatus: user.employmentStatus,
+      hourlyRate: user.hourlyRate,
+      currency: user.currency,
+      country: user.country,
       createdAt: user.createdAt,
       roleNames: user.userRoles.map((ur) => ur.role.name),
       supplier: user.supplier ?? undefined,
