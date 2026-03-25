@@ -565,8 +565,75 @@ export function Risk() {
                 {saving ? 'Saving...' : 'Add'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
 
-            <h2 style={{ marginTop: '1rem' }}>Add action</h2>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
+          <div className="table-wrap">
+            {items.length === 0 ? (
+              <p className="table-empty">No rows.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Supplier</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Likelihood</th>
+                    <th>Severity</th>
+                    <th>Risk level</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    {canEditRiskItems ? <th>Action</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.code}</td>
+                      <td>{row.supplier.code} - {row.supplier.name}</td>
+                      <td>{row.type}</td>
+                      <td>{row.description}</td>
+                      <td>{row.likelihood ?? '—'}</td>
+                      <td>{row.severity ?? '—'}</td>
+                      <td>{row.riskLevel ?? '—'}</td>
+                      <td>{row.status}</td>
+                      <td>{new Date(row.createdAt).toLocaleString()}</td>
+                      {canEditRiskItems ? (
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setEditingId(row.id);
+                              setEditType(row.type === 'opportunity' ? 'opportunity' : 'risk');
+                              setEditDescription(row.description);
+                              setEditStatus(row.status);
+                              setEditLikelihood(row.likelihood ?? 'Possible');
+                              setEditSeverity(row.severity ?? 'Moderate');
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {canEditRiskItems && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Add action</h2>
             <form onSubmit={createAction} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr 1fr 1fr auto', gap: '0.75rem' }}>
               <select className="input" value={newActionSupplierId} onChange={(e) => setNewActionSupplierId(e.target.value)} required>
                 <option value="">Supplier</option>
@@ -659,63 +726,6 @@ export function Risk() {
                       <td>{row.residualLikelihood ?? '—'}</td>
                       <td>{row.residualSeverity ?? '—'}</td>
                       <td>{row.residualRiskLevel ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
-          <div className="table-wrap">
-            {items.length === 0 ? (
-              <p className="table-empty">No rows.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Supplier</th>
-                    <th>Type</th>
-                    <th>Description</th>
-                    <th>Likelihood</th>
-                    <th>Severity</th>
-                    <th>Risk level</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    {canEditRiskItems ? <th>Action</th> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.code}</td>
-                      <td>{row.supplier.code} - {row.supplier.name}</td>
-                      <td>{row.type}</td>
-                      <td>{row.description}</td>
-                      <td>{row.likelihood ?? '—'}</td>
-                      <td>{row.severity ?? '—'}</td>
-                      <td>{row.riskLevel ?? '—'}</td>
-                      <td>{row.status}</td>
-                      <td>{new Date(row.createdAt).toLocaleString()}</td>
-                      {canEditRiskItems ? (
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setEditType(row.type === 'opportunity' ? 'opportunity' : 'risk');
-                              setEditDescription(row.description);
-                              setEditStatus(row.status);
-                              setEditLikelihood(row.likelihood ?? 'Possible');
-                              setEditSeverity(row.severity ?? 'Moderate');
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      ) : null}
                     </tr>
                   ))}
                 </tbody>
