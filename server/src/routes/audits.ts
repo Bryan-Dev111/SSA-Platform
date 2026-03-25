@@ -107,6 +107,8 @@ router.get(
       auditDate: a.auditDate,
       auditor: a.auditor,
       result: a.result,
+      summary: a.summary,
+      scope: a.scope,
       notes: a.notes,
       createdAt: a.createdAt,
       derivedStatus: getDerivedStatus(a.result, a.auditDate),
@@ -166,11 +168,13 @@ router.post(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const { supplierId, auditTypeId, auditDate, auditor, notes } = req.body as {
+    const { supplierId, auditTypeId, auditDate, auditor, summary, scope, notes } = req.body as {
       supplierId?: string;
       auditTypeId?: string | null;
       auditDate?: string;
       auditor?: string | null;
+      summary?: string | null;
+      scope?: string | null;
       notes?: string | null;
     };
     if (!supplierId || !auditDate) {
@@ -191,6 +195,8 @@ router.post(
         auditTypeId: auditTypeId || null,
         auditDate: dateOnly,
         auditor: auditor ? String(auditor).trim() : null,
+        summary: summary ? String(summary).trim() : null,
+        scope: scope ? String(scope).trim() : null,
         notes: notes || null,
       },
       include: {
@@ -224,12 +230,14 @@ router.patch(
       res.status(404).json({ error: 'Audit not found' });
       return;
     }
-    const { auditDate, notes, result, auditTypeId, auditor } = req.body as {
+    const { auditDate, notes, result, auditTypeId, auditor, summary, scope } = req.body as {
       auditDate?: string;
       notes?: string | null;
       result?: AuditResult | null;
       auditTypeId?: string | null;
       auditor?: string | null;
+      summary?: string | null;
+      scope?: string | null;
     };
 
     const isAdminOrQe = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
@@ -238,6 +246,8 @@ router.patch(
       const triesToEditOtherFields =
         auditDate !== undefined ||
         notes !== undefined ||
+        summary !== undefined ||
+        scope !== undefined ||
         auditTypeId !== undefined ||
         auditor !== undefined;
       if (triesToEditOtherFields) {
@@ -252,6 +262,8 @@ router.patch(
     const update: {
       auditDate?: Date;
       notes?: string | null;
+      summary?: string | null;
+      scope?: string | null;
       result?: AuditResult | null;
       auditTypeId?: string | null;
       auditor?: string | null;
@@ -260,6 +272,8 @@ router.patch(
       update.auditDate = new Date(auditDate.trim().slice(0, 10) + 'T12:00:00.000Z');
     }
     if (notes !== undefined) update.notes = notes;
+    if (summary !== undefined) update.summary = summary ? String(summary).trim() : null;
+    if (scope !== undefined) update.scope = scope ? String(scope).trim() : null;
     if (auditor !== undefined) update.auditor = auditor ? String(auditor).trim() : null;
     if (result !== undefined) {
       if (!canSetResult) {

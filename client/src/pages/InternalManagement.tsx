@@ -66,7 +66,14 @@ export function InternalManagement() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<Record<string, number>>({});
-  const [newAudit, setNewAudit] = useState({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
+  const [newAudit, setNewAudit] = useState({
+    supplierId: '',
+    auditDate: '',
+    auditTypeId: '',
+    auditor: '',
+    summary: '',
+    scope: '',
+  });
   const [submittingAudit, setSubmittingAudit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -292,11 +299,19 @@ export function InternalManagement() {
           auditDate: newAudit.auditDate,
           auditTypeId: newAudit.auditTypeId || null,
           auditor: newAudit.auditor || null,
-          notes: newAudit.notes || null,
+          summary: newAudit.summary || null,
+          scope: newAudit.scope || null,
         }),
       });
       toast.success(`Audit ${created.code} created`);
-      setNewAudit({ supplierId: '', auditDate: '', auditTypeId: '', auditor: '', notes: '' });
+      setNewAudit({
+        supplierId: '',
+        auditDate: '',
+        auditTypeId: '',
+        auditor: '',
+        summary: '',
+        scope: '',
+      });
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -401,11 +416,20 @@ export function InternalManagement() {
                 </div>
               </div>
               <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                <label className="input-label">Notes</label>
+                <label className="input-label">Summary</label>
                 <input
                   className="input"
-                  value={newAudit.notes}
-                  onChange={(e) => setNewAudit((p) => ({ ...p, notes: e.target.value }))}
+                  value={newAudit.summary}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, summary: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                <label className="input-label">Scope</label>
+                <input
+                  className="input"
+                  value={newAudit.scope}
+                  onChange={(e) => setNewAudit((p) => ({ ...p, scope: e.target.value }))}
                   placeholder="Optional"
                 />
               </div>

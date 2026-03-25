@@ -26,6 +26,8 @@ interface Audit {
   auditDate: string;
   auditor: string | null;
   result: 'Passed' | 'Failed' | 'Cancelled' | null;
+  summary: string | null;
+  scope: string | null;
   notes: string | null;
   derivedStatus: string;
   findingCodes: string[];
@@ -71,7 +73,7 @@ export function Audits() {
     result: 'Passed' | 'Failed' | 'Cancelled';
   } | null>(null);
   const [sortBy, setSortBy] = useState<
-    'code' | 'supplier' | 'date' | 'type' | 'auditor' | 'status' | 'result' | 'findings' | 'notes' | 'records'
+    'code' | 'supplier' | 'date' | 'type' | 'auditor' | 'status' | 'result' | 'findings' | 'summary' | 'records'
   >('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const roleNames = user?.roleNames ?? [];
@@ -113,7 +115,7 @@ export function Audits() {
         case 'status': return statusRank[a.derivedStatus] ?? 999;
         case 'result': return resultRank[a.result ?? ''] ?? 999;
         case 'findings': return a.findingCodes.join(',');
-        case 'notes': return a.notes ?? '';
+        case 'summary': return a.summary ?? '';
         case 'records': return a.records.length;
       }
     };
@@ -138,6 +140,16 @@ export function Audits() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
   const paginatedAudits = sortedAudits.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const auditsBySupplier = useMemo(() => {
+    const map = new Map<string, { label: string; count: number }>();
+    for (const a of audits) {
+      const current = map.get(a.supplierId) ?? { label: `${a.supplier.code} — ${a.supplier.name}`, count: 0 };
+      current.count += 1;
+      map.set(a.supplierId, current);
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 12);
+  }, [audits]);
+  const maxAuditsBySupplier = Math.max(1, ...auditsBySupplier.map((x) => x.count));
 
   useEffect(() => {
     if (!token) return;
@@ -277,6 +289,36 @@ export function Audits() {
         </label>
       </div>
 
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Audits by supplier</h2>
+          {auditsBySupplier.length === 0 ? (
+            <p className="table-empty">No audits in scope.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {auditsBySupplier.map((row) => (
+                <div key={row.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+                    <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{row.count}</span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${(row.count / maxAuditsBySupplier) * 100}%`,
+                        height: '100%',
+                        background: '#2563eb',
+                        borderRadius: 4,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="card">
         <div className="table-wrap">
           <table className="table">
@@ -290,7 +332,7 @@ export function Audits() {
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('result')}>Result {sortIndicator('result')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('findings')}>Findings {sortIndicator('findings')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('notes')}>Notes {sortIndicator('notes')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
                 {isAdmin && <th>Delete</th>}
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>Records {sortIndicator('records')}</th>
               </tr>
@@ -369,8 +411,8 @@ export function Audits() {
                         )}
                       </div>
                     </td>
-                    <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.notes ?? ''}>
-                      {a.notes ?? '—'}
+                    <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.summary ?? ''}>
+                      {a.summary ?? '—'}
                     </td>
                     {isAdmin && (
                       <td>

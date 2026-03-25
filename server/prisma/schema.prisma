@@ -180,6 +180,8 @@ model Audit {
   auditDate    DateTime  @db.Date
   auditor      String?
   result       AuditResult? // Passed, Failed, Cancelled
+  summary      String?
+  scope        String?
   notes        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
