@@ -807,7 +807,7 @@ export function CARRecord() {
                 <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} required />
               </div>
               <div className="input-group">
-                <label className="input-label">Discrepancy *</label>
+                <label className="input-label">Problem Statement *</label>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} required />
               </div>
               <ReferenceCodeSelect
@@ -940,7 +940,7 @@ export function CARRecord() {
                 disabled={!canEdit}
               />
               <div className="input-group">
-                <label className="input-label">Discrepancy</label>
+                <label className="input-label">Problem Statement</label>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} disabled={!canEdit} />
               </div>
               <div className="input-group">
