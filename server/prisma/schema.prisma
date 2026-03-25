@@ -47,6 +47,7 @@ model User {
   buyerSuppliers BuyerSupplier[]  @relation("BuyerAssignments")
   qeSuppliers  QeSupplier[]       @relation("QeAssignments")
   supplier     Supplier?          @relation("SupplierUser")
+  auditorSuppliers AuditorSupplier[] @relation("AuditorAssignments")
   recordsUploaded Record[]
   findingsCreated Finding[]
   carsCreated  CorrectiveAction[]
@@ -55,6 +56,9 @@ model User {
   riskActionsCreated RiskAction[]
   alerts       Alert[]
   alertPrefs   UserAlertPreference[]
+
+  qeBuyers QeBuyer[] @relation("QeBuyerQeAssignments")
+  qeBuyerBuyers QeBuyer[] @relation("QeBuyerBuyerAssignments")
 }
 
 model UserRole {
@@ -108,6 +112,7 @@ model Supplier {
   updatedAt       DateTime  @updatedAt
   buyerSuppliers  BuyerSupplier[]
   qeSuppliers     QeSupplier[]
+  auditorSuppliers AuditorSupplier[]
   audits          Audit[]
   findings        Finding[]
   correctiveActions CorrectiveAction[]
@@ -138,6 +143,23 @@ model QeSupplier {
   qualityEngineer   User     @relation("QeAssignments", fields: [qualityEngineerId], references: [id], onDelete: Cascade)
   supplier          Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   @@id([qualityEngineerId, supplierId])
+}
+
+model AuditorSupplier {
+  auditorId   String
+  supplierId  String
+  auditor     User     @relation("AuditorAssignments", fields: [auditorId], references: [id], onDelete: Cascade)
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  @@id([auditorId, supplierId])
+}
+
+model QeBuyer {
+  qualityEngineerId String
+  buyerId           String
+
+  qualityEngineer User @relation("QeBuyerQeAssignments", fields: [qualityEngineerId], references: [id], onDelete: Cascade)
+  buyer           User @relation("QeBuyerBuyerAssignments", fields: [buyerId], references: [id], onDelete: Cascade)
+  @@id([qualityEngineerId, buyerId])
 }
 
 // ============== Audits & Findings & CARs ==============

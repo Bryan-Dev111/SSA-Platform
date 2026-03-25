@@ -188,6 +188,8 @@ router.get(
         supplier: { select: { id: true, code: true, name: true } },
         buyerSuppliers: { select: { supplierId: true } },
         qeSuppliers: { select: { supplierId: true } },
+        auditorSuppliers: { select: { supplierId: true } },
+        qeBuyers: { select: { buyerId: true } },
       },
       orderBy: { email: 'asc' },
     });
@@ -203,7 +205,9 @@ router.get(
         roleNames: u.userRoles.map((ur) => ur.role.name),
         supplier: u.supplier ?? undefined,
         assignedSupplierIds: u.buyerSuppliers.map((b) => b.supplierId),
-        qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId),
+        qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId), // legacy direct mapping
+        auditorAssignedSupplierIds: u.auditorSuppliers.map((a) => a.supplierId),
+        qeAssignedBuyerIds: u.qeBuyers.map((qb) => qb.buyerId),
       }))
     );
   })

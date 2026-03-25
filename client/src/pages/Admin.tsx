@@ -9,9 +9,11 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   AdminAuditTypesPanel,
   AdminBuyersSuppliersPanel,
+  // (Employee assignments lives in separate file)
   AdminPermissionsPanel,
   AdminRiskWeightsPanel,
 } from './admin/AdminDay9Panels';
+import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
 
 type Tab =
   | 'commodity'
@@ -22,6 +24,7 @@ type Tab =
   | 'users'
   | 'employees'
   | 'buyersSuppliers'
+  | 'employeeAssignments'
   | 'permissions';
 
 interface CommodityType {
@@ -306,6 +309,7 @@ export function Admin() {
             ['users', 'Users'],
             ['employees', 'Employees'],
             ['buyersSuppliers', 'Buyers & suppliers'],
+            ['employeeAssignments', 'Employee Assignments'],
             ['permissions', 'Permissions'],
           ] as const
         ).map(([t, label]) => (
@@ -352,6 +356,9 @@ export function Admin() {
           showUsersTable={false}
           showBuyerSupplierSections
         />
+      )}
+      {tab === 'employeeAssignments' && (
+        <AdminEmployeeAssignmentsPanel token={token} toast={toast} />
       )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
 
