@@ -200,14 +200,13 @@ export function Dashboard() {
           alignItems: 'start',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div
-            style={{
-              display: 'grid',
-              gap: '1rem',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            }}
-          >
+        <div
+          style={{
+            display: 'grid',
+            gap: '1rem',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          }}
+        >
             <div className="card">
               <div className="card-body">
                 <h2 style={{ marginTop: 0 }}>Top risk suppliers</h2>
@@ -281,18 +280,6 @@ export function Dashboard() {
                 )}
               </div>
             </div>
-          </div>
-
-          <div className="card">
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
-              {monthly.length === 0 ? (
-                <p className="table-empty">No trend data yet.</p>
-              ) : (
-                <MonthlyTrendsLineChart rows={monthly} maxY={trendMax} />
-              )}
-            </div>
-          </div>
         </div>
 
         <div className="card">
@@ -329,6 +316,17 @@ export function Dashboard() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
+          {monthly.length === 0 ? (
+            <p className="table-empty">No trend data yet.</p>
+          ) : (
+            <MonthlyTrendsLineChart rows={monthly} maxY={trendMax} />
+          )}
         </div>
       </div>
 
