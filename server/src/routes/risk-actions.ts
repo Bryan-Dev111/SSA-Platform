@@ -57,7 +57,14 @@ router.get(
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(rows);
+    // Translate DB statuses to UI statuses (`Open`/`Closed`).
+    // - DB `Mitigated` -> UI `Closed`
+    // - DB `Open`/`InProgress` -> UI `Open`
+    const mapped = rows.map((r) => ({
+      ...r,
+      status: r.status === 'Mitigated' ? 'Closed' : 'Open',
+    }));
+    res.json(mapped);
   })
 );
 
@@ -74,7 +81,11 @@ router.post(
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
     const owner = typeof req.body?.owner === 'string' ? req.body.owner.trim() || null : null;
     const dueDate = typeof req.body?.dueDate === 'string' && req.body.dueDate.trim() ? req.body.dueDate.trim() : null;
-    const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'Open';
+    // UI requirement: Actions status choices are only `Open` and `Closed`.
+    // DB uses `Open` | `InProgress` | `Mitigated`, so we map:
+    // - UI `Open` -> DB `Open`
+    // - UI `Closed` -> DB `Mitigated`
+    const uiStatus = typeof req.body?.status === 'string' ? req.body.status.trim() : 'Open';
     const residualLikelihoodRaw = typeof req.body?.residualLikelihood === 'string' ? req.body.residualLikelihood.trim() : '';
     const residualSeverityRaw = typeof req.body?.residualSeverity === 'string' ? req.body.residualSeverity.trim() : '';
 
@@ -82,8 +93,8 @@ router.post(
       res.status(400).json({ error: 'supplierId, riskId, and description are required' });
       return;
     }
-    if (!['Open', 'InProgress', 'Mitigated'].includes(status)) {
-      res.status(400).json({ error: 'status must be Open, InProgress, or Mitigated' });
+    if (!['Open', 'Closed'].includes(uiStatus)) {
+      res.status(400).json({ error: 'status must be Open or Closed' });
       return;
     }
 
@@ -99,16 +110,18 @@ router.post(
       return;
     }
 
+    const dbStatus: RiskActionStatus = uiStatus === 'Closed' ? 'Mitigated' : 'Open';
+
     let residualLikelihood: RiskLikelihood | null = null;
     let residualSeverity: RiskSeverity | null = null;
     let residualRiskLevel: 'Low' | 'Medium' | 'High' | null = null;
-    if (status === 'Mitigated' || residualLikelihoodRaw || residualSeverityRaw) {
+    if (uiStatus === 'Closed' || residualLikelihoodRaw || residualSeverityRaw) {
       if (!['VeryUnlikely', 'Unlikely', 'Possible', 'Likely', 'VeryLikely'].includes(residualLikelihoodRaw)) {
-        res.status(400).json({ error: 'residualLikelihood is required when status is Mitigated' });
+        res.status(400).json({ error: 'residualLikelihood is required when status is Closed' });
         return;
       }
       if (!['Negligible', 'Minor', 'Moderate', 'Significant', 'Severe'].includes(residualSeverityRaw)) {
-        res.status(400).json({ error: 'residualSeverity is required when status is Mitigated' });
+        res.status(400).json({ error: 'residualSeverity is required when status is Closed' });
         return;
       }
       residualLikelihood = residualLikelihoodRaw as RiskLikelihood;
@@ -124,7 +137,7 @@ router.post(
         description,
         owner,
         dueDate: dueDate ? new Date(`${dueDate.slice(0, 10)}T12:00:00.000Z`) : null,
-        status: status as RiskActionStatus,
+        status: dbStatus,
         residualLikelihood,
         residualSeverity,
         residualRiskLevel,
@@ -136,7 +149,9 @@ router.post(
         createdBy: { select: { id: true, name: true, email: true } },
       },
     });
-    res.status(201).json(created);
+    // Translate DB status to UI status for the frontend.
+    const statusForUi = created.status === 'Mitigated' ? 'Closed' : 'Open';
+    res.status(201).json({ ...created, status: statusForUi });
   })
 );
 

@@ -41,7 +41,7 @@ interface RiskActionRow {
   description: string;
   owner: string | null;
   dueDate: string | null;
-  status: 'Open' | 'InProgress' | 'Mitigated';
+  status: 'Open' | 'Closed';
   residualLikelihood: 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely' | null;
   residualSeverity: 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe' | null;
   residualRiskLevel: 'Low' | 'Medium' | 'High' | null;
@@ -87,7 +87,7 @@ export function Risk() {
   const [newActionDescription, setNewActionDescription] = useState('');
   const [newActionOwner, setNewActionOwner] = useState('');
   const [newActionDueDate, setNewActionDueDate] = useState('');
-  const [newActionStatus, setNewActionStatus] = useState<'Open' | 'InProgress' | 'Mitigated'>('Open');
+  const [newActionStatus, setNewActionStatus] = useState<'Open' | 'Closed'>('Open');
   const [newResidualLikelihood, setNewResidualLikelihood] = useState<RiskLikelihood>('Possible');
   const [newResidualSeverity, setNewResidualSeverity] = useState<RiskSeverity>('Moderate');
 
@@ -138,7 +138,7 @@ export function Risk() {
       .map((r) => {
         const action = latestActionByRisk.get(r.id);
         const useResidual =
-          action?.status === 'Mitigated' && !!action.residualLikelihood && !!action.residualSeverity && !!action.residualRiskLevel;
+          action?.status === 'Closed' && !!action.residualLikelihood && !!action.residualSeverity && !!action.residualRiskLevel;
         return {
           ...r,
           effectiveLikelihood: (useResidual ? action!.residualLikelihood : r.likelihood) as OpportunityRow['likelihood'],
@@ -214,7 +214,7 @@ export function Risk() {
         ? 0
         : Math.round((effectiveRisks.reduce((sum, r) => sum + levelWeight(r.effectiveRiskLevel), 0) / effectiveRisks.length) * 100) / 100;
     const openRisks = effectiveRisks.filter((x) => x.status === 'Open').length;
-    const mitigatedRisks = actions.filter((x) => x.status === 'Mitigated').length;
+    const mitigatedRisks = actions.filter((x) => x.status === 'Closed').length;
     const opportunities = items.filter((x) => x.type === 'opportunity').length;
     return { avgScore, openRisks, mitigatedRisks, opportunities };
   }, [effectiveRisks, actions, items]);
@@ -309,7 +309,7 @@ export function Risk() {
         dueDate: newActionDueDate || null,
         status: newActionStatus,
       };
-      if (newActionStatus === 'Mitigated') {
+      if (newActionStatus === 'Closed') {
         payload.residualLikelihood = newResidualLikelihood;
         payload.residualSeverity = newResidualSeverity;
       }
@@ -444,7 +444,7 @@ export function Risk() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.supplier.code} - {r.supplier.name}</span>
                       <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                        {r.score} ({r.cumulativePercent}% cumulative)
+                        {r.score}
                       </span>
                     </div>
                     <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
@@ -460,7 +460,7 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risk matrix (likelihood x impact)</h2>
+          <h2 style={{ marginTop: 0 }}>Risk matrix</h2>
           <div className="table-wrap">
             <table className="table" style={{ minWidth: 840 }}>
               <thead>
@@ -480,16 +480,19 @@ export function Risk() {
                       const cellColor = matrixColorByLabel[cellLabel] ?? '#e5e7eb';
                       const cellKey = `${likelihood}|${severity}`;
                       const cellRisks = riskPinsByCell.get(cellKey) ?? [];
+                      const riskCodes = cellRisks.slice(0, 8).map((r) => r.code);
+                      const moreSuffix = cellRisks.length > 8 ? ` +${cellRisks.length - 8} more` : '';
+                      const hoverText = riskCodes.length > 0 ? `Risks: ${riskCodes.join(', ')}${moreSuffix}` : '';
                       return (
                         <td
                           key={`${likelihood}-${severity}`}
                           style={{ background: cellColor, color: cellLabel === 'High' ? '#ffffff' : '#111827', fontWeight: 700, minWidth: 120, verticalAlign: 'top' }}
-                          title={cellRisks.length > 0 ? cellRisks.slice(0, 8).map((r) => r.code).join(', ') : ''}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                             <span>{cellLabel}</span>
                             {cellRisks.length > 0 ? (
                               <span
+                                title={hoverText}
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -515,7 +518,7 @@ export function Risk() {
             </table>
           </div>
           <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-            Hover each pin cell to see risk IDs (example: RISK-0005).
+            Hover the pins (counts) to see the related risks.
           </p>
         </div>
       </div>
@@ -656,12 +659,11 @@ export function Risk() {
               <input className="input" placeholder="Action description" value={newActionDescription} onChange={(e) => setNewActionDescription(e.target.value)} required />
               <input className="input" placeholder="Owner" value={newActionOwner} onChange={(e) => setNewActionOwner(e.target.value)} />
               <input className="input" type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} />
-              <select className="input" value={newActionStatus} onChange={(e) => setNewActionStatus(e.target.value as 'Open' | 'InProgress' | 'Mitigated')}>
+              <select className="input" value={newActionStatus} onChange={(e) => setNewActionStatus(e.target.value as 'Open' | 'Closed')}>
                 <option value="Open">Open</option>
-                <option value="InProgress">In Progress</option>
-                <option value="Mitigated">Mitigated</option>
+                <option value="Closed">Closed</option>
               </select>
-              {newActionStatus === 'Mitigated' ? (
+              {newActionStatus === 'Closed' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <select className="input" value={newResidualLikelihood} onChange={(e) => setNewResidualLikelihood(e.target.value as RiskLikelihood)}>
                     <option value="VeryUnlikely">Very Unlikely</option>
