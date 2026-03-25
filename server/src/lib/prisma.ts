@@ -1,10 +1,40 @@
 /**
  * Single Prisma client for the app. Uses DATABASE_URL (Supabase).
- * One instance avoids connection pool issues with Supabase pooler.
+ * Reuses the same client across dev hot-reloads (nodemon/ts-node) so old pools
+ * are not left open. Add connection_limit / pool_timeout to DATABASE_URL
+ * (see server/.env) to stay under Supabase pooler limits.
  */
 import { PrismaClient } from '@prisma/client';
 
-const basePrisma = new PrismaClient();
+const globalForPrisma = globalThis as typeof globalThis & {
+  __ssa_prismaBase?: PrismaClient;
+  __ssa_prisma?: PrismaExtended;
+};
+
+type PrismaExtended = ReturnType<typeof extendPrisma>;
+
+function extendPrisma(base: PrismaClient) {
+  return base.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ args, query }) {
+          try {
+            return await query(args);
+          } catch (error) {
+            if (!isTransientPrismaConnectionError(error)) {
+              throw error;
+            }
+            const err = error as { code?: string };
+            await base.$disconnect();
+            await sleep(err.code === 'P2024' ? 400 : 120);
+            await base.$connect();
+            return query(args);
+          }
+        },
+      },
+    },
+  });
+}
 
 function isTransientPrismaConnectionError(error: unknown): boolean {
   const err = error as { code?: string; message?: string };
@@ -12,8 +42,10 @@ function isTransientPrismaConnectionError(error: unknown): boolean {
   return (
     err?.code === 'P1017' ||
     err?.code === 'P1001' ||
+    err?.code === 'P2024' ||
     message.includes('server has closed the connection') ||
-    message.includes("can't reach database server")
+    message.includes("can't reach database server") ||
+    message.includes('timed out fetching a new connection from the connection pool')
   );
 }
 
@@ -21,24 +53,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Global query retry for transient DB connection drops (e.g., Supabase pooler hiccups).
-export const prisma = basePrisma.$extends({
-  query: {
-    $allModels: {
-      async $allOperations({ args, query }) {
-        try {
-          return await query(args);
-        } catch (error) {
-          if (!isTransientPrismaConnectionError(error)) {
-            throw error;
-          }
-          // Reset connection and retry once.
-          await basePrisma.$disconnect();
-          await sleep(120);
-          await basePrisma.$connect();
-          return query(args);
-        }
-      },
-    },
-  },
-});
+const basePrisma =
+  globalForPrisma.__ssa_prismaBase ??
+  new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.__ssa_prismaBase = basePrisma;
+}
+
+export const prisma: PrismaExtended =
+  globalForPrisma.__ssa_prisma ?? extendPrisma(basePrisma);
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.__ssa_prisma = prisma;
+}
