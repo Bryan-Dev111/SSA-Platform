@@ -234,6 +234,8 @@ export function CARRecord() {
   const [createFindingChoice, setCreateFindingChoice] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
+  // Requirement: On the CAR Record (create) page, fields must be locked until user clicks "Create CAR".
+  const [createEnabled, setCreateEnabled] = useState(false);
   const activeLoadIdRef = useRef(0);
   const roleNames = user?.roleNames ?? [];
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
@@ -349,6 +351,7 @@ export function CARRecord() {
       setLoading(false);
       setError(null);
       setCar(null);
+      setCreateEnabled(false);
       setSearchMissNoCreate(false);
       apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => { if (isActive()) setSuppliers([]); });
       apiJson<{ list: Array<{ id: string; code: string; auditId: string; supplierId: string; severity: string }> }>('/findings', { token })
@@ -365,6 +368,7 @@ export function CARRecord() {
       .then((c: CAR) => {
         if (!isActive()) return;
         setCar(c);
+        setCreateEnabled(false);
         setCarQuery('');
         setError(null);
         setForm({
@@ -388,6 +392,7 @@ export function CARRecord() {
       .catch((e) => {
         if (!isActive()) return;
         setCar(null);
+        setCreateEnabled(false);
         const message = e instanceof Error ? e.message : 'Failed to load';
         setError(isCarNotFoundErrorMessage(message) ? null : message);
       })
@@ -562,6 +567,10 @@ export function CARRecord() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!createEnabled) {
+      toast.info('Click Create CAR to enable editing.');
+      return;
+    }
     if (createFindingChoice === '') {
       setError('Finding # is required');
       toast.error('Finding # is required');
@@ -593,6 +602,7 @@ export function CARRecord() {
         }),
       });
       setCar(created);
+      setCreateEnabled(false);
       resetCreateForm();
       toast.success('CAR created');
       navigate(`/car-record?id=${encodeURIComponent(created.id)}`, { replace: true });
@@ -659,10 +669,13 @@ export function CARRecord() {
     setSearching(false);
     setSearchMissNoCreate(false);
     setEditMode(false);
+    setCreateEnabled(true);
     setApprovalComment('');
     setCarQuery('');
     resetCreateForm();
-    navigate('/car-record');
+    // If we're already on the create page, avoid navigating (prevents state reset).
+    // If coming from the detail view (id/code in URL), navigate to drop query params.
+    if (idParam || codeParam) navigate('/car-record');
   };
 
   if (loading) {
@@ -680,6 +693,7 @@ export function CARRecord() {
   }
 
   const isNew = !car && !idParam && !codeParam && !searchMissNoCreate;
+  const createLocked = isNew && !createEnabled;
 
   if (!loading && isNew && !canCreateNew) {
     // Viewer/Auditor cannot create CARs, so redirect to the list page.
@@ -743,6 +757,7 @@ export function CARRecord() {
                       onFindingSelect(v === FINDING_NONE_OPTION ? '' : v);
                     }}
                     required
+                    disabled={createLocked}
                   >
                     <option value="">Select...</option>
                     <option value={FINDING_NONE_OPTION}>None</option>
@@ -758,7 +773,7 @@ export function CARRecord() {
                     value={form.supplierId}
                     onChange={(e) => setForm((p) => ({ ...p, supplierId: e.target.value, auditId: '' }))}
                     required
-                    disabled={!!form.findingId}
+                    disabled={createLocked || !!form.findingId}
                   >
                     <option value="">Select</option>
                     {suppliers.map((s) => (
@@ -773,7 +788,7 @@ export function CARRecord() {
                     value={form.auditId}
                     onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}
                     required
-                    disabled={!form.supplierId || !!form.findingId}
+                    disabled={createLocked || !form.supplierId || !!form.findingId}
                   >
                     <option value="">Select</option>
                     {audits.filter((a) => a.supplierId === form.supplierId).map((a) => (
@@ -787,6 +802,7 @@ export function CARRecord() {
                     className="input"
                     value={form.severity}
                     onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value }))}
+                    disabled={createLocked}
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -795,28 +811,55 @@ export function CARRecord() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">CAR Owner</label>
-                  <input className="input" value={form.carOwner} onChange={(e) => setForm((p) => ({ ...p, carOwner: e.target.value }))} />
+                  <input
+                    className="input"
+                    value={form.carOwner}
+                    onChange={(e) => setForm((p) => ({ ...p, carOwner: e.target.value }))}
+                    disabled={createLocked}
+                  />
                 </div>
                 <div className="input-group">
                   <label className="input-label">Target Completion Date</label>
-                  <input className="input" type="date" value={form.targetCompletionDate} onChange={(e) => setForm((p) => ({ ...p, targetCompletionDate: e.target.value }))} />
+                  <input
+                    className="input"
+                    type="date"
+                    value={form.targetCompletionDate}
+                    onChange={(e) => setForm((p) => ({ ...p, targetCompletionDate: e.target.value }))}
+                    disabled={createLocked}
+                  />
                 </div>
               </div>
               <div className="input-group">
                 <label className="input-label">Summary *</label>
-                <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} required />
+                <input
+                  className="input"
+                  value={form.summary}
+                  onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
+                  required
+                  disabled={createLocked}
+                />
               </div>
               <div className="input-group">
                 <label className="input-label">Problem Statement *</label>
-                <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} required />
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={form.discrepancy}
+                  onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))}
+                  required
+                  disabled={createLocked}
+                />
               </div>
               <ReferenceCodeSelect
                 label="Defect Code"
                 value={form.defectCode}
                 onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
                 options={defectCodeOptions}
+                disabled={createLocked}
               />
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving || createLocked}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
             </form>
           </div>
         </div>
