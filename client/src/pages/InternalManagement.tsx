@@ -10,7 +10,7 @@ import { Navigate } from 'react-router-dom';
 import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
-type ImTab = 'audits' | 'shipments' | 'contracts';
+type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents';
 
 interface InternalRow {
   id: string;
@@ -132,7 +132,7 @@ export function InternalManagement() {
     return <Navigate to={getDefaultPath(user.roleNames)} replace />;
   }
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent, options?: { categoryOverride?: string | null }) => {
     e.preventDefault();
     if (!token || !name.trim()) return;
     if (file && file.size > 8 * 1024 * 1024) {
@@ -167,7 +167,10 @@ export function InternalManagement() {
         method: 'POST',
         body: JSON.stringify({
           name: name.trim(),
-          category: category.trim() || null,
+          category:
+            options?.categoryOverride !== undefined
+              ? options.categoryOverride
+              : category.trim() || null,
           note: note.trim() || null,
           ...(fileBase64 ? { fileBase64, fileName } : {}),
         }),
@@ -335,6 +338,7 @@ export function InternalManagement() {
             ['audits', 'Audits'],
             ['shipments', 'Shipments'],
             ['contracts', 'Contracts'],
+            ['documents', 'Documents'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -585,7 +589,7 @@ export function InternalManagement() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
               <h2 style={{ marginTop: 0 }}>Upload</h2>
-              <form onSubmit={submit}>
+              <form onSubmit={(e) => void submit(e)}>
                 <div
                   style={{
                     display: 'grid',
@@ -603,6 +607,181 @@ export function InternalManagement() {
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Type</label>
                     <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Note</label>
+                    <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
+                    <label className="input-label">File (optional)</label>
+                    <input
+                      ref={fileInputRef}
+                      className="input"
+                      type="file"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        setFile(e.target.files?.[0] ?? null);
+                        setUploadProgress(null);
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn file-picker-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Choose file
+                      </button>
+                      <span
+                        style={{
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-text-muted)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                          maxWidth: 170,
+                        }}
+                        title={file?.name || 'No file chosen'}
+                      >
+                        {file?.name || 'No file chosen'}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        minHeight: 18,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
+                      <span>
+                        {file
+                          ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${
+                              file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'
+                            }`
+                          : ''}
+                      </span>
+                      {uploadProgress !== null && file ? (
+                        <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
+                          <span>{uploadProgress}%</span>
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  </div>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? '…' : 'Add'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Library</h2>
+              <div className="table-wrap">
+                {loading ? (
+                  <p className="table-empty">Loading…</p>
+                ) : rows.length === 0 ? (
+                  <p className="table-empty">No internal documents.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Note</th>
+                        <th>View</th>
+                        <th>Updated</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.name}</td>
+                          <td>{r.category ?? '—'}</td>
+                          <td>{r.note ?? '—'}</td>
+                          <td>
+                            {r.filePath ? (
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => download(r)}
+                                disabled={downloading[r.id] !== undefined}
+                                style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
+                              >
+                                {downloading[r.id] !== undefined ? (
+                                  <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
+                                    <span>{downloading[r.id]}%</span>
+                                  </span>
+                                ) : (
+                                  'Download'
+                                )}
+                              </button>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td>{new Date(r.updatedAt).toLocaleString()}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              disabled={deletingId === r.id}
+                              onClick={() => setDeleteConfirmId(r.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === 'documents' && (
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Upload</h2>
+              <form
+                onSubmit={(e) => {
+                  void submit(e, { categoryOverride: 'Document' });
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
+                    gap: '0.75rem',
+                    alignItems: 'flex-end',
+                    paddingBottom: 22,
+                  }}
+                >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Name *</label>
+                    <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Note</label>
