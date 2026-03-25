@@ -1,6 +1,6 @@
 /**
- * Findings API: CRUD; status flow New → Waiting Disposition → Waiting Approval → Closed.
- * Required for Save (New): Supplier, Severity, Summary, Discrepancy.
+ * Findings API: CRUD; status flow Waiting Disposition → Waiting Approval → Closed (legacy New/DRAFT still supported).
+ * Required for Save (legacy New/DRAFT): Supplier, Severity, Summary, Discrepancy.
  * Process/Reverse; Approve/Reject (Waiting Approval, Admin/QE only). Only Admin can delete.
  */
 import { Router, Request, Response } from 'express';
@@ -222,7 +222,7 @@ router.post(
       code,
       ...(normalizedAuditId ? { auditId: normalizedAuditId } : {}),
       supplierId: supplierId as string,
-      status: 'New',
+      status: 'WaitingDisposition',
       severity: severity as 'Critical' | 'Major' | 'Minor',
       summary: String(summary).trim(),
       discrepancy: String(discrepancy).trim(),
@@ -343,7 +343,7 @@ router.post(
       return;
     }
     if (!['New', 'DRAFT'].includes(existing.status)) {
-      res.status(400).json({ error: 'Only New findings can be saved' });
+      res.status(400).json({ error: 'Only legacy New/DRAFT findings can be saved' });
       return;
     }
     if (!existing.summary?.trim() || !existing.discrepancy?.trim()) {
@@ -353,7 +353,7 @@ router.post(
     const code = /^FIN-\d{5}$/.test(existing.code) ? existing.code : await getNextCode('FIN');
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
-      data: { code, status: 'New' },
+      data: { code, status: 'WaitingDisposition' },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true, auditDate: true } },
