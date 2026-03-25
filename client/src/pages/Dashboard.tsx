@@ -15,7 +15,8 @@ interface DashboardResponse {
     openCars: number;
     overdueCars: number;
     openFindingsMajorCritical: number;
-    shipmentsOnHold: number;
+    shipmentRequests: number;
+    shipmentsRejected: number;
     rejectedDocuments: number;
   };
   charts: {
@@ -31,6 +32,14 @@ interface DashboardResponse {
       type: 'Audit' | 'Shipment';
       code: string;
       date: string | null;
+      supplierCode: string;
+      supplierName: string;
+    }>;
+    recentUpdates: Array<{
+      id: string;
+      type: 'Shipment Request' | 'Finding' | 'CAR' | 'Audit';
+      code: string;
+      date: string;
       supplierCode: string;
       supplierName: string;
     }>;
@@ -124,11 +133,13 @@ export function Dashboard() {
     openCars: 0,
     overdueCars: 0,
     openFindingsMajorCritical: 0,
-    shipmentsOnHold: 0,
+    shipmentRequests: 0,
+    shipmentsRejected: 0,
     rejectedDocuments: 0,
   };
   const topRisk = data?.charts.topRiskSuppliers ?? [];
   const upcoming = data?.charts.upcomingEvents ?? [];
+  const recentUpdates = data?.charts.recentUpdates ?? [];
   const monthly = data?.charts.monthlyTrends ?? [];
   const maxTopRisk = Math.max(1, ...topRisk.map((r) => r.score));
 
@@ -175,7 +186,8 @@ export function Dashboard() {
         <MetricCard title="Open CARs" value={metrics.openCars} />
         <MetricCard title="Overdue CARs" value={metrics.overdueCars} />
         <MetricCard title="Open findings (Major/Critical)" value={metrics.openFindingsMajorCritical} />
-        <MetricCard title="Shipments on hold" value={metrics.shipmentsOnHold} />
+        <MetricCard title="Shipment Requests" value={metrics.shipmentRequests} />
+        <MetricCard title="Shipments Rejected" value={metrics.shipmentsRejected} />
         <MetricCard title="Rejected documents" value={metrics.rejectedDocuments} />
       </div>
 
@@ -183,93 +195,140 @@ export function Dashboard() {
         style={{
           display: 'grid',
           gap: '1rem',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 420px)',
           marginBottom: '1rem',
+          alignItems: 'start',
         }}
       >
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Top risk suppliers</h2>
-            {topRisk.length === 0 ? (
-              <p className="table-empty">No data.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {topRisk.map((r) => (
-                  <div key={r.supplierId}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontSize: 'var(--text-sm)',
-                        marginBottom: 4,
-                        gap: '0.75rem',
-                      }}
-                    >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {r.code} — {r.name}
-                      </span>
-                      <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                        {r.score} ({r.level})
-                      </span>
-                    </div>
-                    <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: '1rem',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            }}
+          >
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0 }}>Top risk suppliers</h2>
+                {topRisk.length === 0 ? (
+                  <p className="table-empty">No data.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {topRisk.map((r) => (
+                      <div key={r.supplierId}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: 'var(--text-sm)',
+                            marginBottom: 4,
+                            gap: '0.75rem',
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.code} — {r.name}
+                          </span>
+                          <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                            {r.score} ({r.level})
+                          </span>
+                        </div>
+                        <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${(r.score / maxTopRisk) * 100}%`,
+                              height: '100%',
+                              background: '#4f46e5',
+                              borderRadius: 4,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0 }}>Upcoming events</h2>
+                {upcoming.length === 0 ? (
+                  <p className="table-empty">No upcoming audits or shipment inspections.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {upcoming.map((e) => (
                       <div
+                        key={`${e.type}-${e.id}`}
                         style={{
-                          width: `${(r.score / maxTopRisk) * 100}%`,
-                          height: '100%',
-                          background: '#4f46e5',
-                          borderRadius: 4,
+                          display: 'grid',
+                          gridTemplateColumns: '90px 1fr',
+                          gap: '0.5rem',
+                          fontSize: 'var(--text-sm)',
+                          borderBottom: '1px solid var(--color-border-subtle)',
+                          paddingBottom: '0.4rem',
                         }}
-                      />
-                    </div>
+                      >
+                        <span style={{ color: 'var(--color-text-muted)' }}>
+                          {e.date ? new Date(e.date).toLocaleDateString() : 'N/A'}
+                        </span>
+                        <span>
+                          <strong>{e.type}</strong> {e.code} - {e.supplierCode} — {e.supplierName}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
+              {monthly.length === 0 ? (
+                <p className="table-empty">No trend data yet.</p>
+              ) : (
+                <MonthlyTrendsLineChart rows={monthly} maxY={trendMax} />
+              )}
+            </div>
           </div>
         </div>
 
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Upcoming events</h2>
-            {upcoming.length === 0 ? (
-              <p className="table-empty">No upcoming audits or shipment inspections.</p>
+            <h2 style={{ marginTop: 0 }}>Recent Updates</h2>
+            {recentUpdates.length === 0 ? (
+              <p className="table-empty">No updates in last 7 days.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {upcoming.map((e) => (
-                  <div
-                    key={`${e.type}-${e.id}`}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '90px 1fr',
-                      gap: '0.5rem',
-                      fontSize: 'var(--text-sm)',
-                      borderBottom: '1px solid var(--color-border-subtle)',
-                      paddingBottom: '0.4rem',
-                    }}
-                  >
-                    <span style={{ color: 'var(--color-text-muted)' }}>
-                      {e.date ? new Date(e.date).toLocaleDateString() : 'N/A'}
-                    </span>
-                    <span>
-                      <strong>{e.type}</strong> {e.code} - {e.supplierCode} — {e.supplierName}
-                    </span>
-                  </div>
-                ))}
+              <div className="table-wrap" style={{ maxHeight: 520, overflowY: 'auto' }}>
+                <table className="table" style={{ marginBottom: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Code</th>
+                      <th>Supplier</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentUpdates.map((u) => (
+                      <tr key={u.id}>
+                        <td>{new Date(u.date).toLocaleDateString()}</td>
+                        <td>{u.type}</td>
+                        <td title={u.code} style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {u.code}
+                        </td>
+                        <td title={u.supplierCode ? `${u.supplierCode} — ${u.supplierName}` : u.supplierName} style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {u.supplierCode} — {u.supplierName}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
-          {monthly.length === 0 ? (
-            <p className="table-empty">No trend data yet.</p>
-          ) : (
-            <MonthlyTrendsLineChart rows={monthly} maxY={trendMax} />
-          )}
         </div>
       </div>
 

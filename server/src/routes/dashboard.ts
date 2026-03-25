@@ -29,10 +29,11 @@ router.get(
           openCars: 0,
           overdueCars: 0,
           openFindingsMajorCritical: 0,
-          shipmentsOnHold: 0,
+          shipmentRequests: 0,
+          shipmentsRejected: 0,
           rejectedDocuments: 0,
         },
-        charts: { topRiskSuppliers: [], upcomingEvents: [], monthlyTrends: [] },
+        charts: { topRiskSuppliers: [], upcomingEvents: [], recentUpdates: [], monthlyTrends: [] },
       });
       return;
     }
@@ -49,8 +50,9 @@ router.get(
 
     const now = new Date();
     const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [openCars, openFindingsMajorCritical, shipmentsOnHold, rejectedDocuments, upcomingAudits, upcomingShipments] =
+    const [openCars, openFindingsMajorCritical, shipmentRequests, shipmentsRejected, rejectedDocuments, upcomingAudits, upcomingShipments] =
       await Promise.all([
         prisma.correctiveAction.findMany({
           where: { ...whereInScope, status: { not: 'Closed' } },
@@ -63,9 +65,8 @@ router.get(
             severity: { in: ['Major', 'Critical'] },
           },
         }),
-        prisma.shipment.count({
-          where: { ...whereInScope, status: 'WaitingInspection' },
-        }),
+        prisma.shipment.count({ where: { ...whereInScope, status: 'WaitingInspection' } }),
+        prisma.shipment.count({ where: { ...whereInScope, status: 'Failed' } }),
         prisma.record.count({
           where: { ...whereInScope, status: 'Rejected', internalOrSupplier: 'internal' },
         }),
@@ -132,6 +133,90 @@ router.get(
       });
     }
 
+    const [recentShipments, recentFindings, recentCars, recentAudits] = await Promise.all([
+      prisma.shipment.findMany({
+        where: { ...whereInScope, createdAt: { gte: sevenDaysAgo }, status: 'WaitingInspection' },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          purchaseOrder: true,
+          createdAt: true,
+          supplier: { select: { code: true, name: true } },
+        },
+      }),
+      prisma.finding.findMany({
+        where: { ...whereInScope, createdAt: { gte: sevenDaysAgo } },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          code: true,
+          createdAt: true,
+          supplier: { select: { code: true, name: true } },
+        },
+      }),
+      prisma.correctiveAction.findMany({
+        where: { ...whereInScope, createdAt: { gte: sevenDaysAgo } },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          code: true,
+          createdAt: true,
+          supplier: { select: { code: true, name: true } },
+        },
+      }),
+      prisma.audit.findMany({
+        where: { ...whereInScope, createdAt: { gte: sevenDaysAgo } },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          code: true,
+          createdAt: true,
+          supplier: { select: { code: true, name: true } },
+        },
+      }),
+    ]);
+
+    const recentUpdates = [
+      ...recentShipments.map((s) => ({
+        id: `shipment-${s.id}`,
+        type: 'Shipment Request' as const,
+        code: s.purchaseOrder || 'PO-N/A',
+        date: s.createdAt.toISOString(),
+        supplierCode: s.supplier.code,
+        supplierName: s.supplier.name,
+      })),
+      ...recentFindings.map((f) => ({
+        id: `finding-${f.id}`,
+        type: 'Finding' as const,
+        code: f.code,
+        date: f.createdAt.toISOString(),
+        supplierCode: f.supplier.code,
+        supplierName: f.supplier.name,
+      })),
+      ...recentCars.map((c) => ({
+        id: `car-${c.id}`,
+        type: 'CAR' as const,
+        code: c.code,
+        date: c.createdAt.toISOString(),
+        supplierCode: c.supplier.code,
+        supplierName: c.supplier.name,
+      })),
+      ...recentAudits.map((a) => ({
+        id: `audit-${a.id}`,
+        type: 'Audit' as const,
+        code: a.code,
+        date: a.createdAt.toISOString(),
+        supplierCode: a.supplier.code,
+        supplierName: a.supplier.name,
+      })),
+    ]
+      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+      .slice(0, 40);
+
     const upcomingEvents = [
       ...upcomingAudits.map((a) => ({
         id: a.id,
@@ -160,12 +245,14 @@ router.get(
         openCars: openCars.length,
         overdueCars,
         openFindingsMajorCritical,
-        shipmentsOnHold,
+        shipmentRequests,
+        shipmentsRejected,
         rejectedDocuments,
       },
       charts: {
         topRiskSuppliers,
         upcomingEvents,
+        recentUpdates,
         monthlyTrends,
       },
     });
