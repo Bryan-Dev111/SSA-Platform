@@ -29,6 +29,21 @@ const DOCUMENT_TYPES: DocumentType[] = [
   'Form',
 ];
 
+let ensuredDocumentTypeEnum = false;
+async function ensureDocumentTypeEnumValues(): Promise<void> {
+  if (ensuredDocumentTypeEnum) return;
+  for (const value of DOCUMENT_TYPES) {
+    await prisma.$executeRawUnsafe(
+      `DO $$ BEGIN
+         ALTER TYPE "DocumentType" ADD VALUE IF NOT EXISTS '${value}';
+       EXCEPTION
+         WHEN duplicate_object THEN null;
+       END $$;`
+    );
+  }
+  ensuredDocumentTypeEnum = true;
+}
+
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
@@ -104,6 +119,7 @@ router.post(
       });
       return;
     }
+    await ensureDocumentTypeEnumValues();
     let filePath: string | null = null;
     if (req.file) {
       try {
@@ -171,6 +187,7 @@ router.patch(
       }
       data.documentType = req.body.documentType as DocumentType;
     }
+    await ensureDocumentTypeEnumValues();
     const fileBase64Raw =
       typeof req.body?.fileBase64 === 'string' && req.body.fileBase64.trim() !== ''
         ? req.body.fileBase64.trim()

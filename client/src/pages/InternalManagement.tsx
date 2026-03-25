@@ -10,7 +10,18 @@ import { Navigate } from 'react-router-dom';
 import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
-type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia';
+
+const COMMAND_MEDIA_TYPES: { value: string; label: string }[] = [
+  { value: 'Procedure', label: 'Procedure' },
+  { value: 'Policy', label: 'Policy' },
+  { value: 'QualityManual', label: 'Quality Manual' },
+  { value: 'Standard', label: 'Standard' },
+  { value: 'StandardOperatingProcedure', label: 'SOP' },
+  { value: 'WorkInstruction', label: 'Work Instruction' },
+  { value: 'Form', label: 'Form' },
+];
 
 interface InternalRow {
   id: string;
@@ -88,6 +99,16 @@ export function InternalManagement() {
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
   const [scheduleDeleteId, setScheduleDeleteId] = useState<string | null>(null);
   const [scheduleBusyId, setScheduleBusyId] = useState<string | null>(null);
+  const [commandMedia, setCommandMedia] = useState({
+    documentNumber: '',
+    name: '',
+    documentType: 'Procedure',
+    revision: '',
+    file: null as File | null,
+  });
+  const [commandMediaSubmitting, setCommandMediaSubmitting] = useState(false);
+  const [commandMediaUploadProgress, setCommandMediaUploadProgress] = useState<number | null>(null);
+  const commandMediaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
@@ -322,6 +343,60 @@ export function InternalManagement() {
     }
   };
 
+  const submitCommandMedia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !commandMedia.documentNumber.trim() || !commandMedia.name.trim()) return;
+    if (commandMedia.file && commandMedia.file.size > 150 * 1024 * 1024) {
+      toast.error('File must be 150MB or smaller');
+      return;
+    }
+    setCommandMediaSubmitting(true);
+    setCommandMediaUploadProgress(commandMedia.file ? 0 : null);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/documents`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.upload.onprogress = (evt) => {
+          if (!evt.lengthComputable) return;
+          setCommandMediaUploadProgress(Math.max(0, Math.min(100, Math.round((evt.loaded / evt.total) * 100))));
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setCommandMediaUploadProgress(100);
+            resolve();
+          } else {
+            reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error while uploading file'));
+        const form = new FormData();
+        form.append('documentNumber', commandMedia.documentNumber.trim());
+        form.append('name', commandMedia.name.trim());
+        form.append('documentType', commandMedia.documentType);
+        form.append('revision', commandMedia.revision.trim());
+        if (commandMedia.file) form.append('file', commandMedia.file);
+        xhr.send(form);
+      });
+
+      setCommandMedia({
+        documentNumber: '',
+        name: '',
+        documentType: 'Procedure',
+        revision: '',
+        file: null,
+      });
+      if (commandMediaFileInputRef.current) commandMediaFileInputRef.current.value = '';
+      setCommandMediaUploadProgress(null);
+      toast.success('Command media uploaded');
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setCommandMediaSubmitting(false);
+      setCommandMediaUploadProgress(null);
+    }
+  };
+
   return (
     <div className="page">
       <header className="page-header">
@@ -339,6 +414,7 @@ export function InternalManagement() {
             ['shipments', 'Shipments'],
             ['contracts', 'Contracts'],
             ['documents', 'Documents'],
+            ['commandMedia', 'Command Media'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -932,6 +1008,82 @@ export function InternalManagement() {
             </div>
           </div>
         </>
+      )}
+
+      {tab === 'commandMedia' && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Add document</h2>
+            <form onSubmit={submitCommandMedia}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                  gap: '0.75rem',
+                  alignItems: 'end',
+                }}
+              >
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Document Number *</label>
+                  <input
+                    className="input"
+                    value={commandMedia.documentNumber}
+                    onChange={(e) => setCommandMedia((p) => ({ ...p, documentNumber: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Name *</label>
+                  <input
+                    className="input"
+                    value={commandMedia.name}
+                    onChange={(e) => setCommandMedia((p) => ({ ...p, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Type *</label>
+                  <select
+                    className="input"
+                    value={commandMedia.documentType}
+                    onChange={(e) => setCommandMedia((p) => ({ ...p, documentType: e.target.value }))}
+                  >
+                    {COMMAND_MEDIA_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Revision</label>
+                  <input
+                    className="input"
+                    value={commandMedia.revision}
+                    onChange={(e) => setCommandMedia((p) => ({ ...p, revision: e.target.value }))}
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">File (optional)</label>
+                  <input
+                    ref={commandMediaFileInputRef}
+                    className="input"
+                    type="file"
+                    onChange={(e) => setCommandMedia((p) => ({ ...p, file: e.target.files?.[0] ?? null }))}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={commandMediaSubmitting}>
+                  {commandMediaSubmitting ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+              {commandMediaUploadProgress !== null && (
+                <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                  Upload progress: {commandMediaUploadProgress}%
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
       )}
 
       <ConfirmDialog
