@@ -129,6 +129,10 @@ export function FindingsRecord() {
   // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
   const canCreateNew = canEditDraft;
 
+  // Requirement: on the Finding Record (create) page, inputs must be locked until
+  // user clicks "Create finding".
+  const [createEnabled, setCreateEnabled] = useState(false);
+
   const resetCreateForm = () => {
     setForm({
       supplierId: '',
@@ -184,6 +188,7 @@ export function FindingsRecord() {
       setLoading(false);
       setError(null);
       setFinding(null);
+      setCreateEnabled(false);
       setSearchMissNoCreate(false);
       apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => { if (isActive()) setSuppliers([]); });
       return;
@@ -196,11 +201,13 @@ export function FindingsRecord() {
       .then((f) => {
         if (!isActive()) return;
         setFinding(f);
+        setCreateEnabled(false);
         setForm(formStateFromFinding(f));
       })
       .catch((e) => {
         if (!isActive()) return;
         setFinding(null);
+        setCreateEnabled(false);
         const message = e instanceof Error ? e.message : 'Failed to load';
         const isNotFound = isFindingNotFoundErrorMessage(message);
         setError(isNotFound ? null : message);
@@ -395,6 +402,10 @@ export function FindingsRecord() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (createLocked) {
+      toast.info('Click Create finding to enable editing.');
+      return;
+    }
     if (!token || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
     setSaving(true);
     try {
@@ -462,6 +473,7 @@ export function FindingsRecord() {
     setSearchMissNoCreate(false);
     setFindingQuery('');
     resetCreateForm();
+    setCreateEnabled(true);
     navigate('/findings-record');
   };
 
@@ -480,6 +492,7 @@ export function FindingsRecord() {
   }
 
   const isNew = !finding && !idParam && !codeParam && !searchMissNoCreate;
+  const createLocked = isNew && !createEnabled;
 
   // Viewer/Buyer are read-only: do not show the "New finding" create form (redirect to list)
   if (!loading && isNew && !canCreateNew) {
@@ -542,6 +555,7 @@ export function FindingsRecord() {
                     value={form.supplierId}
                     onChange={(e) => setForm((p) => ({ ...p, supplierId: e.target.value, auditId: '' }))}
                     required
+                    disabled={createLocked}
                   >
                     <option value="">Select</option>
                     {suppliers.map((s) => (
@@ -555,6 +569,7 @@ export function FindingsRecord() {
                     className="input"
                     value={form.auditId}
                     onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}
+                    disabled={createLocked}
                   >
                     <option value="">None / N/A</option>
                     {audits.filter((a) => a.supplierId === form.supplierId).map((a) => (
@@ -568,6 +583,7 @@ export function FindingsRecord() {
                     className="input"
                     value={form.severity}
                     onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value }))}
+                    disabled={createLocked}
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -578,20 +594,36 @@ export function FindingsRecord() {
               <div className="input-group">
                 <label className="input-label">Summary *</label>
                 <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Brief description of the issue</p>
-                <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} required />
+                <input
+                  className="input"
+                  value={form.summary}
+                  onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
+                  required
+                  disabled={createLocked}
+                />
               </div>
               <div className="input-group">
                 <label className="input-label">Discrepancy *</label>
                 <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
-                <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} required />
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={form.discrepancy}
+                  onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))}
+                  required
+                  disabled={createLocked}
+                />
               </div>
               <ReferenceCodeSelect
                 label="Defect Code"
                 value={form.defectCode}
                 onChange={(v) => setForm((p) => ({ ...p, defectCode: v }))}
                 options={defectCodeOptions}
+                disabled={createLocked}
               />
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving || createLocked}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
             </form>
           </div>
         </div>

@@ -245,12 +245,12 @@ export function Findings() {
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalAll}</div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open (All)</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
-        </div>
-        <div className="card" style={{ padding: '1rem' }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Critical/Major</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.criticalMajor}</div>
+        </div>
+        <div className="card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open (All)</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
         </div>
       </div>
 
