@@ -224,7 +224,7 @@ export function Documents() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Documents</h1>
+        <h1 className="page-title">Command Media</h1>
         <p className="page-description">
           Controlled policies, procedures, SOPs, work instructions, and forms.
         </p>

@@ -4,11 +4,17 @@ export const PAGE_DEFINITIONS = [
   { key: 'Dashboard', label: 'Dashboard', path: '/dashboard' },
   { key: 'Risk', label: 'Risk', path: '/risk' },
   { key: 'CorrectiveActions', label: 'CAR', path: '/corrective-actions' },
+  { key: 'CARRecord', label: 'CAR Record', path: '/car-record' },
   { key: 'Findings', label: 'Findings', path: '/findings' },
+  { key: 'FindingsRecord', label: 'Findings Record', path: '/findings-record' },
   { key: 'Audits', label: 'Audits', path: '/audits' },
+  { key: 'SupplierProfile', label: 'Supplier Profile', path: '/supplier-profile' },
   { key: 'SupplierList', label: 'Suppliers', path: '/supplier-list' },
+  { key: 'SuppliersMap', label: 'Suppliers Map', path: '/suppliers-map' },
   { key: 'Records', label: 'Records', path: '/records' },
+  { key: 'Shipments', label: 'Shipments', path: '/shipments' },
   { key: 'Documents', label: 'Documents', path: '/documents' },
+  { key: 'InternalManagement', label: 'Internal Management', path: '/internal-management' },
   { key: 'Admin', label: 'Admin', path: '/admin' },
 ] as const;
 
@@ -60,14 +66,15 @@ export async function getPathRolesMatrix(): Promise<Record<string, string[]>> {
   const roleById = new Map(roles.map((r) => [r.id, r.name]));
   const pathRoles: Record<string, string[]> = { ...DEFAULT_PATH_ROLES };
   for (const page of PAGE_DEFINITIONS) {
+    const rowsForPage = permissions.filter((p) => p.pageKey === page.key);
+    if (rowsForPage.length === 0) continue; // keep DEFAULT_PATH_ROLES fallback when no rows exist yet
     pathRoles[page.path] = [];
-  }
-  for (const p of permissions) {
-    if (!p.canAccess) continue;
-    const roleName = roleById.get(p.roleId);
-    const page = PAGE_DEFINITIONS.find((d) => d.key === p.pageKey);
-    if (!roleName || !page) continue;
-    pathRoles[page.path].push(roleName);
+    for (const p of rowsForPage) {
+      if (!p.canAccess) continue;
+      const roleName = roleById.get(p.roleId);
+      if (!roleName) continue;
+      pathRoles[page.path].push(roleName);
+    }
   }
   return pathRoles;
 }

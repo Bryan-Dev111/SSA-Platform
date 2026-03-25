@@ -105,7 +105,7 @@ router.get(
         if (perms.length === 0) {
           matrix[role.name][page.key] = (DEFAULT_PATH_ROLES[page.path] ?? []).includes(role.name);
         } else {
-          matrix[role.name][page.key] = row?.canAccess ?? false;
+          matrix[role.name][page.key] = row?.canAccess ?? (DEFAULT_PATH_ROLES[page.path] ?? []).includes(role.name);
         }
       }
     }
