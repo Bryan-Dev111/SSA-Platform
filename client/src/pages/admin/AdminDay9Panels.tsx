@@ -301,6 +301,7 @@ interface UserRow {
   email: string;
   name: string | null;
   isEmployee?: boolean;
+  isContractor?: boolean;
   roleNames: string[];
   passwordPlain: string | null;
   assignedSupplierIds: string[];
@@ -496,7 +497,8 @@ export function AdminBuyersSuppliersPanel({
           lastName: newUserLastName.trim(),
           email: newUserEmail.trim(),
           password: newUserPassword,
-          isEmployee: newUserIsEmployee === 'Yes',
+            isEmployee: newUserIsEmployee === 'Yes',
+            isContractor: newUserIsEmployee === 'Contractor',
           roleNames,
         }),
       });
@@ -723,7 +725,13 @@ export function AdminBuyersSuppliersPanel({
                     <tr key={u.id}>
                       <td>{u.name?.trim() ? u.name : '—'}</td>
                       <td>{u.email}</td>
-                      <td>{u.isEmployee ? 'Yes' : 'No'}</td>
+                      <td>
+                        {u.isContractor
+                          ? 'Contractor'
+                          : u.isEmployee
+                            ? 'Yes'
+                            : 'No'}
+                      </td>
                       <td style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 'var(--text-xs)' }}>
                         {u.passwordPlain ?? '—'}
                       </td>

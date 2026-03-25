@@ -22,6 +22,16 @@ function parseIsEmployee(value: unknown): boolean {
   return false;
 }
 
+function parseIsContractor(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'contractor' || normalized === 'true' || normalized === '1';
+  }
+  if (typeof value === 'number') return value === 1;
+  return false;
+}
+
 function getPasswordEncryptionKey(): Buffer {
   const raw = process.env.PASSWORD_ENCRYPTION_KEY;
   if (!raw || !raw.trim()) {
@@ -172,6 +182,7 @@ router.get(
         name: true,
         passwordEncrypted: true,
         isEmployee: true,
+        isContractor: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -186,6 +197,7 @@ router.get(
         email: u.email,
         name: u.name,
         isEmployee: u.isEmployee,
+        isContractor: u.isContractor,
         createdAt: u.createdAt,
         passwordPlain: decryptPassword(u.passwordEncrypted),
         roleNames: u.userRoles.map((ur) => ur.role.name),
@@ -208,6 +220,7 @@ router.post(
     const nameLegacy = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const name = nameFromParts || nameLegacy || null;
     const isEmployee = parseIsEmployee(req.body?.isEmployee);
+    const isContractor = parseIsContractor(req.body?.isContractor);
     const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : [];
     const roleNames = [...new Set(roleNamesRaw)];
     if (!emailRaw || !password) {
@@ -237,6 +250,7 @@ router.post(
         passwordEncrypted,
         name,
         isEmployee,
+        isContractor,
         userRoles: {
           create: roleRows.map((r) => ({ roleId: r.id })),
         },
@@ -246,6 +260,7 @@ router.post(
         email: true,
         name: true,
         isEmployee: true,
+        isContractor: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -258,6 +273,7 @@ router.post(
       email: user.email,
       name: user.name,
       isEmployee: user.isEmployee,
+      isContractor: user.isContractor,
       createdAt: user.createdAt,
       roleNames: user.userRoles.map((ur) => ur.role.name),
       supplier: user.supplier ?? undefined,
