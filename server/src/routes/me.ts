@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { prisma } from '../lib/prisma';
 import { getPathRolesMatrix } from '../lib/permissions';
+import { getNextCode } from '../services/idGenerator';
 
 const router = Router();
 
@@ -88,6 +89,16 @@ router.get(
         take: 100,
       }),
     ]);
+
+    // Backfill missing SHIP codes for existing shipments.
+    const missingShipCodes = shipments.filter((s) => s.code == null);
+    if (missingShipCodes.length > 0) {
+      for (const s of missingShipCodes) {
+        const code = await getNextCode('SHIP');
+        await prisma.shipment.update({ where: { id: s.id }, data: { code } });
+        s.code = code;
+      }
+    }
     const openCars = cars.filter((c) => c.status !== 'Closed').length;
     res.json({
       supplier: {

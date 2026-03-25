@@ -10,6 +10,7 @@ import { computeShipmentMetrics } from '../services/shipmentMetrics';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { ShipmentResult, ShipmentStatus } from '@prisma/client';
 import { createAlertForRecipients } from '../services/alerts';
+import { getNextCode } from '../services/idGenerator';
 
 const router = Router();
 
@@ -18,6 +19,10 @@ router.use(requirePageAccess('Shipments'));
 
 function canRecordInspectionResult(roleNames: string[]): boolean {
   return roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
+}
+
+function canEditInspector(roleNames: string[]): boolean {
+  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager');
 }
 
 router.get(
@@ -81,6 +86,18 @@ router.get(
       include: { supplier: { select: { id: true, code: true, name: true } } },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Backfill missing SHIP codes for existing shipments.
+    // (Older rows may have `code = null` until the migration is fully applied.)
+    const missing = list.filter((s) => s.code == null);
+    if (missing.length > 0) {
+      for (const s of missing) {
+        const code = await getNextCode('SHIP');
+        await prisma.shipment.update({ where: { id: s.id }, data: { code } });
+        // Reflect backfill in the response object.
+        s.code = code;
+      }
+    }
     res.json(list);
   })
 );
@@ -145,14 +162,18 @@ router.post(
       return;
     }
     const inspectionDate = new Date(inspectionDateStr.slice(0, 10) + 'T12:00:00.000Z');
+    const code = await getNextCode('SHIP');
+    const createdBy = req.user.name?.trim() ? req.user.name.trim() : req.user.email;
     const shipment = await prisma.shipment.create({
       data: {
         supplierId,
+        code,
         purchaseOrder,
         partNumber,
         lot,
         qty: Math.floor(qty),
         inspectionDate,
+        createdBy,
       },
       include: { supplier: { select: { id: true, code: true, name: true } } },
     });
@@ -174,23 +195,12 @@ router.patch(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    if (!canRecordInspectionResult(req.user.roleNames)) {
-      res.status(403).json({ error: 'Only Admin or Quality Engineer can record inspection results' });
-      return;
-    }
     const id = req.params.id;
     const resultRaw = req.body?.result;
-    if (resultRaw !== 'Passed' && resultRaw !== 'Failed') {
-      res.status(400).json({ error: 'result must be Passed or Failed' });
-      return;
-    }
+    const inspectorRaw = req.body?.inspector;
     const existing = await prisma.shipment.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ error: 'Not found' });
-      return;
-    }
-    if (existing.status !== 'WaitingInspection') {
-      res.status(400).json({ error: 'This inspection was already reviewed' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -198,29 +208,95 @@ router.patch(
       res.status(403).json({ error: 'Supplier not in scope' });
       return;
     }
-    const result = resultRaw as ShipmentResult;
-    const status: ShipmentStatus = result === 'Passed' ? 'Passed' : 'Failed';
-    const notesRaw = req.body?.notes;
-    const data: { result: ShipmentResult; status: ShipmentStatus; notes?: string | null } = { result, status };
-    if (typeof notesRaw === 'string') {
-      data.notes = notesRaw.trim() || null;
-    } else if (result === 'Passed') {
-      data.notes = null;
+
+    const hasResultUpdate = resultRaw === 'Passed' || resultRaw === 'Failed';
+    const hasInspectorUpdate = typeof inspectorRaw === 'string' || inspectorRaw === null;
+
+    if (!hasResultUpdate && !hasInspectorUpdate) {
+      res.status(400).json({ error: 'Provide either result (Passed/Failed) or inspector' });
+      return;
     }
-    const updated = await prisma.shipment.update({
-      where: { id },
-      data,
-      include: { supplier: { select: { id: true, code: true, name: true } } },
-    });
-    if (updated.result === 'Failed') {
-      await createAlertForRecipients({
-        category: 'rejectedShipmentDocument',
-        entityType: 'Shipment',
-        entityId: updated.id,
-        message: `Shipment ${updated.purchaseOrder || updated.id} was rejected for ${updated.supplier.code} — ${updated.supplier.name}.`,
+
+    const shouldBePending = existing.status === 'WaitingInspection';
+    const canInspector = canEditInspector(req.user.roleNames);
+    const canResult = canRecordInspectionResult(req.user.roleNames);
+
+    // Inspector-only edit: allowed only while waiting.
+    if (hasInspectorUpdate && !hasResultUpdate) {
+      if (!canInspector) {
+        res.status(403).json({ error: 'Insufficient permissions to edit inspector' });
+        return;
+      }
+      if (!shouldBePending) {
+        res.status(400).json({ error: 'This inspection was already reviewed' });
+        return;
+      }
+
+      const inspector = typeof inspectorRaw === 'string' ? inspectorRaw.trim() || null : null;
+      const updated = await prisma.shipment.update({
+        where: { id },
+        data: { inspector },
+        include: { supplier: { select: { id: true, code: true, name: true } } },
       });
+      res.json(updated);
+      return;
     }
-    res.json(updated);
+
+    // Result update: only Admin/QE. Also requires pending status.
+    if (hasResultUpdate) {
+      if (!canResult) {
+        res.status(403).json({ error: 'Only Admin or Quality Engineer can record inspection results' });
+        return;
+      }
+      if (!shouldBePending) {
+        res.status(400).json({ error: 'This inspection was already reviewed' });
+        return;
+      }
+
+      const result = resultRaw as ShipmentResult;
+      const status: ShipmentStatus = result === 'Passed' ? 'Passed' : 'Failed';
+      const notesRaw = req.body?.notes;
+
+      const data: { result: ShipmentResult; status: ShipmentStatus; notes?: string | null; inspector?: string | null } = {
+        result,
+        status,
+      };
+
+      if (typeof notesRaw === 'string') {
+        const trimmed = notesRaw.trim();
+        data.notes = trimmed || (result === 'Failed' ? 'Rejected' : null);
+      } else if (result === 'Failed') {
+        data.notes = 'Rejected';
+      } else if (result === 'Passed') {
+        data.notes = null;
+      }
+
+      // If caller can edit inspector, persist it at the same time as the decision.
+      if (hasInspectorUpdate && canInspector) {
+        data.inspector = typeof inspectorRaw === 'string' ? inspectorRaw.trim() || null : null;
+      }
+
+      const updated = await prisma.shipment.update({
+        where: { id },
+        data,
+        include: { supplier: { select: { id: true, code: true, name: true } } },
+      });
+
+      if (updated.result === 'Failed') {
+        await createAlertForRecipients({
+          category: 'rejectedShipmentDocument',
+          entityType: 'Shipment',
+          entityId: updated.id,
+          message: `Shipment ${updated.purchaseOrder || updated.id} was rejected for ${updated.supplier.code} — ${updated.supplier.name}.`,
+        });
+      }
+
+      res.json(updated);
+      return;
+    }
+
+    // If we reached here, something unexpected happened.
+    res.status(400).json({ error: 'No valid updates provided' });
   })
 );
 

@@ -273,8 +273,31 @@ router.get(
         where: { supplierId },
         orderBy: { createdAt: 'desc' },
         take: 100,
+        select: {
+          id: true,
+          code: true,
+          purchaseOrder: true,
+          partNumber: true,
+          lot: true,
+          qty: true,
+          inspectionDate: true,
+          status: true,
+          notes: true,
+          createdAt: true,
+          createdBy: true,
+        },
       }),
     ]);
+
+    // Backfill missing SHIP codes for existing shipments.
+    const missingShipCodes = shipments.filter((s) => s.code == null);
+    if (missingShipCodes.length > 0) {
+      for (const s of missingShipCodes) {
+        const code = await getNextCode('SHIP');
+        await prisma.shipment.update({ where: { id: s.id }, data: { code } });
+        s.code = code;
+      }
+    }
     const openCars = cars.filter((c) => c.status !== 'Closed').length;
     res.json({
       supplier: {

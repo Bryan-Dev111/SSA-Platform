@@ -56,12 +56,15 @@ interface PortalData {
   }>;
   shipments: Array<{
     id: string;
+    code: string | null;
     purchaseOrder: string | null;
     partNumber: string | null;
     lot: string | null;
     qty: number | null;
     inspectionDate: string | null;
-    status: string;
+    createdBy: string | null;
+    createdAt: string;
+    notes: string | null;
   }>;
   metrics: {
     assignedBuyerCount: number;
@@ -155,6 +158,19 @@ export function SupplierProfile() {
     if (!url) return;
     apiJson<PortalData>(url, { token }).then(setData).catch(() => {});
   };
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = window.setInterval(() => {
+      refresh();
+    }, 15000);
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [token, isSupplier, canSelectSupplier, selectedSupplierId]);
 
   const submitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -650,23 +666,38 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr>
-              <th>PO</th>
-              <th>Part #</th>
-              <th>Qty</th>
+              <th>Shipment ID</th>
+              <th>Supplier</th>
+              <th>P.O.</th>
               <th>Lot</th>
-              <th>Inspection date</th>
-              <th>Status</th>
+              <th>Part Number</th>
+              <th>Quantity</th>
+              <th>Requested Inspection Date</th>
+              <th>User</th>
+              <th>Date Created</th>
+              <th>NOTES</th>
             </tr>
           </thead>
           <tbody>
             {data.shipments.map((s) => (
               <tr key={s.id}>
+                <td>{s.code ?? '—'}</td>
+                <td>
+                  {supplier?.code ?? '—'} — {supplier?.name ?? ''}
+                </td>
                 <td>{s.purchaseOrder ?? '—'}</td>
+                <td>{s.lot ?? '—'}</td>
                 <td>{s.partNumber ?? '—'}</td>
                 <td>{s.qty ?? '—'}</td>
-                <td>{s.lot ?? '—'}</td>
                 <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
-                <td>{s.status}</td>
+                <td>{s.createdBy ?? '—'}</td>
+                <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                <td
+                  style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={s.notes ?? ''}
+                >
+                  {s.notes?.trim() ? s.notes : '—'}
+                </td>
               </tr>
             ))}
           </tbody>

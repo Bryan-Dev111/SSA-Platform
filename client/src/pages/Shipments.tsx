@@ -17,6 +17,7 @@ interface Supplier {
 
 interface ShipmentRow {
   id: string;
+  code: string | null;
   supplierId: string;
   purchaseOrder: string | null;
   partNumber: string | null;
@@ -25,8 +26,10 @@ interface ShipmentRow {
   inspectionDate: string | null;
   status: string;
   result: string | null;
+  inspector: string | null;
   notes: string | null;
   supplier: { id: string; code: string; name: string };
+  updatedAt?: string;
   createdAt?: string;
 }
 
@@ -40,13 +43,6 @@ interface Metrics {
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount?: number;
-}
-
-function formatShipmentStatus(status: string): string {
-  if (status === 'WaitingInspection') return 'Waiting inspection';
-  if (status === 'Passed') return 'Passed';
-  if (status === 'Failed') return 'Failed';
-  return status;
 }
 
 export function Shipments() {
@@ -67,8 +63,18 @@ export function Shipments() {
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
+  const isQM = user?.roleNames?.includes('QualityManager') ?? false;
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
   const canReview = isAdmin || isQE;
+  const canEditInspector = isAdmin || isQE || isQM;
+
+  const [inspectorDrafts, setInspectorDrafts] = useState<Record<string, string>>({});
+
+  const initializeInspectorDrafts = (list: ShipmentRow[]) => {
+    const next: Record<string, string> = {};
+    for (const s of list) next[s.id] = s.inspector ?? '';
+    setInspectorDrafts(next);
+  };
 
   const loadData = () => {
     if (!token) return;
@@ -80,6 +86,7 @@ export function Shipments() {
     ])
       .then(([s, m]) => {
         setShipments(s);
+        initializeInspectorDrafts(s);
         setMetrics(m);
       })
       .catch((e) => setError(parseApiError(e)));
@@ -136,6 +143,7 @@ export function Shipments() {
     ])
       .then(([s, m]) => {
         setShipments(s);
+        initializeInspectorDrafts(s);
         setMetrics(m);
       })
       .catch((e) => setError(parseApiError(e)))
@@ -146,10 +154,12 @@ export function Shipments() {
     if (!token || !approveConfirmId) return;
     setSavingId(approveConfirmId);
     try {
+      const inspectorRaw = inspectorDrafts[approveConfirmId] ?? '';
+      const inspector = inspectorRaw.trim() || null;
       await apiJson(`/shipments/${approveConfirmId}`, {
         token,
         method: 'PATCH',
-        body: JSON.stringify({ result: 'Passed' }),
+        body: JSON.stringify({ result: 'Passed', inspector }),
       });
       toast.success('Approved (Passed)');
       setApproveConfirmId(null);
@@ -165,10 +175,16 @@ export function Shipments() {
     if (!token || !rejectDialog) return;
     setSavingId(rejectDialog.id);
     try {
+      const inspectorRaw = inspectorDrafts[rejectDialog.id] ?? '';
+      const inspector = inspectorRaw.trim() || null;
       await apiJson(`/shipments/${rejectDialog.id}`, {
         token,
         method: 'PATCH',
-        body: JSON.stringify({ result: 'Failed', notes: rejectDialog.note.trim() || null }),
+        body: JSON.stringify({
+          result: 'Failed',
+          notes: rejectDialog.note.trim() || null,
+          inspector,
+        }),
       });
       toast.success('Rejected (Failed)');
       setRejectDialog(null);
@@ -271,71 +287,110 @@ export function Shipments() {
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
                       Supplier {sortIndicator('supplier')}
                     </th>
-                    <th>PO</th>
-                    <th>Part #</th>
-                    <th>Qty</th>
+                    <th>P.O.</th>
                     <th>Lot</th>
+                    <th>Part Number</th>
+                    <th>Quantity</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('scheduled')}>
-                      Scheduled {sortIndicator('scheduled')}
+                      Requested Inspection Date {sortIndicator('scheduled')}
                     </th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>
-                      Status {sortIndicator('status')}
-                    </th>
-                    <th>Notes</th>
-                    {canReview ? <th>Review</th> : null}
+                    <th>Inspector</th>
+                    <th>Approval</th>
+                    <th>Approval Date</th>
+                    <th>Approve/Reject Button</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedShipments.map((r) => (
                     <tr key={r.id}>
                       <td>
-                        {r.supplier?.code ?? '—'} — {r.supplier?.name ?? ''}
+                        <div style={{ fontWeight: 600 }}>{r.code ?? '—'}</div>
+                        <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                          {r.supplier?.code ?? '—'} — {r.supplier?.name ?? ''}
+                        </div>
                       </td>
                       <td>{r.purchaseOrder ?? '—'}</td>
+                      <td>{r.lot ?? '—'}</td>
                       <td>{r.partNumber ?? '—'}</td>
                       <td>{r.qty ?? '—'}</td>
-                      <td>{r.lot ?? '—'}</td>
                       <td>{r.inspectionDate?.slice(0, 10) ?? '—'}</td>
-                      <td>{formatShipmentStatus(r.status)}</td>
-                      <td
-                        style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        title={r.notes ?? ''}
-                      >
-                        {r.notes?.trim() ? r.notes : '—'}
+
+                      <td>
+                        {canEditInspector && r.status === 'WaitingInspection' ? (
+                          <input
+                            className="input"
+                            value={inspectorDrafts[r.id] ?? ''}
+                            placeholder="Inspector"
+                            disabled={savingId === r.id}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              setInspectorDrafts((d) => ({ ...d, [r.id]: next }));
+                            }}
+                            onBlur={async () => {
+                              if (!token) return;
+                              const raw = inspectorDrafts[r.id] ?? '';
+                              const inspector = raw.trim() || null;
+                              if (inspector === (r.inspector ?? null)) return;
+                              if (savingId === r.id) return;
+
+                              setSavingId(r.id);
+                              try {
+                                await apiJson(`/shipments/${r.id}`, {
+                                  token,
+                                  method: 'PATCH',
+                                  body: JSON.stringify({ inspector }),
+                                });
+                                toast.success('Inspector updated');
+                                loadData();
+                              } catch (e) {
+                                toast.error(parseApiError(e));
+                              } finally {
+                                setSavingId(null);
+                              }
+                            }}
+                            style={{ width: 180 }}
+                          />
+                        ) : (
+                          <span style={{ color: r.inspector ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+                            {r.inspector ?? '—'}
+                          </span>
+                        )}
                       </td>
-                      {canReview ? (
-                        <td>
-                          {r.status === 'WaitingInspection' ? (
-                            <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                className="btn"
-                                style={{
-                                  fontSize: 'var(--text-sm)',
-                                  padding: '0.35rem 0.65rem',
-                                  background: 'var(--color-success)',
-                                  color: '#fff',
-                                }}
-                                disabled={savingId === r.id}
-                                onClick={() => setApproveConfirmId(r.id)}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.65rem' }}
-                                disabled={savingId === r.id}
-                                onClick={() => setRejectDialog({ id: r.id, note: '' })}
-                              >
-                                Reject
-                              </button>
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
-                          )}
-                        </td>
-                      ) : null}
+
+                      <td>{r.status === 'Passed' ? 'Approved' : r.status === 'Failed' ? 'Rejected' : '—'}</td>
+                      <td>{r.status === 'WaitingInspection' ? '—' : r.updatedAt?.slice(0, 10) ?? '—'}</td>
+
+                      <td>
+                        {canReview && r.status === 'WaitingInspection' ? (
+                          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{
+                                fontSize: 'var(--text-sm)',
+                                padding: '0.35rem 0.65rem',
+                                background: 'var(--color-success)',
+                                color: '#fff',
+                              }}
+                              disabled={savingId === r.id}
+                              onClick={() => setApproveConfirmId(r.id)}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.65rem' }}
+                              disabled={savingId === r.id}
+                              onClick={() => setRejectDialog({ id: r.id, note: '' })}
+                            >
+                              Reject
+                            </button>
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

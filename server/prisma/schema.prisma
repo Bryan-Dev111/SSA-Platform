@@ -287,6 +287,7 @@ enum CARStatus {
 // ============== Shipments ==============
 model Shipment {
   id              String          @id @default(cuid())
+  code            String?         @unique
   supplierId      String
   supplier        Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   purchaseOrder   String?
@@ -296,6 +297,8 @@ model Shipment {
   inspectionDate  DateTime?       @db.Date
   status          ShipmentStatus @default(WaitingInspection)
   result          ShipmentResult? // Passed, Failed (set by Admin/QE)
+  inspector       String?
+  createdBy      String?
   notes           String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
