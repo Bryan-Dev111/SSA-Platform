@@ -278,6 +278,22 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>Risk category weights</h2>
         <p style={{ color: 'var(--color-text-muted)' }}>Used for risk calculation (Day 11). All five must sum to exactly 100%.</p>
+        <div
+          style={{
+            marginBottom: '0.75rem',
+            padding: '0.6rem 0.75rem',
+            borderRadius: 8,
+            background: 'var(--color-surface-muted)',
+            border: '1px solid var(--color-border-subtle)',
+            fontSize: 'var(--text-sm)',
+          }}
+        >
+          <strong>Risk equation:</strong>{' '}
+          <code>
+            Overall Risk = (Quality x Quality%) + (Audit x Audit%) + (Delivery x Delivery%) + (CAR Closure x CAR
+            Closure%) + (Documentation x Documentation%)
+          </code>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
           {field('qualityPercent', 'Quality')}
           {field('auditPercent', 'Audit')}

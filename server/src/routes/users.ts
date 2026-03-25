@@ -190,6 +190,7 @@ router.get(
         qeSuppliers: { select: { supplierId: true } },
         auditorSuppliers: { select: { supplierId: true } },
         qeBuyers: { select: { buyerId: true } },
+        qmQes: { select: { qualityEngineerId: true } },
       },
       orderBy: { email: 'asc' },
     });
@@ -208,6 +209,7 @@ router.get(
         qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId), // legacy direct mapping
         auditorAssignedSupplierIds: u.auditorSuppliers.map((a) => a.supplierId),
         qeAssignedBuyerIds: u.qeBuyers.map((qb) => qb.buyerId),
+        qmAssignedQeIds: u.qmQes.map((qq) => qq.qualityEngineerId),
       }))
     );
   })

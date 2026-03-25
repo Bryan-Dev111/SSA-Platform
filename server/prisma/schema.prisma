@@ -59,6 +59,8 @@ model User {
 
   qeBuyers QeBuyer[] @relation("QeBuyerQeAssignments")
   qeBuyerBuyers QeBuyer[] @relation("QeBuyerBuyerAssignments")
+  qmQes QualityManagerQe[] @relation("QmQeManagerAssignments")
+  qmQeEngineers QualityManagerQe[] @relation("QmQeEngineerAssignments")
 }
 
 model UserRole {
@@ -160,6 +162,16 @@ model QeBuyer {
   qualityEngineer User @relation("QeBuyerQeAssignments", fields: [qualityEngineerId], references: [id], onDelete: Cascade)
   buyer           User @relation("QeBuyerBuyerAssignments", fields: [buyerId], references: [id], onDelete: Cascade)
   @@id([qualityEngineerId, buyerId])
+}
+
+model QualityManagerQe {
+  qualityManagerId  String
+  qualityEngineerId String
+
+  qualityManager  User @relation("QmQeManagerAssignments", fields: [qualityManagerId], references: [id], onDelete: Cascade)
+  qualityEngineer User @relation("QmQeEngineerAssignments", fields: [qualityEngineerId], references: [id], onDelete: Cascade)
+
+  @@id([qualityManagerId, qualityEngineerId])
 }
 
 // ============== Audits & Findings & CARs ==============
