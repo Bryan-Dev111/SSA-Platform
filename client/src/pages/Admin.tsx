@@ -15,6 +15,7 @@ import {
 } from './admin/AdminDay9Panels';
 import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
 import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
+import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 
 type Tab =
   | 'commodity'
@@ -369,12 +370,7 @@ export function Admin() {
         <AdminWorkLogsPanel token={token} />
       )}
       {tab === 'laborCosts' && (
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Labor Costs</h2>
-            <p className="table-empty">No labor cost module is configured in this build yet.</p>
-          </div>
-        </div>
+        <AdminLaborCostsPanel token={token} />
       )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
 

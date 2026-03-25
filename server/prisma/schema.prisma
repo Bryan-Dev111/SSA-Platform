@@ -338,6 +338,25 @@ model WorkLog {
   shipment    Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
   description String?
   createdAt   DateTime @default(now())
+  laborCosts  LaborCost[]
+}
+
+model LaborCost {
+  id         String     @id @default(cuid())
+  code       String     @unique // COST-00001
+  workLogId  String?
+  workLog    WorkLog?   @relation(fields: [workLogId], references: [id], onDelete: SetNull)
+  fullName   String
+  hours      Float
+  rate       Float
+  totalCost  Float
+  paidStatus PaidStatus @default(Pending)
+  createdAt  DateTime   @default(now())
+}
+
+enum PaidStatus {
+  Pending
+  Paid
 }
 
 enum WorkType {
