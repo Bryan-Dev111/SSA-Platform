@@ -1,6 +1,6 @@
 /**
- * Findings Record: Summary, Discrepancy, Defect Code, Disposition (after create), Closing Comments.
- * Header layout aligned with CAR record; workflow Save / Process / Reverse / Approve / Reject.
+ * Findings Record: layout aligned with CAR Record — status on record, Save/Edit/Process/Reverse,
+ * Approval section at bottom with Approve/Reject, approval log and status history tables.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Navigate, Link } from 'react-router-dom';
@@ -46,10 +46,28 @@ interface Finding {
   closingComments: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy?: { id: string; name: string | null; email: string | null } | null;
   correctiveActions?: { id: string; code: string; status: string }[];
+  approvalLogs?: Array<{
+    id: string;
+    action: string;
+    comment: string | null;
+    createdAt: string;
+    user: { id: string; name: string | null; email: string | null } | null;
+  }>;
+}
+
+interface StatusHistoryEntry {
+  id: string;
+  status: string;
+  note: string;
+  user: string;
+  at: string;
 }
 
 const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
+
+const FINDING_STATUS_VALUES = new Set(['New', 'DRAFT', 'WaitingDisposition', 'WaitingApproval', 'Closed']);
 
 /** Human-readable labels for Prisma enum-style status strings */
 function formatFindingStatus(status: string): string {
@@ -57,6 +75,92 @@ function formatFindingStatus(status: string): string {
   if (status === 'WaitingDisposition') return 'Waiting Disposition';
   if (status === 'WaitingApproval') return 'Waiting Approval';
   return status;
+}
+
+function displayPersonFullName(
+  user: { name: string | null; email: string | null } | null | undefined,
+  fallback = 'Unknown'
+): string {
+  const name = user?.name?.trim();
+  return name && name.length > 0 ? name : fallback;
+}
+
+function approvalLogCommentDisplay(log: NonNullable<Finding['approvalLogs']>[number]): string {
+  const a = log.action.trim().toLowerCase();
+  const c = log.comment?.trim() ?? '';
+  if ((a === 'processed' || a === 'reversed') && c && FINDING_STATUS_VALUES.has(c)) {
+    return formatFindingStatus(c);
+  }
+  return log.comment?.trim() || '—';
+}
+
+function statusFromFindingApprovalLog(log: { action: string; comment: string | null }, findingStatus: string): string {
+  const normalizedAction = log.action.trim().toLowerCase();
+  if (normalizedAction === 'approved') return 'Closed';
+  if (normalizedAction === 'rejected') return 'WaitingDisposition';
+  if (normalizedAction === 'processed' || normalizedAction === 'reversed') {
+    const cc = log.comment?.trim() ?? '';
+    if (cc && FINDING_STATUS_VALUES.has(cc)) return cc;
+  }
+  return findingStatus;
+}
+
+function buildFindingStatusHistory(finding: Finding): StatusHistoryEntry[] {
+  const createdBy = displayPersonFullName(finding.createdBy);
+  const approvalEvents = (finding.approvalLogs ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .map((log) => {
+      const actor = displayPersonFullName(log.user);
+      const normalizedAction = log.action.trim().toLowerCase();
+      const statusFromAction = statusFromFindingApprovalLog(log, finding.status);
+      let note: string;
+      if (normalizedAction === 'processed') {
+        note = `Processed to ${formatFindingStatus(statusFromAction)} by ${actor}.`.trim();
+      } else if (normalizedAction === 'reversed') {
+        note = `Reversed to ${formatFindingStatus(statusFromAction)} by ${actor}.`.trim();
+      } else {
+        const commentPart = log.comment?.trim() ? ` Comment: ${log.comment.trim()}` : '';
+        note = `${log.action} by ${actor}.${commentPart}`.trim();
+      }
+      return {
+        id: `approval-${log.id}`,
+        status: formatFindingStatus(statusFromAction),
+        note,
+        user: actor,
+        at: log.createdAt,
+      } satisfies StatusHistoryEntry;
+    });
+
+  const createdStatusDisplay =
+    finding.status === 'New' || finding.status === 'DRAFT'
+      ? formatFindingStatus(finding.status)
+      : formatFindingStatus('WaitingDisposition');
+
+  const seed: StatusHistoryEntry[] = [
+    {
+      id: `created-${finding.id}`,
+      status: createdStatusDisplay,
+      note: 'Finding created.',
+      user: createdBy,
+      at: finding.createdAt,
+    },
+    ...approvalEvents,
+  ];
+
+  const findingStatusDisplay = formatFindingStatus(finding.status);
+  const latest = seed[seed.length - 1];
+  if (!latest || latest.status !== findingStatusDisplay) {
+    seed.push({
+      id: `current-${finding.id}`,
+      status: findingStatusDisplay,
+      note: 'Latest status (no workflow log for this change).',
+      user: 'Unknown',
+      at: finding.updatedAt,
+    });
+  }
+
+  return seed.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 }
 
 function isFindingNotFoundErrorMessage(message: string): boolean {
@@ -112,6 +216,8 @@ export function FindingsRecord() {
   const [findingQuery, setFindingQuery] = useState(codeParam ?? '');
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [approvalComment, setApprovalComment] = useState('');
   const activeLoadIdRef = useRef(0);
   const prefillFromAuditDoneRef = useRef(false);
   const prefillInvalidAuditToastRef = useRef(false);
@@ -121,17 +227,31 @@ export function FindingsRecord() {
   const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
   const isEditableFindingStatus =
     !!finding && ['New', 'DRAFT', 'WaitingDisposition'].includes(finding.status);
-  const canEdit = isEditableFindingStatus && canEditDraft;
+  const canEdit = !!finding && editMode && canEditDraft && isEditableFindingStatus;
   const canSave = canEdit;
-  const canProcess = canEditDraft && !!finding && (finding.status === 'New' || finding.status === 'DRAFT' || finding.status === 'WaitingDisposition');
-  const canReverse = canEditDraft && !!finding && finding.status !== 'New' && finding.status !== 'DRAFT' && finding.status !== 'WaitingDisposition' && finding.status !== 'Closed';
-  const canApproveReject = finding?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
-  // Requirement: Admin, QE, Auditor can initiate and edit; Viewer/Buyer read-only (open existing from list only).
+  const canApproveReject =
+    finding?.status === 'WaitingApproval' &&
+    roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
 
-  // Requirement: on the Finding Record (create) page, inputs must be locked until
-  // user clicks "Create finding".
   const [createEnabled, setCreateEnabled] = useState(false);
+
+  const processButtonDisabled =
+    actioning ||
+    !canEditDraft ||
+    !finding ||
+    editMode ||
+    finding.status === 'WaitingApproval' ||
+    finding.status === 'Closed' ||
+    !(finding.status === 'New' || finding.status === 'DRAFT' || finding.status === 'WaitingDisposition');
+
+  const reverseButtonDisabled = actioning || !canEditDraft || !finding || editMode || finding.status !== 'WaitingApproval';
+
+  const statusHistory = finding ? buildFindingStatusHistory(finding) : [];
+  const approvalDecisionLogs = (finding?.approvalLogs ?? []).filter((log) => {
+    const action = log.action.trim().toLowerCase();
+    return action === 'approved' || action === 'rejected';
+  });
 
   const resetCreateForm = () => {
     setForm({
@@ -159,7 +279,9 @@ export function FindingsRecord() {
       }
     };
     const tryByCode = async (): Promise<Finding | null> =>
-      apiJson<Finding | null>(`/findings/by-code/${encodeURIComponent(query.toUpperCase())}`, { token: token! });
+      apiJson<Finding | null>(`/findings/by-code/${encodeURIComponent(query.toUpperCase())}`,{
+        token: token!,
+      });
 
     const looksLikeFindingCode = /^fin[-\s]?\d+/i.test(query);
     if (looksLikeFindingCode) {
@@ -190,6 +312,7 @@ export function FindingsRecord() {
       setFinding(null);
       setCreateEnabled(false);
       setSearchMissNoCreate(false);
+      setEditMode(false);
       apiJson<Supplier[]>('/suppliers', { token }).then((rows) => { if (isActive()) setSuppliers(rows); }).catch(() => { if (isActive()) setSuppliers([]); });
       return;
     }
@@ -202,12 +325,15 @@ export function FindingsRecord() {
         if (!isActive()) return;
         setFinding(f);
         setCreateEnabled(false);
+        setEditMode(false);
+        setApprovalComment('');
         setForm(formStateFromFinding(f));
       })
       .catch((e) => {
         if (!isActive()) return;
         setFinding(null);
         setCreateEnabled(false);
+        setEditMode(false);
         const message = e instanceof Error ? e.message : 'Failed to load';
         const isNotFound = isFindingNotFoundErrorMessage(message);
         setError(isNotFound ? null : message);
@@ -319,13 +445,13 @@ export function FindingsRecord() {
           closingComments: form.closingComments.trim() || null,
         }),
       });
-      /** POST /save only applies to New/DRAFT (assigns FIN code). WaitingDisposition etc. use PATCH only. */
       const updated =
         finding.status === 'New' || finding.status === 'DRAFT'
           ? await apiJson<Finding>(`/findings/${finding.id}/save`, { token, method: 'POST' })
           : patched;
       setFinding(updated);
       setForm(formStateFromFinding(updated));
+      setEditMode(false);
       setError(null);
       toast.info('Finding saved');
       navigate(`/findings-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
@@ -343,6 +469,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/process`, { token, method: 'POST' });
       setFinding(updated);
       setForm(formStateFromFinding(updated));
+      setEditMode(false);
       setError(null);
       toast.info('Process successful');
     } catch (e) {
@@ -359,6 +486,7 @@ export function FindingsRecord() {
       const updated = await apiJson<Finding>(`/findings/${finding.id}/reverse`, { token, method: 'POST' });
       setFinding(updated);
       setForm(formStateFromFinding(updated));
+      setEditMode(false);
       setError(null);
       toast.info('Reverse successful');
     } catch (e) {
@@ -368,33 +496,23 @@ export function FindingsRecord() {
     }
   };
 
-  const handleApprove = async () => {
+  const runApprovalAction = async (path: string, label: 'Approve' | 'Reject') => {
     if (!token || !finding) return;
     setActioning(true);
+    setError(null);
     try {
-      const updated = await apiJson<Finding>(`/findings/${finding.id}/approve`, { token, method: 'POST' });
+      const updated = await apiJson<Finding>(path, {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ comment: approvalComment.trim() || null }),
+      });
       setFinding(updated);
       setForm(formStateFromFinding(updated));
-      setError(null);
-      toast.info('Approved');
+      setApprovalComment('');
+      setEditMode(false);
+      toast.info(`${label} successful`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Approve failed');
-    } finally {
-      setActioning(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!token || !finding) return;
-    setActioning(true);
-    try {
-      const updated = await apiJson<Finding>(`/findings/${finding.id}/reject`, { token, method: 'POST' });
-      setFinding(updated);
-      setForm(formStateFromFinding(updated));
-      setError(null);
-      toast.info('Rejected');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Reject failed');
+      setError(e instanceof Error ? e.message : `${label} failed`);
     } finally {
       setActioning(false);
     }
@@ -425,7 +543,6 @@ export function FindingsRecord() {
       setForm(formStateFromFinding(created));
       setError(null);
       toast.success('Finding created');
-      // Move to a stable URL so refresh/navigation keeps showing the saved record.
       navigate(`/findings-record?id=${encodeURIComponent(created.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed');
@@ -452,6 +569,8 @@ export function FindingsRecord() {
       if (!isActive()) return;
       setFinding(found);
       setForm(formStateFromFinding(found));
+      setEditMode(false);
+      setApprovalComment('');
     } catch (err) {
       if (!isActive()) return;
       setFinding(null);
@@ -474,6 +593,8 @@ export function FindingsRecord() {
     setFindingQuery('');
     resetCreateForm();
     setCreateEnabled(true);
+    setEditMode(false);
+    setApprovalComment('');
     navigate('/findings-record');
   };
 
@@ -494,7 +615,6 @@ export function FindingsRecord() {
   const isNew = !finding && !idParam && !codeParam && !searchMissNoCreate;
   const createLocked = isNew && !createEnabled;
 
-  // Viewer/Buyer are read-only: do not show the "New finding" create form (redirect to list)
   if (!loading && isNew && !canCreateNew) {
     return <Navigate to="/findings" replace />;
   }
@@ -515,26 +635,27 @@ export function FindingsRecord() {
         <p style={{ marginTop: 4 }}>
           <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
         </p>
-        <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
-          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap', flex: '1 1 auto' }}>
-            <input
-              className="input"
-              value={findingQuery}
-              onChange={(e) => setFindingQuery(e.target.value)}
-              placeholder="Search by Finding id or code"
-              style={{ width: 320, minWidth: 320, maxWidth: 320 }}
-            />
-            <button type="submit" className="btn btn-ghost" disabled={searching}>
-              {searching ? 'Searching…' : 'Search'}
-            </button>
-            {canCreateNew && (
-              <button type="button" className="btn btn-primary" onClick={handleStartCreateFinding}>
-                Create Finding
-              </button>
-            )}
-          </form>
-        </div>
       </header>
+
+      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap', flex: '1 1 auto' }}>
+          <input
+            className="input"
+            value={findingQuery}
+            onChange={(e) => setFindingQuery(e.target.value)}
+            placeholder="Search by Finding id or code"
+            style={{ width: 320, minWidth: 320, maxWidth: 320 }}
+          />
+          <button type="submit" className="btn btn-ghost" disabled={searching}>
+            {searching ? 'Searching…' : 'Search'}
+          </button>
+          {canCreateNew && (
+            <button type="button" className="btn btn-primary" onClick={handleStartCreateFinding}>
+              Create Finding
+            </button>
+          )}
+        </form>
+      </div>
 
       {error && (
         <div className="alert-error" role="alert">
@@ -633,30 +754,29 @@ export function FindingsRecord() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: '0.75rem 1rem',
-                  alignItems: 'flex-end',
-                }}
-              >
-                <div className="input-group" style={{ marginBottom: 0, flex: '0 1 8.5rem', minWidth: '7rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div className="input-group">
                   <label className="input-label">Finding #</label>
                   <input className="input" value={finding.code} readOnly disabled />
                 </div>
-                <div className="input-group" style={{ marginBottom: 0, flex: '1 1 12rem', minWidth: '10rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Status</label>
+                  <select className="input" value={finding.status} disabled>
+                    {(['New', 'DRAFT', 'WaitingDisposition', 'WaitingApproval', 'Closed'] as const).map((s) => (
+                      <option key={s} value={s}>{formatFindingStatus(s)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group">
                   <label className="input-label">Supplier</label>
                   <input
                     className="input"
                     value={finding.supplier ? `${finding.supplier.code} — ${finding.supplier.name}` : ''}
                     readOnly
                     disabled
-                    title={finding.supplier ? `${finding.supplier.code} — ${finding.supplier.name}` : undefined}
                   />
                 </div>
-                <div className="input-group" style={{ marginBottom: 0, flex: '0 1 7rem', minWidth: '6rem' }}>
+                <div className="input-group">
                   <label className="input-label">Audit #</label>
                   {finding.audit?.code ? (
                     <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
@@ -666,58 +786,51 @@ export function FindingsRecord() {
                     <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
                   )}
                 </div>
-                <div className="input-group" style={{ marginBottom: 0, flex: '0 1 8rem', minWidth: '7rem' }}>
-                  <label className="input-label">Severity</label>
-                  <select
-                    className="input"
-                    value={form.severity}
-                    onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value }))}
-                    disabled={!canEdit}
-                  >
-                    {SEVERITIES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
                 <div
                   style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    flex: '0 0 auto',
-                    marginLeft: 'auto',
+                    gridColumn: '1 / -1',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(170px, 1fr)) auto',
+                    gap: '1rem',
+                    alignItems: 'end',
                   }}
                 >
-                  {canSave && (
-                    <button type="button" className="btn btn-primary" onClick={handleSave} disabled={actioning}>
-                      {actioning ? 'Saving…' : 'Save'}
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Severity</label>
+                    <select
+                      className="input"
+                      value={form.severity}
+                      onChange={(e) => setForm((p) => ({ ...p, severity: e.target.value }))}
+                      disabled={!canEdit}
+                    >
+                      {SEVERITIES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', paddingBottom: 1, gridColumn: '2 / -1', justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn btn-primary" onClick={() => void handleSave()} disabled={!canSave || actioning}>
+                      {actioning && canSave ? 'Saving…' : 'Save'}
                     </button>
-                  )}
-                  {canProcess && (
-                    <button type="button" className="btn btn-primary" onClick={handleProcess} disabled={actioning}>
-                      Process
+                    <button
+                      type="button"
+                      className={editMode ? 'btn btn-ghost' : 'btn btn-primary'}
+                      onClick={() => setEditMode((v) => !v)}
+                      disabled={!canEditDraft || actioning || editMode || !isEditableFindingStatus}
+                    >
+                      Edit
                     </button>
-                  )}
-                  {canReverse && (
-                    <button type="button" className="btn btn-ghost" onClick={handleReverse} disabled={actioning}>
-                      Reverse
+                    <button type="button" className="btn btn-primary" onClick={() => void handleProcess()} disabled={processButtonDisabled}>
+                      {actioning ? '…' : 'Process'}
                     </button>
-                  )}
-                  {canApproveReject && (
-                    <>
-                      <button type="button" className="btn btn-primary" onClick={handleApprove} disabled={actioning}>
-                        Approve
-                      </button>
-                      <button type="button" className="btn btn-ghost" onClick={handleReject} disabled={actioning}>
-                        Reject
-                      </button>
-                    </>
-                  )}
+                    <button type="button" className="btn btn-ghost" onClick={() => void handleReverse()} disabled={reverseButtonDisabled}>
+                      {actioning ? '…' : 'Reverse'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="input-group" style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
+              <div className="input-group" style={{ marginTop: '1rem' }}>
                 <label className="input-label">Summary</label>
                 <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Brief description of the issue</p>
                 <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} disabled={!canEdit} />
@@ -751,24 +864,91 @@ export function FindingsRecord() {
 
           <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Record snapshot</h2>
-              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Current status and timestamps (full approval history can be added in a later iteration).
-              </p>
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Approval</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Approval Comment</label>
+                  <input
+                    className="input"
+                    value={approvalComment}
+                    onChange={(e) => setApprovalComment(e.target.value)}
+                    placeholder="Add approval or rejection comment"
+                    disabled={!canApproveReject || actioning}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void runApprovalAction(`/findings/${finding.id}/approve`, 'Approve')}
+                    disabled={!canApproveReject || actioning}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => void runApprovalAction(`/findings/${finding.id}/reject`, 'Reject')}
+                    disabled={!canApproveReject || actioning}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+
+              <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Approval Log</h2>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Comment</th>
+                    <th>Date/Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvalDecisionLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="table-empty">No approval decisions yet.</td>
+                    </tr>
+                  ) : (
+                    approvalDecisionLogs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{displayPersonFullName(log.user)}</td>
+                        <td>{log.action}</td>
+                        <td>{approvalLogCommentDisplay(log)}</td>
+                        <td>{new Date(log.createdAt).toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              <h2 style={{ marginTop: '1rem', marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Status History</h2>
               <table className="table">
                 <thead>
                   <tr>
                     <th>Status</th>
-                    <th>Created</th>
-                    <th>Updated</th>
+                    <th>Note</th>
+                    <th>User</th>
+                    <th>Date/Time</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>{formatFindingStatus(finding.status)}</td>
-                    <td>{new Date(finding.createdAt).toLocaleString()}</td>
-                    <td>{new Date(finding.updatedAt).toLocaleString()}</td>
-                  </tr>
+                  {statusHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="table-empty">No status history yet.</td>
+                    </tr>
+                  ) : (
+                    statusHistory.map((entry) => (
+                      <tr key={entry.id}>
+                        <td>{entry.status}</td>
+                        <td>{entry.note}</td>
+                        <td>{entry.user}</td>
+                        <td>{new Date(entry.at).toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

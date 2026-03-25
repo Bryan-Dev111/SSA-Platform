@@ -7,7 +7,7 @@ import { Router, Request, Response } from 'express';
 import { FindingSeverity, FindingStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess, requireRole } from '../middleware/rbac';
+import { requirePageAccess } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
@@ -29,6 +29,26 @@ function prevStatus(s: FindingStatus): FindingStatus | null {
 
 router.use(authMiddleware);
 router.use(requirePageAccess('Findings'));
+
+const findingInclude = {
+  supplier: { select: { id: true, code: true, name: true } },
+  audit: { select: { id: true, code: true, auditDate: true } },
+  createdBy: { select: { id: true, email: true, name: true } },
+  correctiveActions: {
+    select: { id: true, code: true, status: true },
+    orderBy: { updatedAt: 'desc' as const },
+  },
+  approvalLogs: {
+    select: {
+      id: true,
+      action: true,
+      comment: true,
+      createdAt: true,
+      user: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: 'desc' as const },
+  },
+};
 
 router.get(
   '/',
@@ -113,15 +133,7 @@ router.get(
     }
     const finding = await prisma.finding.findFirst({
       where: { code: { equals: rawCode.toUpperCase(), mode: 'insensitive' } },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        createdBy: { select: { id: true, email: true, name: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
-        },
-      },
+      include: findingInclude,
     });
     if (!finding) {
       // Search endpoint behavior: return null to avoid noisy network errors for misses.
@@ -146,15 +158,7 @@ router.get(
     const allowedIds = await getAllowedSupplierIds(req.user);
     const finding = await prisma.finding.findUnique({
       where: { id: req.params.id },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        createdBy: { select: { id: true, email: true, name: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
-        },
-      },
+      include: findingInclude,
     });
     if (!finding) {
       res.status(404).json({ error: 'Finding not found' });
@@ -238,11 +242,7 @@ router.post(
     };
     const finding = await prisma.finding.create({
       data: createData as any,
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: { select: { id: true, code: true, status: true }, orderBy: { updatedAt: 'desc' } },
-      },
+      include: findingInclude,
     });
     if (finding.severity === 'Critical' || finding.severity === 'Major') {
       await createAlertForRecipients({
@@ -307,14 +307,7 @@ router.patch(
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
       data,
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
-        },
-      },
+      include: findingInclude,
     });
     res.json(finding);
   })
@@ -354,14 +347,7 @@ router.post(
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
       data: { code, status: 'WaitingDisposition' },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
-        },
-      },
+      include: findingInclude,
     });
     res.json(finding);
   })
@@ -399,15 +385,17 @@ router.post(
     }
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
-      data: { status: next },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
+      data: {
+        status: next,
+        approvalLogs: {
+          create: {
+            action: 'Processed',
+            comment: next,
+            userId: req.user.id,
+          },
         },
       },
+      include: findingInclude,
     });
     res.json(finding);
   })
@@ -442,15 +430,17 @@ router.post(
     }
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
-      data: { status: prev },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
+      data: {
+        status: prev,
+        approvalLogs: {
+          create: {
+            action: 'Reversed',
+            comment: prev,
+            userId: req.user.id,
+          },
         },
       },
+      include: findingInclude,
     });
     res.json(finding);
   })
@@ -463,9 +453,9 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canApprove = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+    const canApprove = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
     if (!canApprove) {
-      res.status(403).json({ error: 'Only Admin or Quality Engineer can approve findings' });
+      res.status(403).json({ error: 'Only Admin, Quality Engineer, or Buyer can approve findings' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -482,17 +472,20 @@ router.post(
       res.status(400).json({ error: 'Only findings in Waiting Approval can be approved' });
       return;
     }
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
-      data: { status: 'Closed' },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
+      data: {
+        status: 'Closed',
+        approvalLogs: {
+          create: {
+            action: 'Approved',
+            comment: comment || null,
+            userId: req.user.id,
+          },
         },
       },
+      include: findingInclude,
     });
     res.json(finding);
   })
@@ -505,9 +498,9 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canReject = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer'].includes(r));
+    const canReject = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
     if (!canReject) {
-      res.status(403).json({ error: 'Only Admin or Quality Engineer can reject findings' });
+      res.status(403).json({ error: 'Only Admin, Quality Engineer, or Buyer can reject findings' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -524,17 +517,20 @@ router.post(
       res.status(400).json({ error: 'Only findings in Waiting Approval can be rejected' });
       return;
     }
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
     const finding = await prisma.finding.update({
       where: { id: req.params.id },
-      data: { status: 'WaitingDisposition' },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true, auditDate: true } },
-        correctiveActions: {
-          select: { id: true, code: true, status: true },
-          orderBy: { updatedAt: 'desc' },
+      data: {
+        status: 'WaitingDisposition',
+        approvalLogs: {
+          create: {
+            action: 'Rejected',
+            comment: comment || null,
+            userId: req.user.id,
+          },
         },
       },
+      include: findingInclude,
     });
     res.json(finding);
   })
