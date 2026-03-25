@@ -124,13 +124,21 @@ function statusFromCarApprovalLog(
   return carStatus;
 }
 
+function displayPersonFullName(
+  user: { name: string | null; email: string | null } | null | undefined,
+  fallback = 'Unknown'
+): string {
+  const name = user?.name?.trim();
+  return name && name.length > 0 ? name : fallback;
+}
+
 function buildCarStatusHistory(car: CAR): StatusHistoryEntry[] {
-  const createdBy = car.createdBy?.name || car.createdBy?.email || 'Unknown';
+  const createdBy = displayPersonFullName(car.createdBy);
   const approvalEvents = (car.approvalLogs ?? [])
     .slice()
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .map((log) => {
-      const actor = log.user?.name || log.user?.email || 'Unknown';
+      const actor = displayPersonFullName(log.user);
       const normalizedAction = log.action.trim().toLowerCase();
       const statusFromAction = statusFromCarApprovalLog(log, car.status);
       let note: string;
@@ -250,6 +258,10 @@ export function CARRecord() {
   const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
   const statusHistory = car ? buildCarStatusHistory(car) : [];
+  const approvalDecisionLogs = (car?.approvalLogs ?? []).filter((log) => {
+    const action = log.action.trim().toLowerCase();
+    return action === 'approved' || action === 'rejected';
+  });
 
   const resetCreateForm = () => {
     setCreateFindingChoice('');
@@ -353,7 +365,7 @@ export function CARRecord() {
       .then((c: CAR) => {
         if (!isActive()) return;
         setCar(c);
-        setCarQuery(c.code);
+        setCarQuery('');
         setError(null);
         setForm({
           findingId: c.findingId ?? '',
@@ -626,6 +638,7 @@ export function CARRecord() {
       if (!isActive()) return;
       setCar(found);
       syncFormFromCar(found);
+      setCarQuery('');
       setError(null);
       setSearchMissNoCreate(false);
     } catch (err) {
@@ -991,14 +1004,14 @@ export function CARRecord() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(car.approvalLogs ?? []).length === 0 ? (
+                  {approvalDecisionLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="table-empty">No approval actions yet.</td>
+                      <td colSpan={4} className="table-empty">No approval decisions yet.</td>
                     </tr>
                   ) : (
-                    (car.approvalLogs ?? []).map((log) => (
+                    approvalDecisionLogs.map((log) => (
                       <tr key={log.id}>
-                        <td>{log.user?.name || log.user?.email || 'Unknown'}</td>
+                        <td>{displayPersonFullName(log.user)}</td>
                         <td>{log.action}</td>
                         <td>{approvalLogCommentDisplay(log)}</td>
                         <td>{new Date(log.createdAt).toLocaleString()}</td>
