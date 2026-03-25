@@ -14,6 +14,7 @@ import {
   AdminRiskWeightsPanel,
 } from './admin/AdminDay9Panels';
 import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
+import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
 
 type Tab =
   | 'commodity'
@@ -365,12 +366,7 @@ export function Admin() {
         <AdminEmployeeAssignmentsPanel token={token} toast={toast} />
       )}
       {tab === 'workLogs' && (
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Work Logs</h2>
-            <p className="table-empty">No work log module is configured in this build yet.</p>
-          </div>
-        </div>
+        <AdminWorkLogsPanel token={token} />
       )}
       {tab === 'laborCosts' && (
         <div className="card">
