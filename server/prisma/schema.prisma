@@ -467,6 +467,24 @@ model InternalDoc {
   updatedAt DateTime @updatedAt
 }
 
+/// Client / engagement records for Internal Management — Client History tab.
+model ClientHistory {
+  id                   String   @id @default(cuid())
+  clientName           String
+  companyName          String
+  clientEmail          String?
+  clientMobile         String?
+  industry             String?
+  country              String?
+  projectDescription   String?
+  periodOfPerformance  String?
+  revenue              String?
+  /// Active or Inactive
+  status               String   @default("Active")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
 // ============== Risk ==============
 model RiskWeightConfig {
   id                  String @id @default(cuid())

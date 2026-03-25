@@ -11,7 +11,7 @@ import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia';
+type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia' | 'clientHistory';
 
 const COMMAND_MEDIA_TYPES: { value: string; label: string }[] = [
   { value: 'Procedure', label: 'Procedure' },
@@ -54,6 +54,22 @@ interface ScheduleRow {
   scheduledDate: string | null;
   notes: string | null;
   supplier: { id: string; code: string; name: string } | null;
+}
+
+interface ClientHistoryRow {
+  id: string;
+  clientName: string;
+  companyName: string;
+  clientEmail: string | null;
+  clientMobile: string | null;
+  industry: string | null;
+  country: string | null;
+  projectDescription: string | null;
+  periodOfPerformance: string | null;
+  revenue: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export function InternalManagement() {
@@ -110,7 +126,31 @@ export function InternalManagement() {
   const [commandMediaUploadProgress, setCommandMediaUploadProgress] = useState<number | null>(null);
   const commandMediaFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [clientHistories, setClientHistories] = useState<ClientHistoryRow[]>([]);
+  const [clientForm, setClientForm] = useState({
+    clientName: '',
+    companyName: '',
+    clientEmail: '',
+    clientMobile: '',
+    industry: '',
+    country: '',
+    projectDescription: '',
+    periodOfPerformance: '',
+    revenue: '',
+    status: 'Active' as 'Active' | 'Inactive',
+  });
+  const [clientEditingId, setClientEditingId] = useState<string | null>(null);
+  const [clientSubmitting, setClientSubmitting] = useState(false);
+  const [clientBusyId, setClientBusyId] = useState<string | null>(null);
+
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
+
+  const loadClientHistories = () => {
+    if (!token) return;
+    apiJson<ClientHistoryRow[]>('/client-history', { token })
+      .then(setClientHistories)
+      .catch(() => setClientHistories([]));
+  };
 
   const load = () => {
     if (!token) return;
@@ -148,6 +188,11 @@ export function InternalManagement() {
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (!token || !isAdmin || tab !== 'clientHistory') return;
+    loadClientHistories();
+  }, [token, isAdmin, tab]);
 
   if (user && !isAdmin) {
     return <Navigate to={getDefaultPath(user.roleNames)} replace />;
@@ -397,6 +442,107 @@ export function InternalManagement() {
     }
   };
 
+  const resetClientForm = () => {
+    setClientEditingId(null);
+    setClientForm({
+      clientName: '',
+      companyName: '',
+      clientEmail: '',
+      clientMobile: '',
+      industry: '',
+      country: '',
+      projectDescription: '',
+      periodOfPerformance: '',
+      revenue: '',
+      status: 'Active',
+    });
+  };
+
+  const submitClientHistory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !clientForm.clientName.trim() || !clientForm.companyName.trim()) {
+      toast.error('Client name and company name are required');
+      return;
+    }
+    setClientSubmitting(true);
+    try {
+      if (clientEditingId) {
+        await apiJson(`/client-history/${clientEditingId}`, {
+          token,
+          method: 'PATCH',
+          body: JSON.stringify({
+            clientName: clientForm.clientName.trim(),
+            companyName: clientForm.companyName.trim(),
+            clientEmail: clientForm.clientEmail.trim() || null,
+            clientMobile: clientForm.clientMobile.trim() || null,
+            industry: clientForm.industry.trim() || null,
+            country: clientForm.country.trim() || null,
+            projectDescription: clientForm.projectDescription.trim() || null,
+            periodOfPerformance: clientForm.periodOfPerformance.trim() || null,
+            revenue: clientForm.revenue.trim() || null,
+            status: clientForm.status,
+          }),
+        });
+        toast.success('Client history updated');
+      } else {
+        await apiJson('/client-history', {
+          token,
+          method: 'POST',
+          body: JSON.stringify({
+            clientName: clientForm.clientName.trim(),
+            companyName: clientForm.companyName.trim(),
+            clientEmail: clientForm.clientEmail.trim() || null,
+            clientMobile: clientForm.clientMobile.trim() || null,
+            industry: clientForm.industry.trim() || null,
+            country: clientForm.country.trim() || null,
+            projectDescription: clientForm.projectDescription.trim() || null,
+            periodOfPerformance: clientForm.periodOfPerformance.trim() || null,
+            revenue: clientForm.revenue.trim() || null,
+            status: clientForm.status,
+          }),
+        });
+        toast.success('Client history added');
+      }
+      resetClientForm();
+      loadClientHistories();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setClientSubmitting(false);
+    }
+  };
+
+  const startEditClient = (row: ClientHistoryRow) => {
+    setClientEditingId(row.id);
+    setClientForm({
+      clientName: row.clientName,
+      companyName: row.companyName,
+      clientEmail: row.clientEmail ?? '',
+      clientMobile: row.clientMobile ?? '',
+      industry: row.industry ?? '',
+      country: row.country ?? '',
+      projectDescription: row.projectDescription ?? '',
+      periodOfPerformance: row.periodOfPerformance ?? '',
+      revenue: row.revenue ?? '',
+      status: row.status === 'Inactive' ? 'Inactive' : 'Active',
+    });
+  };
+
+  const deleteClientHistory = async (id: string) => {
+    if (!token) return;
+    setClientBusyId(id);
+    try {
+      await apiJson(`/client-history/${id}`, { token, method: 'DELETE' });
+      toast.success('Removed');
+      if (clientEditingId === id) resetClientForm();
+      loadClientHistories();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setClientBusyId(null);
+    }
+  };
+
   return (
     <div className="page">
       <header className="page-header">
@@ -415,6 +561,7 @@ export function InternalManagement() {
             ['contracts', 'Contracts'],
             ['documents', 'Documents'],
             ['commandMedia', 'Command Media'],
+            ['clientHistory', 'Client History'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -997,6 +1144,194 @@ export function InternalManagement() {
                               onClick={() => setDeleteConfirmId(r.id)}
                             >
                               Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === 'clientHistory' && (
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>{clientEditingId ? 'Edit client' : 'Add client'}</h2>
+              <form onSubmit={submitClientHistory}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '0.75rem',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Client name *</label>
+                    <input
+                      className="input"
+                      value={clientForm.clientName}
+                      onChange={(e) => setClientForm((p) => ({ ...p, clientName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Company name *</label>
+                    <input
+                      className="input"
+                      value={clientForm.companyName}
+                      onChange={(e) => setClientForm((p) => ({ ...p, companyName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Client email</label>
+                    <input
+                      className="input"
+                      type="email"
+                      value={clientForm.clientEmail}
+                      onChange={(e) => setClientForm((p) => ({ ...p, clientEmail: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Client mobile</label>
+                    <input
+                      className="input"
+                      value={clientForm.clientMobile}
+                      onChange={(e) => setClientForm((p) => ({ ...p, clientMobile: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Industry</label>
+                    <input
+                      className="input"
+                      value={clientForm.industry}
+                      onChange={(e) => setClientForm((p) => ({ ...p, industry: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Country</label>
+                    <input
+                      className="input"
+                      value={clientForm.country}
+                      onChange={(e) => setClientForm((p) => ({ ...p, country: e.target.value }))}
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Status</label>
+                    <select
+                      className="input"
+                      value={clientForm.status}
+                      onChange={(e) =>
+                        setClientForm((p) => ({ ...p, status: e.target.value === 'Inactive' ? 'Inactive' : 'Active' }))
+                      }
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="input-label">Project description</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={clientForm.projectDescription}
+                    onChange={(e) => setClientForm((p) => ({ ...p, projectDescription: e.target.value }))}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '0.75rem',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Period of performance</label>
+                    <input
+                      className="input"
+                      value={clientForm.periodOfPerformance}
+                      onChange={(e) => setClientForm((p) => ({ ...p, periodOfPerformance: e.target.value }))}
+                      placeholder="e.g. 2024-01-01 — 2025-12-31"
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Revenue</label>
+                    <input
+                      className="input"
+                      value={clientForm.revenue}
+                      onChange={(e) => setClientForm((p) => ({ ...p, revenue: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button type="submit" className="btn btn-primary" disabled={clientSubmitting}>
+                    {clientSubmitting ? 'Saving…' : clientEditingId ? 'Update' : 'Add'}
+                  </button>
+                  {clientEditingId && (
+                    <button type="button" className="btn btn-ghost" onClick={resetClientForm}>
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Client history</h2>
+              <div className="table-wrap" style={{ overflowX: 'auto' }}>
+                {clientHistories.length === 0 ? (
+                  <p className="table-empty">No client records yet.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Client name</th>
+                        <th>Company</th>
+                        <th>Email</th>
+                        <th>Mobile</th>
+                        <th>Industry</th>
+                        <th>Country</th>
+                        <th>Project</th>
+                        <th>Period</th>
+                        <th>Revenue</th>
+                        <th>Status</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clientHistories.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.clientName}</td>
+                          <td>{r.companyName}</td>
+                          <td>{r.clientEmail ?? '—'}</td>
+                          <td>{r.clientMobile ?? '—'}</td>
+                          <td>{r.industry ?? '—'}</td>
+                          <td>{r.country ?? '—'}</td>
+                          <td style={{ maxWidth: 200, whiteSpace: 'pre-wrap' }}>{r.projectDescription ?? '—'}</td>
+                          <td>{r.periodOfPerformance ?? '—'}</td>
+                          <td>{r.revenue ?? '—'}</td>
+                          <td>{r.status}</td>
+                          <td>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEditClient(r)}>
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              disabled={clientBusyId === r.id}
+                              onClick={() => void deleteClientHistory(r.id)}
+                            >
+                              {clientBusyId === r.id ? '…' : 'Delete'}
                             </button>
                           </td>
                         </tr>

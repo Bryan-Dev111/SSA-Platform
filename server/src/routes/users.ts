@@ -2,6 +2,7 @@
  * Users API: list + create (Admin). Link to Buyer/Supplier where applicable.
  */
 import { Router, Request, Response } from 'express';
+import { AlertCategory } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 import { prisma } from '../lib/prisma';
@@ -11,6 +12,16 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { DEFAULT_PATH_ROLES, PAGE_DEFINITIONS } from '../lib/permissions';
 
 const router = Router();
+
+/** In-app / dashboard alerts (email delivery can be wired later); matches `createAlertForRecipients` categories. */
+const ALERT_EMAIL_MATRIX_CATEGORIES: AlertCategory[] = [
+  'shipmentInspectionRequest',
+  'rejectedShipmentDocument',
+  'overdueCAR',
+  'majorCriticalFinding',
+];
+
+const ALERT_RECIPIENT_ROLE_NAMES = ['Admin', 'QualityEngineer', 'Buyer', 'Auditor'] as const;
 
 function parseIsEmployee(value: unknown): boolean {
   if (value === true) return true;
@@ -136,6 +147,111 @@ router.post(
     }
     const created = await prisma.role.create({ data: { name } });
     res.status(201).json(created);
+  })
+);
+
+/** Admin matrix: users (who receive operational alerts) × four key email topics */
+router.get(
+  '/alert-preferences-matrix',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const users = await prisma.user.findMany({
+      where: {
+        userRoles: {
+          some: { role: { name: { in: [...ALERT_RECIPIENT_ROLE_NAMES] } } },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        userRoles: { select: { role: { select: { name: true } } } },
+      },
+      orderBy: { email: 'asc' },
+    });
+    const userIds = users.map((u) => u.id);
+    const prefs =
+      userIds.length === 0
+        ? []
+        : await prisma.userAlertPreference.findMany({
+            where: {
+              userId: { in: userIds },
+              alertCategory: { in: ALERT_EMAIL_MATRIX_CATEGORIES },
+            },
+            select: { userId: true, alertCategory: true, enabled: true },
+          });
+    const prefByUser = new Map<string, Map<AlertCategory, boolean>>();
+    for (const p of prefs) {
+      if (!prefByUser.has(p.userId)) prefByUser.set(p.userId, new Map());
+      prefByUser.get(p.userId)!.set(p.alertCategory, p.enabled);
+    }
+    const matrix: Record<string, Record<string, boolean>> = {};
+    for (const u of users) {
+      matrix[u.id] = {};
+      for (const cat of ALERT_EMAIL_MATRIX_CATEGORIES) {
+        const v = prefByUser.get(u.id)?.get(cat);
+        matrix[u.id][cat] = v !== false;
+      }
+    }
+    const categoryLabels: Record<string, string> = {
+      shipmentInspectionRequest: 'New shipping requests',
+      rejectedShipmentDocument: 'Rejected shipments',
+      overdueCAR: 'Overdue CARs',
+      majorCriticalFinding: 'New major / critical finding',
+    };
+    res.json({
+      categories: ALERT_EMAIL_MATRIX_CATEGORIES.map((key) => ({
+        key,
+        label: categoryLabels[key] ?? key,
+      })),
+      users: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        roleNames: u.userRoles.map((ur) => ur.role.name),
+      })),
+      matrix,
+    });
+  })
+);
+
+router.put(
+  '/alert-preferences-matrix',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const matrixRaw = req.body?.matrix as Record<string, Record<string, boolean>> | undefined;
+    if (!matrixRaw || typeof matrixRaw !== 'object') {
+      res.status(400).json({ error: 'matrix is required' });
+      return;
+    }
+    const allowedUsers = await prisma.user.findMany({
+      where: {
+        userRoles: {
+          some: { role: { name: { in: [...ALERT_RECIPIENT_ROLE_NAMES] } } },
+        },
+      },
+      select: { id: true },
+    });
+    const allowedIds = new Set(allowedUsers.map((u) => u.id));
+    const ops = [];
+    for (const userId of Object.keys(matrixRaw)) {
+      if (!allowedIds.has(userId)) continue;
+      const row = matrixRaw[userId];
+      if (!row || typeof row !== 'object') continue;
+      for (const cat of ALERT_EMAIL_MATRIX_CATEGORIES) {
+        if (!(cat in row)) continue;
+        const enabled = Boolean(row[cat]);
+        ops.push(
+          prisma.userAlertPreference.upsert({
+            where: { userId_alertCategory: { userId, alertCategory: cat } },
+            create: { userId, alertCategory: cat, enabled },
+            update: { enabled },
+          })
+        );
+      }
+    }
+    if (ops.length > 0) {
+      await prisma.$transaction(ops);
+    }
+    res.json({ ok: true });
   })
 );
 

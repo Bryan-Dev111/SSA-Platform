@@ -16,6 +16,7 @@ import {
 import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
 import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
 import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
+import { AdminAlertPreferencesPanel } from './admin/AdminAlertPreferencesPanel';
 
 type Tab =
   | 'commodity'
@@ -29,7 +30,8 @@ type Tab =
   | 'employeeAssignments'
   | 'workLogs'
   | 'laborCosts'
-  | 'permissions';
+  | 'permissions'
+  | 'alertPreferences';
 
 interface CommodityType {
   id: string;
@@ -312,6 +314,7 @@ export function Admin() {
             ['workLogs', 'Work Logs'],
             ['laborCosts', 'Labor Costs'],
             ['permissions', 'Permissions'],
+            ['alertPreferences', 'Email alerts'],
             ['commodity', 'Commodity types'],
             ['defect', 'Defect codes'],
             ['disposition', 'Disposition codes'],
@@ -373,6 +376,7 @@ export function Admin() {
         <AdminLaborCostsPanel token={token} />
       )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
+      {tab === 'alertPreferences' && <AdminAlertPreferencesPanel token={token} toast={toast} />}
 
       {tab === 'commodity' && (
         <div className="card">
