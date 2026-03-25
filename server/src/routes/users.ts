@@ -3,6 +3,7 @@
  */
 import { Router, Request, Response } from 'express';
 import * as bcrypt from 'bcrypt';
+import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { API_PAGE_ROLES, requireRole } from '../middleware/rbac';
@@ -19,6 +20,59 @@ function parseIsEmployee(value: unknown): boolean {
   }
   if (typeof value === 'number') return value === 1;
   return false;
+}
+
+function getPasswordEncryptionKey(): Buffer {
+  const raw = process.env.PASSWORD_ENCRYPTION_KEY;
+  if (!raw || !raw.trim()) {
+    // Fallback: derive an AES key from JWT_SECRET if no dedicated key is configured.
+    // This keeps the feature functional without extra env configuration.
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || !jwtSecret.trim()) {
+      throw new Error('Either PASSWORD_ENCRYPTION_KEY or JWT_SECRET must be set');
+    }
+    return createHash('sha256').update(jwtSecret, 'utf8').digest(); // 32 bytes
+  }
+  const trimmed = raw.trim();
+
+  // Accept 64-hex (32 bytes) or base64 (32 bytes).
+  const isHex = /^[0-9a-fA-F]+$/.test(trimmed);
+  if (isHex) {
+    const buf = Buffer.from(trimmed, 'hex');
+    if (buf.length !== 32) throw new Error('PASSWORD_ENCRYPTION_KEY hex must decode to 32 bytes');
+    return buf;
+  }
+  const buf = Buffer.from(trimmed, 'base64');
+  if (buf.length !== 32) throw new Error('PASSWORD_ENCRYPTION_KEY base64 must decode to 32 bytes');
+  return buf;
+}
+
+function encryptPassword(plain: string): string {
+  const key = getPasswordEncryptionKey();
+  // AES-256-GCM standard: 12-byte IV + 16-byte auth tag.
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, ciphertext]).toString('base64');
+}
+
+function decryptPassword(encrypted: string | null): string | null {
+  if (!encrypted) return null;
+  try {
+    const key = getPasswordEncryptionKey();
+    const buf = Buffer.from(encrypted, 'base64');
+    if (buf.length < 12 + 16) return null;
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const ciphertext = buf.subarray(28);
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(Buffer.from(tag));
+    const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    return plain;
+  } catch {
+    return null;
+  }
 }
 
 router.use(authMiddleware);
@@ -116,6 +170,7 @@ router.get(
         id: true,
         email: true,
         name: true,
+        passwordEncrypted: true,
         isEmployee: true,
         createdAt: true,
         userRoles: { include: { role: true } },
@@ -132,6 +187,7 @@ router.get(
         name: u.name,
         isEmployee: u.isEmployee,
         createdAt: u.createdAt,
+        passwordPlain: decryptPassword(u.passwordEncrypted),
         roleNames: u.userRoles.map((ur) => ur.role.name),
         supplier: u.supplier ?? undefined,
         assignedSupplierIds: u.buyerSuppliers.map((b) => b.supplierId),
@@ -168,6 +224,7 @@ router.post(
       return;
     }
     const passwordHash = await bcrypt.hash(password, 10);
+    const passwordEncrypted = encryptPassword(password);
     const roleRows = await prisma.role.findMany({ where: { name: { in: roleNames } } });
     if (roleRows.length !== roleNames.length) {
       res.status(400).json({ error: 'One or more role names are invalid' });
@@ -177,6 +234,7 @@ router.post(
       data: {
         email: emailRaw,
         passwordHash,
+        passwordEncrypted,
         name,
         isEmployee,
         userRoles: {

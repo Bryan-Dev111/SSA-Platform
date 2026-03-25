@@ -302,6 +302,7 @@ interface UserRow {
   name: string | null;
   isEmployee?: boolean;
   roleNames: string[];
+  passwordPlain: string | null;
   assignedSupplierIds: string[];
   qeAssignedSupplierIds?: string[];
 }
@@ -371,7 +372,7 @@ export function AdminBuyersSuppliersPanel({
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
   const [newUserRole, setNewUserRole] = useState<string>('Viewer');
-  const [newUserIsEmployee, setNewUserIsEmployee] = useState<'Yes' | 'No'>('No');
+  const [newUserIsEmployee, setNewUserIsEmployee] = useState<'Yes' | 'No' | 'Contractor'>('No');
   /** Role names from server (includes custom roles); matrix UI lives only on Permissions tab. */
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [newSupName, setNewSupName] = useState('');
@@ -621,9 +622,14 @@ export function AdminBuyersSuppliersPanel({
               </div>
               <div className="input-group">
                 <label className="input-label">Employee</label>
-                <select className="input" value={newUserIsEmployee} onChange={(e) => setNewUserIsEmployee(e.target.value as 'Yes' | 'No')}>
+                <select
+                  className="input"
+                  value={newUserIsEmployee}
+                  onChange={(e) => setNewUserIsEmployee(e.target.value as 'Yes' | 'No' | 'Contractor')}
+                >
                   <option value="No">No</option>
                   <option value="Yes">Yes</option>
+                  <option value="Contractor">Contractor</option>
                 </select>
               </div>
             </div>
@@ -691,8 +697,8 @@ export function AdminBuyersSuppliersPanel({
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>{usersTableTitle}</h2>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '0.75rem' }}>
-              All accounts. The Password column cannot show real values — they are stored only as a one-way hash on the server (not
-              retrievable).
+              All accounts. Admin can view the stored original password (encrypted at rest). Existing users without an
+              encrypted password will show `—` until their password is recreated.
             </p>
             <div className="table-wrap">
               <table className="table">
@@ -718,7 +724,9 @@ export function AdminBuyersSuppliersPanel({
                       <td>{u.name?.trim() ? u.name : '—'}</td>
                       <td>{u.email}</td>
                       <td>{u.isEmployee ? 'Yes' : 'No'}</td>
-                      <td style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Not shown</td>
+                      <td style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 'var(--text-xs)' }}>
+                        {u.passwordPlain ?? '—'}
+                      </td>
                       <td>{u.roleNames.map(formatUserRoleLabel).join(', ')}</td>
                     </tr>
                   ))

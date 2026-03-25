@@ -35,6 +35,9 @@ model User {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String
+  // Encrypted at rest so Admin can view the original password in the User table.
+  // This is sensitive data; keep PASSWORD_ENCRYPTION_KEY secret.
+  passwordEncrypted String?
   name         String?
   isEmployee   Boolean   @default(false)
   createdAt    DateTime  @default(now())
