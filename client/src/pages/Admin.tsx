@@ -44,7 +44,7 @@ interface CodeRow {
 export function Admin() {
   const { token } = useAuth();
   const toast = useToast();
-  const [tab, setTab] = useState<Tab>('commodity');
+  const [tab, setTab] = useState<Tab>('users');
 
   const [commodities, setCommodities] = useState<CommodityType[]>([]);
   const [newCommodityName, setNewCommodityName] = useState('');
