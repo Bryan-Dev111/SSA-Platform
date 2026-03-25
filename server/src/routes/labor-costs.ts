@@ -18,7 +18,10 @@ router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const rows = await prisma.laborCost.findMany({
-      include: { workLog: { select: { id: true, code: true } } },
+      include: {
+        workLog: { select: { id: true, code: true, projectHistoryId: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
@@ -34,6 +37,10 @@ router.post(
     const hoursRaw = req.body?.hours;
     const rateRaw = req.body?.rate;
     const paidStatusRaw = typeof req.body?.paidStatus === 'string' ? req.body.paidStatus.trim() : '';
+    let projectHistoryId =
+      typeof req.body?.projectHistoryId === 'string' && req.body.projectHistoryId.trim()
+        ? req.body.projectHistoryId.trim()
+        : null;
 
     if (!fullName) {
       res.status(400).json({ error: 'fullName is required' });
@@ -51,18 +58,44 @@ router.post(
     }
 
     const paidStatus = paidStatusRaw === 'Paid' ? 'Paid' : 'Pending';
+    let workLogProjectHistoryId: string | null = null;
+    if (workLogId) {
+      const workLog = await prisma.workLog.findUnique({
+        where: { id: workLogId },
+        select: { id: true, projectHistoryId: true },
+      });
+      if (!workLog) {
+        res.status(400).json({ error: 'workLogId is invalid' });
+        return;
+      }
+      workLogProjectHistoryId = workLog.projectHistoryId;
+    }
+    if (!projectHistoryId && workLogProjectHistoryId) {
+      projectHistoryId = workLogProjectHistoryId;
+    }
+    if (projectHistoryId) {
+      const project = await prisma.clientHistory.findUnique({ where: { id: projectHistoryId }, select: { id: true } });
+      if (!project) {
+        res.status(400).json({ error: 'projectHistoryId is invalid' });
+        return;
+      }
+    }
     const code = await getNextCode('COST');
     const created = await prisma.laborCost.create({
       data: {
         code,
         workLogId,
+        projectHistoryId,
         fullName,
         hours,
         rate,
         totalCost: hours * rate,
         paidStatus: paidStatus as PaidStatus,
       },
-      include: { workLog: { select: { id: true, code: true } } },
+      include: {
+        workLog: { select: { id: true, code: true, projectHistoryId: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
+      },
     });
     res.status(201).json(created);
   })

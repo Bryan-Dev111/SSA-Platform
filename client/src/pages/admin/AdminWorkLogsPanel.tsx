@@ -15,6 +15,8 @@ interface WorkLogRow {
   audit: { id: string; code: string } | null;
   shipmentId: string | null;
   shipment: { id: string; code: string | null } | null;
+  projectHistoryId: string | null;
+  projectHistory: { id: string; projectCode: string } | null;
   description: string | null;
   createdAt: string;
 }
@@ -57,6 +59,7 @@ export function AdminWorkLogsPanel({ token }: { token: string | null }) {
                   <th>Supplier Name</th>
                   <th>Audit ID</th>
                   <th>Shipment ID</th>
+                  <th>Project</th>
                   <th>Description</th>
                   <th>Created at</th>
                 </tr>
@@ -73,6 +76,7 @@ export function AdminWorkLogsPanel({ token }: { token: string | null }) {
                     <td>{r.supplier?.name ?? '—'}</td>
                     <td>{r.audit?.code ?? r.auditId ?? '—'}</td>
                     <td>{r.shipment?.code ?? r.shipmentId ?? '—'}</td>
+                    <td>{r.projectHistory?.projectCode ?? r.projectHistoryId ?? '—'}</td>
                     <td style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description ?? ''}>
                       {r.description?.trim() ? r.description : '—'}
                     </td>

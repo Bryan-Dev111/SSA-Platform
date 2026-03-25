@@ -23,10 +23,13 @@ interface UserRow {
   email: string;
   name: string | null;
   roleNames: string[];
+  isEmployee?: boolean;
+  isContractor?: boolean;
   // Buyer → Suppliers
   assignedSupplierIds?: string[];
   // Auditor → Suppliers
   auditorAssignedSupplierIds?: string[];
+  employeeAssignedSupplierIds?: string[];
   // QE → Buyers
   qeAssignedBuyerIds?: string[];
   // Quality Manager → Quality Engineers
@@ -46,8 +49,8 @@ export function AdminEmployeeAssignmentsPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [auditorId, setAuditorId] = useState('');
-  const [auditorSupplierId, setAuditorSupplierId] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [employeeSupplierId, setEmployeeSupplierId] = useState('');
 
   const [qeId, setQeId] = useState('');
   const [qeBuyerId, setQeBuyerId] = useState('');
@@ -75,7 +78,10 @@ export function AdminEmployeeAssignmentsPanel({
     void load();
   }, [load]);
 
-  const auditors = useMemo(() => users.filter((u) => u.roleNames.includes('Auditor')), [users]);
+  const employeeContractors = useMemo(
+    () => users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor)),
+    [users]
+  );
   const buyers = useMemo(() => users.filter((u) => u.roleNames.includes('Buyer')), [users]);
   const qes = useMemo(() => users.filter((u) => u.roleNames.includes('QualityEngineer')), [users]);
   const qualityManagers = useMemo(() => users.filter((u) => u.roleNames.includes('QualityManager')), [users]);
@@ -94,17 +100,17 @@ export function AdminEmployeeAssignmentsPanel({
     return map;
   }, [suppliers]);
 
-  const assignAuditorSupplier = async () => {
-    if (!token || !auditorId || !auditorSupplierId) return;
+  const assignEmployeeSupplier = async () => {
+    if (!token || !employeeId || !employeeSupplierId) return;
     setBusy(true);
     try {
-      await apiJson('/auditor-suppliers', {
+      await apiJson('/employee-suppliers', {
         token,
         method: 'POST',
-        body: JSON.stringify({ auditorId, supplierId: auditorSupplierId }),
+        body: JSON.stringify({ employeeId, supplierId: employeeSupplierId }),
       });
-      toast.success('Auditor assignment created');
-      setAuditorSupplierId('');
+      toast.success('Employee/contractor assignment created');
+      setEmployeeSupplierId('');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Assignment failed');
@@ -113,12 +119,12 @@ export function AdminEmployeeAssignmentsPanel({
     }
   };
 
-  const removeAuditorSupplier = async (aId: string, sId: string) => {
+  const removeEmployeeSupplier = async (aId: string, sId: string) => {
     if (!token) return;
     setBusy(true);
     try {
-      await apiJson(`/auditor-suppliers/${aId}/${sId}`, { token, method: 'DELETE' });
-      toast.info('Auditor assignment removed');
+      await apiJson(`/employee-suppliers/${aId}/${sId}`, { token, method: 'DELETE' });
+      toast.info('Employee/contractor assignment removed');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Remove failed');
@@ -223,19 +229,19 @@ export function AdminEmployeeAssignmentsPanel({
       <header className="page-header">
         <h1 className="page-title">Employee Assignments</h1>
         <p className="page-description">
-          Auditor → direct suppliers. QE → buyers (suppliers are derived from Buyer → Suppliers).
+          Employee/Contractor → direct suppliers. QE → buyers (suppliers are derived from Buyer → Suppliers).
         </p>
       </header>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Auditor → Supplier</h2>
+          <h2 style={{ marginTop: 0 }}>Employee/Contractor → Supplier</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Auditor</label>
-              <select className="input" value={auditorId} onChange={(e) => setAuditorId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select Auditor</option>
-                {auditors.map((a) => (
+              <label className="input-label">Employee / Contractor</label>
+              <select className="input" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} style={{ minWidth: 260 }}>
+                <option value="">Select Employee/Contractor</option>
+                {employeeContractors.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name?.trim() ? `${a.name} (${a.email})` : a.email}
                   </option>
@@ -244,7 +250,7 @@ export function AdminEmployeeAssignmentsPanel({
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">Supplier</label>
-              <select className="input" value={auditorSupplierId} onChange={(e) => setAuditorSupplierId(e.target.value)} style={{ minWidth: 260 }}>
+              <select className="input" value={employeeSupplierId} onChange={(e) => setEmployeeSupplierId(e.target.value)} style={{ minWidth: 260 }}>
                 <option value="">Select Supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -253,7 +259,7 @@ export function AdminEmployeeAssignmentsPanel({
                 ))}
               </select>
             </div>
-            <button type="button" className="btn btn-primary" onClick={() => void assignAuditorSupplier()} disabled={busy || !auditorId || !auditorSupplierId}>
+            <button type="button" className="btn btn-primary" onClick={() => void assignEmployeeSupplier()} disabled={busy || !employeeId || !employeeSupplierId}>
               Assign
             </button>
           </div>
@@ -263,24 +269,26 @@ export function AdminEmployeeAssignmentsPanel({
               <thead>
                 <tr>
                   <th>Auditor</th>
+                  <th>Type</th>
                   <th>Assigned Suppliers</th>
                   <th style={{ width: 100 }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {auditors.length === 0 ? (
+                {employeeContractors.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="table-empty">
-                      No auditors. Create a user with Auditor role.
+                    <td colSpan={4} className="table-empty">
+                      No employees/contractors found.
                     </td>
                   </tr>
                 ) : (
-                  auditors.flatMap((a) => {
-                    const supplierIds = a.auditorAssignedSupplierIds ?? [];
+                  employeeContractors.flatMap((a) => {
+                    const supplierIds = a.employeeAssignedSupplierIds ?? [];
                     if (supplierIds.length === 0) {
                       return (
                         <tr key={a.id}>
                           <td>{a.name?.trim() ? a.name : a.email}</td>
+                          <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
                           <td colSpan={2} className="table-empty">
                             None
                           </td>
@@ -292,9 +300,10 @@ export function AdminEmployeeAssignmentsPanel({
                       return (
                         <tr key={`${a.id}-${sid}`}>
                           <td>{a.name?.trim() ? a.name : a.email}</td>
+                          <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
                           <td>{sup ? `${sup.code} — ${sup.name}` : sid}</td>
                           <td>
-                            <button type="button" className="btn btn-ghost" onClick={() => void removeAuditorSupplier(a.id, sid)} disabled={busy}>
+                            <button type="button" className="btn btn-ghost" onClick={() => void removeEmployeeSupplier(a.id, sid)} disabled={busy}>
                               Remove
                             </button>
                           </td>

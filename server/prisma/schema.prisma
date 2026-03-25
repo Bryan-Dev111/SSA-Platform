@@ -52,6 +52,7 @@ model User {
   qeSuppliers  QeSupplier[]       @relation("QeAssignments")
   supplier     Supplier?          @relation("SupplierUser")
   auditorSuppliers AuditorSupplier[] @relation("AuditorAssignments")
+  employeeSuppliers EmployeeSupplierAssignment[] @relation("EmployeeSupplierAssignments")
   recordsUploaded Record[]
   findingsCreated Finding[]
   carsCreated  CorrectiveAction[]
@@ -120,6 +121,7 @@ model Supplier {
   buyerSuppliers  BuyerSupplier[]
   qeSuppliers     QeSupplier[]
   auditorSuppliers AuditorSupplier[]
+  employeeSuppliers EmployeeSupplierAssignment[]
   audits          Audit[]
   findings        Finding[]
   correctiveActions CorrectiveAction[]
@@ -159,6 +161,15 @@ model AuditorSupplier {
   auditor     User     @relation("AuditorAssignments", fields: [auditorId], references: [id], onDelete: Cascade)
   supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   @@id([auditorId, supplierId])
+}
+
+model EmployeeSupplierAssignment {
+  employeeId String
+  supplierId String
+  employee   User     @relation("EmployeeSupplierAssignments", fields: [employeeId], references: [id], onDelete: Cascade)
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@id([employeeId, supplierId])
 }
 
 model QeBuyer {
@@ -349,6 +360,8 @@ model WorkLog {
   audit       Audit?    @relation(fields: [auditId], references: [id], onDelete: SetNull)
   shipmentId  String?
   shipment    Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  projectHistoryId String?
+  projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
   description String?
   createdAt   DateTime @default(now())
   laborCosts  LaborCost[]
@@ -359,6 +372,8 @@ model LaborCost {
   code       String     @unique // COST-00001
   workLogId  String?
   workLog    WorkLog?   @relation(fields: [workLogId], references: [id], onDelete: SetNull)
+  projectHistoryId String?
+  projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
   fullName   String
   hours      Float
   rate       Float
@@ -470,6 +485,7 @@ model InternalDoc {
 /// Client / engagement records for Internal Management — Client History tab.
 model ClientHistory {
   id                   String   @id @default(cuid())
+  projectCode          String   @unique
   clientName           String
   companyName          String
   clientEmail          String?
@@ -479,10 +495,13 @@ model ClientHistory {
   projectDescription   String?
   periodOfPerformance  String?
   revenue              String?
+  revenueAmount        Float?
   /// Active or Inactive
   status               String   @default("Active")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  workLogs             WorkLog[]
+  laborCosts           LaborCost[]
 }
 
 // ============== Risk ==============

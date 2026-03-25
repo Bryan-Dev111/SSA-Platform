@@ -22,6 +22,7 @@ router.get(
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true } },
         shipment: { select: { id: true, code: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
       },
       orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
       take: 500,
@@ -40,6 +41,10 @@ router.post(
     const supplierId = typeof req.body?.supplierId === 'string' && req.body.supplierId.trim() ? req.body.supplierId.trim() : null;
     const auditId = typeof req.body?.auditId === 'string' && req.body.auditId.trim() ? req.body.auditId.trim() : null;
     const shipmentId = typeof req.body?.shipmentId === 'string' && req.body.shipmentId.trim() ? req.body.shipmentId.trim() : null;
+    const projectHistoryId =
+      typeof req.body?.projectHistoryId === 'string' && req.body.projectHistoryId.trim()
+        ? req.body.projectHistoryId.trim()
+        : null;
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() || null : null;
 
     if (!fullName) {
@@ -60,6 +65,14 @@ router.post(
       return;
     }
 
+    if (projectHistoryId) {
+      const exists = await prisma.clientHistory.findUnique({ where: { id: projectHistoryId }, select: { id: true } });
+      if (!exists) {
+        res.status(400).json({ error: 'projectHistoryId is invalid' });
+        return;
+      }
+    }
+
     const code = await getNextCode('LOG');
     const workDate = new Date(workDateRaw.slice(0, 10) + 'T12:00:00.000Z');
     const created = await prisma.workLog.create({
@@ -72,12 +85,14 @@ router.post(
         supplierId,
         auditId,
         shipmentId,
+        projectHistoryId,
         description,
       },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true } },
         shipment: { select: { id: true, code: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
       },
     });
     res.status(201).json(created);

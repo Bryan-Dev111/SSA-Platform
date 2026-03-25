@@ -6,7 +6,9 @@ interface LaborCostRow {
   id: string;
   code: string;
   workLogId: string | null;
-  workLog: { id: string; code: string } | null;
+  workLog: { id: string; code: string; projectHistoryId: string | null } | null;
+  projectHistoryId: string | null;
+  projectHistory: { id: string; projectCode: string } | null;
   fullName: string;
   hours: number;
   rate: number;
@@ -15,26 +17,131 @@ interface LaborCostRow {
   createdAt: string;
 }
 
+interface WorkLogOption {
+  id: string;
+  code: string;
+}
+
+interface ProjectOption {
+  id: string;
+  projectCode: string;
+  companyName: string;
+}
+
 export function AdminLaborCostsPanel({ token }: { token: string | null }) {
   const [rows, setRows] = useState<LaborCostRow[]>([]);
+  const [workLogs, setWorkLogs] = useState<WorkLogOption[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    workLogId: '',
+    projectHistoryId: '',
+    fullName: '',
+    hours: '',
+    rate: '',
+    paidStatus: 'Pending' as 'Pending' | 'Paid',
+  });
 
   useEffect(() => {
     if (!token) return;
     setLoading(true);
     setError(null);
-    apiJson<LaborCostRow[]>('/labor-costs', { token })
-      .then(setRows)
+    Promise.all([
+      apiJson<LaborCostRow[]>('/labor-costs', { token }),
+      apiJson<WorkLogOption[]>('/work-logs', { token }).catch(() => []),
+      apiJson<ProjectOption[]>('/project-history', { token }).catch(() => []),
+    ])
+      .then(([costs, logs, proj]) => {
+        setRows(costs);
+        setWorkLogs(logs);
+        setProjects(proj);
+      })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const createCost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !form.fullName.trim() || !form.hours.trim() || !form.rate.trim()) return;
+    setSubmitting(true);
+    try {
+      const created = await apiJson<LaborCostRow>('/labor-costs', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          workLogId: form.workLogId || null,
+          projectHistoryId: form.projectHistoryId || null,
+          fullName: form.fullName.trim(),
+          hours: Number(form.hours),
+          rate: Number(form.rate),
+          paidStatus: form.paidStatus,
+        }),
+      });
+      setRows((prev) => [created, ...prev]);
+      setForm({
+        workLogId: '',
+        projectHistoryId: '',
+        fullName: '',
+        hours: '',
+        rate: '',
+        paidStatus: 'Pending',
+      });
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="card">
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>Labor Costs</h2>
         {error && <div className="alert-error">{error}</div>}
+        <form onSubmit={createCost} style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Log ID</label>
+              <select className="input" value={form.workLogId} onChange={(e) => setForm((p) => ({ ...p, workLogId: e.target.value }))}>
+                <option value="">None</option>
+                {workLogs.map((w) => (
+                  <option key={w.id} value={w.id}>{w.code}</option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Project</label>
+              <select className="input" value={form.projectHistoryId} onChange={(e) => setForm((p) => ({ ...p, projectHistoryId: e.target.value }))}>
+                <option value="">None</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.projectCode} — {p.companyName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Full Name</label>
+              <input className="input" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} required />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Hours</label>
+              <input className="input" type="number" min={0} step="0.01" value={form.hours} onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} required />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Rate</label>
+              <input className="input" type="number" min={0} step="0.01" value={form.rate} onChange={(e) => setForm((p) => ({ ...p, rate: e.target.value }))} required />
+            </div>
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Paid Status</label>
+              <select className="input" value={form.paidStatus} onChange={(e) => setForm((p) => ({ ...p, paidStatus: e.target.value === 'Paid' ? 'Paid' : 'Pending' }))}>
+                <option value="Pending">Pending</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create Cost'}</button>
+          </div>
+        </form>
         <div className="table-wrap">
           {loading ? (
             <p className="table-empty">Loading labor costs…</p>
@@ -46,6 +153,7 @@ export function AdminLaborCostsPanel({ token }: { token: string | null }) {
                 <tr>
                   <th>Cost ID</th>
                   <th>Log ID</th>
+                  <th>Project</th>
                   <th>Full Name</th>
                   <th>Hours</th>
                   <th>Rate</th>
@@ -58,6 +166,7 @@ export function AdminLaborCostsPanel({ token }: { token: string | null }) {
                   <tr key={r.id}>
                     <td>{r.code}</td>
                     <td>{r.workLog?.code ?? r.workLogId ?? '—'}</td>
+                    <td>{r.projectHistory?.projectCode ?? r.projectHistoryId ?? r.workLog?.projectHistoryId ?? '—'}</td>
                     <td>{r.fullName}</td>
                     <td>{r.hours}</td>
                     <td>{r.rate}</td>

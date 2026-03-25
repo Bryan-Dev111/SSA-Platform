@@ -11,7 +11,7 @@ import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia' | 'clientHistory';
+type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia' | 'projectHistory' | 'profit';
 
 const COMMAND_MEDIA_TYPES: { value: string; label: string }[] = [
   { value: 'Procedure', label: 'Procedure' },
@@ -56,8 +56,9 @@ interface ScheduleRow {
   supplier: { id: string; code: string; name: string } | null;
 }
 
-interface ClientHistoryRow {
+interface ProjectHistoryRow {
   id: string;
+  projectCode: string;
   clientName: string;
   companyName: string;
   clientEmail: string | null;
@@ -67,9 +68,21 @@ interface ClientHistoryRow {
   projectDescription: string | null;
   periodOfPerformance: string | null;
   revenue: string | null;
+  revenueAmount: number | null;
   status: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ProfitRow {
+  projectId: string;
+  projectCode: string;
+  companyName: string;
+  revenue: string | null;
+  revenueAmount: number;
+  costs: number;
+  profit: number;
+  status: string;
 }
 
 export function InternalManagement() {
@@ -126,7 +139,7 @@ export function InternalManagement() {
   const [commandMediaUploadProgress, setCommandMediaUploadProgress] = useState<number | null>(null);
   const commandMediaFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [clientHistories, setClientHistories] = useState<ClientHistoryRow[]>([]);
+  const [projectHistories, setProjectHistories] = useState<ProjectHistoryRow[]>([]);
   const [clientForm, setClientForm] = useState({
     clientName: '',
     companyName: '',
@@ -139,17 +152,25 @@ export function InternalManagement() {
     revenue: '',
     status: 'Active' as 'Active' | 'Inactive',
   });
-  const [clientEditingId, setClientEditingId] = useState<string | null>(null);
-  const [clientSubmitting, setClientSubmitting] = useState(false);
-  const [clientBusyId, setClientBusyId] = useState<string | null>(null);
+  const [projectEditingId, setProjectEditingId] = useState<string | null>(null);
+  const [projectSubmitting, setProjectSubmitting] = useState(false);
+  const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
+  const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
-  const loadClientHistories = () => {
+  const loadProjectHistories = () => {
     if (!token) return;
-    apiJson<ClientHistoryRow[]>('/client-history', { token })
-      .then(setClientHistories)
-      .catch(() => setClientHistories([]));
+    apiJson<ProjectHistoryRow[]>('/project-history', { token })
+      .then(setProjectHistories)
+      .catch(() => setProjectHistories([]));
+  };
+
+  const loadProfit = () => {
+    if (!token) return;
+    apiJson<ProfitRow[]>('/project-history/profit-summary', { token })
+      .then(setProfitRows)
+      .catch(() => setProfitRows([]));
   };
 
   const load = () => {
@@ -190,8 +211,9 @@ export function InternalManagement() {
   }, [token, isAdmin]);
 
   useEffect(() => {
-    if (!token || !isAdmin || tab !== 'clientHistory') return;
-    loadClientHistories();
+    if (!token || !isAdmin || (tab !== 'projectHistory' && tab !== 'profit')) return;
+    if (tab === 'projectHistory') loadProjectHistories();
+    if (tab === 'profit') loadProfit();
   }, [token, isAdmin, tab]);
 
   if (user && !isAdmin) {
@@ -442,8 +464,8 @@ export function InternalManagement() {
     }
   };
 
-  const resetClientForm = () => {
-    setClientEditingId(null);
+  const resetProjectForm = () => {
+    setProjectEditingId(null);
     setClientForm({
       clientName: '',
       companyName: '',
@@ -458,16 +480,16 @@ export function InternalManagement() {
     });
   };
 
-  const submitClientHistory = async (e: React.FormEvent) => {
+  const submitProjectHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !clientForm.clientName.trim() || !clientForm.companyName.trim()) {
       toast.error('Client name and company name are required');
       return;
     }
-    setClientSubmitting(true);
+    setProjectSubmitting(true);
     try {
-      if (clientEditingId) {
-        await apiJson(`/client-history/${clientEditingId}`, {
+      if (projectEditingId) {
+        await apiJson(`/project-history/${projectEditingId}`, {
           token,
           method: 'PATCH',
           body: JSON.stringify({
@@ -483,9 +505,9 @@ export function InternalManagement() {
             status: clientForm.status,
           }),
         });
-        toast.success('Client history updated');
+        toast.success('Project history updated');
       } else {
-        await apiJson('/client-history', {
+        await apiJson('/project-history', {
           token,
           method: 'POST',
           body: JSON.stringify({
@@ -501,19 +523,20 @@ export function InternalManagement() {
             status: clientForm.status,
           }),
         });
-        toast.success('Client history added');
+        toast.success('Project history added');
       }
-      resetClientForm();
-      loadClientHistories();
+      resetProjectForm();
+      loadProjectHistories();
+      loadProfit();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
-      setClientSubmitting(false);
+      setProjectSubmitting(false);
     }
   };
 
-  const startEditClient = (row: ClientHistoryRow) => {
-    setClientEditingId(row.id);
+  const startEditProject = (row: ProjectHistoryRow) => {
+    setProjectEditingId(row.id);
     setClientForm({
       clientName: row.clientName,
       companyName: row.companyName,
@@ -528,18 +551,19 @@ export function InternalManagement() {
     });
   };
 
-  const deleteClientHistory = async (id: string) => {
+  const deleteProjectHistory = async (id: string) => {
     if (!token) return;
-    setClientBusyId(id);
+    setProjectBusyId(id);
     try {
-      await apiJson(`/client-history/${id}`, { token, method: 'DELETE' });
+      await apiJson(`/project-history/${id}`, { token, method: 'DELETE' });
       toast.success('Removed');
-      if (clientEditingId === id) resetClientForm();
-      loadClientHistories();
+      if (projectEditingId === id) resetProjectForm();
+      loadProjectHistories();
+      loadProfit();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
-      setClientBusyId(null);
+      setProjectBusyId(null);
     }
   };
 
@@ -561,7 +585,8 @@ export function InternalManagement() {
             ['contracts', 'Contracts'],
             ['documents', 'Documents'],
             ['commandMedia', 'Command Media'],
-            ['clientHistory', 'Client History'],
+            ['projectHistory', 'Project History'],
+            ['profit', 'Profit'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -1157,12 +1182,12 @@ export function InternalManagement() {
         </>
       )}
 
-      {tab === 'clientHistory' && (
+      {tab === 'projectHistory' && (
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>{clientEditingId ? 'Edit client' : 'Add client'}</h2>
-              <form onSubmit={submitClientHistory}>
+              <h2 style={{ marginTop: 0 }}>{projectEditingId ? 'Edit project' : 'Add project'}</h2>
+              <form onSubmit={submitProjectHistory}>
                 <div
                   style={{
                     display: 'grid',
@@ -1272,11 +1297,11 @@ export function InternalManagement() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button type="submit" className="btn btn-primary" disabled={clientSubmitting}>
-                    {clientSubmitting ? 'Saving…' : clientEditingId ? 'Update' : 'Add'}
+                  <button type="submit" className="btn btn-primary" disabled={projectSubmitting}>
+                    {projectSubmitting ? 'Saving…' : projectEditingId ? 'Update' : 'Add'}
                   </button>
-                  {clientEditingId && (
-                    <button type="button" className="btn btn-ghost" onClick={resetClientForm}>
+                  {projectEditingId && (
+                    <button type="button" className="btn btn-ghost" onClick={resetProjectForm}>
                       Cancel edit
                     </button>
                   )}
@@ -1287,14 +1312,15 @@ export function InternalManagement() {
 
           <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Client history</h2>
+              <h2 style={{ marginTop: 0 }}>Project history</h2>
               <div className="table-wrap" style={{ overflowX: 'auto' }}>
-                {clientHistories.length === 0 ? (
-                  <p className="table-empty">No client records yet.</p>
+                {projectHistories.length === 0 ? (
+                  <p className="table-empty">No project records yet.</p>
                 ) : (
                   <table className="table">
                     <thead>
                       <tr>
+                        <th>Project</th>
                         <th>Client name</th>
                         <th>Company</th>
                         <th>Email</th>
@@ -1309,8 +1335,9 @@ export function InternalManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {clientHistories.map((r) => (
+                      {projectHistories.map((r) => (
                         <tr key={r.id}>
+                          <td>{r.projectCode}</td>
                           <td>{r.clientName}</td>
                           <td>{r.companyName}</td>
                           <td>{r.clientEmail ?? '—'}</td>
@@ -1322,16 +1349,16 @@ export function InternalManagement() {
                           <td>{r.revenue ?? '—'}</td>
                           <td>{r.status}</td>
                           <td>
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEditClient(r)}>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEditProject(r)}>
                               Edit
                             </button>
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm"
-                              disabled={clientBusyId === r.id}
-                              onClick={() => void deleteClientHistory(r.id)}
+                              disabled={projectBusyId === r.id}
+                              onClick={() => void deleteProjectHistory(r.id)}
                             >
-                              {clientBusyId === r.id ? '…' : 'Delete'}
+                              {projectBusyId === r.id ? '…' : 'Delete'}
                             </button>
                           </td>
                         </tr>
@@ -1343,6 +1370,44 @@ export function InternalManagement() {
             </div>
           </div>
         </>
+      )}
+
+      {tab === 'profit' && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Profit by project</h2>
+            <div className="table-wrap" style={{ overflowX: 'auto' }}>
+              {profitRows.length === 0 ? (
+                <p className="table-empty">No projects yet.</p>
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th>Company</th>
+                      <th>Revenue</th>
+                      <th>Costs</th>
+                      <th>Profit</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profitRows.map((r) => (
+                      <tr key={r.projectId}>
+                        <td>{r.projectCode}</td>
+                        <td>{r.companyName}</td>
+                        <td>{r.revenue ?? r.revenueAmount.toFixed(2)}</td>
+                        <td>{r.costs.toFixed(2)}</td>
+                        <td>{r.profit.toFixed(2)}</td>
+                        <td>{r.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === 'commandMedia' && (

@@ -313,13 +313,13 @@ export function Admin() {
             ['buyersSuppliers', 'Buyers & Suppliers'],
             ['workLogs', 'Work Logs'],
             ['laborCosts', 'Labor Costs'],
-            ['permissions', 'Permissions'],
-            ['alertPreferences', 'Email alerts'],
             ['commodity', 'Commodity types'],
             ['defect', 'Defect codes'],
             ['disposition', 'Disposition codes'],
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
+            ['alertPreferences', 'Email alerts'],
+            ['permissions', 'Permissions'],
           ] as const
         ).map(([t, label]) => (
           <button

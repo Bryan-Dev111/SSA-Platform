@@ -309,6 +309,7 @@ router.get(
         buyerSuppliers: { select: { supplierId: true } },
         qeSuppliers: { select: { supplierId: true } },
         auditorSuppliers: { select: { supplierId: true } },
+        employeeSuppliers: { select: { supplierId: true } },
         qeBuyers: { select: { buyerId: true } },
         qmQes: { select: { qualityEngineerId: true } },
       },
@@ -332,6 +333,7 @@ router.get(
         assignedSupplierIds: u.buyerSuppliers.map((b) => b.supplierId),
         qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId), // legacy direct mapping
         auditorAssignedSupplierIds: u.auditorSuppliers.map((a) => a.supplierId),
+        employeeAssignedSupplierIds: u.employeeSuppliers.map((a) => a.supplierId),
         qeAssignedBuyerIds: u.qeBuyers.map((qb) => qb.buyerId),
         qmAssignedQeIds: u.qmQes.map((qq) => qq.qualityEngineerId),
       }))
