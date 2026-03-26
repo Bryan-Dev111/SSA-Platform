@@ -1401,9 +1401,6 @@ export function AdminPermissionsPanel({ token }: { token: string | null }) {
     <div className="card">
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>Permissions</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>
-          Manage role access by page/module. Changes apply to sidebar visibility, route guards, and API page protection.
-        </p>
         {matrixError && (
           <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
             {matrixError}
