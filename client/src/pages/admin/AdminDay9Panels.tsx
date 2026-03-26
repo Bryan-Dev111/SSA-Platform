@@ -277,7 +277,7 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
     <div className="card">
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>Risk category weights</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>Used for risk calculation (Day 11). All five must sum to exactly 100%.</p>
+        {/* <p style={{ color: 'var(--color-text-muted)' }}>Used for risk calculation (Day 11). All five must sum to exactly 100%.</p> */}
         <div
           style={{
             marginBottom: '0.75rem',
@@ -301,6 +301,9 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
           {field('carClosurePercent', 'CAR closure')}
           {field('documentationPercent', 'Documentation')}
         </div>
+        <p style={{ marginTop: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+          Final score = sum of (Category Risk % x Category Weight %).
+        </p>
         <p style={{ marginTop: '0.75rem', fontWeight: sumOk ? 400 : 600, color: sumOk ? 'inherit' : 'var(--color-danger)' }}>
           Current sum: {sum.toFixed(2)}%{sumOk ? ' ✓' : ' — must be 100'}
         </p>
