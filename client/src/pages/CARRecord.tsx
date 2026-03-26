@@ -889,15 +889,6 @@ export function CARRecord() {
                   <input className="input" value={car.code} readOnly disabled />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Status</label>
-                  <select className="input" value={car.status === 'DRAFT' ? 'RCCA' : car.status} disabled>
-                    <option value="RCCA">RCCA</option>
-                    <option value="WaitingApproval">Waiting Approval</option>
-                    <option value="FollowUp">Follow Up</option>
-                    <option value="Closed">Closed</option>
-                  </select>
-                </div>
-                <div className="input-group">
                   <label className="input-label">Supplier</label>
                   <input className="input" value={car.supplier?.code ?? ''} readOnly disabled />
                 </div>
