@@ -22,6 +22,48 @@ const ALERT_EMAIL_MATRIX_CATEGORIES: AlertCategory[] = [
 ];
 
 const ALERT_RECIPIENT_ROLE_NAMES = ['Admin', 'QualityEngineer', 'Buyer', 'QualityManager'] as const;
+const ROLE_ALIASES: Record<string, string> = {
+  admin: 'Admin',
+  viewer: 'Viewer',
+  buyer: 'Buyer',
+  supplier: 'Supplier',
+  auditor: 'Auditor',
+  qualityengineer: 'QualityEngineer',
+  qualitymanager: 'QualityManager',
+  qualitymanger: 'QualityManager',
+};
+
+function normalizeRoleName(name: string): string {
+  const key = name.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  return ROLE_ALIASES[key] ?? name.trim();
+}
+
+function normalizeRoleNames(roleNames: string[]): string[] {
+  return [...new Set(roleNames.map(normalizeRoleName).filter(Boolean))];
+}
+
+async function resolveRoleRows(roleNamesInput: string[]): Promise<{ rows: Array<{ id: string; name: string }>; missing: string[] }> {
+  const requested = normalizeRoleNames(roleNamesInput.map((r) => r.trim()).filter(Boolean));
+  if (requested.length === 0) return { rows: [], missing: [] };
+  const allRoles = await prisma.role.findMany({ select: { id: true, name: true } });
+  const exactByName = new Map(allRoles.map((r) => [r.name, r] as const));
+  const normalizedByName = new Map<string, { id: string; name: string }>();
+  for (const role of allRoles) {
+    const key = normalizeRoleName(role.name);
+    if (!normalizedByName.has(key)) normalizedByName.set(key, role);
+  }
+  const rows: Array<{ id: string; name: string }> = [];
+  const missing: string[] = [];
+  for (const roleName of requested) {
+    const resolved = exactByName.get(roleName) ?? normalizedByName.get(normalizeRoleName(roleName));
+    if (!resolved) {
+      missing.push(roleName);
+      continue;
+    }
+    if (!rows.some((r) => r.id === resolved.id)) rows.push(resolved);
+  }
+  return { rows, missing };
+}
 
 function parseIsEmployee(value: unknown): boolean {
   if (value === true) return true;
@@ -207,7 +249,7 @@ router.get(
         id: u.id,
         email: u.email,
         name: u.name,
-        roleNames: u.userRoles.map((ur) => ur.role.name),
+        roleNames: normalizeRoleNames(u.userRoles.map((ur) => ur.role.name)),
       })),
       matrix,
     });
@@ -361,7 +403,7 @@ router.post(
     const currency = typeof req.body?.currency === 'string' ? req.body.currency.trim() || null : null;
     const country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
     const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : [];
-    const roleNames = [...new Set(roleNamesRaw)];
+    const roleNames = normalizeRoleNames(roleNamesRaw);
     if (!emailRaw || !password) {
       res.status(400).json({ error: 'email and password are required' });
       return;
@@ -381,8 +423,8 @@ router.post(
     }
     const passwordHash = await bcrypt.hash(password, 10);
     const passwordEncrypted = encryptPassword(password);
-    const roleRows = await prisma.role.findMany({ where: { name: { in: roleNames } } });
-    if (roleRows.length !== roleNames.length) {
+    const { rows: roleRows, missing } = await resolveRoleRows(roleNames);
+    if (missing.length > 0 || roleRows.length !== roleNames.length) {
       res.status(400).json({ error: 'One or more role names are invalid' });
       return;
     }
@@ -430,7 +472,7 @@ router.post(
       currency: user.currency,
       country: user.country,
       createdAt: user.createdAt,
-      roleNames: user.userRoles.map((ur) => ur.role.name),
+      roleNames: normalizeRoleNames(user.userRoles.map((ur) => ur.role.name)),
       supplier: user.supplier ?? undefined,
       assignedSupplierIds: user.buyerSuppliers.map((b) => b.supplierId),
       qeAssignedSupplierIds: user.qeSuppliers.map((q) => q.supplierId),
@@ -528,13 +570,14 @@ router.patch(
     }
 
     const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : null;
-    const roleNames = roleNamesRaw ? [...new Set(roleNamesRaw.map((r) => r.trim()).filter(Boolean))] : null;
+    const roleNames = roleNamesRaw ? normalizeRoleNames(roleNamesRaw) : null;
     if (roleNames && roleNames.length === 0) {
       res.status(400).json({ error: 'roleNames cannot be empty' });
       return;
     }
-    const roleRows = roleNames ? await prisma.role.findMany({ where: { name: { in: roleNames } } }) : null;
-    if (roleNames && roleRows && roleRows.length !== roleNames.length) {
+    const roleResolution = roleNames ? await resolveRoleRows(roleNames) : null;
+    const roleRows = roleResolution?.rows ?? null;
+    if (roleNames && roleRows && (roleRows.length !== roleNames.length || (roleResolution?.missing.length ?? 0) > 0)) {
       res.status(400).json({ error: 'One or more role names are invalid' });
       return;
     }
@@ -579,7 +622,7 @@ router.patch(
       country: updated.country,
       createdAt: updated.createdAt,
       passwordPlain: decryptPassword(updated.passwordEncrypted),
-      roleNames: updated.userRoles.map((ur) => ur.role.name),
+      roleNames: normalizeRoleNames(updated.userRoles.map((ur) => ur.role.name)),
       supplier: updated.supplier ?? undefined,
       assignedSupplierIds: updated.buyerSuppliers.map((b) => b.supplierId),
       qeAssignedSupplierIds: updated.qeSuppliers.map((q) => q.supplierId),

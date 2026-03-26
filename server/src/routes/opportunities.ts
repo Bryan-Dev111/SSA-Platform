@@ -78,7 +78,7 @@ router.get(
 
 router.post(
   '/',
-  requireRole(['Admin', 'QualityEngineer', 'Buyer']),
+  requireRole(['Admin', 'QualityEngineer', 'QualityManager', 'Buyer']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -142,7 +142,7 @@ router.post(
 
 router.patch(
   '/:id',
-  requireRole(['Admin', 'QualityEngineer', 'Buyer']),
+  requireRole(['Admin', 'QualityEngineer', 'QualityManager', 'Buyer']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });

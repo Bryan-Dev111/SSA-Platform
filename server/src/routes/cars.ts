@@ -210,7 +210,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canInitiate = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canInitiate = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canInitiate) {
       res.status(403).json({ error: 'Only Admin, Quality Engineer, or Buyer can create a CAR' });
       return;
@@ -302,7 +302,7 @@ router.patch(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canEdit = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canEdit = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canEdit) {
       res.status(403).json({ error: 'Viewer and other roles cannot edit CARs' });
       return;
@@ -362,7 +362,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canSave = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canSave = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canSave) {
       res.status(403).json({ error: 'Viewer and other roles cannot save CARs' });
       return;
@@ -403,7 +403,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canProcess = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canProcess = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canProcess) {
       res.status(403).json({ error: 'Viewer and other roles cannot process CARs' });
       return;
@@ -473,7 +473,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canReverse = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canReverse = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canReverse) {
       res.status(403).json({ error: 'Viewer and other roles cannot reverse CARs' });
       return;
@@ -522,7 +522,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canApprove = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canApprove = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canApprove) {
       res.status(403).json({ error: 'Only Admin, Quality Engineer, or Buyer can approve CARs' });
       return;
@@ -569,7 +569,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canReject = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    const canReject = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canReject) {
       res.status(403).json({ error: 'Only Admin, Quality Engineer, or Buyer can reject CARs' });
       return;

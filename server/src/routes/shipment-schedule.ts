@@ -13,7 +13,7 @@ const router = Router();
 router.use(authMiddleware);
 router.use(requirePageAccess('InternalManagement'));
 
-const adminOnly = requireRole(['Admin']);
+const adminOnly = requireRole(['Admin', 'QualityManager']);
 
 router.get(
   '/',

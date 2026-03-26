@@ -50,7 +50,7 @@ export function CorrectiveActions() {
   const [error, setError] = useState<string | null>(null);
 
   const roleNames = user?.roleNames ?? [];
-  const canCreateCAR = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+  const canCreateCAR = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
   const isAdmin = roleNames.includes('Admin');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

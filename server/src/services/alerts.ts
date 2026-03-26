@@ -9,7 +9,7 @@ async function getEnabledRecipientIds(category: AlertCategory): Promise<string[]
       userRoles: {
         some: {
           role: {
-            name: { in: ['Admin', 'QualityEngineer', 'Buyer', 'Auditor'] },
+            name: { in: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'] },
           },
         },
       },

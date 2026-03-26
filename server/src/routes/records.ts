@@ -20,7 +20,7 @@ router.use(authMiddleware);
 router.use(requirePageAccess('Records'));
 
 function canReviewRecord(roleNames: string[]): boolean {
-  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
+  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager');
 }
 
 router.get(

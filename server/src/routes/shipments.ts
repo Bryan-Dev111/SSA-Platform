@@ -18,7 +18,7 @@ router.use(authMiddleware);
 router.use(requirePageAccess('Shipments'));
 
 function canRecordInspectionResult(roleNames: string[]): boolean {
-  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer');
+  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager');
 }
 
 function canEditInspector(roleNames: string[]): boolean {
@@ -155,6 +155,7 @@ router.post(
     const canCreateForOthers =
       req.user.roleNames.includes('Admin') ||
       req.user.roleNames.includes('QualityEngineer') ||
+      req.user.roleNames.includes('QualityManager') ||
       req.user.roleNames.includes('Buyer');
     const isSupplier = req.user.roleNames.includes('Supplier');
     if (!canCreateForOthers && !isSupplier) {

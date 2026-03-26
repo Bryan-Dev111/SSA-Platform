@@ -60,9 +60,9 @@ export function Findings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const roleNames = user?.roleNames ?? [];
-  const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r));
   /** Admin, QE, Buyer can create CARs (matches server POST /cars). */
-  const canCreateCar = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+  const canCreateCar = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
   const isAdmin = roleNames.includes('Admin');
 
   const [refreshKey, setRefreshKey] = useState(0);

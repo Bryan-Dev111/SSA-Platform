@@ -17,7 +17,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 router.use(authMiddleware);
 router.use(requirePageAccess('Documents'));
 
-const canMutate = requireRole(['Admin', 'QualityEngineer']);
+const canMutate = requireRole(['Admin', 'QualityEngineer', 'QualityManager']);
 
 const DOCUMENT_TYPES: DocumentType[] = [
   'Procedure',

@@ -65,7 +65,7 @@ export function Shipments() {
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
   const isQM = user?.roleNames?.includes('QualityManager') ?? false;
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
-  const canReview = isAdmin || isQE;
+  const canReview = isAdmin || isQE || isQM;
   const canEditInspector = isAdmin || isQE || isQM;
 
   const [inspectorDrafts, setInspectorDrafts] = useState<Record<string, string>>({});

@@ -104,7 +104,7 @@ export function SupplierProfile() {
 
   const isSupplier = user?.roleNames?.includes('Supplier');
   const roleNames = user?.roleNames ?? [];
-  const canSelectSupplier = !isSupplier && roleNames.some((r) => ['Admin', 'Buyer', 'QualityEngineer'].includes(r));
+  const canSelectSupplier = !isSupplier && roleNames.some((r) => ['Admin', 'Buyer', 'QualityEngineer', 'QualityManager'].includes(r));
 
   useEffect(() => {
     if (supplierIdFromUrl && canSelectSupplier) {

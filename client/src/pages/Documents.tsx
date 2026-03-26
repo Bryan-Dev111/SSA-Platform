@@ -56,7 +56,9 @@ export function Documents() {
   const [pageSize, setPageSize] = useState(10);
 
   const canMutate =
-    (user?.roleNames?.includes('Admin') ?? false) || (user?.roleNames?.includes('QualityEngineer') ?? false);
+    (user?.roleNames?.includes('Admin') ?? false) ||
+    (user?.roleNames?.includes('QualityEngineer') ?? false) ||
+    (user?.roleNames?.includes('QualityManager') ?? false);
   const totalCount = rows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;

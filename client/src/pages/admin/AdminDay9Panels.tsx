@@ -351,10 +351,12 @@ interface SupplierRow {
   user?: { id: string; email: string; name: string | null } | null;
 }
 
-const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'Auditor'] as const;
+const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'] as const;
 
 function formatUserRoleLabel(roleName: string): string {
-  return roleName === 'QualityEngineer' ? 'Quality Engineer' : roleName;
+  if (roleName === 'QualityEngineer') return 'Quality Engineer';
+  if (roleName === 'QualityManager') return 'Quality Manager';
+  return roleName;
 }
 
 interface PermissionPageDef {
@@ -697,7 +699,7 @@ export function AdminBuyersSuppliersPanel({
                 <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
                   {availableRoleOptions.map((r) => (
                     <option key={r} value={r}>
-                      {r === 'QualityEngineer' ? 'Quality Engineer' : r}
+                      {formatUserRoleLabel(r)}
                     </option>
                   ))}
                 </select>
@@ -1433,7 +1435,7 @@ export function AdminPermissionsPanel({ token }: { token: string | null }) {
               <tbody>
                 {serverData.roles.map((roleName) => (
                   <tr key={roleName}>
-                    <td>{roleName === 'QualityEngineer' ? 'Quality Engineer' : roleName}</td>
+                    <td>{formatUserRoleLabel(roleName)}</td>
                     {serverData.pages.map((p) => (
                       <td key={`${roleName}-${p.key}`}>
                         <input

@@ -23,7 +23,7 @@ async function getOrCreateConfig() {
 
 router.get(
   '/',
-  requireRole(['Admin', 'Viewer', 'QualityEngineer', 'Buyer']),
+  requireRole(['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer']),
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const row = await getOrCreateConfig();
     res.json(row);

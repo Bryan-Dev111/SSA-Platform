@@ -93,7 +93,10 @@ export function Risk() {
 
   const roleNames = user?.roleNames ?? [];
   const canEditRiskItems =
-    roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('Buyer');
+    roleNames.includes('Admin') ||
+    roleNames.includes('QualityEngineer') ||
+    roleNames.includes('QualityManager') ||
+    roleNames.includes('Buyer');
 
   const load = async (showLoader = true) => {
     if (!token) return;

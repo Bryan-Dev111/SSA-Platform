@@ -224,14 +224,14 @@ export function FindingsRecord() {
   const [dispositionCodeOptions, setDispositionCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const roleNames = user?.roleNames ?? [];
-  const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r));
   const isEditableFindingStatus =
     !!finding && ['New', 'DRAFT', 'WaitingDisposition'].includes(finding.status);
   const canEdit = !!finding && editMode && canEditDraft && isEditableFindingStatus;
   const canSave = canEdit;
   const canApproveReject =
     finding?.status === 'WaitingApproval' &&
-    roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+    roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
 
   const [createEnabled, setCreateEnabled] = useState(false);

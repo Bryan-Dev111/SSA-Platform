@@ -78,9 +78,9 @@ export function Audits() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const roleNames = user?.roleNames ?? [];
   const isAdmin = roleNames.includes('Admin');
-  const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Auditor'].includes(r));
+  const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r));
   const canSetResultForAudit = (audit: Audit): boolean => {
-    if (roleNames.includes('Admin') || roleNames.includes('QualityEngineer')) return true;
+    if (roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager')) return true;
     if (!roleNames.includes('Auditor')) return false;
     const target = (audit.auditor ?? '').trim().toLowerCase();
     if (!target) return false;

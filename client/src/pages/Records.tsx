@@ -119,11 +119,13 @@ export function Records() {
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
+  const isQM = user?.roleNames?.includes('QualityManager') ?? false;
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
-  const canReview = isAdmin || isQE;
+  const canReview = isAdmin || isQE || isQM;
   const canUpload =
     isAdmin ||
     isQE ||
+    isQM ||
     user?.roleNames?.includes('Auditor') ||
     user?.roleNames?.includes('Buyer');
 

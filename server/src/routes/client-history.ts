@@ -20,7 +20,7 @@ function parseRevenueAmount(value: unknown): number | null {
 
 router.use(authMiddleware);
 router.use(requirePageAccess('InternalManagement'));
-router.use(requireRole(['Admin']));
+router.use(requireRole(['Admin', 'QualityManager']));
 
 router.get(
   '/',

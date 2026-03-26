@@ -238,7 +238,7 @@ export function CARRecord() {
   const [createEnabled, setCreateEnabled] = useState(false);
   const activeLoadIdRef = useRef(0);
   const roleNames = user?.roleNames ?? [];
-  const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+  const canEditDraft = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
   const canEdit = !!car && editMode && canEditDraft;
   const canSave = !!car && canEditDraft && editMode;
   /** Process stays clickable for RCCA / FollowUp with missing fields so we can show a warning toast. */
@@ -257,7 +257,7 @@ export function CARRecord() {
     !car ||
     editMode ||
     !['WaitingApproval', 'FollowUp', 'Closed'].includes(car.status);
-  const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'Buyer'].includes(r));
+  const canApproveReject = car?.status === 'WaitingApproval' && roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
   const canCreateNew = canEditDraft;
   const statusHistory = car ? buildCarStatusHistory(car) : [];
   const approvalDecisionLogs = (car?.approvalLogs ?? []).filter((log) => {

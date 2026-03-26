@@ -162,7 +162,10 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const canCreateOrEdit = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
+    const canCreateOrEdit =
+      req.user.roleNames.includes('Admin') ||
+      req.user.roleNames.includes('QualityEngineer') ||
+      req.user.roleNames.includes('QualityManager');
     if (!canCreateOrEdit) {
       res.status(403).json({ error: 'Viewer and other roles are read-only for audits' });
       return;
@@ -240,7 +243,10 @@ router.patch(
       scope?: string | null;
     };
 
-    const isAdminOrQe = req.user.roleNames.includes('Admin') || req.user.roleNames.includes('QualityEngineer');
+    const isAdminOrQe =
+      req.user.roleNames.includes('Admin') ||
+      req.user.roleNames.includes('QualityEngineer') ||
+      req.user.roleNames.includes('QualityManager');
     if (!isAdminOrQe) {
       // Auditors are allowed to submit only `result` for audits they are assigned to.
       const triesToEditOtherFields =
@@ -258,6 +264,7 @@ router.patch(
     const canSetResult =
       req.user.roleNames.includes('Admin') ||
       req.user.roleNames.includes('QualityEngineer') ||
+      req.user.roleNames.includes('QualityManager') ||
       (req.user.roleNames.includes('Auditor') && isAssignedAuditorForAudit(existing.auditor, req.user));
     const update: {
       auditDate?: Date;
