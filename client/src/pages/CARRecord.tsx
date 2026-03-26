@@ -576,7 +576,19 @@ export function CARRecord() {
       toast.error('Finding # is required');
       return;
     }
-    if (!token || !form.auditId || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
+    if (!token) return;
+    const missing: string[] = [];
+    if (!form.supplierId) missing.push('Supplier');
+    if (!form.auditId) missing.push('Audit #');
+    if (!form.severity) missing.push('Severity');
+    if (!form.summary.trim()) missing.push('Summary');
+    if (!form.discrepancy.trim()) missing.push('Problem Statement');
+    if (missing.length > 0) {
+      const message = `Please complete required fields: ${missing.join(', ')}`;
+      setError(message);
+      toast.error(message);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
