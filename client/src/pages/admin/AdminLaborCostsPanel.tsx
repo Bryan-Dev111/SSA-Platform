@@ -20,12 +20,23 @@ interface LaborCostRow {
 interface WorkLogOption {
   id: string;
   code: string;
+  fullName: string;
+  hoursWorked: number;
+  projectHistoryId: string | null;
 }
 
 interface ProjectOption {
   id: string;
   projectCode: string;
   companyName: string;
+}
+
+interface UserOption {
+  id: string;
+  name: string | null;
+  email: string;
+  isEmployee?: boolean;
+  hourlyRate?: number | null;
 }
 
 export function AdminLaborCostsPanel({ token }: { token: string | null }) {
@@ -35,6 +46,7 @@ export function AdminLaborCostsPanel({ token }: { token: string | null }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [employeeRateByName, setEmployeeRateByName] = useState<Record<string, number>>({});
   const [form, setForm] = useState({
     workLogId: '',
     projectHistoryId: '',
@@ -52,15 +64,39 @@ export function AdminLaborCostsPanel({ token }: { token: string | null }) {
       apiJson<LaborCostRow[]>('/labor-costs', { token }),
       apiJson<WorkLogOption[]>('/work-logs', { token }).catch(() => []),
       apiJson<ProjectOption[]>('/project-history', { token }).catch(() => []),
+      apiJson<UserOption[]>('/users', { token }).catch(() => []),
     ])
-      .then(([costs, logs, proj]) => {
+      .then(([costs, logs, proj, users]) => {
         setRows(costs);
         setWorkLogs(logs);
         setProjects(proj);
+        const next: Record<string, number> = {};
+        for (const u of users) {
+          const label = u.name?.trim() || u.email;
+          if (u.isEmployee && typeof u.hourlyRate === 'number' && Number.isFinite(u.hourlyRate)) {
+            next[label.toLowerCase()] = u.hourlyRate;
+          }
+        }
+        setEmployeeRateByName(next);
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    if (!form.workLogId) return;
+    const selected = workLogs.find((w) => w.id === form.workLogId);
+    if (!selected) return;
+    const key = selected.fullName.trim().toLowerCase();
+    const employeeRate = employeeRateByName[key];
+    setForm((prev) => ({
+      ...prev,
+      fullName: selected.fullName,
+      hours: String(selected.hoursWorked),
+      rate: typeof employeeRate === 'number' ? String(employeeRate) : prev.rate,
+      projectHistoryId: prev.projectHistoryId || selected.projectHistoryId || '',
+    }));
+  }, [form.workLogId, workLogs, employeeRateByName]);
 
   const createCost = async (e: React.FormEvent) => {
     e.preventDefault();
