@@ -192,9 +192,13 @@ export function Dashboard() {
         style={{
           display: 'grid',
           gap: '1rem',
-          gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 420px)',
+          gridTemplateColumns: '1fr', // single column by default (mobile)
           marginBottom: '1rem',
           alignItems: 'start',
+          // Responsive 2:1 columns for larger screens
+          ...(window.innerWidth >= 768
+            ? { gridTemplateColumns: '2fr 1fr' }
+            : {}),
         }}
       >
         <div
@@ -202,6 +206,7 @@ export function Dashboard() {
             display: 'grid',
             gap: '1rem',
             gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            height: '100%',
           }}
         >
             <div className="card">
