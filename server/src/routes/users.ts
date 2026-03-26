@@ -21,7 +21,7 @@ const ALERT_EMAIL_MATRIX_CATEGORIES: AlertCategory[] = [
   'majorCriticalFinding',
 ];
 
-const ALERT_RECIPIENT_ROLE_NAMES = ['Admin', 'QualityEngineer', 'Buyer', 'Auditor'] as const;
+const ALERT_RECIPIENT_ROLE_NAMES = ['Admin', 'QualityEngineer', 'Buyer', 'QualityManager'] as const;
 
 function parseIsEmployee(value: unknown): boolean {
   if (value === true) return true;

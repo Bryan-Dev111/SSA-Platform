@@ -89,7 +89,7 @@ export function AdminAlertPreferencesPanel({ token, toast }: { token: string | n
         <p style={{ color: 'var(--color-text-muted)' }}>
           Turn operational notifications on or off per user. These settings control who receives in-app alerts for
           shipment requests, rejections, overdue CARs, and major/critical findings (same pool as Admin, Quality
-          Engineer, Buyer, and Auditor recipients).
+          Engineer, Buyer, and Quality Manager recipients).
         </p>
         {error && (
           <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
