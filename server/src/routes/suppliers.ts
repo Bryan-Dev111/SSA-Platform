@@ -245,10 +245,14 @@ router.post(
       return;
     }
 
-    await prisma.$transaction([
-      prisma.supplier.updateMany({ where: { userId }, data: { userId: null } }),
-      prisma.supplier.update({ where: { id: supplierId }, data: { userId } }),
-    ]);
+    // Relink in one flow: no manual unlink step required by admin users.
+    await prisma.$transaction(async (tx) => {
+      await tx.supplier.updateMany({
+        where: { OR: [{ userId }, { id: supplierId }] },
+        data: { userId: null },
+      });
+      await tx.supplier.update({ where: { id: supplierId }, data: { userId } });
+    });
 
     const updated = await prisma.supplier.findUnique({
       where: { id: supplierId },

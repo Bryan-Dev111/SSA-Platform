@@ -493,6 +493,8 @@ export function AdminBuyersSuppliersPanel({
         body: JSON.stringify({ userId: supplierLinkUserId }),
       });
       toast.success('Supplier user linked');
+      setSupplierLinkSupplierId('');
+      setSupplierLinkUserId('');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Link failed');
@@ -1220,6 +1222,9 @@ export function AdminBuyersSuppliersPanel({
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Link supplier user account</h2>
+            <p style={{ marginTop: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              Linking replaces any existing supplier-user link automatically. Disconnect only removes the link; it does not delete users or suppliers.
+            </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Supplier company</label>
@@ -1287,7 +1292,7 @@ export function AdminBuyersSuppliersPanel({
                         <td>
                           {s.user ? (
                             <button type="button" className="btn btn-ghost" onClick={() => unlinkSupplierUser(s.id)} disabled={busy}>
-                              Unlink
+                              Disconnect
                             </button>
                           ) : (
                             '—'
