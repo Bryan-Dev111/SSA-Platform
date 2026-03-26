@@ -414,6 +414,8 @@ export function AdminBuyersSuppliersPanel({
   const [newSupCommodityTypeId, setNewSupCommodityTypeId] = useState('');
   const [commodityTypes, setCommodityTypes] = useState<CommodityTypeRow[]>([]);
   const [editSup, setEditSup] = useState<SupplierRow | null>(null);
+  const [editUser, setEditUser] = useState<UserRow | null>(null);
+  const [editUserPassword, setEditUserPassword] = useState('');
   const [delSup, setDelSup] = useState<SupplierRow | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -614,6 +616,40 @@ export function AdminBuyersSuppliersPanel({
     }
   };
 
+  const saveUserEdit = async () => {
+    if (!token || !editUser) return;
+    setBusy(true);
+    try {
+      await apiJson(`/users/${editUser.id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editUser.name?.trim() || null,
+          email: editUser.email.trim(),
+          isEmployee: Boolean(editUser.isEmployee),
+          isContractor: Boolean(editUser.isContractor),
+          employmentStatus: editUser.employmentStatus ?? 'Active',
+          hourlyRate:
+            editUser.hourlyRate === null || editUser.hourlyRate === undefined
+              ? null
+              : Number(editUser.hourlyRate),
+          currency: editUser.currency?.trim() || null,
+          country: editUser.country?.trim() || null,
+          roleNames: editUser.roleNames,
+          ...(editUserPassword.trim() ? { password: editUserPassword } : {}),
+        }),
+      });
+      setEditUser(null);
+      setEditUserPassword('');
+      toast.success('User updated');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doDeleteSupplier = async () => {
     if (!token || !delSup) return;
     setBusy(true);
@@ -783,35 +819,173 @@ export function AdminBuyersSuppliersPanel({
                   {usersOnlyEmployees && <th>Country</th>}
                   <th>Password</th>
                   <th>Role</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={usersOnlyEmployees ? 9 : 5} className="table-empty">
+                    <td colSpan={usersOnlyEmployees ? 10 : 6} className="table-empty">
                       No users yet.
                     </td>
                   </tr>
                 ) : (
                   visibleUsers.map((u) => (
                     <tr key={u.id}>
-                      <td>{u.name?.trim() ? u.name : '—'}</td>
-                      <td>{u.email}</td>
                       <td>
-                        {u.isContractor
-                          ? 'Contractor'
-                          : u.isEmployee
-                            ? 'Yes'
-                            : 'No'}
+                        {editUser?.id === u.id ? (
+                          <input className="input" value={editUser.name ?? ''} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} />
+                        ) : (
+                          u.name?.trim() ? u.name : '—'
+                        )}
                       </td>
-                      {usersOnlyEmployees && <td>{u.employmentStatus ?? 'Active'}</td>}
-                      {usersOnlyEmployees && <td>{u.hourlyRate != null ? u.hourlyRate : '—'}</td>}
-                      {usersOnlyEmployees && <td>{u.currency ?? '—'}</td>}
-                      {usersOnlyEmployees && <td>{u.country ?? '—'}</td>}
+                      <td>
+                        {editUser?.id === u.id ? (
+                          <input className="input" type="email" value={editUser.email} onChange={(e) => setEditUser({ ...editUser, email: e.target.value })} />
+                        ) : (
+                          u.email
+                        )}
+                      </td>
+                      <td>
+                        {editUser?.id === u.id ? (
+                          <select
+                            className="input"
+                            value={editUser.isContractor ? 'Contractor' : editUser.isEmployee ? 'Yes' : 'No'}
+                            onChange={(e) => {
+                              const v = e.target.value as 'Yes' | 'No' | 'Contractor';
+                              setEditUser({
+                                ...editUser,
+                                isEmployee: v === 'Yes',
+                                isContractor: v === 'Contractor',
+                              });
+                            }}
+                          >
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                            <option value="Contractor">Contractor</option>
+                          </select>
+                        ) : u.isContractor ? (
+                          'Contractor'
+                        ) : u.isEmployee ? (
+                          'Yes'
+                        ) : (
+                          'No'
+                        )}
+                      </td>
+                      {usersOnlyEmployees && (
+                        <td>
+                          {editUser?.id === u.id ? (
+                            <select
+                              className="input"
+                              value={editUser.employmentStatus ?? 'Active'}
+                              onChange={(e) => setEditUser({ ...editUser, employmentStatus: e.target.value as 'Active' | 'Inactive' })}
+                            >
+                              <option value="Active">Active</option>
+                              <option value="Inactive">Inactive</option>
+                            </select>
+                          ) : (
+                            u.employmentStatus ?? 'Active'
+                          )}
+                        </td>
+                      )}
+                      {usersOnlyEmployees && (
+                        <td>
+                          {editUser?.id === u.id ? (
+                            <input
+                              className="input"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={editUser.hourlyRate ?? ''}
+                              onChange={(e) => setEditUser({ ...editUser, hourlyRate: e.target.value === '' ? null : Number(e.target.value) })}
+                            />
+                          ) : u.hourlyRate != null ? (
+                            u.hourlyRate
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      )}
+                      {usersOnlyEmployees && (
+                        <td>
+                          {editUser?.id === u.id ? (
+                            <input className="input" value={editUser.currency ?? ''} onChange={(e) => setEditUser({ ...editUser, currency: e.target.value })} />
+                          ) : (
+                            u.currency ?? '—'
+                          )}
+                        </td>
+                      )}
+                      {usersOnlyEmployees && (
+                        <td>
+                          {editUser?.id === u.id ? (
+                            <input className="input" value={editUser.country ?? ''} onChange={(e) => setEditUser({ ...editUser, country: e.target.value })} />
+                          ) : (
+                            u.country ?? '—'
+                          )}
+                        </td>
+                      )}
                       <td style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 'var(--text-xs)' }}>
-                        {u.passwordPlain ?? '—'}
+                        {editUser?.id === u.id ? (
+                          <input
+                            className="input"
+                            type="password"
+                            placeholder="Leave blank to keep current"
+                            value={editUserPassword}
+                            onChange={(e) => setEditUserPassword(e.target.value)}
+                          />
+                        ) : (
+                          u.passwordPlain ?? '—'
+                        )}
                       </td>
-                      <td>{u.roleNames.map(formatUserRoleLabel).join(', ')}</td>
+                      <td>
+                        {editUser?.id === u.id ? (
+                          <select
+                            className="input"
+                            value={editUser.roleNames[0] ?? 'Viewer'}
+                            onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
+                          >
+                            {availableRoleOptions.map((r) => (
+                              <option key={r} value={r}>
+                                {formatUserRoleLabel(r)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          u.roleNames.map(formatUserRoleLabel).join(', ')
+                        )}
+                      </td>
+                      <td>
+                        {editUser?.id === u.id ? (
+                          <>
+                            <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveUserEdit} disabled={busy}>
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              onClick={() => {
+                                setEditUser(null);
+                                setEditUserPassword('');
+                              }}
+                              disabled={busy}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setEditUser({ ...u, roleNames: u.roleNames.length ? [...u.roleNames] : ['Viewer'] });
+                              setEditUserPassword('');
+                            }}
+                            disabled={busy}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}

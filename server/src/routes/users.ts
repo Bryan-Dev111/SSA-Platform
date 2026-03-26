@@ -438,4 +438,153 @@ router.post(
   })
 );
 
+router.patch(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const data: {
+      email?: string;
+      name?: string | null;
+      isEmployee?: boolean;
+      isContractor?: boolean;
+      employmentStatus?: 'Active' | 'Inactive';
+      hourlyRate?: number | null;
+      currency?: string | null;
+      country?: string | null;
+      passwordHash?: string;
+      passwordEncrypted?: string | null;
+    } = {};
+
+    if ('email' in req.body) {
+      const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+      if (!email) {
+        res.status(400).json({ error: 'email cannot be empty' });
+        return;
+      }
+      const duplicate = await prisma.user.findUnique({ where: { email } });
+      if (duplicate && duplicate.id !== id) {
+        res.status(400).json({ error: 'Email already in use' });
+        return;
+      }
+      data.email = email;
+    }
+
+    if ('name' in req.body) {
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      data.name = name || null;
+    }
+
+    if ('isEmployee' in req.body) {
+      data.isEmployee = parseIsEmployee(req.body?.isEmployee);
+    }
+
+    if ('isContractor' in req.body) {
+      data.isContractor = parseIsContractor(req.body?.isContractor);
+    }
+
+    if ('employmentStatus' in req.body) {
+      const raw = typeof req.body?.employmentStatus === 'string' ? req.body.employmentStatus.trim() : '';
+      data.employmentStatus = raw.toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
+    }
+
+    if ('hourlyRate' in req.body) {
+      const hourlyRateRaw = req.body?.hourlyRate;
+      const hourlyRate =
+        hourlyRateRaw === undefined || hourlyRateRaw === null || hourlyRateRaw === '' ? null : Number(hourlyRateRaw);
+      if (hourlyRate !== null && (!Number.isFinite(hourlyRate) || hourlyRate < 0)) {
+        res.status(400).json({ error: 'hourlyRate must be a non-negative number' });
+        return;
+      }
+      data.hourlyRate = hourlyRate;
+    }
+
+    if ('currency' in req.body) {
+      data.currency = typeof req.body?.currency === 'string' ? req.body.currency.trim() || null : null;
+    }
+
+    if ('country' in req.body) {
+      data.country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
+    }
+
+    if ('password' in req.body) {
+      const password = typeof req.body?.password === 'string' ? req.body.password : '';
+      if (!password.trim()) {
+        res.status(400).json({ error: 'password cannot be empty' });
+        return;
+      }
+      data.passwordHash = await bcrypt.hash(password, 10);
+      data.passwordEncrypted = encryptPassword(password);
+    }
+
+    const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : null;
+    const roleNames = roleNamesRaw ? [...new Set(roleNamesRaw.map((r) => r.trim()).filter(Boolean))] : null;
+    if (roleNames && roleNames.length === 0) {
+      res.status(400).json({ error: 'roleNames cannot be empty' });
+      return;
+    }
+    const roleRows = roleNames ? await prisma.role.findMany({ where: { name: { in: roleNames } } }) : null;
+    if (roleNames && roleRows && roleRows.length !== roleNames.length) {
+      res.status(400).json({ error: 'One or more role names are invalid' });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (roleNames && roleRows) {
+        await tx.userRole.deleteMany({ where: { userId: id } });
+        await tx.userRole.createMany({ data: roleRows.map((r) => ({ userId: id, roleId: r.id })) });
+      }
+      return tx.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          passwordEncrypted: true,
+          isEmployee: true,
+          isContractor: true,
+          employmentStatus: true,
+          hourlyRate: true,
+          currency: true,
+          country: true,
+          createdAt: true,
+          userRoles: { include: { role: true } },
+          supplier: { select: { id: true, code: true, name: true } },
+          buyerSuppliers: { select: { supplierId: true } },
+          qeSuppliers: { select: { supplierId: true } },
+        },
+      });
+    });
+
+    res.json({
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      isEmployee: updated.isEmployee,
+      isContractor: updated.isContractor,
+      employmentStatus: updated.employmentStatus,
+      hourlyRate: updated.hourlyRate,
+      currency: updated.currency,
+      country: updated.country,
+      createdAt: updated.createdAt,
+      passwordPlain: decryptPassword(updated.passwordEncrypted),
+      roleNames: updated.userRoles.map((ur) => ur.role.name),
+      supplier: updated.supplier ?? undefined,
+      assignedSupplierIds: updated.buyerSuppliers.map((b) => b.supplierId),
+      qeAssignedSupplierIds: updated.qeSuppliers.map((q) => q.supplierId),
+    });
+  })
+);
+
 export default router;
