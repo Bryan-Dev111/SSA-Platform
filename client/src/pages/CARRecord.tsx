@@ -717,9 +717,9 @@ export function CARRecord() {
         <h1 className="page-title">
           {car ? `${car.code} — CAR` : 'CAR Record'}
         </h1>
-        <p className="page-description">
-          {car ? `Status: ${car.status}` : isNew ? 'Create a draft CAR (Admin, QE, or Buyer).' : 'CAR not found.'}
-        </p>
+          <p className="page-description">
+            {car ? `Status: ${car.status}` : isNew ? '' : 'CAR not found.'}
+          </p>
         <p style={{ marginTop: 4 }}>
           <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions</Link>
         </p>
@@ -1025,7 +1025,7 @@ export function CARRecord() {
                     className="input"
                     value={approvalComment}
                     onChange={(e) => setApprovalComment(e.target.value)}
-                    placeholder="Add approval or rejection comment"
+                    // placeholder="Add approval or rejection comment"
                     disabled={!canApproveReject || actioning}
                   />
                 </div>

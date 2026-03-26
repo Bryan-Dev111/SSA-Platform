@@ -519,9 +519,9 @@ export function Risk() {
               </tbody>
             </table>
           </div>
-          <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+          {/* <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
             Hover the pins (counts) to see the related risks.
-          </p>
+          </p> */}
         </div>
       </div>
 

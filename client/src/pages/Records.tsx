@@ -325,9 +325,9 @@ export function Records() {
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Upload record</h2>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+            {/* <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
               Supplier is taken from <strong>Filter by supplier</strong> above (not shown here). Choose one supplier before uploading.
-            </p>
+            </p> */}
             <form onSubmit={submit}>
               <div className="input-group">
                 <label className="input-label">Name *</label>

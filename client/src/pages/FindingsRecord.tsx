@@ -867,7 +867,7 @@ export function FindingsRecord() {
                     className="input"
                     value={approvalComment}
                     onChange={(e) => setApprovalComment(e.target.value)}
-                    placeholder="Add approval or rejection comment"
+                    // placeholder="Add approval or rejection comment"
                     disabled={!canApproveReject || actioning}
                   />
                 </div>
