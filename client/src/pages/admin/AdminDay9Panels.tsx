@@ -652,13 +652,15 @@ export function AdminBuyersSuppliersPanel({
 
   const doDeleteSupplier = async () => {
     if (!token || !delSup) return;
+    const target = delSup;
     setBusy(true);
+    setDelSup(null);
     try {
-      await apiJson(`/suppliers/${delSup.id}`, { token, method: 'DELETE' });
+      await apiJson(`/suppliers/${target.id}`, { token, method: 'DELETE' });
       toast.success('Supplier deleted');
-      setDelSup(null);
       await load();
     } catch (e) {
+      setDelSup(target);
       toast.error(e instanceof Error ? e.message : 'Delete failed');
     } finally {
       setBusy(false);

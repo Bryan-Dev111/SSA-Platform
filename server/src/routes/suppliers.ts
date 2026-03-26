@@ -76,7 +76,8 @@ router.post(
     }
     const code = await getNextCode('SUP');
     const created = await prisma.supplier.create({
-      data: { code, name, city, country, status: status as 'Active' | 'Inactive', notes, commodityTypeId },
+      // Keep create compatible with databases where Supplier.status is TEXT (no SupplierStatus enum type).
+      data: { code, name, city, country, notes, commodityTypeId },
       select: {
         id: true,
         code: true,
@@ -91,6 +92,27 @@ router.post(
         user: { select: { id: true, email: true, name: true } },
       },
     });
+    if (status === 'Inactive') {
+      await prisma.$executeRaw`UPDATE "Supplier" SET "status" = 'Inactive' WHERE "id" = ${created.id}`;
+      const refreshed = await prisma.supplier.findUnique({
+        where: { id: created.id },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          city: true,
+          country: true,
+          status: true,
+          notes: true,
+          commodityTypeId: true,
+          commodityType: { select: { id: true, name: true } },
+          userId: true,
+          user: { select: { id: true, email: true, name: true } },
+        },
+      });
+      res.status(201).json(refreshed ?? created);
+      return;
+    }
     res.status(201).json(created);
   })
 );
@@ -109,11 +131,11 @@ router.patch(
       name?: string;
       city?: string | null;
       country?: string | null;
-      status?: 'Active' | 'Inactive';
       notes?: string | null;
       commodityTypeId?: string | null;
       userId?: string | null;
     } = {};
+    let statusToApply: 'Active' | 'Inactive' | null = null;
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) {
@@ -134,7 +156,7 @@ router.patch(
         res.status(400).json({ error: 'status must be Active or Inactive' });
         return;
       }
-      data.status = status as 'Active' | 'Inactive';
+      statusToApply = status as 'Active' | 'Inactive';
     }
     if (body.notes !== undefined) {
       data.notes = typeof body.notes === 'string' ? body.notes.trim() || null : null;
@@ -152,7 +174,7 @@ router.patch(
       }
       data.commodityTypeId = commodityTypeId;
     }
-    if (Object.keys(data).length === 0) {
+    if (Object.keys(data).length === 0 && statusToApply === null) {
       res.status(400).json({ error: 'Provide at least one of: name, city, country, status, notes, commodityTypeId, userId' });
       return;
     }
@@ -161,9 +183,15 @@ router.patch(
       res.status(404).json({ error: 'Supplier not found' });
       return;
     }
-    const updated = await prisma.supplier.update({
+    await prisma.supplier.update({
       where: { id: req.params.id },
       data,
+    });
+    if (statusToApply) {
+      await prisma.$executeRaw`UPDATE "Supplier" SET "status" = ${statusToApply} WHERE "id" = ${req.params.id}`;
+    }
+    const updated = await prisma.supplier.findUnique({
+      where: { id: req.params.id },
       select: {
         id: true,
         code: true,
@@ -178,6 +206,10 @@ router.patch(
         user: { select: { id: true, email: true, name: true } },
       },
     });
+    if (!updated) {
+      res.status(404).json({ error: 'Supplier not found' });
+      return;
+    }
     res.json(updated);
   })
 );

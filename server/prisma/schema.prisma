@@ -110,7 +110,7 @@ model Supplier {
   name            String
   city            String?
   country         String?
-  status          SupplierStatus @default(Active)
+  status          String    @default("Active")
   notes           String?
   commodityTypeId String?
   commodityType   CommodityType? @relation(fields: [commodityTypeId], references: [id])
@@ -132,11 +132,6 @@ model Supplier {
   riskActions     RiskAction[]
   shipmentSchedules ShipmentSchedule[]
   workLogs        WorkLog[]
-}
-
-enum SupplierStatus {
-  Active
-  Inactive
 }
 
 model BuyerSupplier {
