@@ -796,9 +796,138 @@ export function AdminBuyersSuppliersPanel({
             </div>
           </div>
             <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
-              Create supplier (auto code)
+              Create supplier
             </button>
           </div>
+        </div>
+      )}
+
+      {showBuyerSupplierSections && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Suppliers (edit / delete)</h2>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>City</th>
+                  <th>Country</th>
+                  <th>Commodity</th>
+                  <th>Status</th>
+                  <th>Notes</th>
+                  <th style={{ width: 220 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suppliers.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.code}</td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input className="input" value={editSup.name} onChange={(e) => setEditSup({ ...editSup, name: e.target.value })} />
+                      ) : (
+                        s.name
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input className="input" value={editSup.city ?? ''} onChange={(e) => setEditSup({ ...editSup, city: e.target.value })} />
+                      ) : (
+                        s.city ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input
+                          className="input"
+                          value={editSup.country ?? ''}
+                          onChange={(e) => setEditSup({ ...editSup, country: e.target.value })}
+                        />
+                      ) : (
+                        s.country ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <select
+                          className="input"
+                          style={{ minWidth: 140 }}
+                          value={editSup.commodityTypeId ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const ct = v ? commodityTypes.find((x) => x.id === v) ?? null : null;
+                            setEditSup({
+                              ...editSup,
+                              commodityTypeId: v === '' ? null : v,
+                              commodityType: ct ? { id: ct.id, name: ct.name } : null,
+                            });
+                          }}
+                        >
+                          <option value="">— None —</option>
+                          {commodityTypes.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        s.commodityType?.name ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <select
+                          className="input"
+                          value={editSup.status}
+                          onChange={(e) => setEditSup({ ...editSup, status: e.target.value as 'Active' | 'Inactive' })}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      ) : (
+                        s.status
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input
+                          className="input"
+                          value={editSup.notes ?? ''}
+                          onChange={(e) => setEditSup({ ...editSup, notes: e.target.value })}
+                        />
+                      ) : (
+                        s.notes?.trim() ? s.notes : '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <>
+                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveSupplierEdit} disabled={busy}>
+                            Save
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setEditSup(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => setEditSup({ ...s })}>
+                            Edit
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setDelSup(s)}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         </div>
       )}
 
@@ -1169,135 +1298,6 @@ export function AdminBuyersSuppliersPanel({
               </table>
             </div>
           </div>
-        </div>
-      )}
-
-      {showBuyerSupplierSections && (
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Suppliers (edit / delete)</h2>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>City</th>
-                  <th>Country</th>
-                  <th>Commodity</th>
-                  <th>Status</th>
-                  <th>Notes</th>
-                  <th style={{ width: 220 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.code}</td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <input className="input" value={editSup.name} onChange={(e) => setEditSup({ ...editSup, name: e.target.value })} />
-                      ) : (
-                        s.name
-                      )}
-                    </td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <input className="input" value={editSup.city ?? ''} onChange={(e) => setEditSup({ ...editSup, city: e.target.value })} />
-                      ) : (
-                        s.city ?? '—'
-                      )}
-                    </td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <input
-                          className="input"
-                          value={editSup.country ?? ''}
-                          onChange={(e) => setEditSup({ ...editSup, country: e.target.value })}
-                        />
-                      ) : (
-                        s.country ?? '—'
-                      )}
-                    </td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <select
-                          className="input"
-                          style={{ minWidth: 140 }}
-                          value={editSup.commodityTypeId ?? ''}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const ct = v ? commodityTypes.find((x) => x.id === v) ?? null : null;
-                            setEditSup({
-                              ...editSup,
-                              commodityTypeId: v === '' ? null : v,
-                              commodityType: ct ? { id: ct.id, name: ct.name } : null,
-                            });
-                          }}
-                        >
-                          <option value="">— None —</option>
-                          {commodityTypes.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        s.commodityType?.name ?? '—'
-                      )}
-                    </td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <select
-                          className="input"
-                          value={editSup.status}
-                          onChange={(e) => setEditSup({ ...editSup, status: e.target.value as 'Active' | 'Inactive' })}
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                        </select>
-                      ) : (
-                        s.status
-                      )}
-                    </td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <input
-                          className="input"
-                          value={editSup.notes ?? ''}
-                          onChange={(e) => setEditSup({ ...editSup, notes: e.target.value })}
-                        />
-                      ) : (
-                        s.notes?.trim() ? s.notes : '—'
-                      )}
-                    </td>
-                    <td>
-                      {editSup?.id === s.id ? (
-                        <>
-                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveSupplierEdit} disabled={busy}>
-                            Save
-                          </button>
-                          <button type="button" className="btn btn-ghost" onClick={() => setEditSup(null)}>
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => setEditSup({ ...s })}>
-                            Edit
-                          </button>
-                          <button type="button" className="btn btn-ghost" onClick={() => setDelSup(s)}>
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
         </div>
       )}
 
