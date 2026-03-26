@@ -110,6 +110,14 @@ export async function computeSupplierRisk(supplierId: string): Promise<SupplierR
 
 export async function computeAndStoreRiskSnapshot(supplierId: string) {
   const summary = await computeSupplierRisk(supplierId);
+  const latest = await prisma.riskSnapshot.findFirst({
+    where: { supplierId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, supplierId: true, score: true, level: true, createdAt: true },
+  });
+  if (latest && latest.score === summary.score && latest.level === summary.level) {
+    return { snapshot: latest, summary };
+  }
   const row = await prisma.riskSnapshot.create({
     data: {
       supplierId,

@@ -731,7 +731,7 @@ export function CARRecord() {
             className="input"
             value={carQuery}
             onChange={(e) => setCarQuery(e.target.value)}
-            placeholder="Search by CAR id or code"
+            // placeholder="Search by CAR id or code"
             style={{ width: 320, minWidth: 320, maxWidth: 320 }}
           />
           <button type="submit" className="btn btn-ghost" disabled={searching}>

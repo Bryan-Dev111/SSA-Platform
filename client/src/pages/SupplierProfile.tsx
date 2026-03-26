@@ -2,7 +2,7 @@
  * Supplier Profile (Day 9.5): metrics, tables, upload record metadata, request shipment inspection.
  * Supplier role: full portal from GET /me/supplier-portal. Other roles: short notice.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -74,6 +74,12 @@ interface PortalData {
     recordCount: number;
     shipmentCount: number;
   };
+}
+
+interface WeeklyRiskPoint {
+  weekStartIso: string;
+  label: string;
+  score: number;
 }
 
 export function SupplierProfile() {
@@ -171,6 +177,11 @@ export function SupplierProfile() {
       window.removeEventListener('focus', onFocus);
     };
   }, [token, isSupplier, canSelectSupplier, selectedSupplierId]);
+
+  const weeklyRiskSeries = useMemo(() => {
+    if (!data?.riskSnapshots?.length) return [] as WeeklyRiskPoint[];
+    return buildWeeklyRiskSeries(data.riskSnapshots);
+  }, [data?.riskSnapshots]);
 
   const submitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -594,24 +605,11 @@ export function SupplierProfile() {
         empty="No risk snapshots."
         rowCount={data.riskSnapshots.length}
       >
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Level</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.riskSnapshots.map((r) => (
-              <tr key={r.id}>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
-                <td>{r.level}</td>
-                <td>{r.score ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {weeklyRiskSeries.length === 0 ? (
+          <p className="table-empty">No numeric risk scores yet.</p>
+        ) : (
+          <RiskHistoryLineChart points={weeklyRiskSeries} />
+        )}
       </SectionTable>
 
       <SectionTable
@@ -711,6 +709,91 @@ export function SupplierProfile() {
 
 function safeExportFilePart(s: string): string {
   return s.replace(/[/\\?*:[\]"<>|]/g, '_').trim() || 'supplier';
+}
+
+function buildWeeklyRiskSeries(
+  snapshots: Array<{ id: string; score: number | null; level: string; createdAt: string }>
+): WeeklyRiskPoint[] {
+  const sortedAsc = [...snapshots]
+    .filter((s): s is { id: string; score: number; level: string; createdAt: string } => typeof s.score === 'number')
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const byWeek = new Map<string, WeeklyRiskPoint>();
+  for (const snap of sortedAsc) {
+    const created = new Date(snap.createdAt);
+    if (Number.isNaN(created.getTime())) continue;
+    const weekStart = toUtcWeekStart(created);
+    const iso = weekStart.toISOString().slice(0, 10);
+    byWeek.set(iso, {
+      weekStartIso: iso,
+      label: `${weekStart.toLocaleString('en-US', { month: 'short' })} ${weekStart.getUTCDate()}`,
+      score: Math.round(snap.score * 100) / 100,
+    });
+  }
+  return [...byWeek.values()].sort((a, b) => a.weekStartIso.localeCompare(b.weekStartIso));
+}
+
+function toUtcWeekStart(d: Date): Date {
+  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = dt.getUTCDay();
+  const mondayOffset = (day + 6) % 7;
+  dt.setUTCDate(dt.getUTCDate() - mondayOffset);
+  return dt;
+}
+
+function RiskHistoryLineChart({ points }: { points: WeeklyRiskPoint[] }) {
+  const width = 960;
+  const height = 280;
+  const padLeft = 48;
+  const padRight = 20;
+  const padTop = 16;
+  const padBottom = 42;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+  const maxY = Math.max(100, ...points.map((p) => p.score));
+  const minY = 0;
+
+  const xAt = (i: number) => padLeft + (points.length <= 1 ? plotW / 2 : (i / (points.length - 1)) * plotW);
+  const yAt = (v: number) => padTop + plotH - ((v - minY) / (maxY - minY || 1)) * plotH;
+  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(p.score).toFixed(2)}`).join(' ');
+
+  return (
+    <div>
+      <div style={{ marginBottom: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+        Weekly risk score trend
+      </div>
+      <div className="table-wrap" style={{ overflowX: 'auto' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', minWidth: 680, height: 'auto', display: 'block' }}>
+          {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
+            const y = padTop + plotH * f;
+            const val = Math.round(maxY * (1 - f));
+            return (
+              <g key={`grid-${idx}`}>
+                <line x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke="#e5e7eb" strokeWidth="1" />
+                <text x={padLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">
+                  {val}
+                </text>
+              </g>
+            );
+          })}
+
+          <line x1={padLeft} y1={padTop + plotH} x2={width - padRight} y2={padTop + plotH} stroke="#9ca3af" />
+          <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + plotH} stroke="#9ca3af" />
+
+          <path d={path} fill="none" stroke="#2563eb" strokeWidth="2.5" />
+          {points.map((p, i) => (
+            <circle key={p.weekStartIso} cx={xAt(i)} cy={yAt(p.score)} r="3.5" fill="#2563eb" />
+          ))}
+
+          {points.map((p, i) => (
+            <text key={`${p.weekStartIso}-x`} x={xAt(i)} y={height - 14} textAnchor="middle" fontSize="11" fill="#6b7280">
+              {p.label}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
 }
 
 function SectionTable({
