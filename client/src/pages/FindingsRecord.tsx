@@ -628,9 +628,9 @@ export function FindingsRecord() {
         <p className="page-description">
           {finding
             ? `Status: ${formatFindingStatus(finding.status)}`
-            : isNew
-              ? 'Create a new finding (Admin, QE, or Auditor).'
-              : 'Finding not found.'}
+            : !isNew
+              ? 'Finding not found.'
+              : null}
         </p>
         <p style={{ marginTop: 4 }}>
           <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
@@ -714,7 +714,6 @@ export function FindingsRecord() {
               </div>
               <div className="input-group">
                 <label className="input-label">Summary *</label>
-                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Brief description of the issue</p>
                 <input
                   className="input"
                   value={form.summary}
@@ -725,7 +724,6 @@ export function FindingsRecord() {
               </div>
               <div className="input-group">
                 <label className="input-label">Discrepancy *</label>
-                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
                 <textarea
                   className="input"
                   rows={2}
@@ -832,12 +830,10 @@ export function FindingsRecord() {
 
               <div className="input-group" style={{ marginTop: '1rem' }}>
                 <label className="input-label">Summary</label>
-                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Brief description of the issue</p>
                 <input className="input" value={form.summary} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))} disabled={!canEdit} />
               </div>
               <div className="input-group">
                 <label className="input-label">Discrepancy</label>
-                <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>What went wrong</p>
                 <textarea className="input" rows={2} value={form.discrepancy} onChange={(e) => setForm((p) => ({ ...p, discrepancy: e.target.value }))} disabled={!canEdit} />
               </div>
               <ReferenceCodeSelect
