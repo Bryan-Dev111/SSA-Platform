@@ -62,7 +62,6 @@ export function SupplierList() {
       <div className="page">
         <header className="page-header">
           <h1 className="page-title">Approved Supplier List</h1>
-          <p className="page-description">Suppliers in your scope.</p>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -87,10 +86,6 @@ export function SupplierList() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Approved Supplier List</h1>
-        <p className="page-description">
-          Admin sees all; Buyer sees assigned suppliers; Supplier sees own record. Commodity type is set when an admin
-          creates the supplier (Admin → Buyers & Suppliers).
-        </p>
       </header>
       <div className="card">
         <div className="table-wrap">

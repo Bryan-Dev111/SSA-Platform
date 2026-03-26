@@ -225,9 +225,6 @@ export function Documents() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Command Media</h1>
-        <p className="page-description">
-          Controlled policies, procedures, SOPs, work instructions, and forms.
-        </p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}

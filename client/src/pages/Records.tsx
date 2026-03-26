@@ -293,9 +293,6 @@ export function Records() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Records</h1>
-        <p className="page-description">
-          Supplier and internal quality records. Admin and QE approve or reject pending items.
-        </p>
       </header>
 
       {!isSupplier && suppliers.length > 0 && (

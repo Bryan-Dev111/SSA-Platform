@@ -202,9 +202,6 @@ export function Findings() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Findings</h1>
-        <p className="page-description">
-          Findings (past New). Use the finding code to open the record for status workflow. Supplier filter for Buyers.
-        </p>
       </header>
 
       {error && (

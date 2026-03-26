@@ -101,7 +101,7 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
     <div className="card">
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>Audit types (TYP-xx)</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>Used when scheduling audits. Leave code blank to auto-generate.</p>
+        {/* <p style={{ color: 'var(--color-text-muted)' }}>Used when scheduling audits. Leave code blank to auto-generate.</p> */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Code (optional)</label>
@@ -767,10 +767,6 @@ export function AdminBuyersSuppliersPanel({
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>{usersTableTitle}</h2>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '0.75rem' }}>
-              All accounts. Admin can view the stored original password (encrypted at rest). Existing users without an
-              encrypted password will show `—` until their password is recreated.
-            </p>
             <div className="table-wrap">
               <table className="table">
               <thead>
@@ -916,9 +912,6 @@ export function AdminBuyersSuppliersPanel({
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Link supplier user account</h2>
-            <p style={{ marginTop: 0, color: 'var(--color-text-muted)' }}>
-              Link a user with Supplier role to a supplier company so they see that company data after login.
-            </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Supplier company</label>

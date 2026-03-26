@@ -253,11 +253,6 @@ export function Audits() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Audits</h1>
-        <p className="page-description">
-          Schedule and results. Set result (Passed/Failed/Cancelled) as assigned Auditor, Admin, or Quality Engineer —
-          confirmation required before
-          saving.
-        </p>
       </header>
 
       {error && (

@@ -571,10 +571,6 @@ export function InternalManagement() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Internal Management</h1>
-        <p className="page-description">
-          Admin workspace: schedule audits, manage shipment schedules (planned dates vs supplier requests), and internal contracts
-          / documents.
-        </p>
       </header>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>

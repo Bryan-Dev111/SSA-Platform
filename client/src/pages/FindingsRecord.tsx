@@ -843,7 +843,6 @@ export function FindingsRecord() {
                 options={defectCodeOptions}
                 disabled={!canEdit}
               />
-              <p style={{ margin: '0 0 0.35rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Decision or action taken</p>
               <ReferenceCodeSelect
                 label="Disposition"
                 value={form.dispositionCode}

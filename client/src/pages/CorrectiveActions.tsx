@@ -224,7 +224,6 @@ export function CorrectiveActions() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Corrective Actions</h1>
-        <p className="page-description">CARs (RCCA and beyond). Supplier filter for Buyers.</p>
       </header>
 
       {error && (

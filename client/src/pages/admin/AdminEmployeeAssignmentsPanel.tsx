@@ -228,9 +228,6 @@ export function AdminEmployeeAssignmentsPanel({
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Employee Assignments</h1>
-        <p className="page-description">
-          Employee/Contractor → direct suppliers. QE → buyers (suppliers are derived from Buyer → Suppliers).
-        </p>
       </header>
 
       <div className="card" style={{ marginBottom: '1rem' }}>

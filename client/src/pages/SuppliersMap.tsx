@@ -156,9 +156,6 @@ export function SuppliersMap() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Suppliers Map</h1>
-        <p className="page-description">
-          Supplier locations with risk-colored pins for quick risk visibility in your access scope.
-        </p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}

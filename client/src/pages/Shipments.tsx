@@ -224,10 +224,6 @@ export function Shipments() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Shipments</h1>
-        <p className="page-description">
-          Shipment inspection requests: review outcomes (Admin / Quality Engineer). Suppliers submit requests from Supplier Profile;
-          admins schedule inspections in Internal Management.
-        </p>
       </header>
 
       {!isSupplier && suppliers.length > 0 && (

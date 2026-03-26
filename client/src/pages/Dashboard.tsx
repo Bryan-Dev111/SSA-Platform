@@ -147,9 +147,6 @@ export function Dashboard() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Dashboard</h1>
-        <p className="page-description">
-          Metrics and trends for supplier quality performance. Buyer view is automatically scoped to assigned suppliers.
-        </p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}

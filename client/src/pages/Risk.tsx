@@ -382,7 +382,6 @@ export function Risk() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Risk</h1>
-        <p className="page-description">Supplier risk score, distribution, risk matrix, and action tracking.</p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}

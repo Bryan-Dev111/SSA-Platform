@@ -299,9 +299,6 @@ export function Admin() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Admin</h1>
-        <p className="page-description">
-          Reference data (Day 8), audit types & risk weights, buyer/supplier management, and permission matrix (Day 9).
-        </p>
       </header>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -469,9 +466,9 @@ export function Admin() {
         <div className="card">
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Defect codes</h2>
-            <p style={{ marginTop: 0, color: 'var(--color-text-muted)' }}>
+            {/* <p style={{ marginTop: 0, color: 'var(--color-text-muted)' }}>
               Inactive codes stay on old records but are hidden from new dropdowns.
-            </p>
+            </p> */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Code</label>
@@ -580,9 +577,9 @@ export function Admin() {
         <div className="card">
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Disposition codes</h2>
-            <p style={{ marginTop: 0, color: 'var(--color-text-muted)' }}>
+            {/* <p style={{ marginTop: 0, color: 'var(--color-text-muted)' }}>
               Used on Findings (draft). Inactive codes are hidden from new selections.
-            </p>
+            </p> */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Code</label>
