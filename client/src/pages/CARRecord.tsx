@@ -585,7 +585,6 @@ export function CARRecord() {
     if (!form.discrepancy.trim()) missing.push('Problem Statement');
     if (missing.length > 0) {
       const message = `Please complete required fields: ${missing.join(', ')}`;
-      setError(message);
       toast.error(message);
       return;
     }
