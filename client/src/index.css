@@ -691,6 +691,17 @@ a.btn:focus {
   border: 1px solid var(--color-border);
 }
 
+.login-header {
+  text-align: center;
+}
+
+.login-logo {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto var(--space-4);
+  display: block;
+}
+
 .login-title {
   text-align: center;
   font-size: var(--text-xl);
@@ -731,23 +742,6 @@ a.btn:focus {
   padding: var(--space-8);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-}
-
-/* ----- Sentinel logo ----- */
-.sentinel-symbol {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto var(--space-6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--color-primary) 0%, #1d4ed8 100%);
-  color: #fff;
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.04em;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
 }
 
 /* ----- Mobile: sidebar overlay ----- */

@@ -1,12 +1,11 @@
 /**
- * Login page: Sentinel symbol, form, auth API, redirect by role
+ * Login page: logo, form, auth API, redirect by role
  */
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
-import { SentinelSymbol } from '../components/SentinelSymbol';
 
 export function Login() {
   const { user, token, login, loading } = useAuth();
@@ -58,8 +57,10 @@ export function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <SentinelSymbol />
-        <h1 className="login-title">Sentinel Supplier Assurance</h1>
+        <div className="login-header">
+          <img src="/logo.png" alt="Sentinel" className="login-logo" />
+          <h1 className="login-title">Welcome</h1>
+        </div>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">
             <label htmlFor="email" className="input-label">
