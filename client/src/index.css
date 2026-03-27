@@ -1321,3 +1321,17 @@ body.sidebar-open {
   color: var(--color-primary-hover);
   text-decoration: underline;
 }
+
+/* Dashboard: two columns (lists + recent updates) on wide screens */
+.dashboard-split {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .dashboard-split {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}

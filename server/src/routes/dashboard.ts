@@ -26,6 +26,7 @@ router.get(
         metrics: {
           totalSuppliers: 0,
           highRiskSuppliers: 0,
+          mediumRiskSuppliers: 0,
           openCars: 0,
           overdueCars: 0,
           openFindingsMajorCritical: 0,
@@ -111,6 +112,7 @@ router.get(
     }
     const topRiskSuppliers = [...risks].sort((a, b) => b.score - a.score).slice(0, 5);
     const highRiskSuppliers = risks.filter((r) => r.level === 'High').length;
+    const mediumRiskSuppliers = risks.filter((r) => r.level === 'Medium').length;
 
     const monthlyTrends: Array<{ month: string; findings: number; cars: number; audits: number; shipments: number }> = [];
     const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -125,7 +127,7 @@ router.get(
         prisma.shipment.count({ where: { ...whereInScope, createdAt: { gte: start, lt: end } } }),
       ]);
       monthlyTrends.push({
-        month: start.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+        month: start.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
         findings,
         cars,
         audits,
@@ -242,6 +244,7 @@ router.get(
       metrics: {
         totalSuppliers: suppliers.length,
         highRiskSuppliers,
+        mediumRiskSuppliers,
         openCars: openCars.length,
         overdueCars,
         openFindingsMajorCritical,

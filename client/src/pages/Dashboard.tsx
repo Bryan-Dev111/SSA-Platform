@@ -12,6 +12,7 @@ interface DashboardResponse {
   metrics: {
     totalSuppliers: number;
     highRiskSuppliers: number;
+    mediumRiskSuppliers?: number;
     openCars: number;
     overdueCars: number;
     openFindingsMajorCritical: number;
@@ -54,7 +55,7 @@ interface DashboardResponse {
 }
 
 export function Dashboard() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -84,6 +85,13 @@ export function Dashboard() {
     return Math.max(1, ...rows.map((r) => Math.max(r.findings, r.cars, r.audits, r.shipments)));
   }, [data]);
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
   if (loading && !data) {
     return (
       <div className="page">
@@ -101,6 +109,7 @@ export function Dashboard() {
   const metrics = data?.metrics ?? {
     totalSuppliers: 0,
     highRiskSuppliers: 0,
+    mediumRiskSuppliers: 0,
     openCars: 0,
     overdueCars: 0,
     openFindingsMajorCritical: 0,
@@ -118,6 +127,11 @@ export function Dashboard() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Dashboard</h1>
+        <p className="page-description">
+          {greeting}
+          {user?.name?.trim() ? `, ${user.name.trim()}` : user?.email ? `, ${user.email}` : ''}. Here is what is happening with
+          your suppliers today.
+        </p>
       </header>
 
       {error && <div className="alert-error">{error}</div>}
@@ -149,29 +163,49 @@ export function Dashboard() {
           marginBottom: '1rem',
         }}
       >
-        <MetricCard title="Total suppliers" value={metrics.totalSuppliers} />
-        <MetricCard title="High-risk suppliers" value={metrics.highRiskSuppliers} />
-        <MetricCard title="Open CARs" value={metrics.openCars} />
-        <MetricCard title="Overdue CARs" value={metrics.overdueCars} />
-        <MetricCard title="Open findings (Major/Critical)" value={metrics.openFindingsMajorCritical} />
-        <MetricCard title="Shipment Requests" value={metrics.shipmentRequests} />
-        <MetricCard title="Shipments Rejected" value={metrics.shipmentsRejected} />
-        <MetricCard title="Rejected documents" value={metrics.rejectedDocuments} />
+        <MetricCard
+          title="Total suppliers"
+          value={metrics.totalSuppliers}
+          subtitle={`${metrics.highRiskSuppliers} high-risk supplier${metrics.highRiskSuppliers === 1 ? '' : 's'}`}
+        />
+        <MetricCard
+          title="High-risk suppliers"
+          value={metrics.highRiskSuppliers}
+          subtitle={`${metrics.mediumRiskSuppliers ?? 0} medium-risk supplier${(metrics.mediumRiskSuppliers ?? 0) === 1 ? '' : 's'}`}
+        />
+        <MetricCard
+          title="Open CARs"
+          value={metrics.openCars}
+          subtitle={`${metrics.overdueCars} overdue`}
+        />
+        <MetricCard
+          title="Overdue CARs"
+          value={metrics.overdueCars}
+          subtitle={metrics.openCars > 0 ? `${metrics.openCars} open CARs total` : 'No open CARs'}
+        />
+        <MetricCard
+          title="Open findings (Major/Critical)"
+          value={metrics.openFindingsMajorCritical}
+          subtitle="Major or Critical, not yet closed"
+        />
+        <MetricCard
+          title="Shipment Requests"
+          value={metrics.shipmentRequests}
+          subtitle="Awaiting inspection"
+        />
+        <MetricCard
+          title="Shipments Rejected"
+          value={metrics.shipmentsRejected}
+          subtitle="Failed inspection"
+        />
+        <MetricCard
+          title="Rejected documents"
+          value={metrics.rejectedDocuments}
+          subtitle="Internal records"
+        />
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: '1fr', // single column by default (mobile)
-          marginBottom: '1rem',
-          alignItems: 'start',
-          // Responsive 2:1 columns for larger screens
-          ...(window.innerWidth >= 768
-            ? { gridTemplateColumns: '2fr 1fr' }
-            : {}),
-        }}
-      >
+      <div className="dashboard-split" style={{ marginBottom: '1rem' }}>
         <div
           style={{
             display: 'grid',
@@ -307,16 +341,28 @@ export function Dashboard() {
   );
 }
 
-function MetricCard({ title, value }: { title: string; value: number }) {
+function MetricCard({ title, value, subtitle }: { title: string; value: number; subtitle?: string }) {
   return (
     <div className="card">
       <div className="card-body" style={{ padding: '0.9rem' }}>
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{title}</div>
         <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>{value}</div>
+        {subtitle ? (
+          <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
+            {subtitle}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
+
+const TREND = {
+  findings: { stroke: '#c2185b', fill: 'rgba(194, 24, 91, 0.14)' },
+  cars: { stroke: '#c99a17', fill: 'rgba(201, 154, 23, 0.18)' },
+  audits: { stroke: '#1f78c8', fill: 'rgba(31, 120, 200, 0.16)' },
+  shipments: { stroke: '#6e47c8', fill: 'rgba(110, 71, 200, 0.12)' },
+} as const;
 
 function MonthlyTrendsLineChart({
   rows,
@@ -338,11 +384,30 @@ function MonthlyTrendsLineChart({
 
   const xAt = (i: number) => padLeft + (rows.length <= 1 ? 0 : (i / (rows.length - 1)) * plotW);
   const yAt = (v: number) => padTop + plotH - (v / safeMax) * plotH;
+  const baselineY = padTop + plotH;
 
-  const toPath = (values: number[]): string => {
-    return values
-      .map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(v).toFixed(2)}`)
-      .join(' ');
+  const toSmoothPath = (values: number[]): string => {
+    if (values.length === 0) return '';
+    if (values.length === 1) return `M ${xAt(0).toFixed(2)} ${yAt(values[0]).toFixed(2)}`;
+    let d = `M ${xAt(0).toFixed(2)} ${yAt(values[0]).toFixed(2)}`;
+    for (let i = 0; i < values.length - 1; i += 1) {
+      const x0 = xAt(i);
+      const y0 = yAt(values[i]);
+      const x1 = xAt(i + 1);
+      const y1 = yAt(values[i + 1]);
+      const cx1 = x0 + (x1 - x0) * 0.42;
+      const cx2 = x1 - (x1 - x0) * 0.42;
+      d += ` C ${cx1.toFixed(2)} ${y0.toFixed(2)}, ${cx2.toFixed(2)} ${y1.toFixed(2)}, ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+    }
+    return d;
+  };
+
+  const toAreaPath = (values: number[]): string => {
+    if (values.length === 0) return '';
+    const line = toSmoothPath(values);
+    const startX = xAt(0);
+    const endX = xAt(values.length - 1);
+    return `${line} L ${endX.toFixed(2)} ${baselineY.toFixed(2)} L ${startX.toFixed(2)} ${baselineY.toFixed(2)} Z`;
   };
 
   const findingsVals = rows.map((r) => r.findings);
@@ -356,10 +421,10 @@ function MonthlyTrendsLineChart({
   return (
     <div>
       <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.5rem', fontSize: 'var(--text-sm)' }}>
-        <LegendItem color="#2563eb" label="Findings" />
-        <LegendItem color="#f59e0b" label="CARs" />
-        <LegendItem color="#16a34a" label="Audits" />
-        <LegendItem color="#7c3aed" label="Shipments" />
+        <LegendItem color={TREND.findings.stroke} label="Findings" />
+        <LegendItem color={TREND.cars.stroke} label="CARs" />
+        <LegendItem color={TREND.audits.stroke} label="Audits" />
+        <LegendItem color={TREND.shipments.stroke} label="Shipments" dashed />
       </div>
       <div className="table-wrap" style={{ overflowX: 'auto' }}>
         <svg
@@ -385,13 +450,26 @@ function MonthlyTrendsLineChart({
           <line x1={padLeft} y1={padTop + plotH} x2={width - padRight} y2={padTop + plotH} stroke="#9ca3af" />
           <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + plotH} stroke="#9ca3af" />
 
-          <path d={toPath(findingsVals)} fill="none" stroke="#2563eb" strokeWidth="2.5" />
-          <path d={toPath(carsVals)} fill="none" stroke="#f59e0b" strokeWidth="2.5" />
-          <path d={toPath(auditsVals)} fill="none" stroke="#16a34a" strokeWidth="2.5" />
-          <path d={toPath(shipmentsVals)} fill="none" stroke="#7c3aed" strokeWidth="2.5" />
+          <path d={toAreaPath(findingsVals)} fill={TREND.findings.fill} stroke="none" />
+          <path d={toAreaPath(carsVals)} fill={TREND.cars.fill} stroke="none" />
+          <path d={toAreaPath(auditsVals)} fill={TREND.audits.fill} stroke="none" />
+          <path d={toAreaPath(shipmentsVals)} fill={TREND.shipments.fill} stroke="none" />
+
+          <path d={toSmoothPath(findingsVals)} fill="none" stroke={TREND.findings.stroke} strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={toSmoothPath(carsVals)} fill="none" stroke={TREND.cars.stroke} strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={toSmoothPath(auditsVals)} fill="none" stroke={TREND.audits.stroke} strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d={toSmoothPath(shipmentsVals)}
+            fill="none"
+            stroke={TREND.shipments.stroke}
+            strokeWidth="2.35"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="5 3"
+          />
 
           {rows.map((r, i) => (
-            <g key={`x-${r.month}`}>
+            <g key={`x-${r.month}-${i}`}>
               <line
                 x1={xAt(i)}
                 y1={padTop}
@@ -410,25 +488,25 @@ function MonthlyTrendsLineChart({
           {hovered && hoverX !== null ? (
             <>
               <line x1={hoverX} y1={padTop} x2={hoverX} y2={padTop + plotH} stroke="#9ca3af" strokeDasharray="4 3" />
-              <circle cx={hoverX} cy={yAt(hovered.findings)} r="3.8" fill="#2563eb" />
-              <circle cx={hoverX} cy={yAt(hovered.cars)} r="3.8" fill="#f59e0b" />
-              <circle cx={hoverX} cy={yAt(hovered.audits)} r="3.8" fill="#16a34a" />
-              <circle cx={hoverX} cy={yAt(hovered.shipments)} r="3.8" fill="#7c3aed" />
+              <circle cx={hoverX} cy={yAt(hovered.findings)} r="3.8" fill={TREND.findings.stroke} />
+              <circle cx={hoverX} cy={yAt(hovered.cars)} r="3.8" fill={TREND.cars.stroke} />
+              <circle cx={hoverX} cy={yAt(hovered.audits)} r="3.8" fill={TREND.audits.stroke} />
+              <circle cx={hoverX} cy={yAt(hovered.shipments)} r="3.8" fill={TREND.shipments.stroke} />
               <g transform={`translate(${Math.min(hoverX + 10, width - 220)}, ${padTop + 8})`}>
                 <rect width="200" height="92" rx="8" fill="#111827" opacity="0.93" />
                 <text x="10" y="18" fill="#ffffff" fontSize="12" fontWeight="700">
                   {hovered.month}
                 </text>
-                <text x="10" y="36" fill="#93c5fd" fontSize="12">
+                <text x="10" y="36" fill={TREND.findings.stroke} fontSize="12">
                   Findings: {hovered.findings}
                 </text>
-                <text x="10" y="52" fill="#fcd34d" fontSize="12">
+                <text x="10" y="52" fill={TREND.cars.stroke} fontSize="12">
                   CARs: {hovered.cars}
                 </text>
-                <text x="10" y="68" fill="#86efac" fontSize="12">
+                <text x="10" y="68" fill={TREND.audits.stroke} fontSize="12">
                   Audits: {hovered.audits}
                 </text>
-                <text x="10" y="84" fill="#c4b5fd" fontSize="12">
+                <text x="10" y="84" fill={TREND.shipments.stroke} fontSize="12">
                   Shipments: {hovered.shipments}
                 </text>
               </g>
@@ -440,10 +518,21 @@ function MonthlyTrendsLineChart({
   );
 }
 
-function LegendItem({ color, label }: { color: string; label: string }) {
+function LegendItem({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ width: 14, height: 2.5, background: color, display: 'inline-block' }} />
+      <svg width={22} height={10} style={{ flexShrink: 0 }} aria-hidden>
+        <line
+          x1={1}
+          y1={5}
+          x2={21}
+          y2={5}
+          stroke={color}
+          strokeWidth={2.35}
+          strokeLinecap="round"
+          strokeDasharray={dashed ? '5 3' : undefined}
+        />
+      </svg>
       {label}
     </span>
   );
