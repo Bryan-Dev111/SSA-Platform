@@ -1,7 +1,7 @@
 /**
  * Risk/Opportunity managed entity with lifecycle:
  * type: risk|opportunity
- * status: Open|Mitigated|Closed
+ * status: Open|Mitigated|Closed|Realized
  * risk_level is derived from likelihood x severity for risk rows.
  */
 import { Router, Request, Response } from 'express';
@@ -18,7 +18,7 @@ router.use(authMiddleware);
 router.use(requirePageAccess('Risk'));
 
 type RiskItemType = 'risk' | 'opportunity';
-type RiskStatus = 'Open' | 'Mitigated' | 'Closed';
+type RiskStatus = 'Open' | 'Mitigated' | 'Closed' | 'Realized';
 type RiskLikelihood = 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely';
 type RiskSeverity = 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe';
 
@@ -188,8 +188,8 @@ router.patch(
 
     if (req.body?.status !== undefined) {
       const s = typeof req.body.status === 'string' ? req.body.status.trim() : '';
-      if (!['Open', 'Mitigated', 'Closed'].includes(s)) {
-        res.status(400).json({ error: 'status must be Open, Mitigated, or Closed' });
+      if (!['Open', 'Mitigated', 'Closed', 'Realized'].includes(s)) {
+        res.status(400).json({ error: 'status must be Open, Mitigated, Closed, or Realized' });
         return;
       }
       data.status = s as RiskStatus;

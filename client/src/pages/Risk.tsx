@@ -23,7 +23,7 @@ interface OpportunityRow {
   likelihood: 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely' | null;
   severity: 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe' | null;
   riskLevel: 'Low' | 'Medium' | 'High' | null;
-  status: 'Open' | 'Mitigated' | 'Closed';
+  status: 'Open' | 'Mitigated' | 'Closed' | 'Realized';
   createdAt: string;
 }
 
@@ -83,7 +83,7 @@ export function Risk() {
   const [editDescription, setEditDescription] = useState('');
   const [editLikelihood, setEditLikelihood] = useState<RiskLikelihood>('Possible');
   const [editSeverity, setEditSeverity] = useState<RiskSeverity>('Moderate');
-  const [editStatus, setEditStatus] = useState<'Open' | 'Mitigated' | 'Closed'>('Open');
+  const [editStatus, setEditStatus] = useState<OpportunityRow['status']>('Open');
 
   const [newActionSupplierId, setNewActionSupplierId] = useState('');
   const [newActionRiskId, setNewActionRiskId] = useState('');
@@ -743,10 +743,11 @@ export function Risk() {
               )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0.75rem' }}>
-              <select className="input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as 'Open' | 'Mitigated' | 'Closed')}>
+              <select className="input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as OpportunityRow['status'])}>
                 <option value="Open">Open</option>
                 <option value="Mitigated">Mitigated</option>
                 <option value="Closed">Closed</option>
+                <option value="Realized">Realized</option>
               </select>
               <button className="btn btn-primary" type="button" onClick={saveEdit} disabled={saving}>
                 {saving ? 'Saving...' : 'Save'}

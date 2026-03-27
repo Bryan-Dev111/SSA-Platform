@@ -572,6 +572,7 @@ enum RiskStatus {
   Open
   Mitigated
   Closed
+  Realized
 }
 
 enum RiskLikelihood {
