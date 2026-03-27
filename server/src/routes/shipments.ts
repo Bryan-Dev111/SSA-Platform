@@ -102,6 +102,38 @@ router.get(
   })
 );
 
+router.get(
+  '/inspectors',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (!canEditInspector(req.user.roleNames)) {
+      res.status(403).json({ error: 'Insufficient permissions to view inspectors' });
+      return;
+    }
+    const users = await prisma.user.findMany({
+      where: {
+        isEmployee: true,
+        employmentStatus: 'Active',
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    });
+    const list = users.map((u) => ({
+      id: u.id,
+      name: u.name?.trim() || u.email,
+      email: u.email,
+    }));
+    res.json({ list });
+  })
+);
+
 router.post(
   '/',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {

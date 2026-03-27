@@ -19,7 +19,6 @@ interface AuditTypeRow {
 
 export function AdminAuditTypesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
   const [list, setList] = useState<AuditTypeRow[]>([]);
-  const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [edit, setEdit] = useState<AuditTypeRow | null>(null);
   const [del, setDel] = useState<AuditTypeRow | null>(null);
@@ -42,17 +41,19 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
 
   const add = async () => {
     if (!token) return;
+    if (!newName.trim()) {
+      toast.error('Name is required');
+      return;
+    }
     setBusy(true);
     try {
       await apiJson('/audit-types', {
         token,
         method: 'POST',
         body: JSON.stringify({
-          code: newCode.trim() || undefined,
           name: newName.trim() || null,
         }),
       });
-      setNewCode('');
       setNewName('');
       toast.success('Audit type added');
       await load();
@@ -70,7 +71,7 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
       await apiJson(`/audit-types/${edit.id}`, {
         token,
         method: 'PATCH',
-        body: JSON.stringify({ code: edit.code.trim(), name: edit.name?.trim() || null }),
+        body: JSON.stringify({ name: edit.name?.trim() || null }),
       });
       setEdit(null);
       toast.success('Updated');
@@ -100,13 +101,8 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Audit types (TYP-xx)</h2>
-        {/* <p style={{ color: 'var(--color-text-muted)' }}>Used when scheduling audits. Leave code blank to auto-generate.</p> */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Code (optional)</label>
-            <input className="input" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Auto" />
-          </div>
+        <h2 style={{ marginTop: 0 }}>Audit types</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Name</label>
             <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} />
@@ -121,7 +117,6 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
                 <th>Name</th>
                 <th style={{ width: 200 }}>Actions</th>
               </tr>
@@ -129,20 +124,13 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="table-empty">
+                  <td colSpan={2} className="table-empty">
                     No audit types.
                   </td>
                 </tr>
               ) : (
                 list.map((row) => (
                   <tr key={row.id}>
-                    <td>
-                      {edit?.id === row.id ? (
-                        <input className="input" value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value })} />
-                      ) : (
-                        row.code
-                      )}
-                    </td>
                     <td>
                       {edit?.id === row.id ? (
                         <input className="input" value={edit.name ?? ''} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
@@ -181,7 +169,7 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
       <ConfirmDialog
         open={!!del}
         title="Delete audit type?"
-        message={del ? `Remove ${del.code}? Audits referencing it must be reassigned first.` : ''}
+        message={del ? `Remove ${del.name ?? del.code}? Audits referencing it must be reassigned first.` : ''}
         confirmLabel="Delete"
         variant="danger"
         onCancel={() => setDel(null)}

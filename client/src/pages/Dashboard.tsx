@@ -53,30 +53,11 @@ interface DashboardResponse {
   };
 }
 
-type AlertCategory =
-  | 'overdueAudit'
-  | 'majorCriticalFinding'
-  | 'overdueCAR'
-  | 'shipmentInspectionRequest'
-  | 'rejectedShipmentDocument'
-  | 'lateShipment';
-
-interface AlertRow {
-  id: string;
-  category: AlertCategory;
-  entityType: string | null;
-  entityId: string | null;
-  message: string | null;
-  createdAt: string;
-}
-
 export function Dashboard() {
   const { token } = useAuth();
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [data, setData] = useState<DashboardResponse | null>(null);
-  const [alerts, setAlerts] = useState<AlertRow[]>([]);
-  const [alertPrefs, setAlertPrefs] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,16 +78,6 @@ export function Dashboard() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load dashboard'))
       .finally(() => setLoading(false));
   }, [token, filterSupplierId]);
-
-  useEffect(() => {
-    if (!token) return;
-    apiJson<AlertRow[]>('/alerts', { token })
-      .then(setAlerts)
-      .catch(() => setAlerts([]));
-    apiJson<{ categories: AlertCategory[]; preferences: Record<string, boolean> }>('/alerts/preferences', { token })
-      .then((v) => setAlertPrefs(v.preferences))
-      .catch(() => setAlertPrefs({}));
-  }, [token]);
 
   const trendMax = useMemo(() => {
     const rows = data?.charts.monthlyTrends ?? [];
@@ -332,69 +303,6 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          marginTop: '1rem',
-        }}
-      >
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Alerts</h2>
-            {alerts.length === 0 ? (
-              <p className="table-empty">No alerts.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {alerts.slice(0, 12).map((a) => (
-                  <div key={a.id} style={{ borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '0.45rem' }}>
-                    <div style={{ fontSize: 'var(--text-sm)' }}>{a.message || a.category}</div>
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                      {new Date(a.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Alert preferences</h2>
-            {Object.keys(alertPrefs).length === 0 ? (
-              <p className="table-empty">No preference data.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                {Object.entries(alertPrefs).map(([k, v]) => (
-                  <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(v)}
-                      onChange={async (e) => {
-                        if (!token) return;
-                        const next = { ...alertPrefs, [k]: e.target.checked };
-                        setAlertPrefs(next);
-                        try {
-                          await apiJson('/alerts/preferences', {
-                            token,
-                            method: 'PUT',
-                            body: JSON.stringify({ preferences: next }),
-                          });
-                        } catch {
-                          setAlertPrefs(alertPrefs);
-                        }
-                      }}
-                    />
-                    <span style={{ fontSize: 'var(--text-sm)' }}>{formatAlertCategory(k as AlertCategory)}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -408,25 +316,6 @@ function MetricCard({ title, value }: { title: string; value: number }) {
       </div>
     </div>
   );
-}
-
-function formatAlertCategory(category: AlertCategory): string {
-  switch (category) {
-    case 'overdueAudit':
-      return 'Overdue audit';
-    case 'majorCriticalFinding':
-      return 'Major/Critical finding';
-    case 'overdueCAR':
-      return 'Overdue CAR';
-    case 'shipmentInspectionRequest':
-      return 'Shipment inspection request';
-    case 'rejectedShipmentDocument':
-      return 'Rejected shipment/document';
-    case 'lateShipment':
-      return 'Late shipment';
-    default:
-      return category;
-  }
 }
 
 function MonthlyTrendsLineChart({

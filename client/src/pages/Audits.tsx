@@ -110,7 +110,7 @@ export function Audits() {
         case 'code': return a.code;
         case 'supplier': return `${a.supplier.code} ${a.supplier.name}`;
         case 'date': return new Date(a.auditDate).getTime();
-        case 'type': return a.auditType?.code ?? '';
+        case 'type': return a.auditType?.name ?? '';
         case 'auditor': return a.auditor ?? '';
         case 'status': return statusRank[a.derivedStatus] ?? 999;
         case 'result': return resultRank[a.result ?? ''] ?? 999;
@@ -345,7 +345,7 @@ export function Audits() {
                     <td><strong>{a.code}</strong></td>
                     <td>{a.supplier.code} — {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate)}</td>
-                    <td>{a.auditType ? `${a.auditType.code}${a.auditType.name ? ` ${a.auditType.name}` : ''}` : '—'}</td>
+                    <td>{a.auditType?.name?.trim() ? a.auditType.name : '—'}</td>
                     <td>{a.auditor?.trim() ? a.auditor : '—'}</td>
                     <td>
                       <span className={`audit-status-badge audit-status-badge--${getAuditStatusSlug(a.derivedStatus)}`}>

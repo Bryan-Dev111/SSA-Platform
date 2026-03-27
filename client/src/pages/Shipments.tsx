@@ -15,6 +15,12 @@ interface Supplier {
   name: string;
 }
 
+interface InspectorOption {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface ShipmentRow {
   id: string;
   code: string | null;
@@ -49,6 +55,7 @@ export function Shipments() {
   const { token, user } = useAuth();
   const toast = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [inspectors, setInspectors] = useState<InspectorOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [shipments, setShipments] = useState<ShipmentRow[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -130,6 +137,16 @@ export function Shipments() {
       })
       .catch(() => setSuppliers([]));
   }, [token, isSupplier]);
+
+  useEffect(() => {
+    if (!token || !canEditInspector) {
+      setInspectors([]);
+      return;
+    }
+    apiJson<{ list: InspectorOption[] }>('/shipments/inspectors', { token })
+      .then((r) => setInspectors(r.list ?? []))
+      .catch(() => setInspectors([]));
+  }, [token, canEditInspector]);
 
   useEffect(() => {
     if (!token) return;
@@ -280,6 +297,7 @@ export function Shipments() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th>Shipment ID</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
                       Supplier {sortIndicator('supplier')}
                     </th>
@@ -299,11 +317,11 @@ export function Shipments() {
                 <tbody>
                   {sortedShipments.map((r) => (
                     <tr key={r.id}>
+                      <td style={{ fontWeight: 600 }}>{r.code ?? '—'}</td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{r.code ?? '—'}</div>
-                        <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
                           {r.supplier?.code ?? '—'} — {r.supplier?.name ?? ''}
-                        </div>
+                        </span>
                       </td>
                       <td>{r.purchaseOrder ?? '—'}</td>
                       <td>{r.lot ?? '—'}</td>
@@ -313,19 +331,15 @@ export function Shipments() {
 
                       <td>
                         {canEditInspector && r.status === 'WaitingInspection' ? (
-                          <input
+                          <select
                             className="input"
                             value={inspectorDrafts[r.id] ?? ''}
-                            placeholder="Inspector"
                             disabled={savingId === r.id}
-                            onChange={(e) => {
-                              const next = e.target.value;
-                              setInspectorDrafts((d) => ({ ...d, [r.id]: next }));
-                            }}
-                            onBlur={async () => {
+                            onChange={async (e) => {
                               if (!token) return;
-                              const raw = inspectorDrafts[r.id] ?? '';
-                              const inspector = raw.trim() || null;
+                              const nextValue = e.target.value;
+                              setInspectorDrafts((d) => ({ ...d, [r.id]: nextValue }));
+                              const inspector = nextValue.trim() || null;
                               if (inspector === (r.inspector ?? null)) return;
                               if (savingId === r.id) return;
 
@@ -345,7 +359,14 @@ export function Shipments() {
                               }
                             }}
                             style={{ width: 180 }}
-                          />
+                          >
+                            <option value="">Select inspector</option>
+                            {inspectors.map((opt) => (
+                              <option key={opt.id} value={opt.name}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           <span style={{ color: r.inspector ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
                             {r.inspector ?? '—'}
