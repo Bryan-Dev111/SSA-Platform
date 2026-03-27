@@ -1326,7 +1326,7 @@ export function AdminBuyersSuppliersPanel({
 /**
  * Day 9.4: Client routes (menu/guards) + live server matrix from GET /users/permission-matrix.
  */
-export function AdminPermissionsPanel({ token }: { token: string | null }) {
+export function AdminPermissionsPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
   const [serverData, setServerData] = useState<PermissionMatrixResponse | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1392,6 +1392,7 @@ export function AdminPermissionsPanel({ token }: { token: string | null }) {
         body: JSON.stringify({ matrix: serverData.matrix }),
       });
       await load();
+      toast.success('Permissions saved');
     } catch (e) {
       setMatrixError(e instanceof Error ? e.message : 'Failed to save permissions');
     } finally {

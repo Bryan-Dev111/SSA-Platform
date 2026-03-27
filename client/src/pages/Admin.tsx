@@ -372,7 +372,7 @@ export function Admin() {
       {tab === 'laborCosts' && (
         <AdminLaborCostsPanel token={token} />
       )}
-      {tab === 'permissions' && <AdminPermissionsPanel token={token} />}
+      {tab === 'permissions' && <AdminPermissionsPanel token={token} toast={toast} />}
       {tab === 'alertPreferences' && <AdminAlertPreferencesPanel token={token} toast={toast} />}
 
       {tab === 'commodity' && (
