@@ -195,14 +195,7 @@ export function Dashboard() {
         </label>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: '0.75rem',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-          marginBottom: '1rem',
-        }}
-      >
+      <div className="dashboard-metric-grid-four">
         <MetricCard
           title="Total suppliers"
           value={metrics.totalSuppliers}
