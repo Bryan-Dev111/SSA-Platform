@@ -209,39 +209,19 @@ export function Dashboard() {
           subtitle={`${metrics.highRiskSuppliers} high-risk supplier${metrics.highRiskSuppliers === 1 ? '' : 's'}`}
         />
         <MetricCard
-          title="High-risk suppliers"
-          value={metrics.highRiskSuppliers}
-          subtitle={`${metrics.mediumRiskSuppliers ?? 0} medium-risk supplier${(metrics.mediumRiskSuppliers ?? 0) === 1 ? '' : 's'}`}
-        />
-        <MetricCard
           title="Open CARs"
           value={metrics.openCars}
-          subtitle={`${metrics.overdueCars} overdue`}
+          subtitle={`${metrics.overdueCars} overdue CAR${metrics.overdueCars === 1 ? '' : 's'}`}
         />
         <MetricCard
-          title="Overdue CARs"
-          value={metrics.overdueCars}
-          subtitle={metrics.openCars > 0 ? `${metrics.openCars} open CARs total` : 'No open CARs'}
-        />
-        <MetricCard
-          title="Open findings (Major/Critical)"
+          title="Open findings"
           value={metrics.openFindingsMajorCritical}
-          subtitle="Major or Critical, not yet closed"
+          subtitle="Open Major or Critical findings"
         />
         <MetricCard
           title="Shipment Requests"
           value={metrics.shipmentRequests}
           subtitle="Awaiting inspection"
-        />
-        <MetricCard
-          title="Shipments Rejected"
-          value={metrics.shipmentsRejected}
-          subtitle="Failed inspection"
-        />
-        <MetricCard
-          title="Rejected documents"
-          value={metrics.rejectedDocuments}
-          subtitle="Internal records"
         />
       </div>
 
