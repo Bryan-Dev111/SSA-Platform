@@ -50,6 +50,7 @@ router.get(
         include: {
           supplier: { select: { id: true, code: true, name: true } },
           audit: { select: { id: true, code: true } },
+          shipment: { select: { id: true, code: true } },
           uploadedBy: { select: { id: true, email: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -68,6 +69,7 @@ router.get(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true } },
+        shipment: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -84,15 +86,23 @@ router.get(
       return;
     }
     const id = req.params.id;
-    const rec = await prisma.record.findUnique({ where: { id } });
+    const rec = await prisma.record.findUnique({
+      where: { id },
+      include: { shipment: { select: { supplierId: true } } },
+    });
     if (!rec || (!rec.fileData && !rec.filePath)) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    if (allowedIds !== null && (!rec.supplierId || !allowedIds.includes(rec.supplierId))) {
-      res.status(403).json({ error: 'Supplier not in scope' });
-      return;
+    if (allowedIds !== null) {
+      const supplierOk = rec.supplierId && allowedIds.includes(rec.supplierId);
+      const shipmentSupplierOk =
+        rec.shipment?.supplierId && allowedIds.includes(rec.shipment.supplierId);
+      if (!supplierOk && !shipmentSupplierOk) {
+        res.status(403).json({ error: 'Supplier not in scope' });
+        return;
+      }
     }
     if (rec.fileData) {
       const outName = (rec.fileName || rec.name || 'record-file').replace(/[/\\]/g, '_');
@@ -148,15 +158,23 @@ router.patch(
       res.status(400).json({ error: 'status must be Approved or Rejected' });
       return;
     }
-    const existing = await prisma.record.findUnique({ where: { id } });
+    const existing = await prisma.record.findUnique({
+      where: { id },
+      include: { shipment: { select: { supplierId: true } } },
+    });
     if (!existing) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    if (allowedIds !== null && (!existing.supplierId || !allowedIds.includes(existing.supplierId))) {
-      res.status(403).json({ error: 'Supplier not in scope' });
-      return;
+    if (allowedIds !== null) {
+      const supplierOk = existing.supplierId && allowedIds.includes(existing.supplierId);
+      const shipmentSupplierOk =
+        existing.shipment?.supplierId && allowedIds.includes(existing.shipment.supplierId);
+      if (!supplierOk && !shipmentSupplierOk) {
+        res.status(403).json({ error: 'Supplier not in scope' });
+        return;
+      }
     }
     const status = statusRaw as RecordStatus;
     const updated = await prisma.record.update({
@@ -198,6 +216,11 @@ router.post(
       auditIdRaw === null || auditIdRaw === undefined || auditIdRaw === ''
         ? null
         : String(auditIdRaw);
+    const shipmentIdRaw = req.body?.shipmentId;
+    const shipmentIdBody =
+      shipmentIdRaw === null || shipmentIdRaw === undefined || shipmentIdRaw === ''
+        ? null
+        : String(shipmentIdRaw);
     const internalOrSupplier = req.body?.internalOrSupplier === 'internal' ? 'internal' : 'supplier';
     const notesRaw = req.body?.notes;
     const notes =
@@ -234,6 +257,11 @@ router.post(
       res.status(403).json({ error: 'Supplier not in scope' });
       return;
     }
+    if (auditId && shipmentIdBody) {
+      res.status(400).json({ error: 'Link a record to either an audit or a shipment, not both' });
+      return;
+    }
+    let shipmentId: string | null = null;
     if (auditId) {
       const audit = await prisma.audit.findUnique({
         where: { id: auditId },
@@ -253,6 +281,26 @@ router.post(
         res.status(403).json({ error: 'Supplier not in scope' });
         return;
       }
+    }
+    if (shipmentIdBody) {
+      const ship = await prisma.shipment.findUnique({
+        where: { id: shipmentIdBody },
+        select: { id: true, supplierId: true },
+      });
+      if (!ship) {
+        res.status(400).json({ error: 'Invalid shipment id' });
+        return;
+      }
+      if (supplierId && supplierId !== ship.supplierId) {
+        res.status(400).json({ error: 'Selected shipment does not belong to selected supplier' });
+        return;
+      }
+      supplierId = supplierId ?? ship.supplierId;
+      if (allowedIds !== null && !allowedIds.includes(ship.supplierId)) {
+        res.status(403).json({ error: 'Supplier not in scope' });
+        return;
+      }
+      shipmentId = ship.id;
     }
     if (isSupplierUser) {
       const own = await prisma.supplier.findFirst({ where: { userId: req.user.id }, select: { id: true } });
@@ -320,6 +368,7 @@ router.post(
         notes,
         supplierId,
         auditId,
+        shipmentId,
         internalOrSupplier: internalOrSupplier as RecordSource,
         status: RecordStatus.PENDING,
         filePath,
@@ -331,6 +380,7 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true } },
+        shipment: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
     });

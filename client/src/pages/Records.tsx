@@ -2,6 +2,7 @@
  * Day 10: Records list (scoped); upload Supplier/Auditor/Buyer/Admin/QE; Admin/QE approve-reject; download.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -17,6 +18,19 @@ interface Supplier {
   name: string;
 }
 
+interface AuditListOption {
+  id: string;
+  code: string;
+  auditDate: string;
+  derivedStatus: string;
+}
+
+interface ShipmentListOption {
+  id: string;
+  code: string | null;
+  inspectionDate: string | null;
+}
+
 interface RecordRow {
   id: string;
   name: string;
@@ -28,6 +42,8 @@ interface RecordRow {
   supplier: { id: string; code: string; name: string } | null;
   auditId?: string | null;
   audit?: { id: string; code: string } | null;
+  shipmentId?: string | null;
+  shipment?: { id: string; code: string | null } | null;
   uploadedBy: { id: string; email: string; name: string | null } | null;
   createdAt: string;
 }
@@ -51,6 +67,7 @@ function postRecordWithProgress(
     name: string;
     supplierId: string | null;
     auditId: string | null;
+    shipmentId: string | null;
     internalOrSupplier: 'supplier' | 'internal';
     file: File | null;
     notes: string;
@@ -88,6 +105,7 @@ function postRecordWithProgress(
     form.append('internalOrSupplier', payload.internalOrSupplier);
     form.append('supplierId', payload.supplierId ?? '');
     form.append('auditId', payload.auditId ?? '');
+    form.append('shipmentId', payload.shipmentId ?? '');
     form.append('notes', payload.notes);
     if (payload.file) form.append('file', payload.file);
     xhr.send(form);
@@ -97,7 +115,15 @@ function postRecordWithProgress(
 export function Records() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const auditSeed = searchParams.get('auditId');
+  const shipmentSeed = searchParams.get('shipmentId');
+  const supplierSeed = searchParams.get('supplierId');
   const [rows, setRows] = useState<RecordRow[]>([]);
+  const [auditOptions, setAuditOptions] = useState<AuditListOption[]>([]);
+  const [shipmentOptions, setShipmentOptions] = useState<ShipmentListOption[]>([]);
+  const [uploadAuditId, setUploadAuditId] = useState('');
+  const [uploadShipmentId, setUploadShipmentId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -160,6 +186,9 @@ export function Records() {
   };
   const sortIndicator = (key: typeof sortBy) => (sortBy !== key ? '▲▼' : sortDir === 'asc' ? '↑' : '↓');
 
+  /** Supplier used to load audit/shipment picklists and as fallback for upload when filter is "All" but URL supplies supplier. */
+  const supplierForLinks = filterSupplierId || supplierSeed || '';
+
   const totalCount = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
@@ -177,6 +206,59 @@ export function Records() {
       .then((list) => setSuppliers(list))
       .catch(() => setSuppliers([]));
   }, [token]);
+
+  useEffect(() => {
+    if (!supplierSeed || suppliers.length === 0) return;
+    if (suppliers.some((s) => s.id === supplierSeed)) setFilterSupplierId(supplierSeed);
+  }, [supplierSeed, suppliers]);
+
+  useEffect(() => {
+    if (!token || !supplierForLinks || isSupplier || !canUpload) {
+      setAuditOptions([]);
+      setShipmentOptions([]);
+      setUploadAuditId('');
+      setUploadShipmentId('');
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      apiJson<AuditListOption[]>(`/audits?supplierId=${encodeURIComponent(supplierForLinks)}`, { token }),
+      apiJson<ShipmentListOption[]>(`/shipments?supplierId=${encodeURIComponent(supplierForLinks)}`, { token }),
+    ])
+      .then(([audits, shipments]) => {
+        if (cancelled) return;
+        setAuditOptions(audits);
+        setShipmentOptions(shipments);
+        setUploadAuditId((id) => (id && audits.some((a) => a.id === id) ? id : ''));
+        setUploadShipmentId((id) => (id && shipments.some((s) => s.id === id) ? id : ''));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAuditOptions([]);
+          setShipmentOptions([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, supplierForLinks, isSupplier, canUpload]);
+
+  /** Apply deep-link query params once lists for the supplier are loaded. */
+  useEffect(() => {
+    if (!auditSeed || auditOptions.length === 0) return;
+    if (auditOptions.some((a) => a.id === auditSeed)) {
+      setUploadAuditId(auditSeed);
+      setUploadShipmentId('');
+    }
+  }, [auditSeed, auditOptions]);
+
+  useEffect(() => {
+    if (!shipmentSeed || shipmentOptions.length === 0) return;
+    if (shipmentOptions.some((s) => s.id === shipmentSeed)) {
+      setUploadShipmentId(shipmentSeed);
+      setUploadAuditId('');
+    }
+  }, [shipmentSeed, shipmentOptions]);
 
   useEffect(() => {
     if (!token) return;
@@ -197,7 +279,8 @@ export function Records() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !name.trim()) return;
-    if (!filterSupplierId) {
+    const effectiveSupplierId = filterSupplierId || supplierSeed || '';
+    if (!effectiveSupplierId) {
       toast.error('Choose a supplier in the filter above. The record will be linked to that supplier.');
       return;
     }
@@ -209,13 +292,20 @@ export function Records() {
       toast.error('File exceeds current upload limit (75MB)');
       return;
     }
+    const auditId = uploadAuditId.trim() || null;
+    const shipId = uploadShipmentId.trim() || null;
+    if (auditId && shipId) {
+      toast.error('Link this record to either an audit or a shipment, not both.');
+      return;
+    }
     setSubmitting(true);
     setUploadProgress(0);
     try {
       const payload = {
         name: name.trim(),
-        supplierId: filterSupplierId,
-        auditId: null as string | null,
+        supplierId: effectiveSupplierId,
+        auditId,
+        shipmentId: shipId,
         internalOrSupplier: 'internal' as const,
         file,
         notes: uploadNotes.trim(),
@@ -223,6 +313,8 @@ export function Records() {
       await postRecordWithProgress(payload, token, (p) => setUploadProgress(p));
       setName('');
       setUploadNotes('');
+      setUploadAuditId('');
+      setUploadShipmentId('');
       setFile(null);
       setUploadProgress(null);
       toast.success('Record submitted');
@@ -325,13 +417,73 @@ export function Records() {
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Upload record</h2>
-            {/* <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-              Supplier is taken from <strong>Filter by supplier</strong> above (not shown here). Choose one supplier before uploading.
-            </p> */}
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+              Choose a supplier (filter above). Optionally link this file to <strong>one</strong> audit <em>or</em> one
+              shipment — not both.
+            </p>
             <form onSubmit={submit}>
               <div className="input-group">
                 <label className="input-label">Name *</label>
                 <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Audit (optional)</label>
+                <select
+                  className="input"
+                  style={{ maxWidth: 480 }}
+                  value={uploadAuditId}
+                  disabled={!supplierForLinks || auditOptions.length === 0}
+                  onChange={(e) => {
+                    setUploadAuditId(e.target.value);
+                    setUploadShipmentId('');
+                  }}
+                >
+                  <option value="">— None —</option>
+                  {auditOptions.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.code} · {a.auditDate?.slice(0, 10) ?? ''} · {a.derivedStatus}
+                    </option>
+                  ))}
+                </select>
+                {!supplierForLinks ? (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    Select a supplier in the filter to load audits.
+                  </span>
+                ) : auditOptions.length === 0 ? (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    No audits for this supplier in your scope.
+                  </span>
+                ) : null}
+              </div>
+              <div className="input-group">
+                <label className="input-label">Shipment (optional)</label>
+                <select
+                  className="input"
+                  style={{ maxWidth: 480 }}
+                  value={uploadShipmentId}
+                  disabled={!supplierForLinks || shipmentOptions.length === 0}
+                  onChange={(e) => {
+                    setUploadShipmentId(e.target.value);
+                    setUploadAuditId('');
+                  }}
+                >
+                  <option value="">— None —</option>
+                  {shipmentOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {(s.code ?? s.id).slice(0, 32)}
+                      {s.inspectionDate ? ` · req. ${s.inspectionDate.slice(0, 10)}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {!supplierForLinks ? (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    Select a supplier in the filter to load shipments.
+                  </span>
+                ) : shipmentOptions.length === 0 ? (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    No shipment requests for this supplier in your scope.
+                  </span>
+                ) : null}
               </div>
               <div className="input-group" style={{ position: 'relative' }}>
                 <label className="input-label">File *</label>
@@ -421,6 +573,7 @@ export function Records() {
                     <th>Notes</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
                     <th>Audit</th>
+                    <th>Shipment</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
                     <th>File</th>
                     <th>Uploaded by</th>
@@ -437,6 +590,7 @@ export function Records() {
                       </td>
                       <td>{r.supplier?.code ?? 'None'}</td>
                       <td>{r.audit?.code ?? 'None'}</td>
+                      <td>{r.shipment?.code ?? 'None'}</td>
                       <td>{getRecordReviewLabel(r.status)}</td>
                       <td>
                         {r.filePath ? (

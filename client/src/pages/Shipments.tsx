@@ -3,10 +3,11 @@
  * Scheduling lives under Internal Management (Admin).
  */
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
-import { parseApiError } from '../utils/apiHelpers';
+import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Supplier {
@@ -35,6 +36,7 @@ interface ShipmentRow {
   inspector: string | null;
   notes: string | null;
   supplier: { id: string; code: string; name: string };
+  records?: Array<{ id: string; name: string; hasFile: boolean }>;
   updatedAt?: string;
   createdAt?: string;
 }
@@ -62,8 +64,9 @@ export function Shipments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'supplier' | 'scheduled' | 'status'>('scheduled');
+  const [sortBy, setSortBy] = useState<'supplier' | 'scheduled' | 'status' | 'records'>('scheduled');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [downloadingRecord, setDownloadingRecord] = useState<Record<string, boolean>>({});
 
   const [approveConfirmId, setApproveConfirmId] = useState<string | null>(null);
   const [rejectDialog, setRejectDialog] = useState<{ id: string; note: string } | null>(null);
@@ -74,6 +77,13 @@ export function Shipments() {
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
   const canReview = isAdmin || isQE || isQM;
   const canEditInspector = isAdmin || isQE || isQM;
+  const canAttachRecord =
+    !isSupplier &&
+    (isAdmin ||
+      isQE ||
+      isQM ||
+      user?.roleNames?.includes('Auditor') ||
+      user?.roleNames?.includes('Buyer'));
 
   const [inspectorDrafts, setInspectorDrafts] = useState<Record<string, string>>({});
 
@@ -109,6 +119,8 @@ export function Shipments() {
           return r.inspectionDate ? new Date(r.inspectionDate).getTime() : 0;
         case 'status':
           return r.status;
+        case 'records':
+          return r.records?.length ?? 0;
       }
     };
     return [...shipments].sort((a, b) => {
@@ -166,6 +178,23 @@ export function Shipments() {
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token, filterSupplierId]);
+
+  const downloadRecord = async (recordId: string, recordName: string) => {
+    if (!token) return;
+    try {
+      setDownloadingRecord((prev) => ({ ...prev, [recordId]: true }));
+      await downloadWithAuthProgress(`/records/${recordId}/download`, token, recordName, () => {});
+      toast.success('Record download completed');
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setDownloadingRecord((prev) => {
+        const next = { ...prev };
+        delete next[recordId];
+        return next;
+      });
+    }
+  };
 
   const recordApprove = async () => {
     if (!token || !approveConfirmId) return;
@@ -312,6 +341,9 @@ export function Shipments() {
                     <th>Approval</th>
                     <th>Approval Date</th>
                     <th>Approve/Reject Button</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>
+                      Records {sortIndicator('records')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -407,6 +439,50 @@ export function Shipments() {
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
                         )}
+                      </td>
+
+                      <td>
+                        <div
+                          style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}
+                        >
+                          {(r.records?.length ?? 0) === 0 ? (
+                            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>—</span>
+                          ) : (
+                            (r.records ?? []).map((rec) => (
+                              <button
+                                key={rec.id}
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{
+                                  display: 'block',
+                                  padding: 0,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: 'var(--color-primary)',
+                                  textDecoration: 'underline',
+                                  marginBottom: 2,
+                                  cursor: rec.hasFile ? 'pointer' : 'default',
+                                }}
+                                disabled={!rec.hasFile || Boolean(downloadingRecord[rec.id])}
+                                onClick={() => rec.hasFile && downloadRecord(rec.id, rec.name)}
+                                title={rec.hasFile ? 'Download record file' : 'No file attached'}
+                              >
+                                {downloadingRecord[rec.id] ? 'Downloading…' : rec.name}
+                              </button>
+                            ))
+                          )}
+                          {canAttachRecord && (
+                            <Link
+                              to={`/records?shipmentId=${encodeURIComponent(r.id)}&supplierId=${encodeURIComponent(r.supplierId)}`}
+                              className="btn btn-ghost"
+                              style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              + Add record
+                            </Link>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -7,8 +7,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Uses server/.env DIRECT_URL (db.*.supabase.co:5432). Migrate/resolve must not use :6543 pooler alone.
+  directUrl = env("DIRECT_URL")
 }
 
 // ============== Auth & Users ==============
@@ -340,6 +342,7 @@ model Shipment {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   workLogs        WorkLog[]
+  records         Record[]
 }
 
 model WorkLog {
@@ -424,6 +427,8 @@ model Record {
   supplier         Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   auditId          String?
   audit            Audit?      @relation(fields: [auditId], references: [id], onDelete: SetNull)
+  shipmentId       String?
+  shipment         Shipment?   @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
   status          RecordStatus @default(PENDING)
   filePath        String?
   fileName        String?

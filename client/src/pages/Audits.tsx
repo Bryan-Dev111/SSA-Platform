@@ -79,6 +79,9 @@ export function Audits() {
   const roleNames = user?.roleNames ?? [];
   const isAdmin = roleNames.includes('Admin');
   const canCreateFinding = roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r));
+  const canAttachRecord =
+    !roleNames.includes('Supplier') &&
+    roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'].includes(r));
   const canSetResultForAudit = (audit: Audit): boolean => {
     if (roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager')) return true;
     if (!roleNames.includes('Auditor')) return false;
@@ -424,9 +427,11 @@ export function Audits() {
                       </td>
                     )}
                     <td>
-                      {(a.records?.length ?? 0) === 0
-                        ? '—'
-                        : (a.records ?? []).map((r) => (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                        {(a.records?.length ?? 0) === 0 ? (
+                          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>—</span>
+                        ) : (
+                          (a.records ?? []).map((r) => (
                             <button
                               key={r.id}
                               type="button"
@@ -447,7 +452,20 @@ export function Audits() {
                             >
                               {downloadingRecord[r.id] ? 'Downloading…' : r.name}
                             </button>
-                          ))}
+                          ))
+                        )}
+                        {canAttachRecord && (
+                          <Link
+                            to={`/records?auditId=${encodeURIComponent(a.id)}&supplierId=${encodeURIComponent(a.supplierId)}`}
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            + Add record
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

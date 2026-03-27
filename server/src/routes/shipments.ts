@@ -83,7 +83,10 @@ router.get(
     }
     const list = await prisma.shipment.findMany({
       where,
-      include: { supplier: { select: { id: true, code: true, name: true } } },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        records: { select: { id: true, name: true, filePath: true }, orderBy: { createdAt: 'desc' } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -98,7 +101,11 @@ router.get(
         s.code = code;
       }
     }
-    res.json(list);
+    const withRecords = list.map((s) => ({
+      ...s,
+      records: (s.records ?? []).map((r) => ({ id: r.id, name: r.name, hasFile: Boolean(r.filePath) })),
+    }));
+    res.json(withRecords);
   })
 );
 
