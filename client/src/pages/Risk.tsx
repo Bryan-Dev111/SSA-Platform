@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { apiJson } from '../api/client';
+import { computeRiskRegisterDistribution } from '../utils/riskDistribution';
 
 interface Supplier {
   id: string;
@@ -151,30 +154,7 @@ export function Risk() {
       });
   }, [items, latestActionByRisk]);
 
-  const distribution = useMemo(() => {
-    const low = effectiveRisks.filter((r) => r.effectiveRiskLevel === 'Low').length;
-    const medium = effectiveRisks.filter((r) => r.effectiveRiskLevel === 'Medium').length;
-    const high = effectiveRisks.filter((r) => r.effectiveRiskLevel === 'High').length;
-    return { low, medium, high };
-  }, [effectiveRisks]);
-
-  const distributionSlices = [
-    { label: 'Low', count: distribution.low, color: '#22c55e' },
-    { label: 'Medium', count: distribution.medium, color: '#f59e0b' },
-    { label: 'High', count: distribution.high, color: '#ef4444' },
-  ] as const;
-  const distributionTotal = distributionSlices.reduce((sum, s) => sum + s.count, 0);
-  const distributionPieSegments = distributionSlices.reduce<{ color: string; start: number; end: number }[]>((acc, s) => {
-    const start = acc.length > 0 ? acc[acc.length - 1].end : 0;
-    const pct = distributionTotal > 0 ? (s.count / distributionTotal) * 100 : 0;
-    const end = start + pct;
-    acc.push({ color: s.color, start, end });
-    return acc;
-  }, []);
-  const distributionPieBackground =
-    distributionTotal === 0
-      ? 'conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg)'
-      : `conic-gradient(${distributionPieSegments.map((s) => `${s.color} ${s.start}% ${s.end}%`).join(', ')})`;
+  const distribution = useMemo(() => computeRiskRegisterDistribution(items, actions), [items, actions]);
 
   const trendBySupplier = useMemo(() => {
     const grouped = new Map<string, RiskSnapshotRow[]>();
@@ -403,37 +383,26 @@ export function Risk() {
         </label>
       </div>
 
-      <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: '1rem' }}>
-        <MetricCard title="Risk score (avg)" value={String(stats.avgScore)} />
-        <MetricCard title="Risk trend (avg)" value={avgTrendPercent === null ? 'N/A' : `${avgTrendPercent > 0 ? '+' : ''}${avgTrendPercent}%`} />
-        <MetricCard title="Open risks" value={String(stats.openRisks)} />
-        <MetricCard title="Mitigated risks" value={String(stats.mitigatedRisks)} />
+      <div className="risk-kpi-grid">
+        <MetricCard
+          title="Risk score (avg)"
+          value={String(stats.avgScore)}
+          trend={{ pct: avgTrendPercent }}
+        />
+        <MetricCard
+          title="Open risks"
+          value={String(stats.openRisks)}
+          subtitle={
+            stats.mitigatedRisks === 0
+              ? 'No completed mitigations'
+              : `${stats.mitigatedRisks} mitigated`
+          }
+        />
         <MetricCard title="Open opportunities" value={String(stats.opportunities)} />
       </div>
 
       <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', marginBottom: '1rem' }}>
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Risk distribution</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <div
-                aria-label="Risk distribution pie chart"
-                style={{ width: 140, height: 140, borderRadius: '50%', background: distributionPieBackground, border: '1px solid var(--color-border)', flex: '0 0 auto' }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 160 }}>
-                {distributionSlices.map((s) => (
-                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
-                      {s.label}
-                    </span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>{s.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <RiskDistributionCard distribution={distribution} />
         <div className="card">
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Top risk suppliers</h2>
@@ -793,13 +762,79 @@ export function Risk() {
   );
 }
 
-function MetricCard({ title, value }: { title: string; value: string }) {
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  trend,
+}: {
+  title: string;
+  value: string;
+  subtitle?: ReactNode;
+  trend?: { pct: number | null };
+}) {
   return (
     <div className="card">
-      <div className="card-body" style={{ padding: '0.9rem' }}>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{title}</div>
-        <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>{value}</div>
+      <div className="card-body metric-card-body">
+        <div className="metric-card-title">{title}</div>
+        <div className="metric-card-value">{value}</div>
+        {subtitle != null && subtitle !== '' ? <div className="metric-card-subtitle">{subtitle}</div> : null}
+        {trend ? <TrendFooter pct={trend.pct} /> : null}
       </div>
+    </div>
+  );
+}
+
+function TrendSpark({ kind }: { kind: 'up' | 'down' | 'flat' }) {
+  const s = 'currentColor';
+  if (kind === 'flat') {
+    return (
+      <svg className="risk-metric-spark" width="22" height="10" viewBox="0 0 22 10" aria-hidden>
+        <path d="M2 5h18" stroke={s} strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      </svg>
+    );
+  }
+  if (kind === 'up') {
+    return (
+      <svg className="risk-metric-spark" width="22" height="10" viewBox="0 0 22 10" aria-hidden>
+        <path d="M2 8 L11 2 L20 8" stroke={s} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="risk-metric-spark" width="22" height="10" viewBox="0 0 22 10" aria-hidden>
+      <path d="M2 2 L11 8 L20 2" stroke={s} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
+/** Snapshot score change: up = worse (red), down = better (green). */
+function TrendFooter({ pct }: { pct: number | null }) {
+  if (pct === null) {
+    return (
+      <div className="risk-metric-trend risk-metric-trend--neutral">
+        <TrendSpark kind="flat" />
+        <span>— vs previous snapshot</span>
+      </div>
+    );
+  }
+  const rounded = Math.round(pct * 100) / 100;
+  if (Math.abs(rounded) < 0.005) {
+    return (
+      <div className="risk-metric-trend risk-metric-trend--neutral">
+        <TrendSpark kind="flat" />
+        <span>0% vs previous snapshot</span>
+      </div>
+    );
+  }
+  const worse = rounded > 0;
+  return (
+    <div className={`risk-metric-trend ${worse ? 'risk-metric-trend--bad' : 'risk-metric-trend--good'}`}>
+      <TrendSpark kind={worse ? 'up' : 'down'} />
+      <span>
+        {rounded > 0 ? '+' : ''}
+        {rounded}% vs previous snapshot
+      </span>
     </div>
   );
 }

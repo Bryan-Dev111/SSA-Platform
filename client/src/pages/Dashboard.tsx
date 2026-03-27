@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { apiJson } from '../api/client';
+import { computeRiskRegisterDistribution } from '../utils/riskDistribution';
 
 interface SupplierOption {
   id: string;
@@ -21,13 +23,6 @@ interface DashboardResponse {
     rejectedDocuments: number;
   };
   charts: {
-    topRiskSuppliers: Array<{
-      supplierId: string;
-      code: string;
-      name: string;
-      score: number;
-      level: 'Low' | 'Medium' | 'High';
-    }>;
     upcomingEvents: Array<{
       id: string;
       type: 'Audit' | 'Shipment';
@@ -54,11 +49,34 @@ interface DashboardResponse {
   };
 }
 
+type DashboardLikelihood = 'VeryUnlikely' | 'Unlikely' | 'Possible' | 'Likely' | 'VeryLikely' | null;
+type DashboardSeverity = 'Negligible' | 'Minor' | 'Moderate' | 'Significant' | 'Severe' | null;
+
+interface DashboardOpportunityRow {
+  id: string;
+  type: 'risk' | 'opportunity';
+  likelihood: DashboardLikelihood;
+  severity: DashboardSeverity;
+  riskLevel: 'Low' | 'Medium' | 'High' | null;
+  createdAt: string;
+}
+
+interface DashboardRiskActionRow {
+  riskId: string;
+  status: 'Open' | 'Closed';
+  residualLikelihood: DashboardLikelihood;
+  residualSeverity: DashboardSeverity;
+  residualRiskLevel: 'Low' | 'Medium' | 'High' | null;
+  createdAt: string;
+}
+
 export function Dashboard() {
   const { token, user } = useAuth();
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [data, setData] = useState<DashboardResponse | null>(null);
+  const [riskRegisterItems, setRiskRegisterItems] = useState<DashboardOpportunityRow[]>([]);
+  const [riskRegisterActions, setRiskRegisterActions] = useState<DashboardRiskActionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,10 +92,29 @@ export function Dashboard() {
     setLoading(true);
     setError(null);
     const q = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
-    apiJson<DashboardResponse>(`/dashboard${q}`, { token })
-      .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load dashboard'))
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const [dashData, opportunities, riskActions] = await Promise.all([
+          apiJson<DashboardResponse>(`/dashboard${q}`, { token }),
+          apiJson<DashboardOpportunityRow[]>(`/opportunities${q}`, { token }),
+          apiJson<DashboardRiskActionRow[]>(`/risk-actions${q}`, { token }),
+        ]);
+        setData(dashData);
+        setRiskRegisterItems(
+          [...opportunities].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+        );
+        setRiskRegisterActions(
+          [...riskActions].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+        );
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load dashboard');
+        setData(null);
+        setRiskRegisterItems([]);
+        setRiskRegisterActions([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [token, filterSupplierId]);
 
   const trendMax = useMemo(() => {
@@ -91,6 +128,11 @@ export function Dashboard() {
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
   }, []);
+
+  const riskRegisterDistribution = useMemo(
+    () => computeRiskRegisterDistribution(riskRegisterItems, riskRegisterActions),
+    [riskRegisterItems, riskRegisterActions]
+  );
 
   if (loading && !data) {
     return (
@@ -117,11 +159,9 @@ export function Dashboard() {
     shipmentsRejected: 0,
     rejectedDocuments: 0,
   };
-  const topRisk = data?.charts.topRiskSuppliers ?? [];
   const upcoming = data?.charts.upcomingEvents ?? [];
   const recentUpdates = data?.charts.recentUpdates ?? [];
   const monthly = data?.charts.monthlyTrends ?? [];
-  const maxTopRisk = Math.max(1, ...topRisk.map((r) => r.score));
 
   return (
     <div className="page">
@@ -214,47 +254,7 @@ export function Dashboard() {
             height: '100%',
           }}
         >
-            <div className="card">
-              <div className="card-body">
-                <h2 style={{ marginTop: 0 }}>Top risk suppliers</h2>
-                {topRisk.length === 0 ? (
-                  <p className="table-empty">No data.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {topRisk.map((r) => (
-                      <div key={r.supplierId}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontSize: 'var(--text-sm)',
-                            marginBottom: 4,
-                            gap: '0.75rem',
-                          }}
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.code} — {r.name}
-                          </span>
-                          <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                            {r.score} ({r.level})
-                          </span>
-                        </div>
-                        <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
-                          <div
-                            style={{
-                              width: `${(r.score / maxTopRisk) * 100}%`,
-                              height: '100%',
-                              background: '#4f46e5',
-                              borderRadius: 4,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <RiskDistributionCard distribution={riskRegisterDistribution} />
 
             <div className="card">
               <div className="card-body">
