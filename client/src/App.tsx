@@ -25,6 +25,7 @@ import { Shipments } from './pages/Shipments';
 import { Documents } from './pages/Documents';
 import { InternalManagement } from './pages/InternalManagement';
 import { Admin } from './pages/Admin';
+import { NoAccess } from './pages/NoAccess';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -65,6 +66,7 @@ function App() {
             <Route path="documents" element={<ProtectedRoute path="/documents"><Documents /></ProtectedRoute>} />
             <Route path="internal-management" element={<ProtectedRoute path="/internal-management"><InternalManagement /></ProtectedRoute>} />
             <Route path="admin" element={<ProtectedRoute path="/admin"><Admin /></ProtectedRoute>} />
+            <Route path="no-access" element={<ProtectedRoute path="/no-access"><NoAccess /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<RedirectToDefault />} />
         </Routes>

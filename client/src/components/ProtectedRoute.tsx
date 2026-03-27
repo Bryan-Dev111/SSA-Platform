@@ -3,7 +3,7 @@
  */
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { canAccessPath, getDefaultPath, SUPPLIER_PATHS } from '../config/rolePageAccess';
+import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -28,20 +28,9 @@ export function ProtectedRoute({ children, path: pathProp }: ProtectedRouteProps
   }
 
   const roleNames = user.roleNames;
-  const isSupplier = roleNames.includes('Supplier');
-
-  if (isSupplier) {
-    const allowed = SUPPLIER_PATHS.some(
-      (p) => pathname === p || pathname.startsWith(p + '/')
-    );
-    if (!allowed) {
-      return <Navigate to="/supplier-profile" replace />;
-    }
-  } else {
-    const allowed = canAccessPath(pathname, roleNames);
-    if (!allowed) {
-      return <Navigate to={getDefaultPath(roleNames)} replace />;
-    }
+  const allowed = canAccessPath(pathname, roleNames);
+  if (!allowed) {
+    return <Navigate to={getDefaultPath(roleNames)} replace />;
   }
 
   return <>{children}</>;

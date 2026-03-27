@@ -1452,38 +1452,6 @@ export function AdminPermissionsPanel({ token }: { token: string | null }) {
           </div>
         )}
 
-        <h3 style={{ marginTop: '1.5rem' }}>Admin-only delete (server-enforced)</h3>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-          Only <strong>Admin</strong> may call these deletes. UI shows Delete on Findings, Audits, and CARs only for Admin;
-          Supplier delete is on Admin → Buyers & suppliers. Risk snapshot / Opportunity deletes are API-ready for future Risk
-          UI.
-        </p>
-        {serverData?.adminOnlyDeletes && (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Entity</th>
-                  <th>Method</th>
-                  <th>Path</th>
-                </tr>
-              </thead>
-              <tbody>
-                {serverData.adminOnlyDeletes.map((row) => (
-                  <tr key={`${row.entity}-${row.path}`}>
-                    <td>{row.entity}</td>
-                    <td>
-                      <code>{row.method}</code>
-                    </td>
-                    <td>
-                      <code>{row.path}</code>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );

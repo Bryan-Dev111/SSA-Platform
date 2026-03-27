@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from './ConfirmDialog';
-import { canAccessPath, getDefaultPath, SUPPLIER_PATHS } from '../config/rolePageAccess';
+import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
 
 const MENU_ITEMS: { path: string; label: string }[] = [
   { path: '/dashboard', label: 'Dashboard' },
@@ -50,7 +50,6 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const roleNames = user?.roleNames ?? [];
-  const isSupplier = roleNames.includes('Supplier');
   const pathname = location.pathname;
 
   useEffect(() => {
@@ -65,22 +64,11 @@ export function Layout() {
   const closeMenu = () => setMenuOpen(false);
 
   if (user) {
-    if (isSupplier) {
-      const allowed = SUPPLIER_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
-      if (!allowed) return <Navigate to="/supplier-profile" replace />;
-    } else {
-      const allowed = canAccessPath(pathname, roleNames);
-      if (!allowed) return <Navigate to={getDefaultPath(roleNames)} replace />;
-    }
+    const allowed = canAccessPath(pathname, roleNames);
+    if (!allowed) return <Navigate to={getDefaultPath(roleNames)} replace />;
   }
 
-  const visibleItems = MENU_ITEMS.filter((item) => {
-    if (isSupplier) {
-      return ['/supplier-profile', '/records', '/shipments'].includes(item.path);
-    }
-    if (!canAccessPath(item.path, roleNames)) return false;
-    return true;
-  });
+  const visibleItems = MENU_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
 
   return (
     <div className="app-layout">

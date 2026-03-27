@@ -25,6 +25,24 @@ export const PATH_ROLES: Record<string, string[]> = {
 };
 
 let runtimePathRoles: Record<string, string[]> = PATH_ROLES;
+export const NO_ACCESS_PATH = '/no-access';
+
+/** Keep in sync with sidebar order in Layout.tsx */
+const SIDEBAR_PATH_ORDER = [
+  '/dashboard',
+  '/risk',
+  '/corrective-actions',
+  '/findings',
+  '/audits',
+  '/shipments',
+  '/records',
+  '/supplier-profile',
+  '/supplier-list',
+  '/suppliers-map',
+  '/documents',
+  '/internal-management',
+  '/admin',
+] as const;
 
 export function setRuntimePathRoles(next?: Record<string, string[]> | null): void {
   runtimePathRoles = next && Object.keys(next).length > 0 ? next : PATH_ROLES;
@@ -33,20 +51,22 @@ export function setRuntimePathRoles(next?: Record<string, string[]> | null): voi
 /** Paths that Supplier can access (own data only) */
 export const SUPPLIER_PATHS = ['/supplier-profile', '/records', '/shipments'];
 
-/** Fallback when user has no Dashboard access (e.g. Auditor-only) */
-const FALLBACK_DEFAULT_PATH = '/corrective-actions';
-
 /**
  * Default landing path for the current user (so refresh and index route work for all roles)
  */
 export function getDefaultPath(roleNames: string[]): string {
-  if (roleNames.includes('Supplier')) return '/supplier-profile';
-  if (!canAccessPath('/dashboard', roleNames)) return FALLBACK_DEFAULT_PATH;
-  return '/dashboard';
+  if (roleNames.includes('Supplier') && canAccessPath('/supplier-profile', roleNames)) {
+    return '/supplier-profile';
+  }
+  for (const path of SIDEBAR_PATH_ORDER) {
+    if (canAccessPath(path, roleNames)) return path;
+  }
+  return NO_ACCESS_PATH;
 }
 
 export function canAccessPath(pathname: string, roleNames: string[]): boolean {
   const path = pathname.replace(/\/$/, '') || '/';
+  if (path === NO_ACCESS_PATH) return true;
   const pathBase = path.split('/').slice(0, 2).join('/') || path;
   const allowed = runtimePathRoles[pathBase] ?? runtimePathRoles[path];
   if (!allowed) return false;

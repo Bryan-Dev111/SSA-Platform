@@ -51,7 +51,7 @@ export function SuppliersMap() {
     setError(null);
     Promise.all([
       apiJson<SupplierRow[]>('/suppliers', { token }),
-      apiJson<RiskCurrentRow[]>('/risk-snapshots/current', { token }),
+      apiJson<RiskCurrentRow[]>('/risk-snapshots/map-current', { token }),
     ])
       .then(([suppliersRows, riskRows]) => {
         setSuppliers(suppliersRows);

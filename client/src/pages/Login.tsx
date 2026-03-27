@@ -20,7 +20,9 @@ export function Login() {
 
   const redirectToWhenLoggedIn = (() => {
     if (!user) return '/dashboard';
-    if (user.roleNames.includes('Supplier')) return '/supplier-profile';
+    if (user.roleNames.includes('Supplier') && canAccessPath('/supplier-profile', user.roleNames)) {
+      return '/supplier-profile';
+    }
     return canAccessPath(from, user.roleNames) ? from : getDefaultPath(user.roleNames);
   })();
 

@@ -12,10 +12,59 @@ import { computeAndStoreRiskSnapshot, computeSupplierRisk } from '../services/ri
 const router = Router();
 
 router.use(authMiddleware);
-router.use(requirePageAccess('Risk'));
+
+async function getCurrentRiskRows(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const allowedIds = await getAllowedSupplierIds(req.user);
+  if (allowedIds !== null && allowedIds.length === 0) {
+    res.json([]);
+    return;
+  }
+  const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
+  if (supplierId && allowedIds !== null && !allowedIds.includes(supplierId)) {
+    res.status(404).json({ error: 'Supplier not found' });
+    return;
+  }
+  const suppliers = await prisma.supplier.findMany({
+    where: supplierId
+      ? { id: supplierId }
+      : allowedIds === null
+        ? {}
+        : { id: { in: allowedIds } },
+    select: { id: true, code: true, name: true },
+    orderBy: { code: 'asc' },
+  });
+  // Compute sequentially to avoid DB-connection spikes when many suppliers are in scope.
+  const list: Array<{
+    supplier: { id: string; code: string; name: string };
+    score: number;
+    level: 'Low' | 'Medium' | 'High';
+    factors: {
+      quality: number;
+      audit: number;
+      delivery: number;
+      carClosure: number;
+      documentation: number;
+    };
+  }> = [];
+  for (const s of suppliers) {
+    const summary = await computeSupplierRisk(s.id);
+    list.push({
+      supplier: s,
+      score: summary.score,
+      level: summary.level,
+      factors: summary.factors,
+    });
+  }
+  res.json(list);
+}
 
 router.get(
   '/',
+  requirePageAccess('Risk'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -38,58 +87,19 @@ router.get(
 
 router.get(
   '/current',
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-    const allowedIds = await getAllowedSupplierIds(req.user);
-    if (allowedIds !== null && allowedIds.length === 0) {
-      res.json([]);
-      return;
-    }
-    const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
-    if (supplierId && allowedIds !== null && !allowedIds.includes(supplierId)) {
-      res.status(404).json({ error: 'Supplier not found' });
-      return;
-    }
-    const suppliers = await prisma.supplier.findMany({
-      where: supplierId
-        ? { id: supplierId }
-        : allowedIds === null
-          ? {}
-          : { id: { in: allowedIds } },
-      select: { id: true, code: true, name: true },
-      orderBy: { code: 'asc' },
-    });
-    // Compute sequentially to avoid DB-connection spikes when many suppliers are in scope.
-    const list: Array<{
-      supplier: { id: string; code: string; name: string };
-      score: number;
-      level: 'Low' | 'Medium' | 'High';
-      factors: {
-        quality: number;
-        audit: number;
-        delivery: number;
-        carClosure: number;
-        documentation: number;
-      };
-    }> = [];
-    for (const s of suppliers) {
-      const summary = await computeSupplierRisk(s.id);
-      list.push({
-        supplier: s,
-        score: summary.score,
-        level: summary.level,
-        factors: summary.factors,
-      });
-    }
-    res.json(list);
-  })
+  requirePageAccess('Risk'),
+  asyncHandler(getCurrentRiskRows)
+);
+
+router.get(
+  '/map-current',
+  requirePageAccess('SuppliersMap'),
+  asyncHandler(getCurrentRiskRows)
 );
 
 router.post(
   '/recalculate',
+  requirePageAccess('Risk'),
   requireRole(['Admin', 'QualityEngineer', 'QualityManager', 'Buyer']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
@@ -129,6 +139,7 @@ router.post(
 
 router.delete(
   '/:id',
+  requirePageAccess('Risk'),
   requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const allowedIds = await getAllowedSupplierIds(req.user!);
