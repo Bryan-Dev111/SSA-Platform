@@ -1376,6 +1376,26 @@ body.sidebar-open {
   }
 }
 
+/* Risk page: Risk distribution + Top risk suppliers share full row width equally */
+.risk-overview-two-col {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+@media (max-width: 768px) {
+  .risk-overview-two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.risk-overview-two-col > .card {
+  min-width: 0;
+}
+
 .risk-kpi-grid > .card {
   height: 100%;
   display: flex;

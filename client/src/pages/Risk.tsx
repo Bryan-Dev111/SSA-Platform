@@ -401,7 +401,7 @@ export function Risk() {
         <MetricCard title="Open opportunities" value={String(stats.opportunities)} />
       </div>
 
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', marginBottom: '1rem' }}>
+      <div className="risk-overview-two-col">
         <RiskDistributionCard distribution={distribution} />
         <div className="card">
           <div className="card-body">
