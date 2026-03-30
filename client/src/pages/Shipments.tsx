@@ -134,6 +134,37 @@ export function Shipments() {
     });
   }, [shipments, sortBy, sortDir]);
 
+  const partTrend = useMemo(() => {
+    const monthMap = new Map<string, { label: string; parts: Map<string, number> }>();
+    const totalByPart = new Map<string, number>();
+    for (const s of shipments) {
+      const qty = typeof s.qty === 'number' ? s.qty : 0;
+      const d = s.createdAt ? new Date(s.createdAt) : null;
+      if (!d || Number.isNaN(d.getTime())) continue;
+      const monthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = d.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+      const part = s.partNumber?.trim() || 'Unspecified';
+      const month = monthMap.get(monthKey) ?? { label: monthLabel, parts: new Map<string, number>() };
+      month.parts.set(part, (month.parts.get(part) ?? 0) + qty);
+      monthMap.set(monthKey, month);
+      totalByPart.set(part, (totalByPart.get(part) ?? 0) + qty);
+    }
+    const months = [...monthMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([, v]) => v);
+    const parts = [...totalByPart.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 4)
+      .map(([part]) => part);
+    const rows = months.map((m) => ({
+      month: m.label,
+      values: parts.map((p) => m.parts.get(p) ?? 0),
+    }));
+    const maxQty = Math.max(1, ...rows.flatMap((r) => r.values));
+    return { parts, rows, maxQty };
+  }, [shipments]);
+
   const onSort = (key: typeof sortBy) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
@@ -201,17 +232,19 @@ export function Shipments() {
 
   const recordApprove = async () => {
     if (!token || !approveConfirmId) return;
-    setSavingId(approveConfirmId);
+    const targetId = approveConfirmId;
+    // UX requirement: close modal immediately, then run approval.
+    setApproveConfirmId(null);
+    setSavingId(targetId);
     try {
-      const inspectorRaw = inspectorDrafts[approveConfirmId] ?? '';
+      const inspectorRaw = inspectorDrafts[targetId] ?? '';
       const inspector = inspectorRaw.trim() || null;
-      await apiJson(`/shipments/${approveConfirmId}`, {
+      await apiJson(`/shipments/${targetId}`, {
         token,
         method: 'PATCH',
         body: JSON.stringify({ result: 'Passed', inspector }),
       });
       toast.success('Approved (Passed)');
-      setApproveConfirmId(null);
       loadData();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -303,21 +336,92 @@ export function Shipments() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
             gap: '0.75rem',
             marginBottom: '1.5rem',
           }}
         >
-          <Metric label="Total requests" value={metrics.totalInspectionRequests} />
-          <Metric label="Waiting inspection" value={metrics.waitingInspection} />
-          <Metric label="Passed" value={metrics.passed ?? 0} />
-          <Metric label="Failed" value={metrics.failed} />
-          <Metric label="Overdue (waiting)" value={metrics.overdueWaiting} />
-          <Metric label="Late vs schedule" value={metrics.lateVsSchedule} />
-          <Metric label="OTD %" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
-          <Metric label="FPY %" value={metrics.fpyPercent != null ? `${metrics.fpyPercent}%` : '—'} />
+          <Metric
+            label="Total requests"
+            value={metrics.totalInspectionRequests}
+            subtitle={`FPY ${metrics.fpyPercent != null ? `${metrics.fpyPercent}%` : '—'}`}
+          />
+          <Metric
+            label="Open shipment requests"
+            value={metrics.waitingInspection}
+            subtitle={`${metrics.lateVsSchedule} late`}
+          />
+          <Metric label="On-time delivery" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Part quantity by month</h2>
+          {partTrend.rows.length === 0 || partTrend.parts.length === 0 ? (
+            <p className="table-empty">No shipment quantity trend data.</p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.8rem', fontSize: 'var(--text-sm)' }}>
+                {partTrend.parts.map((part, idx) => (
+                  <span key={part} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 999,
+                        background: ['#2563eb', '#7c3aed', '#ea580c', '#16a34a'][idx % 4],
+                      }}
+                    />
+                    {part}
+                  </span>
+                ))}
+              </div>
+              <div className="table-wrap">
+                <div
+                  style={{
+                    minWidth: 680,
+                    height: 260,
+                    borderLeft: '1px solid var(--color-border)',
+                    borderBottom: '1px solid var(--color-border)',
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${partTrend.rows.length}, minmax(0, 1fr))`,
+                    gap: '0.75rem',
+                    alignItems: 'end',
+                    padding: '0.75rem 0.75rem 0 0.75rem',
+                    background:
+                      'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
+                  }}
+                >
+                  {partTrend.rows.map((row) => (
+                    <div key={row.month} style={{ display: 'grid', gridTemplateColumns: `repeat(${partTrend.parts.length}, 1fr)`, gap: 6, alignItems: 'end' }}>
+                      {row.values.map((qty, idx) => (
+                        <div key={`${row.month}-${partTrend.parts[idx]}`} title={`${row.month} · ${partTrend.parts[idx]}: ${qty}`}>
+                          <div
+                            style={{
+                              width: '100%',
+                              height: `${Math.max(4, (qty / partTrend.maxQty) * 170)}px`,
+                              background: ['#2563eb', '#7c3aed', '#ea580c', '#16a34a'][idx % 4],
+                              borderRadius: '4px 4px 0 0',
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${partTrend.rows.length}, minmax(0, 1fr))`, gap: '0.75rem', padding: '0.35rem 0.75rem 0 0.75rem' }}>
+                  {partTrend.rows.map((row) => (
+                    <span key={`${row.month}-x`} style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                      {row.month}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
@@ -346,6 +450,7 @@ export function Shipments() {
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>
                       Records {sortIndicator('records')}
                     </th>
+                    <th>Created</th>
                     <th>Approve/Reject Button</th>
                   </tr>
                 </thead>
@@ -466,6 +571,7 @@ export function Shipments() {
                         )}
                         </div>
                       </td>
+                      <td>{r.createdAt?.slice(0, 10) ?? '—'}</td>
                       <td>
                         {canReview && r.status === 'WaitingInspection' ? (
                           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -548,12 +654,17 @@ export function Shipments() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+function Metric({ label, value, subtitle }: { label: string; value: string | number; subtitle?: string }) {
   return (
     <div className="card">
       <div className="card-body" style={{ padding: '0.75rem' }}>
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{label}</div>
         <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{value}</div>
+        {subtitle ? (
+          <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
+            {subtitle}
+          </div>
+        ) : null}
       </div>
     </div>
   );
