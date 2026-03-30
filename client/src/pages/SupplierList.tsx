@@ -15,6 +15,7 @@ interface Supplier {
   status: string;
   commodityTypeId: string | null;
   commodityType: { id: string; name: string } | null;
+  createdAt: string;
 }
 
 interface RiskCurrentRow {
@@ -98,13 +99,14 @@ export function SupplierList() {
                 <th>Country</th>
                 <th>Risk level</th>
                 <th>Commodity</th>
+                <th>Created date</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table-empty">
+                  <td colSpan={8} className="table-empty">
                     No suppliers in scope.
                   </td>
                 </tr>
@@ -121,6 +123,7 @@ export function SupplierList() {
                         : '—'}
                     </td>
                     <td>{s.commodityType?.name ?? '—'}</td>
+                    <td>{s.createdAt ? s.createdAt.slice(0, 10) : '—'}</td>
                     <td>
                       <span
                         className={supplierStatusLabel(s.status) === 'Inactive' ? 'audit-status-badge audit-status-badge--cancelled' : 'audit-status-badge audit-status-badge--complete'}

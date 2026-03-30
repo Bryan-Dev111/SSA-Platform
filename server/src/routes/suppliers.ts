@@ -36,6 +36,7 @@ router.get(
         notes: true,
         commodityTypeId: true,
         commodityType: { select: { id: true, name: true } },
+        createdAt: true,
         userId: true,
         user: { select: { id: true, email: true, name: true } },
       },
