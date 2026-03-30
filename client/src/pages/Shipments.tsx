@@ -163,7 +163,11 @@ export function Shipments() {
       values: parts.map((p) => m.parts.get(p) ?? 0),
     }));
     const maxQty = Math.max(1, ...rows.flatMap((r) => r.values));
-    return { parts, rows, maxQty };
+    const yTickSteps = 4;
+    const yTicks = Array.from({ length: yTickSteps + 1 }, (_, i) =>
+      Math.round((maxQty * (yTickSteps - i)) / yTickSteps)
+    );
+    return { parts, rows, maxQty, yTicks };
   }, [shipments]);
 
   const onSort = (key: typeof sortBy) => {
@@ -343,27 +347,36 @@ export function Shipments() {
           }}
         >
           <Metric
-            label="Total requests"
+            label="Total Requests"
             value={metrics.totalInspectionRequests}
             subtitle={`FPY ${metrics.fpyPercent != null ? `${metrics.fpyPercent}%` : '—'}`}
           />
           <Metric
-            label="Open shipment requests"
+            label="Open Shipment Requests"
             value={metrics.waitingInspection}
-            subtitle={`${metrics.lateVsSchedule} late`}
+            subtitle={`${metrics.lateVsSchedule} Late`}
           />
-          <Metric label="On-time delivery" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
+          <Metric label="On-Time Delivery" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
         </div>
       )}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Part Quantity by Month</h2>
+          <h2 style={{ marginTop: 0, marginBottom: '1rem', textAlign: 'center' }}>Part Quantity by Month</h2>
           {partTrend.rows.length === 0 || partTrend.parts.length === 0 ? (
             <p className="table-empty">No shipment quantity trend data.</p>
           ) : (
             <>
-              <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.8rem', fontSize: 'var(--text-sm)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.9rem',
+                  marginBottom: '0.85rem',
+                  fontSize: 'var(--text-sm)',
+                }}
+              >
                 {partTrend.parts.map((part, idx) => (
                   <span key={part} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span
@@ -381,42 +394,129 @@ export function Shipments() {
               <div className="table-wrap">
                 <div
                   style={{
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    gap: '0.35rem',
                     minWidth: 680,
-                    height: 260,
-                    borderLeft: '1px solid var(--color-border)',
-                    borderBottom: '1px solid var(--color-border)',
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${partTrend.rows.length}, minmax(0, 1fr))`,
-                    gap: '0.75rem',
-                    alignItems: 'end',
-                    padding: '0.75rem 0.75rem 0 0.75rem',
-                    background:
-                      'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
                   }}
                 >
-                  {partTrend.rows.map((row) => (
-                    <div key={row.month} style={{ display: 'grid', gridTemplateColumns: `repeat(${partTrend.parts.length}, 1fr)`, gap: 6, alignItems: 'end' }}>
-                      {row.values.map((qty, idx) => (
-                        <div key={`${row.month}-${partTrend.parts[idx]}`} title={`${row.month} · ${partTrend.parts[idx]}: ${qty}`}>
-                          <div
-                            style={{
-                              width: '100%',
-                              height: `${Math.max(4, (qty / partTrend.maxQty) * 170)}px`,
-                              background: ['#2563eb', '#7c3aed', '#ea580c', '#16a34a'][idx % 4],
-                              borderRadius: '4px 4px 0 0',
-                            }}
-                          />
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 22,
+                      flexShrink: 0,
+                      paddingBottom: 28,
+                    }}
+                    aria-hidden
+                  >
+                    <span
+                      style={{
+                        writingMode: 'vertical-rl',
+                        transform: 'rotate(180deg)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 600,
+                        color: 'var(--color-text-muted)',
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Quantity
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      width: 44,
+                      flexShrink: 0,
+                      height: 260,
+                      paddingTop: 10,
+                      paddingBottom: 2,
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      textAlign: 'right',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {partTrend.yTicks.map((t, i) => (
+                      <span key={`y-tick-${i}`}>{t}</span>
+                    ))}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        height: 260,
+                        borderLeft: '1px solid var(--color-border)',
+                        borderBottom: '1px solid var(--color-border)',
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${partTrend.rows.length}, minmax(0, 1fr))`,
+                        gap: '0.75rem',
+                        alignItems: 'end',
+                        padding: '0.75rem 0.75rem 0 0.75rem',
+                        background:
+                          'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
+                      }}
+                    >
+                      {partTrend.rows.map((row) => (
+                        <div
+                          key={row.month}
+                          style={{ display: 'grid', gridTemplateColumns: `repeat(${partTrend.parts.length}, 1fr)`, gap: 6, alignItems: 'end' }}
+                        >
+                          {row.values.map((qty, idx) => (
+                            <div key={`${row.month}-${partTrend.parts[idx]}`} title={`${row.month} · ${partTrend.parts[idx]}: ${qty}`}>
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: `${Math.max(4, (qty / partTrend.maxQty) * 170)}px`,
+                                  background: ['#2563eb', '#7c3aed', '#ea580c', '#16a34a'][idx % 4],
+                                  borderRadius: '4px 4px 0 0',
+                                }}
+                              />
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>
-                  ))}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${partTrend.rows.length}, minmax(0, 1fr))`, gap: '0.75rem', padding: '0.35rem 0.75rem 0 0.75rem' }}>
-                  {partTrend.rows.map((row) => (
-                    <span key={`${row.month}-x`} style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                      {row.month}
-                    </span>
-                  ))}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${partTrend.rows.length}, minmax(0, 1fr))`,
+                        gap: '0.75rem',
+                        padding: '0.35rem 0.75rem 0 0.75rem',
+                      }}
+                    >
+                      {partTrend.rows.map((row) => (
+                        <span
+                          key={`${row.month}-x`}
+                          style={{
+                            textAlign: 'center',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-text-muted)',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {row.month}
+                        </span>
+                      ))}
+                    </div>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        paddingTop: '0.35rem',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 600,
+                        color: 'var(--color-text-muted)',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Month
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
