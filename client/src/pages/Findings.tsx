@@ -94,6 +94,59 @@ export function Findings() {
   const defectCodeCounts = data?.defectCodeCounts ?? [];
   const topDefectCodes = defectCodeCounts.slice(0, 10);
   const maxDefectCount = Math.max(1, ...defectCodeCounts.map((d) => d.count));
+  const auditFindingsCount = list.filter((f) => !!f.audit).length;
+  const shipmentFindingsCount = Math.max(0, list.length - auditFindingsCount);
+  const sourceDonut = useMemo(() => {
+    const slices = [
+      { key: 'audit', count: auditFindingsCount, color: '#2563eb' },
+      { key: 'shipment', count: shipmentFindingsCount, color: '#8b5cf6' },
+    ];
+    const total = slices.reduce((sum, s) => sum + s.count, 0);
+    const nonZero = slices.filter((s) => s.count > 0);
+    const size = 160;
+    const cx = 80;
+    const cy = 80;
+    const radius = 52;
+    const strokeWidth = 30;
+    const separatorWidth = nonZero.length > 1 ? 2 : 0;
+    const innerRadius = radius - strokeWidth / 2;
+    const outerRadius = radius + strokeWidth / 2;
+    const toPoint = (angleDeg: number, r = radius) => {
+      const rad = ((angleDeg - 90) * Math.PI) / 180;
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    };
+    if (total === 0) {
+      return { size, strokeWidth, cx, cy, radius, separatorWidth, segments: [] as Array<{ d: string; color: string }>, separators: [] as Array<{ x1: number; y1: number; x2: number; y2: number }> };
+    }
+    if (nonZero.length === 1) {
+      return { size, strokeWidth, cx, cy, radius, separatorWidth, segments: [{ d: '', color: nonZero[0].color }], separators: [] as Array<{ x1: number; y1: number; x2: number; y2: number }> };
+    }
+    let cursor = 0;
+    const segments = nonZero.map((slice) => {
+      const arcDeg = (slice.count / total) * 360;
+      const start = cursor;
+      const end = cursor + arcDeg;
+      cursor += arcDeg;
+      const p0 = toPoint(start);
+      const p1 = toPoint(end);
+      const largeArcFlag = arcDeg > 180 ? 1 : 0;
+      return { d: `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${p1.x} ${p1.y}`, color: slice.color };
+    });
+    const separatorAngles = nonZero
+      .slice(0, -1)
+      .reduce<number[]>((angles, slice, idx) => {
+        const prev = idx === 0 ? 0 : angles[idx - 1];
+        angles.push(prev + (slice.count / total) * 360);
+        return angles;
+      }, []);
+    separatorAngles.unshift(0);
+    const separators = separatorAngles.map((angle) => {
+      const inner = toPoint(angle, innerRadius);
+      const outer = toPoint(angle, outerRadius);
+      return { x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y };
+    });
+    return { size, strokeWidth, cx, cy, radius, separatorWidth, segments, separators };
+  }, [auditFindingsCount, shipmentFindingsCount]);
 
   const fetchData = () => {
     if (!token) return;
@@ -167,6 +220,7 @@ export function Findings() {
         Code: f.code,
         Supplier: `${f.supplier.code} — ${f.supplier.name}`,
         Audit: f.audit?.code ?? 'None',
+        Shipment: f.audit ? '—' : 'Shipment finding',
         Severity: f.severity,
         Status: f.status,
         Summary: f.summary,
@@ -279,49 +333,114 @@ export function Findings() {
         </div>
       </div>
 
-      {defectCodeCounts.length > 0 && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(240px, 30%) minmax(0, 70%)',
+          gap: '1rem',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Top defect codes</h2>
-            <div
-              aria-label="Top defect codes bar chart"
-              style={{
-                minHeight: 210,
-                borderLeft: '1px solid var(--color-border)',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'grid',
-                gridTemplateColumns: `repeat(${topDefectCodes.length}, minmax(0, 1fr))`,
-                alignItems: 'flex-end',
-                gap: '0.75rem',
-                padding: '0.5rem 0.5rem 0 0.5rem',
-                background:
-                  'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
-              }}
-            >
-              {topDefectCodes.map(({ code, count }) => (
-                <div key={code} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>
-                    {count}
-                  </span>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: `${Math.max(8, (count / maxDefectCount) * 140)}px`,
-                      background: '#4f46e5',
-                      borderRadius: '4px 4px 0 0',
-                      transition: 'height 0.2s ease',
-                    }}
-                    title={`${code}: ${count}`}
+            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Audit vs Shipment findings</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <svg
+                aria-label="Audit versus shipment findings donut chart"
+                width={sourceDonut.size}
+                height={sourceDonut.size}
+                viewBox={`0 0 ${sourceDonut.size} ${sourceDonut.size}`}
+                style={{ flex: '0 0 auto', display: 'block' }}
+              >
+                {sourceDonut.segments.length === 0 ? (
+                  <circle cx={sourceDonut.cx} cy={sourceDonut.cy} r={sourceDonut.radius} fill="none" stroke="#e5e7eb" strokeWidth={sourceDonut.strokeWidth} />
+                ) : sourceDonut.segments.length === 1 ? (
+                  <circle cx={sourceDonut.cx} cy={sourceDonut.cy} r={sourceDonut.radius} fill="none" stroke={sourceDonut.segments[0].color} strokeWidth={sourceDonut.strokeWidth} />
+                ) : (
+                  sourceDonut.segments.map((segment) => (
+                    <path key={`${segment.color}-${segment.d}`} d={segment.d} fill="none" stroke={segment.color} strokeWidth={sourceDonut.strokeWidth} strokeLinecap="butt" />
+                  ))
+                )}
+                {sourceDonut.separators.map((separator, idx) => (
+                  <line
+                    key={`source-sep-${idx}`}
+                    x1={separator.x1}
+                    y1={separator.y1}
+                    x2={separator.x2}
+                    y2={separator.y2}
+                    stroke="var(--color-surface)"
+                    strokeWidth={sourceDonut.separatorWidth}
+                    strokeLinecap="butt"
                   />
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-                    {code}
+                ))}
+              </svg>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 180 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
+                    Audit findings
                   </span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{auditFindingsCount}</span>
                 </div>
-              ))}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#8b5cf6', display: 'inline-block' }} />
+                    Shipment findings
+                  </span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{shipmentFindingsCount}</span>
+                </div>
+              </div>
             </div>
+            <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              Shipment findings are currently inferred from findings without an audit link.
+            </p>
           </div>
         </div>
-      )}
+
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Top defect codes</h2>
+            {topDefectCodes.length === 0 ? (
+              <p className="table-empty">No defect-code data.</p>
+            ) : (
+              <div
+                aria-label="Top defect codes bar chart"
+                style={{
+                  minHeight: 210,
+                  borderLeft: '1px solid var(--color-border)',
+                  borderBottom: '1px solid var(--color-border)',
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${topDefectCodes.length}, minmax(0, 1fr))`,
+                  alignItems: 'flex-end',
+                  gap: '0.75rem',
+                  padding: '0.5rem 0.5rem 0 0.5rem',
+                  background:
+                    'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
+                }}
+              >
+                {topDefectCodes.map(({ code, count }) => (
+                  <div key={code} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>{count}</span>
+                    <div
+                      style={{
+                        width: '100%',
+                        height: `${Math.max(8, (count / maxDefectCount) * 140)}px`,
+                        background: '#4f46e5',
+                        borderRadius: '4px 4px 0 0',
+                        transition: 'height 0.2s ease',
+                      }}
+                      title={`${code}: ${count}`}
+                    />
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                      {code}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="card">
         <div
@@ -340,129 +459,131 @@ export function Findings() {
           </button>
         </div>
         <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('defectCode')}>Defect Code {sortIndicator('defectCode')}</th>
-                <th>CAR</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('createdAt')}>Date created {sortIndicator('createdAt')}</th>
-                {isAdmin && <th>Delete</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
-                <tr>
-                  <td colSpan={9 + (isAdmin ? 1 : 0)} className="table-empty">
-                    No findings in scope (or none past New yet).
-                  </td>
-                </tr>
-              ) : (
-                paginatedList.map((f) => (
-                  <tr key={f.id} className={`finding-row finding-row--${getStatusBadgeSlug(f.status)}`}>
-                    <td>
-                      <Link
-                        to={`/findings-record?id=${encodeURIComponent(f.id)}`}
-                        className="finding-code-link"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {f.code}
-                      </Link>
-                    </td>
-                    <td>{f.supplier.code} — {f.supplier.name}</td>
-                    <td>{f.audit?.code ?? 'None'}</td>
-                    <td>{f.severity}</td>
-                    <td>
-                      <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>
-                        {f.status}
-                      </span>
-                    </td>
-                    <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
-                      {f.summary.length > 120 ? (
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => setSummaryModal({ code: f.code, summary: f.summary })}
-                          style={{
-                            padding: 0,
-                            textAlign: 'left',
-                            lineHeight: 1.35,
-                            color: 'inherit',
-                            width: '100%',
-                            overflow: 'hidden',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                          }}
-                          title="Click to view full summary"
-                        >
-                          {f.summary}
-                        </button>
-                      ) : (
-                        <div style={{ lineHeight: 1.35 }}>{f.summary}</div>
-                      )}
-                    </td>
-                    <td>{f.defectCode?.trim() ? f.defectCode : '—'}</td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
-                        {(f.correctiveActions ?? []).length === 0 ? (
-                          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>—</span>
-                        ) : (
-                          (f.correctiveActions ?? []).map((c) => (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
+                      <th>Shipment</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('defectCode')}>Defect Code {sortIndicator('defectCode')}</th>
+                      <th>CAR</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('createdAt')}>Date created {sortIndicator('createdAt')}</th>
+                      {isAdmin && <th>Delete</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.length === 0 ? (
+                      <tr>
+                        <td colSpan={10 + (isAdmin ? 1 : 0)} className="table-empty">
+                          No findings in scope (or none past New yet).
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedList.map((f) => (
+                        <tr key={f.id} className={`finding-row finding-row--${getStatusBadgeSlug(f.status)}`}>
+                          <td>
                             <Link
-                              key={c.id}
-                              to={`/car-record?id=${encodeURIComponent(c.id)}`}
+                              to={`/findings-record?id=${encodeURIComponent(f.id)}`}
                               className="finding-code-link"
-                              style={{ fontSize: 'var(--text-sm)' }}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              {c.code}
-                              <span style={{ color: 'var(--color-text-muted)', marginLeft: 4 }}>({c.status})</span>
+                              {f.code}
                             </Link>
-                          ))
-                        )}
-                        {canCreateCar && (
-                          <Link
-                            to={`/car-record?findingId=${encodeURIComponent(f.id)}`}
-                            className="btn btn-ghost"
-                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            + New CAR
-                          </Link>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }} title={f.createdAt}>
-                      {formatFindingCreatedAt(f.createdAt)}
-                    </td>
-                    {isAdmin && (
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
-                          onClick={() => setDeleteConfirmId(f.id)}
-                          disabled={deletingId !== null}
-                          title="Delete finding (Admin only)"
-                        >
-                          {deletingId === f.id ? 'Deleting…' : 'Delete'}
-                        </button>
-                      </td>
+                          </td>
+                          <td>{f.supplier.code} — {f.supplier.name}</td>
+                          <td>{f.audit?.code ?? '—'}</td>
+                          <td>{f.audit ? '—' : 'Shipment finding'}</td>
+                          <td>{f.severity}</td>
+                          <td>
+                            <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>
+                              {f.status}
+                            </span>
+                          </td>
+                          <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                            {f.summary.length > 120 ? (
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={() => setSummaryModal({ code: f.code, summary: f.summary })}
+                                style={{
+                                  padding: 0,
+                                  textAlign: 'left',
+                                  lineHeight: 1.35,
+                                  color: 'inherit',
+                                  width: '100%',
+                                  overflow: 'hidden',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                }}
+                                title="Click to view full summary"
+                              >
+                                {f.summary}
+                              </button>
+                            ) : (
+                              <div style={{ lineHeight: 1.35 }}>{f.summary}</div>
+                            )}
+                          </td>
+                          <td>{f.defectCode?.trim() ? f.defectCode : '—'}</td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                              {(f.correctiveActions ?? []).length === 0 ? (
+                                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>—</span>
+                              ) : (
+                                (f.correctiveActions ?? []).map((c) => (
+                                  <Link
+                                    key={c.id}
+                                    to={`/car-record?id=${encodeURIComponent(c.id)}`}
+                                    className="finding-code-link"
+                                    style={{ fontSize: 'var(--text-sm)' }}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {c.code}
+                                    <span style={{ color: 'var(--color-text-muted)', marginLeft: 4 }}>({c.status})</span>
+                                  </Link>
+                                ))
+                              )}
+                              {canCreateCar && (
+                                <Link
+                                  to={`/car-record?findingId=${encodeURIComponent(f.id)}`}
+                                  className="btn btn-ghost"
+                                  style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  + New CAR
+                                </Link>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }} title={f.createdAt}>
+                            {formatFindingCreatedAt(f.createdAt)}
+                          </td>
+                          {isAdmin && (
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
+                                onClick={() => setDeleteConfirmId(f.id)}
+                                disabled={deletingId !== null}
+                                title="Delete finding (Admin only)"
+                              >
+                                {deletingId === f.id ? 'Deleting…' : 'Delete'}
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))
                     )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                  </tbody>
+                </table>
         </div>
         {list.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
