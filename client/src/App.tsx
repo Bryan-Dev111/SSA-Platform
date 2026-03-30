@@ -9,6 +9,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { getDefaultPath } from './config/rolePageAccess';
 import { Login } from './pages/Login';
+import { RequestAccess } from './pages/RequestAccess';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Risk } from './pages/Risk';
 import { CorrectiveActions } from './pages/CorrectiveActions';
@@ -40,6 +42,8 @@ function App() {
         <AuthProvider>
           <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/request-access" element={<RequestAccess />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             path="/"
             element={

@@ -816,6 +816,54 @@ a.btn:focus {
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
 }
 
+.login-form-footer {
+  margin-top: var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.login-footer-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: var(--font-semibold);
+}
+
+.login-footer-link:hover {
+  text-decoration: underline;
+}
+
+.login-footer-divider {
+  width: 1px;
+  height: 0.875rem;
+  align-self: center;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.login-help-body {
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  color: var(--color-text-muted);
+}
+
+.login-help-body p {
+  margin: 0 0 var(--space-4);
+}
+
+.login-help-body p:last-child {
+  margin-bottom: 0;
+}
+
+.login-help-back {
+  margin: var(--space-6) 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
 /* ----- Loading ----- */
 .loading-spinner {
   width: 32px;
