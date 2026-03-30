@@ -23,7 +23,10 @@ interface Audit {
   id: string;
   code: string;
   auditDate: string;
+  auditor: string | null;
   result: 'Passed' | 'Failed' | 'Cancelled' | null;
+  summary: string | null;
+  scope: string | null;
   notes: string | null;
   derivedStatus: string;
   supplier: Supplier;
@@ -113,6 +116,26 @@ export function AuditRecord() {
                 <div className="input" style={{ userSelect: 'text' }}>
                   {audit.result ?? '—'}
                 </div>
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Auditor</label>
+                <div className="input" style={{ userSelect: 'text' }}>
+                  {audit.auditor?.trim() ? audit.auditor : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem' }}>
+              <label className="input-label">Summary</label>
+              <div className="input" style={{ userSelect: 'text', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>
+                {audit.summary?.trim() ? audit.summary : '—'}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem' }}>
+              <label className="input-label">Scope</label>
+              <div className="input" style={{ userSelect: 'text', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>
+                {audit.scope?.trim() ? audit.scope : '—'}
               </div>
             </div>
 

@@ -91,6 +91,11 @@ export function Findings() {
       statsFromApi?.criticalMajor ??
       statsFromApi?.totalCriticalMajor ??
       list.filter((f) => f.severity === 'Critical' || f.severity === 'Major').length,
+    openCriticalMajor:
+      statsFromApi?.openCriticalMajor ??
+      list.filter(
+        (f) => (f.severity === 'Critical' || f.severity === 'Major') && f.status !== 'Closed'
+      ).length,
   };
   const defectCodeCounts = data?.defectCodeCounts ?? [];
   const topDefectCodes = defectCodeCounts.slice(0, 10);
@@ -316,21 +321,20 @@ export function Findings() {
         </label>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 240px))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total findings</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalAll}</div>
-        </div>
-        <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open findings</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
-          <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
-            {stats.criticalMajor} critical/major
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total</div>
+          <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            Critical/Major
           </div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.criticalMajor}</div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Critical/Major</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.criticalMajor}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open</div>
+          <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            Critical/Major
+          </div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openCriticalMajor}</div>
         </div>
       </div>
 
