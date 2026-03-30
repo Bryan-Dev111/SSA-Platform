@@ -498,7 +498,21 @@ export function Findings() {
                           </td>
                           <td>{f.supplier.code} — {f.supplier.name}</td>
                           <td>{f.audit?.code ?? '—'}</td>
-                          <td>{f.shipment?.code?.trim() || f.shipment?.id || '—'}</td>
+                          <td>
+                            {f.shipment ? (
+                              <Link
+                                to={`/shipments?supplierId=${encodeURIComponent(f.supplierId)}`}
+                                className="finding-code-link"
+                                title={`Shipment ${f.shipment.code?.trim() || f.shipment.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {f.shipment.code?.trim() || f.shipment.id}
+                              </Link>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
                           <td>{f.severity}</td>
                           <td>
                             <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>
