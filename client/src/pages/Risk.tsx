@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { apiJson } from '../api/client';
+import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 import { computeRiskRegisterDistribution } from '../utils/riskDistribution';
 
 interface Supplier {
@@ -251,6 +252,29 @@ export function Risk() {
   }, [effectiveRisks]);
 
   const matchesActiveFilters = (row: OpportunityRow): boolean => !filterSupplierId || row.supplierId === filterSupplierId;
+
+  const handleExportRiskTable = () => {
+    try {
+      const rows: ExportRow[] = items.map((row) => ({
+        ID: row.code,
+        Supplier: `${row.supplier.code} - ${row.supplier.name}`,
+        Type: row.type,
+        Description: row.description,
+        Likelihood: row.likelihood ?? '—',
+        Severity: row.severity ?? '—',
+        'Risk level': row.riskLevel ?? '—',
+        Status: row.status,
+        Created: new Date(row.createdAt).toLocaleString(),
+      }));
+      if (rows.length === 0) return;
+      const supplierSuffix =
+        suppliers.find((s) => s.id === filterSupplierId)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
+      downloadTableXlsx(`Risk_Table_${supplierSuffix}`, 'Risk Table', rows);
+      toast.success('Exported to Excel');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -553,7 +577,12 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risks and opportunities</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            <h2 style={{ margin: 0 }}>Risks and opportunities</h2>
+            <button type="button" className="btn btn-ghost" onClick={handleExportRiskTable} disabled={items.length === 0}>
+              Export to Excel
+            </button>
+          </div>
           <div className="table-wrap">
             {items.length === 0 ? (
               <p className="table-empty">No rows.</p>
