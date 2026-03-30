@@ -31,6 +31,18 @@ interface ShipmentListOption {
   inspectionDate: string | null;
 }
 
+interface CarListOption {
+  id: string;
+  code: string;
+  status: string;
+}
+
+function formatCarStatusForRecords(status: string): string {
+  if (status === 'WaitingApproval') return 'Waiting Approval';
+  if (status === 'FollowUp') return 'Follow Up';
+  return status;
+}
+
 interface RecordRow {
   id: string;
   name: string;
@@ -127,6 +139,7 @@ export function Records() {
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditListOption[]>([]);
   const [shipmentOptions, setShipmentOptions] = useState<ShipmentListOption[]>([]);
+  const [carOptions, setCarOptions] = useState<CarListOption[]>([]);
   const [uploadAuditId, setUploadAuditId] = useState('');
   const [uploadShipmentId, setUploadShipmentId] = useState('');
   const [uploadCarId, setUploadCarId] = useState('');
@@ -222,26 +235,34 @@ export function Records() {
     if (!token || !supplierForLinks || isSupplier || !canUpload) {
       setAuditOptions([]);
       setShipmentOptions([]);
+      setCarOptions([]);
       setUploadAuditId('');
       setUploadShipmentId('');
+      setUploadCarId('');
       return;
     }
     let cancelled = false;
     Promise.all([
       apiJson<AuditListOption[]>(`/audits?supplierId=${encodeURIComponent(supplierForLinks)}`, { token }),
       apiJson<ShipmentListOption[]>(`/shipments?supplierId=${encodeURIComponent(supplierForLinks)}`, { token }),
+      apiJson<{ list: CarListOption[] }>(`/cars?supplierId=${encodeURIComponent(supplierForLinks)}`, { token }).then(
+        (r) => r.list
+      ),
     ])
-      .then(([audits, shipments]) => {
+      .then(([audits, shipments, cars]) => {
         if (cancelled) return;
         setAuditOptions(audits);
         setShipmentOptions(shipments);
+        setCarOptions(cars);
         setUploadAuditId((id) => (id && audits.some((a) => a.id === id) ? id : ''));
         setUploadShipmentId((id) => (id && shipments.some((s) => s.id === id) ? id : ''));
+        setUploadCarId((id) => (id && cars.some((c) => c.id === id) ? id : ''));
       })
       .catch(() => {
         if (!cancelled) {
           setAuditOptions([]);
           setShipmentOptions([]);
+          setCarOptions([]);
         }
       });
     return () => {
@@ -255,6 +276,7 @@ export function Records() {
     if (auditOptions.some((a) => a.id === auditSeed)) {
       setUploadAuditId(auditSeed);
       setUploadShipmentId('');
+      setUploadCarId('');
     }
   }, [auditSeed, auditOptions]);
 
@@ -268,11 +290,13 @@ export function Records() {
   }, [shipmentSeed, shipmentOptions]);
 
   useEffect(() => {
-    if (!carSeed) return;
-    setUploadCarId(carSeed);
-    setUploadAuditId('');
-    setUploadShipmentId('');
-  }, [carSeed]);
+    if (!carSeed || carOptions.length === 0) return;
+    if (carOptions.some((c) => c.id === carSeed)) {
+      setUploadCarId(carSeed);
+      setUploadAuditId('');
+      setUploadShipmentId('');
+    }
+  }, [carSeed, carOptions]);
 
   useEffect(() => {
     if (!token) return;
@@ -435,8 +459,8 @@ export function Records() {
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Upload record</h2>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-              Choose a supplier (filter above). Optionally link this file to <strong>one</strong> audit <em>or</em> one
-              shipment — not both.
+              Choose a supplier (filter above). Optionally link this file to <strong>one</strong> audit, shipment, or CAR
+              only.
             </p>
             <form onSubmit={submit}>
               <div className="input-group">
@@ -453,6 +477,7 @@ export function Records() {
                   onChange={(e) => {
                     setUploadAuditId(e.target.value);
                     setUploadShipmentId('');
+                    setUploadCarId('');
                   }}
                 >
                   <option value="">— None —</option>
@@ -482,6 +507,7 @@ export function Records() {
                   onChange={(e) => {
                     setUploadShipmentId(e.target.value);
                     setUploadAuditId('');
+                    setUploadCarId('');
                   }}
                 >
                   <option value="">— None —</option>
@@ -504,20 +530,37 @@ export function Records() {
               </div>
               <div className="input-group">
                 <label className="input-label">CAR (optional)</label>
-                <input
+                <select
                   className="input"
+                  style={{ maxWidth: 480 }}
                   value={uploadCarId}
+                  disabled={!supplierForLinks || carOptions.length === 0}
                   onChange={(e) => {
                     setUploadCarId(e.target.value);
                     setUploadAuditId('');
                     setUploadShipmentId('');
                   }}
-                  placeholder="CAR id"
-                  style={{ maxWidth: 480 }}
-                />
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                  Tip: from CAR Record page this is prefilled automatically.
-                </span>
+                >
+                  <option value="">— None —</option>
+                  {carOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} · {formatCarStatusForRecords(c.status)}
+                    </option>
+                  ))}
+                </select>
+                {!supplierForLinks ? (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    Select a supplier in the filter to load corrective actions.
+                  </span>
+                ) : carOptions.length === 0 ? (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    No CARs for this supplier in your scope.
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    Opens from CAR Record with supplier and CAR pre-selected when you use Add attachment.
+                  </span>
+                )}
               </div>
               <div className="input-group" style={{ position: 'relative' }}>
                 <label className="input-label">File *</label>
