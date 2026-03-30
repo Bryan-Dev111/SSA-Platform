@@ -21,7 +21,7 @@ interface RiskCurrentRow {
   score: number;
 }
 
-type RiskColor = 'red' | 'orange' | 'yellow' | 'green' | 'gray';
+type RiskColor = 'red' | 'yellow' | 'green' | 'gray';
 type GeoPoint = { lat: number; lon: number };
 
 function supplierStatusLabel(status: string | undefined): string {
@@ -111,7 +111,6 @@ export function SuppliersMap() {
   const colorCounts = useMemo(() => {
     return {
       red: mapPins.filter((p) => p.color === 'red').length,
-      orange: mapPins.filter((p) => p.color === 'orange').length,
       yellow: mapPins.filter((p) => p.color === 'yellow').length,
       green: mapPins.filter((p) => p.color === 'green').length,
       gray: mapPins.filter((p) => p.color === 'gray').length,
@@ -169,7 +168,6 @@ export function SuppliersMap() {
         }}
       >
         <Metric title="High (Red)" value={colorCounts.red} color="#ef4444" />
-        <Metric title="Medium-High (Orange)" value={colorCounts.orange} color="#f97316" />
         <Metric title="Medium (Yellow)" value={colorCounts.yellow} color="#eab308" />
         <Metric title="Low (Green)" value={colorCounts.green} color="#22c55e" />
       </div>
@@ -268,7 +266,7 @@ export function SuppliersMap() {
             </p>
           )}
           <p style={{ marginTop: '0.75rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-            Real map tiles with supplier markers. Pins are color-coded by supplier risk: red/orange/yellow/green.
+            Real map tiles with supplier markers. Pins are color-coded by supplier risk: High (red), Medium (yellow), Low (green), or gray when no risk snapshot.
           </p>
         </div>
       </div>
@@ -320,8 +318,8 @@ function Metric({ title, value, color }: { title: string; value: number; color: 
   );
 }
 
-function getRiskColor(level?: string, score?: number): RiskColor {
-  if (level === 'High') return typeof score === 'number' && score < 85 ? 'orange' : 'red';
+function getRiskColor(level?: string, _score?: number): RiskColor {
+  if (level === 'High') return 'red';
   if (level === 'Medium') return 'yellow';
   if (level === 'Low') return 'green';
   return 'gray';
@@ -329,7 +327,6 @@ function getRiskColor(level?: string, score?: number): RiskColor {
 
 function riskColorHex(color: RiskColor): string {
   if (color === 'red') return '#ef4444';
-  if (color === 'orange') return '#f97316';
   if (color === 'yellow') return '#eab308';
   if (color === 'green') return '#22c55e';
   return '#94a3b8';
