@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 
 interface Supplier {
   id: string;
@@ -60,6 +61,7 @@ export function CorrectiveActions() {
     'code' | 'supplier' | 'audit' | 'finding' | 'severity' | 'status' | 'owner' | 'created' | 'updated'
   >('updated');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [summaryModal, setSummaryModal] = useState<{ code: string; summary: string } | null>(null);
 
   const list = data?.list ?? [];
   const stats = data?.stats ?? { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 };
@@ -170,6 +172,31 @@ export function CorrectiveActions() {
   const pageSafe = Math.min(page, totalPages) || 1;
   const paginatedList = sortedList.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
+  const handleExportCarsTable = () => {
+    try {
+      const rows: ExportRow[] = sortedList.map((c) => ({
+        Code: c.code,
+        Supplier: `${c.supplier.code} — ${c.supplier.name}`,
+        Audit: c.audit.code,
+        Finding: c.finding?.code ?? 'None',
+        Severity: c.severity,
+        Status: formatCarStatusLabel(c.status),
+        Summary: c.summary,
+        Owner: c.carOwner?.trim() ? c.carOwner : '—',
+        'Target Completion Date': c.targetCompletionDate ? new Date(c.targetCompletionDate).toLocaleDateString() : '—',
+        Created: new Date(c.createdAt).toLocaleDateString(),
+        Updated: new Date(c.updatedAt).toLocaleDateString(),
+      }));
+      if (rows.length === 0) return;
+      const supplierSuffix =
+        suppliers.find((s) => s.id === supplierFilter)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
+      downloadTableXlsx(`Corrective_Actions_${supplierSuffix}`, 'Corrective Actions', rows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  };
+
   const fetchData = () => {
     if (!token) return;
     const q = supplierFilter ? `?supplierId=${encodeURIComponent(supplierFilter)}` : '';
@@ -258,18 +285,17 @@ export function CorrectiveActions() {
         </label>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total CARs</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{list.length}</div>
+        </div>
         <div className="card" style={{ padding: '1rem' }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open CARs</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.open}</div>
-        </div>
-        <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Overdue</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.overdue}</div>
-        </div>
-        <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Waiting Approval</div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.waitingApproval}</div>
+          <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
+            {stats.overdue} overdue · {stats.waitingApproval} waiting approval
+          </div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>AVG Closure (days)</div>
@@ -460,6 +486,21 @@ export function CorrectiveActions() {
       )}
 
       <div className="card">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            padding: '1rem',
+            borderBottom: '1px solid var(--color-border)',
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Corrective Actions Table</h2>
+          <button type="button" className="btn btn-ghost" onClick={handleExportCarsTable} disabled={sortedList.length === 0}>
+            Export to Excel
+          </button>
+        </div>
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -526,8 +567,30 @@ export function CorrectiveActions() {
                         {formatCarStatusLabel(c.status)}
                       </span>
                     </td>
-                    <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.summary}>
-                      {c.summary}
+                    <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                      {c.summary.length > 120 ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setSummaryModal({ code: c.code, summary: c.summary })}
+                          style={{
+                            padding: 0,
+                            textAlign: 'left',
+                            lineHeight: 1.35,
+                            color: 'inherit',
+                            width: '100%',
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                          title="Click to view full summary"
+                        >
+                          {c.summary}
+                        </button>
+                      ) : (
+                        <div style={{ lineHeight: 1.35 }}>{c.summary}</div>
+                      )}
                     </td>
                     <td>{c.carOwner?.trim() ? c.carOwner : '—'}</td>
                     <td>{new Date(c.createdAt).toLocaleDateString()}</td>
@@ -608,6 +671,28 @@ export function CorrectiveActions() {
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
         onCancel={() => setDeleteConfirmId(null)}
       />
+
+      {summaryModal && (
+        <div
+          className="confirm-dialog-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="car-summary-title"
+          onClick={() => setSummaryModal(null)}
+        >
+          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="car-summary-title" className="confirm-dialog-title">
+              CAR Summary - {summaryModal.code}
+            </h3>
+            <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{summaryModal.summary}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-primary" onClick={() => setSummaryModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
