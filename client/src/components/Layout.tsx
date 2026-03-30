@@ -116,6 +116,13 @@ export function Layout() {
           </button>
           <span className="app-header-title">Supplier Assurance Platform</span>
           <div className="app-header-actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => navigate('/product-hub')}
+            >
+              Product hub
+            </button>
             <span className="app-header-user">
               {user?.email}
               {user?.roleNames?.length ? (

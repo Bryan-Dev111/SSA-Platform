@@ -4,7 +4,21 @@
  *
  * Keep aligned with server `API_PAGE_ROLES` in `server/src/middleware/rbac.ts` (same roles per feature).
  */
+const ALL_APP_ROLES = [
+  'Admin',
+  'Viewer',
+  'QualityEngineer',
+  'QualityManager',
+  'Buyer',
+  'Auditor',
+  'Supplier',
+] as const;
+
 export const PATH_ROLES: Record<string, string[]> = {
+  /** Product chooser after login; all authenticated roles */
+  '/product-hub': [...ALL_APP_ROLES],
+  /** Global Vendors placeholder; all authenticated roles */
+  '/global-vendors': [...ALL_APP_ROLES],
   '/dashboard': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/risk': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/corrective-actions': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
@@ -45,7 +59,9 @@ const SIDEBAR_PATH_ORDER = [
 ] as const;
 
 export function setRuntimePathRoles(next?: Record<string, string[]> | null): void {
-  runtimePathRoles = next && Object.keys(next).length > 0 ? next : PATH_ROLES;
+  /** Merge so client-only paths (e.g. /product-hub) survive when server matrix omits them. */
+  runtimePathRoles =
+    next && Object.keys(next).length > 0 ? { ...PATH_ROLES, ...next } : PATH_ROLES;
 }
 
 /** Paths that Supplier can access (own data only) */

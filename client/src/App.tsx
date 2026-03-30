@@ -28,6 +28,8 @@ import { Documents } from './pages/Documents';
 import { InternalManagement } from './pages/InternalManagement';
 import { Admin } from './pages/Admin';
 import { NoAccess } from './pages/NoAccess';
+import { ProductHub } from './pages/ProductHub';
+import { GlobalVendorsHome } from './pages/GlobalVendorsHome';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -44,6 +46,22 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/request-access" element={<RequestAccess />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route
+            path="/product-hub"
+            element={
+              <ProtectedRoute path="/product-hub">
+                <ProductHub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/global-vendors"
+            element={
+              <ProtectedRoute path="/global-vendors">
+                <GlobalVendorsHome />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/"
             element={

@@ -44,7 +44,20 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   Login: [],
 };
 
+/** All roles that may authenticate; used for product hub routes (not in PAGE_DEFINITIONS matrix). */
+const ALL_APP_ROLES_HUB = [
+  'Admin',
+  'Viewer',
+  'QualityEngineer',
+  'QualityManager',
+  'Buyer',
+  'Auditor',
+  'Supplier',
+] as const;
+
 export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
+  '/product-hub': [...ALL_APP_ROLES_HUB],
+  '/global-vendors': [...ALL_APP_ROLES_HUB],
   '/dashboard': DEFAULT_API_PAGE_ROLES.Dashboard,
   '/risk': DEFAULT_API_PAGE_ROLES.Risk,
   '/corrective-actions': DEFAULT_API_PAGE_ROLES.CorrectiveActions,

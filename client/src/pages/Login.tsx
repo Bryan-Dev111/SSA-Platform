@@ -2,31 +2,19 @@
  * Login page: logo, form, auth API, redirect by role
  */
 import { useState } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
 import { LoginBrandedShell } from '../components/LoginBrandedShell';
 
 export function Login() {
   const { user, token, login, loading } = useAuth();
   const toast = useToast();
-  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
-
-  const redirectToWhenLoggedIn = (() => {
-    if (!user) return '/dashboard';
-    if (user.roleNames.includes('Supplier') && canAccessPath('/supplier-profile', user.roleNames)) {
-      return '/supplier-profile';
-    }
-    return canAccessPath(from, user.roleNames) ? from : getDefaultPath(user.roleNames);
-  })();
 
   if (loading) {
     return (
@@ -42,7 +30,7 @@ export function Login() {
   }
 
   if (token && user) {
-    return <Navigate to={redirectToWhenLoggedIn} replace />;
+    return <Navigate to="/product-hub" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
