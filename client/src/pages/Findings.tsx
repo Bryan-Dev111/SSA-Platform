@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 
 interface Supplier {
   id: string;
@@ -70,6 +71,7 @@ export function Findings() {
   const [pageSize, setPageSize] = useState(10);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{ code: string; summary: string } | null>(null);
   const [sortBy, setSortBy] = useState<
     'code' | 'supplier' | 'createdAt' | 'audit' | 'severity' | 'status' | 'summary' | 'defectCode'
   >('code');
@@ -158,6 +160,29 @@ export function Findings() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
   const paginatedList = sortedList.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+
+  const handleExportFindingsTable = () => {
+    try {
+      const rows: ExportRow[] = sortedList.map((f) => ({
+        Code: f.code,
+        Supplier: `${f.supplier.code} — ${f.supplier.name}`,
+        Audit: f.audit?.code ?? 'None',
+        Severity: f.severity,
+        Status: f.status,
+        Summary: f.summary,
+        'Defect Code': f.defectCode?.trim() ? f.defectCode : '—',
+        CARs: (f.correctiveActions ?? []).map((c) => `${c.code} (${c.status})`).join(', ') || '—',
+        'Date Created': formatFindingCreatedAt(f.createdAt),
+      }));
+      if (rows.length === 0) return;
+      const supplierSuffix =
+        suppliers.find((s) => s.id === supplierFilter)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
+      downloadTableXlsx(`Findings_${supplierSuffix}`, 'Findings', rows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  };
 
   const handleDelete = async (findingId: string) => {
     if (!token || !isAdmin) return;
@@ -299,6 +324,21 @@ export function Findings() {
       )}
 
       <div className="card">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            padding: '1rem',
+            borderBottom: '1px solid var(--color-border)',
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Findings Table</h2>
+          <button type="button" className="btn btn-ghost" onClick={handleExportFindingsTable} disabled={sortedList.length === 0}>
+            Export to Excel
+          </button>
+        </div>
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -343,8 +383,30 @@ export function Findings() {
                         {f.status}
                       </span>
                     </td>
-                    <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.summary}>
-                      {f.summary}
+                    <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                      {f.summary.length > 120 ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setSummaryModal({ code: f.code, summary: f.summary })}
+                          style={{
+                            padding: 0,
+                            textAlign: 'left',
+                            lineHeight: 1.35,
+                            color: 'inherit',
+                            width: '100%',
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                          title="Click to view full summary"
+                        >
+                          {f.summary}
+                        </button>
+                      ) : (
+                        <div style={{ lineHeight: 1.35 }}>{f.summary}</div>
+                      )}
                     </td>
                     <td>{f.defectCode?.trim() ? f.defectCode : '—'}</td>
                     <td>
@@ -458,6 +520,28 @@ export function Findings() {
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
         onCancel={() => setDeleteConfirmId(null)}
       />
+
+      {summaryModal && (
+        <div
+          className="confirm-dialog-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="finding-summary-title"
+          onClick={() => setSummaryModal(null)}
+        >
+          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="finding-summary-title" className="confirm-dialog-title">
+              Finding Summary - {summaryModal.code}
+            </h3>
+            <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{summaryModal.summary}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-primary" onClick={() => setSummaryModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
