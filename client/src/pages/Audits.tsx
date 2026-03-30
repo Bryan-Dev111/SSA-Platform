@@ -414,7 +414,16 @@ export function Audits() {
               ) : (
                 paginatedAudits.map((a) => (
                   <tr key={a.id} className={`audit-row audit-row--${getAuditStatusSlug(a.derivedStatus)}`}>
-                    <td><strong>{a.code}</strong></td>
+                    <td>
+                      <Link
+                        to={`/audit-record?id=${encodeURIComponent(a.id)}`}
+                        className="finding-code-link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {a.code}
+                      </Link>
+                    </td>
                     <td>{a.supplier.code} — {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate)}</td>
                     <td>{a.auditType?.name?.trim() ? a.auditType.name : '—'}</td>
