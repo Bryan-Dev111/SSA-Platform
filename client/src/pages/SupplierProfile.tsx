@@ -8,6 +8,8 @@ import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
+import { MetricCard } from '../components/MetricCard';
+import { MonthlyTrendsLineChart, type MonthlyTrendRow } from '../components/MonthlyTrendsLineChart';
 import { Link, useSearchParams } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -69,10 +71,16 @@ interface PortalData {
   metrics: {
     assignedBuyerCount: number;
     openCarCount: number;
+    overdueCarCount?: number;
     auditCount: number;
     findingCount: number;
+    openFindingCount?: number;
     recordCount: number;
     shipmentCount: number;
+    waitingInspectionCount?: number;
+  };
+  charts?: {
+    monthlyTrends: MonthlyTrendRow[];
   };
 }
 
@@ -182,6 +190,19 @@ export function SupplierProfile() {
     if (!data?.riskSnapshots?.length) return [] as WeeklyRiskPoint[];
     return buildWeeklyRiskSeries(data.riskSnapshots);
   }, [data?.riskSnapshots]);
+
+  const monthlyTrends = data?.charts?.monthlyTrends ?? [];
+  const profileTrendMax = useMemo(
+    () => Math.max(1, ...monthlyTrends.map((r) => Math.max(r.findings, r.cars, r.audits, r.shipments))),
+    [monthlyTrends]
+  );
+
+  const assignedBuyersSubtitle = useMemo(() => {
+    if (!data?.assignedBuyers?.length) return 'None assigned';
+    const b = data.assignedBuyers;
+    if (b.length <= 2) return b.map((x) => x.name?.trim() || x.email).join(' · ');
+    return `${b.length} contacts`;
+  }, [data?.assignedBuyers]);
 
   const submitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,6 +352,9 @@ export function SupplierProfile() {
   const supplier = data?.supplier;
   const metrics = data?.metrics;
   const latestRisk = data?.riskSnapshots[0];
+  const overdueCars = metrics?.overdueCarCount ?? 0;
+  const openFindings = metrics?.openFindingCount ?? 0;
+  const waitingInspection = metrics?.waitingInspectionCount ?? 0;
 
   return (
     <div className="page">
@@ -370,58 +394,53 @@ export function SupplierProfile() {
           {supplier.code} — {supplier.name}
         </strong>
       </div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: '0.75rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Assigned buyers</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.assignedBuyerCount}</div>
-          </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+            New items by month for this supplier (same view as the main dashboard).
+          </p>
+          {monthlyTrends.length === 0 ? (
+            <p className="table-empty">No trend data yet.</p>
+          ) : (
+            <MonthlyTrendsLineChart rows={monthlyTrends} maxY={profileTrendMax} />
+          )}
         </div>
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open CARs</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.openCarCount}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Audits</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.auditCount}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Findings</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.findingCount}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Records</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.recordCount}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Shipment requests</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{metrics.shipmentCount}</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Current risk</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>
-              {latestRisk ? `${latestRisk.level} (${latestRisk.score ?? '—'})` : '—'}
-            </div>
-          </div>
-        </div>
+      </div>
+
+      <div className="dashboard-metric-grid" style={{ marginBottom: '1.5rem' }}>
+        <MetricCard
+          title="Assigned buyers"
+          value={metrics.assignedBuyerCount}
+          subtitle={assignedBuyersSubtitle}
+        />
+        <MetricCard
+          title="Open CARs"
+          value={metrics.openCarCount}
+          subtitle={`${overdueCars} overdue CAR${overdueCars === 1 ? '' : 's'}`}
+        />
+        <MetricCard
+          title="Findings"
+          value={metrics.findingCount}
+          subtitle={`${openFindings} not closed`}
+        />
+        <MetricCard title="Audits" value={metrics.auditCount} subtitle="All recorded audits" />
+        <MetricCard
+          title="Shipment requests"
+          value={metrics.shipmentCount}
+          subtitle={`${waitingInspection} awaiting inspection`}
+        />
+        <MetricCard title="Records" value={metrics.recordCount} subtitle="Uploaded documents" />
+        <MetricCard
+          title="Current risk"
+          value={latestRisk ? `${latestRisk.level} (${latestRisk.score ?? '—'})` : '—'}
+          subtitle={
+            latestRisk
+              ? `Snapshot ${new Date(latestRisk.createdAt).toLocaleDateString()}`
+              : 'No risk snapshots yet'
+          }
+        />
       </div>
 
       {isSupplier && (

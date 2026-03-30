@@ -8,6 +8,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
+import { buildSupplierMonthlyTrends } from '../services/supplierMonthlyTrends';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
@@ -352,7 +353,25 @@ router.get(
       res.status(404).json({ error: 'Supplier not found' });
       return;
     }
-    const [buyerLinks, audits, findings, cars, riskSnapshots, records, shipments] = await Promise.all([
+    const now = new Date();
+    const [
+      buyerLinks,
+      audits,
+      findings,
+      cars,
+      riskSnapshots,
+      records,
+      shipments,
+      monthlyTrends,
+      auditTotal,
+      findingTotal,
+      recordTotal,
+      shipmentTotal,
+      openCarTotal,
+      overdueCarCount,
+      waitingInspectionCount,
+      openFindingCount,
+    ] = await Promise.all([
       prisma.buyerSupplier.findMany({
         where: { supplierId },
         include: { buyer: { select: { id: true, email: true, name: true } } },
@@ -418,6 +437,23 @@ router.get(
           createdBy: true,
         },
       }),
+      buildSupplierMonthlyTrends(supplierId, now),
+      prisma.audit.count({ where: { supplierId } }),
+      prisma.finding.count({ where: { supplierId, status: { notIn: ['New', 'DRAFT'] } } }),
+      prisma.record.count({ where: { supplierId } }),
+      prisma.shipment.count({ where: { supplierId } }),
+      prisma.correctiveAction.count({ where: { supplierId, status: { notIn: ['DRAFT', 'Closed'] } } }),
+      prisma.correctiveAction.count({
+        where: {
+          supplierId,
+          status: { notIn: ['DRAFT', 'Closed'] },
+          targetCompletionDate: { lt: now },
+        },
+      }),
+      prisma.shipment.count({ where: { supplierId, status: 'WaitingInspection' } }),
+      prisma.finding.count({
+        where: { supplierId, status: { notIn: ['DRAFT', 'Closed'] } },
+      }),
     ]);
 
     // Backfill missing SHIP codes for existing shipments.
@@ -429,7 +465,6 @@ router.get(
         s.code = code;
       }
     }
-    const openCars = cars.filter((c) => c.status !== 'Closed').length;
     res.json({
       supplier: {
         id: supplier.id,
@@ -448,11 +483,17 @@ router.get(
       shipments,
       metrics: {
         assignedBuyerCount: buyerLinks.length,
-        openCarCount: openCars,
-        auditCount: audits.length,
-        findingCount: findings.length,
-        recordCount: records.length,
-        shipmentCount: shipments.length,
+        openCarCount: openCarTotal,
+        overdueCarCount,
+        auditCount: auditTotal,
+        findingCount: findingTotal,
+        openFindingCount,
+        recordCount: recordTotal,
+        shipmentCount: shipmentTotal,
+        waitingInspectionCount,
+      },
+      charts: {
+        monthlyTrends,
       },
     });
   })

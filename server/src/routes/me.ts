@@ -7,6 +7,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { prisma } from '../lib/prisma';
 import { getPathRolesMatrix } from '../lib/permissions';
 import { getNextCode } from '../services/idGenerator';
+import { buildSupplierMonthlyTrends } from '../services/supplierMonthlyTrends';
 
 const router = Router();
 
@@ -35,7 +36,25 @@ router.get(
       return;
     }
     const sid = supplier.id;
-    const [buyerLinks, audits, findings, cars, riskSnapshots, records, shipments] = await Promise.all([
+    const now = new Date();
+    const [
+      buyerLinks,
+      audits,
+      findings,
+      cars,
+      riskSnapshots,
+      records,
+      shipments,
+      monthlyTrends,
+      auditTotal,
+      findingTotal,
+      recordTotal,
+      shipmentTotal,
+      openCarTotal,
+      overdueCarCount,
+      waitingInspectionCount,
+      openFindingCount,
+    ] = await Promise.all([
       prisma.buyerSupplier.findMany({
         where: { supplierId: sid },
         include: { buyer: { select: { id: true, email: true, name: true } } },
@@ -88,6 +107,23 @@ router.get(
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
+      buildSupplierMonthlyTrends(sid, now),
+      prisma.audit.count({ where: { supplierId: sid } }),
+      prisma.finding.count({ where: { supplierId: sid, status: { not: 'DRAFT' } } }),
+      prisma.record.count({ where: { supplierId: sid } }),
+      prisma.shipment.count({ where: { supplierId: sid } }),
+      prisma.correctiveAction.count({ where: { supplierId: sid, status: { notIn: ['DRAFT', 'Closed'] } } }),
+      prisma.correctiveAction.count({
+        where: {
+          supplierId: sid,
+          status: { notIn: ['DRAFT', 'Closed'] },
+          targetCompletionDate: { lt: now },
+        },
+      }),
+      prisma.shipment.count({ where: { supplierId: sid, status: 'WaitingInspection' } }),
+      prisma.finding.count({
+        where: { supplierId: sid, status: { notIn: ['DRAFT', 'Closed'] } },
+      }),
     ]);
 
     // Backfill missing SHIP codes for existing shipments.
@@ -99,7 +135,6 @@ router.get(
         s.code = code;
       }
     }
-    const openCars = cars.filter((c) => c.status !== 'Closed').length;
     res.json({
       supplier: {
         id: supplier.id,
@@ -118,11 +153,17 @@ router.get(
       shipments,
       metrics: {
         assignedBuyerCount: buyerLinks.length,
-        openCarCount: openCars,
-        auditCount: audits.length,
-        findingCount: findings.length,
-        recordCount: records.length,
-        shipmentCount: shipments.length,
+        openCarCount: openCarTotal,
+        overdueCarCount,
+        auditCount: auditTotal,
+        findingCount: findingTotal,
+        openFindingCount,
+        recordCount: recordTotal,
+        shipmentCount: shipmentTotal,
+        waitingInspectionCount,
+      },
+      charts: {
+        monthlyTrends,
       },
     });
   })

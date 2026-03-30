@@ -1355,7 +1355,7 @@ body.sidebar-open {
   grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1308px) {
   .dashboard-split {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
