@@ -17,8 +17,9 @@ const ALL_APP_ROLES = [
 export const PATH_ROLES: Record<string, string[]> = {
   /** Product chooser after login; all authenticated roles */
   '/product-hub': [...ALL_APP_ROLES],
-  /** Global Vendors placeholder; all authenticated roles */
-  '/global-vendors': [...ALL_APP_ROLES],
+  '/global-vendors': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  '/global-vendors/farmers': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  '/global-vendors/approved': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/dashboard': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/risk': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/corrective-actions': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
@@ -53,6 +54,8 @@ const SIDEBAR_PATH_ORDER = [
   '/supplier-profile',
   '/supplier-list',
   '/suppliers-map',
+  '/global-vendors/farmers',
+  '/global-vendors/approved',
   '/documents',
   '/internal-management',
   '/admin',
@@ -84,7 +87,8 @@ export function canAccessPath(pathname: string, roleNames: string[]): boolean {
   const path = pathname.replace(/\/$/, '') || '/';
   if (path === NO_ACCESS_PATH) return true;
   const pathBase = path.split('/').slice(0, 2).join('/') || path;
-  const allowed = runtimePathRoles[pathBase] ?? runtimePathRoles[path];
+  /** Prefer longest match so `/global-vendors/farmers` can differ from `/global-vendors/approved`. */
+  const allowed = runtimePathRoles[path] ?? runtimePathRoles[pathBase];
   if (!allowed) return false;
   return roleNames.some((r) => allowed.includes(r));
 }

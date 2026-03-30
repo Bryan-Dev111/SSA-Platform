@@ -637,8 +637,32 @@ model UserAlertPreference {
   @@id([userId, alertCategory])
 }
 
+// ============== Global Vendors (farms / farmers) ==============
+model Farm {
+  id     String @id @default(cuid())
+  code   String @unique // FARM-00001
+  farmName   String
+  farmerName String
+  country    String
+  city       String?
+
+  latitude        Float?
+  longitude       Float?
+  region          String?
+  farmCategory    String?
+  mainCrop        String?
+  elevationMeters Float?
+  productionStyle String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
+  @@index([country])
+}
+
 // For application-level code generation (SUP-00001, AUD-00001, etc.)
 model IdSequence {
-  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT
+  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM
   lastValue Int    @default(0)
 }

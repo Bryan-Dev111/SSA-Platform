@@ -25,6 +25,8 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
   InternalManagement: ['Admin', 'QualityManager'],
   Admin: ['Admin'],
+  GlobalSupplyFarmers: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyApproved: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   Login: [], // all (no check)
 };
 
@@ -63,6 +65,38 @@ export function requirePageAccess(pageName: string) {
       }
       const hasRole = req.user.roleNames.some((r) => allowedRoles.includes(r));
       if (!hasRole) {
+        res.status(403).json({ error: 'Insufficient permissions' });
+        return;
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+/** Allow the request if the user has access to any of the listed pages (OR). */
+export function requirePageAccessAny(pageNames: string[]) {
+  const unknown = pageNames.filter((n) => !API_PAGE_ROLES[n]);
+  if (unknown.length > 0) {
+    return (_req: Request, res: Response, _next: NextFunction): void => {
+      res.status(403).json({ error: 'Unknown page' });
+    };
+  }
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+      const liveMap = await getApiPageRolesMatrix();
+      const ok = pageNames.some((pageName) => {
+        const allowedRoles = liveMap[pageName] ?? [];
+        return (
+          allowedRoles.length > 0 && req.user!.roleNames.some((r) => allowedRoles.includes(r))
+        );
+      });
+      if (!ok) {
         res.status(403).json({ error: 'Insufficient permissions' });
         return;
       }

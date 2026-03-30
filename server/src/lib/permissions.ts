@@ -2,7 +2,7 @@ import { prisma } from './prisma';
 
 /**
  * Column order for Admin → Permissions matrix and related DB seeding.
- * Match app nav order in `client/src/components/Layout.tsx` (`MENU_ITEMS`) /
+ * Match app nav order in `client/src/components/Layout.tsx` (`MENU_ITEMS`, Global Vendors block) /
  * `client/src/config/rolePageAccess.ts` (`SIDEBAR_PATH_ORDER`). Place record/detail
  * pages immediately after their primary section (CAR Record after Corrective Actions,
  * Findings Record after Findings).
@@ -20,6 +20,8 @@ export const PAGE_DEFINITIONS = [
   { key: 'SupplierProfile', label: 'Supplier Profile', path: '/supplier-profile' },
   { key: 'SupplierList', label: 'Suppliers', path: '/supplier-list' },
   { key: 'SuppliersMap', label: 'Suppliers Map', path: '/suppliers-map' },
+  { key: 'GlobalSupplyFarmers', label: 'Farmer Information', path: '/global-vendors/farmers' },
+  { key: 'GlobalSupplyApproved', label: 'Approved Farmers', path: '/global-vendors/approved' },
   { key: 'Documents', label: 'Command Media', path: '/documents' },
   { key: 'InternalManagement', label: 'Internal Management', path: '/internal-management' },
   { key: 'Admin', label: 'Admin', path: '/admin' },
@@ -36,6 +38,8 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   SupplierProfile: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   SupplierList: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   SuppliersMap: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyFarmers: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyApproved: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   Records: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier'],
   Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
@@ -57,7 +61,6 @@ const ALL_APP_ROLES_HUB = [
 
 export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/product-hub': [...ALL_APP_ROLES_HUB],
-  '/global-vendors': [...ALL_APP_ROLES_HUB],
   '/dashboard': DEFAULT_API_PAGE_ROLES.Dashboard,
   '/risk': DEFAULT_API_PAGE_ROLES.Risk,
   '/corrective-actions': DEFAULT_API_PAGE_ROLES.CorrectiveActions,
@@ -69,6 +72,9 @@ export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/supplier-profile': DEFAULT_API_PAGE_ROLES.SupplierProfile,
   '/supplier-list': DEFAULT_API_PAGE_ROLES.SupplierList,
   '/suppliers-map': DEFAULT_API_PAGE_ROLES.SuppliersMap,
+  '/global-vendors': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
+  '/global-vendors/farmers': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
+  '/global-vendors/approved': DEFAULT_API_PAGE_ROLES.GlobalSupplyApproved,
   '/records': DEFAULT_API_PAGE_ROLES.Records,
   '/shipments': DEFAULT_API_PAGE_ROLES.Shipments,
   '/documents': DEFAULT_API_PAGE_ROLES.Documents,
@@ -112,5 +118,7 @@ export async function getApiPageRolesMatrix(): Promise<Record<string, string[]>>
     Records: pathRoles['/records'] ?? [],
     Documents: pathRoles['/documents'] ?? [],
     Admin: pathRoles['/admin'] ?? [],
+    GlobalSupplyFarmers: pathRoles['/global-vendors/farmers'] ?? [],
+    GlobalSupplyApproved: pathRoles['/global-vendors/approved'] ?? [],
   };
 }

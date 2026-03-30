@@ -24,6 +24,17 @@ const MENU_ITEMS: { path: string; label: string }[] = [
   { path: '/admin', label: 'Admin' },
 ];
 
+const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
+  { path: '/global-vendors/farmers', label: 'Farmer Information' },
+  { path: '/global-vendors/approved', label: 'Approved Farmers' },
+];
+
+/** Routes under this prefix use the Global Vendors shell only (sidebar + header). */
+export function isGlobalVendorsPath(pathname: string): boolean {
+  const p = pathname.replace(/\/$/, '') || '/';
+  return p === '/global-vendors' || p.startsWith('/global-vendors' + '/');
+}
+
 function MenuIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -51,6 +62,7 @@ export function Layout() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const roleNames = user?.roleNames ?? [];
   const pathname = location.pathname;
+  const globalVendorsShell = isGlobalVendorsPath(pathname);
 
   useEffect(() => {
     if (menuOpen) {
@@ -69,6 +81,9 @@ export function Layout() {
   }
 
   const visibleItems = MENU_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
+  const visibleGlobalVendor = GLOBAL_VENDOR_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
+
+  const sidebarNavItems = globalVendorsShell ? visibleGlobalVendor : visibleItems;
 
   return (
     <div className="app-layout">
@@ -82,7 +97,7 @@ export function Layout() {
       />
       <aside className={`sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Main navigation">
         <div className="sidebar-brand-wrap">
-          <div className="sidebar-brand">Sentinel</div>
+          <div className="sidebar-brand">{globalVendorsShell ? 'Global Vendors' : 'Sentinel'}</div>
           <button
             type="button"
             className="sidebar-close-btn"
@@ -93,15 +108,32 @@ export function Layout() {
           </button>
         </div>
         <nav className="sidebar-nav" onClick={closeMenu}>
-          {visibleItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {globalVendorsShell ? (
+            <>
+              <div className="sidebar-nav-section" role="presentation">
+                Navigation
+              </div>
+              {sidebarNavItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </>
+          ) : (
+            sidebarNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            ))
+          )}
         </nav>
       </aside>
       <div className="app-main-wrap">
@@ -114,7 +146,9 @@ export function Layout() {
           >
             <MenuIcon />
           </button>
-          <span className="app-header-title">Supplier Assurance Platform</span>
+          <span className="app-header-title">
+            {globalVendorsShell ? 'Global Vendors' : 'Supplier Assurance Platform'}
+          </span>
           <div className="app-header-actions">
             <button
               type="button"

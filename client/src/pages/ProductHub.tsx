@@ -15,6 +15,7 @@ export function ProductHub() {
   };
 
   const goGlobal = () => {
+    // Index picks first GV route the user may access (farmers vs approved).
     navigate('/global-vendors');
   };
 
@@ -39,7 +40,7 @@ export function ProductHub() {
         >
           <span className="product-hub-panel-kicker">Global Vendors</span>
           <span className="product-hub-panel-title">Additional Products</span>
-          <span className="product-hub-panel-hint">Additional vendor and commodity workflows (placeholder).</span>
+          <span className="product-hub-panel-hint">Farmer information, approved farmers, and related supply workflows.</span>
         </button>
       </div>
     </div>
