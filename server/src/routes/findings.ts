@@ -33,6 +33,7 @@ router.use(requirePageAccess('Findings'));
 const findingInclude = {
   supplier: { select: { id: true, code: true, name: true } },
   audit: { select: { id: true, code: true, auditDate: true } },
+  shipment: { select: { id: true, code: true, purchaseOrder: true } },
   createdBy: { select: { id: true, email: true, name: true } },
   correctiveActions: {
     select: { id: true, code: true, status: true },
@@ -84,6 +85,7 @@ router.get(
         include: {
           supplier: { select: { id: true, code: true, name: true } },
           audit: { select: { id: true, code: true, auditDate: true } },
+          shipment: { select: { id: true, code: true, purchaseOrder: true } },
           correctiveActions: {
             select: { id: true, code: true, status: true },
             orderBy: { updatedAt: 'desc' },
@@ -188,6 +190,7 @@ router.post(
     const {
       supplierId,
       auditId,
+      shipmentId,
       severity,
       summary,
       discrepancy,
@@ -217,6 +220,15 @@ router.post(
       }
       normalizedAuditId = audit.id;
     }
+    let normalizedShipmentId: string | undefined;
+    if (shipmentId !== null && shipmentId !== undefined && String(shipmentId).trim() !== '') {
+      const shipment = await prisma.shipment.findUnique({ where: { id: shipmentId as string }, select: { id: true, supplierId: true } });
+      if (!shipment || shipment.supplierId !== supplierId) {
+        res.status(400).json({ error: 'Shipment not found or does not belong to supplier' });
+        return;
+      }
+      normalizedShipmentId = shipment.id;
+    }
     if (!['Critical', 'Major', 'Minor'].includes(severity as string)) {
       res.status(400).json({ error: 'severity must be Critical, Major, or Minor' });
       return;
@@ -225,6 +237,7 @@ router.post(
     const createData = {
       code,
       ...(normalizedAuditId ? { auditId: normalizedAuditId } : {}),
+      ...(normalizedShipmentId ? { shipmentId: normalizedShipmentId } : {}),
       supplierId: supplierId as string,
       status: 'WaitingDisposition',
       severity: severity as 'Critical' | 'Major' | 'Minor',
@@ -287,6 +300,7 @@ router.patch(
       severity?: FindingSeverity;
       summary?: string;
       discrepancy?: string;
+      shipmentId?: string | null;
       defectCode?: string | null;
       dispositionCode?: string | null;
       closingComments?: string | null;
@@ -303,6 +317,22 @@ router.patch(
         return;
       }
       data.severity = body.severity as FindingSeverity;
+    }
+    if (body.shipmentId !== undefined) {
+      const shipmentIdRaw = typeof body.shipmentId === 'string' ? body.shipmentId.trim() : '';
+      if (!shipmentIdRaw) {
+        data.shipmentId = null;
+      } else {
+        const shipment = await prisma.shipment.findUnique({
+          where: { id: shipmentIdRaw },
+          select: { id: true, supplierId: true },
+        });
+        if (!shipment || shipment.supplierId !== existing.supplierId) {
+          res.status(400).json({ error: 'Shipment not found or does not belong to supplier' });
+          return;
+        }
+        data.shipmentId = shipment.id;
+      }
     }
     const finding = await prisma.finding.update({
       where: { id: req.params.id },

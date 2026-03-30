@@ -77,6 +77,9 @@ export function Shipments() {
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
   const canReview = isAdmin || isQE || isQM;
   const canEditInspector = isAdmin || isQE || isQM;
+  const canCreateFinding = (user?.roleNames ?? []).some((r) =>
+    ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r)
+  );
   const canAttachRecord =
     !isSupplier &&
     (isAdmin ||
@@ -340,10 +343,10 @@ export function Shipments() {
                     <th>Inspector</th>
                     <th>Approval</th>
                     <th>Approval Date</th>
-                    <th>Approve/Reject Button</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>
                       Records {sortIndicator('records')}
                     </th>
+                    <th>Approve/Reject Button</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -410,38 +413,6 @@ export function Shipments() {
                       <td>{r.status === 'WaitingInspection' ? '—' : r.updatedAt?.slice(0, 10) ?? '—'}</td>
 
                       <td>
-                        {canReview && r.status === 'WaitingInspection' ? (
-                          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button
-                              type="button"
-                              className="btn"
-                              style={{
-                                fontSize: 'var(--text-sm)',
-                                padding: '0.35rem 0.65rem',
-                                background: 'var(--color-success)',
-                                color: '#fff',
-                              }}
-                              disabled={savingId === r.id}
-                              onClick={() => setApproveConfirmId(r.id)}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.65rem' }}
-                              disabled={savingId === r.id}
-                              onClick={() => setRejectDialog({ id: r.id, note: '' })}
-                            >
-                              Reject
-                            </button>
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
-                        )}
-                      </td>
-
-                      <td>
                         <div
                           style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}
                         >
@@ -482,7 +453,49 @@ export function Shipments() {
                               + Add record
                             </Link>
                           )}
+                        {canCreateFinding && (
+                          <Link
+                            to={`/findings/create?supplierId=${encodeURIComponent(r.supplierId)}&shipmentId=${encodeURIComponent(r.id)}`}
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            + New Finding
+                          </Link>
+                        )}
                         </div>
+                      </td>
+                      <td>
+                        {canReview && r.status === 'WaitingInspection' ? (
+                          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{
+                                fontSize: 'var(--text-sm)',
+                                padding: '0.35rem 0.65rem',
+                                background: 'var(--color-success)',
+                                color: '#fff',
+                              }}
+                              disabled={savingId === r.id}
+                              onClick={() => setApproveConfirmId(r.id)}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.65rem' }}
+                              disabled={savingId === r.id}
+                              onClick={() => setRejectDialog({ id: r.id, note: '' })}
+                            >
+                              Reject
+                            </button>
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

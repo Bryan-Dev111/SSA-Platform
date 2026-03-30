@@ -66,6 +66,7 @@ export function Audits() {
   const [pageSize, setPageSize] = useState(10);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{ code: string; summary: string } | null>(null);
   const [downloadingRecord, setDownloadingRecord] = useState<Record<string, boolean>>({});
   /** Pending audit result change — API runs only after Confirm in modal */
   const [resultConfirm, setResultConfirm] = useState<{
@@ -331,8 +332,8 @@ export function Audits() {
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('result')}>Result {sortIndicator('result')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('findings')}>Findings {sortIndicator('findings')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
-                {isAdmin && <th>Delete</th>}
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>Records {sortIndicator('records')}</th>
+                {isAdmin && <th>Delete</th>}
               </tr>
             </thead>
             <tbody>
@@ -409,23 +410,31 @@ export function Audits() {
                         )}
                       </div>
                     </td>
-                    <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.summary ?? ''}>
-                      {a.summary ?? '—'}
-                    </td>
-                    {isAdmin && (
-                      <td>
+                    <td style={{ maxWidth: 280, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                      {(a.summary ?? '').length > 120 ? (
                         <button
                           type="button"
                           className="btn btn-ghost"
-                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
-                          onClick={() => setDeleteConfirmId(a.id)}
-                          disabled={deletingId !== null}
-                          title="Delete audit (Admin only)"
+                          onClick={() => setSummaryModal({ code: a.code, summary: a.summary ?? '' })}
+                          style={{
+                            padding: 0,
+                            textAlign: 'left',
+                            lineHeight: 1.35,
+                            color: 'inherit',
+                            width: '100%',
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                          title="Click to view full summary"
                         >
-                          {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                          {a.summary}
                         </button>
-                      </td>
-                    )}
+                      ) : (
+                        <div style={{ lineHeight: 1.35 }}>{a.summary ?? '—'}</div>
+                      )}
+                    </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
                         {(a.records?.length ?? 0) === 0 ? (
@@ -467,6 +476,20 @@ export function Audits() {
                         )}
                       </div>
                     </td>
+                    {isAdmin && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
+                          onClick={() => setDeleteConfirmId(a.id)}
+                          disabled={deletingId !== null}
+                          title="Delete audit (Admin only)"
+                        >
+                          {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -543,6 +566,28 @@ export function Audits() {
         onConfirm={confirmApplyAuditResult}
         onCancel={() => setResultConfirm(null)}
       />
+
+      {summaryModal && (
+        <div
+          className="confirm-dialog-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="audit-summary-title"
+          onClick={() => setSummaryModal(null)}
+        >
+          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="audit-summary-title" className="confirm-dialog-title">
+              Audit Summary - {summaryModal.code}
+            </h3>
+            <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{summaryModal.summary}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-primary" onClick={() => setSummaryModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

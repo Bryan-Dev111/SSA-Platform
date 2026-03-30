@@ -22,6 +22,7 @@ interface Finding {
   supplierId: string;
   supplier: Supplier;
   audit: { id: string; code: string; auditDate: string } | null;
+  shipment: { id: string; code: string | null; purchaseOrder: string | null } | null;
   status: string;
   severity: string;
   summary: string;
@@ -220,7 +221,7 @@ export function Findings() {
         Code: f.code,
         Supplier: `${f.supplier.code} — ${f.supplier.name}`,
         Audit: f.audit?.code ?? 'None',
-        Shipment: f.audit ? '—' : 'Shipment finding',
+        Shipment: f.shipment?.code?.trim() || f.shipment?.id || '—',
         Severity: f.severity,
         Status: f.status,
         Summary: f.summary,
@@ -497,7 +498,7 @@ export function Findings() {
                           </td>
                           <td>{f.supplier.code} — {f.supplier.name}</td>
                           <td>{f.audit?.code ?? '—'}</td>
-                          <td>{f.audit ? '—' : 'Shipment finding'}</td>
+                          <td>{f.shipment?.code?.trim() || f.shipment?.id || '—'}</td>
                           <td>{f.severity}</td>
                           <td>
                             <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>

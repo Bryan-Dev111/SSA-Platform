@@ -25,13 +25,22 @@ interface AuditOption extends Audit {
   supplierId: string;
 }
 
+interface ShipmentOption {
+  id: string;
+  code: string | null;
+  supplierId: string;
+  purchaseOrder: string | null;
+}
+
 interface Finding {
   id: string;
   code: string;
   auditId: string | null;
+  shipmentId: string | null;
   supplierId: string;
   supplier: Supplier;
   audit: Audit | null;
+  shipment: { id: string; code: string | null; purchaseOrder: string | null } | null;
   status: string;
   severity: string;
   summary: string;
@@ -176,6 +185,7 @@ function formStateFromFinding(f: Finding) {
   return {
     supplierId: f.supplierId,
     auditId: f.auditId ?? '',
+    shipmentId: f.shipmentId ?? '',
     severity: f.severity,
     summary: f.summary,
     discrepancy: f.discrepancy,
@@ -194,16 +204,19 @@ export function FindingsRecord() {
   const codeParam = searchParams.get('findingId');
   /** Deep link from Audits: audit code (e.g. AUD-00029) or audit row id; optional supplier UUID */
   const auditSeedParam = searchParams.get('auditId');
+  const shipmentSeedParam = searchParams.get('shipmentId');
   const supplierSeedParam = searchParams.get('supplierId');
   const [finding, setFinding] = useState<Finding | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
+  const [shipments, setShipments] = useState<ShipmentOption[]>([]);
   const [auditsHydrated, setAuditsHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     supplierId: '',
     auditId: '',
+    shipmentId: '',
     severity: 'Major' as string,
     summary: '',
     discrepancy: '',
@@ -257,6 +270,7 @@ export function FindingsRecord() {
     setForm({
       supplierId: '',
       auditId: '',
+      shipmentId: '',
       severity: 'Major',
       summary: '',
       discrepancy: '',
@@ -358,6 +372,13 @@ export function FindingsRecord() {
       .finally(() => setAuditsHydrated(true));
   }, [token]);
 
+  useEffect(() => {
+    if (!token) return;
+    apiJson<Array<{ id: string; code: string | null; supplierId: string; purchaseOrder: string | null }>>('/shipments', { token })
+      .then((list) => setShipments(list))
+      .catch(() => setShipments([]));
+  }, [token]);
+
   /** Pre-fill create form from /findings/create?auditId=AUD-…&supplierId=… (from Audits row) */
   useEffect(() => {
     if (prefillFromAuditDoneRef.current) return;
@@ -365,12 +386,14 @@ export function FindingsRecord() {
     if (finding || idParam || codeParam || searchMissNoCreate) return;
     const seedAudit = auditSeedParam?.trim() ?? '';
     const seedSupplier = supplierSeedParam?.trim() ?? '';
-    if (!seedAudit && !seedSupplier) return;
+    const seedShipment = shipmentSeedParam?.trim() ?? '';
+    if (!seedAudit && !seedShipment && !seedSupplier) return;
 
     if (seedAudit && !auditsHydrated) return;
 
     let nextAuditId = '';
     let nextSupplierId = '';
+    let nextShipmentId = '';
 
     if (seedAudit) {
       const byId = audits.find((x) => x.id === seedAudit);
@@ -390,17 +413,26 @@ export function FindingsRecord() {
         }
         return;
       }
+    } else if (seedShipment) {
+      const shipmentMatch = shipments.find((x) => x.id === seedShipment);
+      if (shipmentMatch) {
+        nextShipmentId = shipmentMatch.id;
+        nextSupplierId = shipmentMatch.supplierId;
+      } else if (seedSupplier) {
+        nextSupplierId = seedSupplier;
+      }
     } else if (seedSupplier) {
       nextSupplierId = seedSupplier;
     }
 
-    if (!nextAuditId && !nextSupplierId) return;
+    if (!nextAuditId && !nextShipmentId && !nextSupplierId) return;
 
     prefillFromAuditDoneRef.current = true;
     setForm((p) => ({
       ...p,
       supplierId: nextSupplierId || p.supplierId,
       auditId: nextAuditId || p.auditId,
+      shipmentId: nextShipmentId || p.shipmentId,
     }));
   }, [
     token,
@@ -409,8 +441,10 @@ export function FindingsRecord() {
     codeParam,
     searchMissNoCreate,
     auditSeedParam,
+    shipmentSeedParam,
     supplierSeedParam,
     audits,
+    shipments,
     auditsHydrated,
     toast,
   ]);
@@ -440,6 +474,7 @@ export function FindingsRecord() {
           severity: form.severity,
           summary: form.summary,
           discrepancy: form.discrepancy,
+          shipmentId: form.shipmentId.trim() || null,
           defectCode: form.defectCode.trim() || null,
           dispositionCode: form.dispositionCode.trim() || null,
           closingComments: form.closingComments.trim() || null,
@@ -533,6 +568,7 @@ export function FindingsRecord() {
         body: JSON.stringify({
           supplierId: form.supplierId,
           auditId: form.auditId || null,
+          shipmentId: form.shipmentId || null,
           severity: form.severity,
           summary: form.summary.trim(),
           discrepancy: form.discrepancy.trim(),
@@ -674,7 +710,7 @@ export function FindingsRecord() {
                   <select
                     className="input"
                     value={form.supplierId}
-                    onChange={(e) => setForm((p) => ({ ...p, supplierId: e.target.value, auditId: '' }))}
+                    onChange={(e) => setForm((p) => ({ ...p, supplierId: e.target.value, auditId: '', shipmentId: '' }))}
                     required
                     disabled={createLocked}
                   >
@@ -695,6 +731,22 @@ export function FindingsRecord() {
                     <option value="">None / N/A</option>
                     {audits.filter((a) => a.supplierId === form.supplierId).map((a) => (
                       <option key={a.id} value={a.id}>{a.code}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Shipment</label>
+                  <select
+                    className="input"
+                    value={form.shipmentId}
+                    onChange={(e) => setForm((p) => ({ ...p, shipmentId: e.target.value }))}
+                    disabled={createLocked}
+                  >
+                    <option value="">None / N/A</option>
+                    {shipments.filter((s) => s.supplierId === form.supplierId).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.code?.trim() || s.id}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -779,6 +831,16 @@ export function FindingsRecord() {
                   {finding.audit?.code ? (
                     <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
                       {finding.audit.code}
+                    </Link>
+                  ) : (
+                    <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
+                  )}
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Shipment #</label>
+                  {finding.shipment?.code || finding.shipment?.id ? (
+                    <Link to="/shipments" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
+                      {finding.shipment.code?.trim() || finding.shipment.id}
                     </Link>
                   ) : (
                     <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
