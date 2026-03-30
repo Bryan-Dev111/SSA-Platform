@@ -192,14 +192,17 @@ export function Risk() {
   }, [trendBySupplier]);
 
   const stats = useMemo(() => {
+    const now = new Date();
     const avgScore =
       effectiveRisks.length === 0
         ? 0
         : Math.round((effectiveRisks.reduce((sum, r) => sum + levelWeight(r.effectiveRiskLevel), 0) / effectiveRisks.length) * 100) / 100;
     const openRisks = effectiveRisks.filter((x) => x.status === 'Open').length;
     const mitigatedRisks = actions.filter((x) => x.status === 'Closed').length;
+    const openActions = actions.filter((x) => x.status === 'Open').length;
+    const overdueActions = actions.filter((x) => x.status === 'Open' && x.dueDate && new Date(x.dueDate) < now).length;
     const opportunities = items.filter((x) => x.type === 'opportunity').length;
-    return { avgScore, openRisks, mitigatedRisks, opportunities };
+    return { avgScore, openRisks, mitigatedRisks, openActions, overdueActions, opportunities };
   }, [effectiveRisks, actions, items]);
 
   const topRiskSuppliers = useMemo(() => {
@@ -397,6 +400,11 @@ export function Risk() {
               ? 'No completed mitigations'
               : `${stats.mitigatedRisks} mitigated`
           }
+        />
+        <MetricCard
+          title="Open actions"
+          value={String(stats.openActions)}
+          subtitle={`${stats.overdueActions} overdue action${stats.overdueActions === 1 ? '' : 's'}`}
         />
         <MetricCard title="Open opportunities" value={String(stats.opportunities)} />
       </div>
@@ -815,7 +823,7 @@ function TrendFooter({ pct }: { pct: number | null }) {
     return (
       <div className="risk-metric-trend risk-metric-trend--neutral">
         <TrendSpark kind="flat" />
-        <span>— vs previous snapshot</span>
+        <span>— vs previous month</span>
       </div>
     );
   }
@@ -824,7 +832,7 @@ function TrendFooter({ pct }: { pct: number | null }) {
     return (
       <div className="risk-metric-trend risk-metric-trend--neutral">
         <TrendSpark kind="flat" />
-        <span>0% vs previous snapshot</span>
+        <span>0% vs previous month</span>
       </div>
     );
   }
@@ -834,7 +842,7 @@ function TrendFooter({ pct }: { pct: number | null }) {
       <TrendSpark kind={worse ? 'up' : 'down'} />
       <span>
         {rounded > 0 ? '+' : ''}
-        {rounded}% vs previous snapshot
+        {rounded}% vs previous month
       </span>
     </div>
   );
