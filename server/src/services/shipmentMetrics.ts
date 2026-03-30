@@ -36,6 +36,11 @@ export function findMatchingSchedule(
   })[0];
 }
 
+export interface LateShipmentDetail {
+  purchaseOrder: string | null;
+  qty: number | null;
+}
+
 export interface ShipmentMetricsResult {
   totalInspectionRequests: number;
   waitingInspection: number;
@@ -43,6 +48,8 @@ export interface ShipmentMetricsResult {
   failed: number;
   overdueWaiting: number;
   lateVsSchedule: number;
+  /** Purchase orders / quantities for shipments counted in lateVsSchedule (for UI tooltip). */
+  lateDetails: LateShipmentDetail[];
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount: number;
@@ -58,6 +65,7 @@ export async function computeShipmentMetrics(
     failed: 0,
     overdueWaiting: 0,
     lateVsSchedule: 0,
+    lateDetails: [],
     otdPercent: null,
     fpyPercent: null,
     scheduleRowCount: 0,
@@ -88,6 +96,7 @@ export async function computeShipmentMetrics(
   let failed = 0;
   let overdueWaiting = 0;
   let lateVsSchedule = 0;
+  const lateDetails: LateShipmentDetail[] = [];
   let fpyPassed = 0;
   let fpyFailed = 0;
   let otdOnTime = 0;
@@ -125,9 +134,13 @@ export async function computeShipmentMetrics(
           else {
             otdLate++;
             lateVsSchedule++;
+            lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
           }
         } else if (sh.status === 'Failed' || sh.result === 'Failed') {
-          if (inspDay > schedDay) lateVsSchedule++;
+          if (inspDay > schedDay) {
+            lateVsSchedule++;
+            lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
+          }
         }
       }
     }
@@ -144,6 +157,7 @@ export async function computeShipmentMetrics(
     failed,
     overdueWaiting,
     lateVsSchedule,
+    lateDetails,
     otdPercent: otdDenom > 0 ? Math.round((otdOnTime / otdDenom) * 1000) / 10 : null,
     fpyPercent: fpyDenom > 0 ? Math.round((fpyPassed / fpyDenom) * 1000) / 10 : null,
     scheduleRowCount,

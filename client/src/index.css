@@ -228,6 +228,15 @@ body {
   overflow: hidden;
 }
 
+/* Shipments KPI: hover tooltip for late-vs-schedule alert must not be clipped */
+.card.shipments-metric-card--overflow-visible {
+  overflow: visible;
+}
+
+.card.shipments-metric-card--overflow-visible .card-body {
+  overflow: visible;
+}
+
 .card-body {
   padding: var(--space-6);
 }

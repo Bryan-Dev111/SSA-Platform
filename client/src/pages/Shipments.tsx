@@ -48,6 +48,8 @@ interface Metrics {
   failed: number;
   overdueWaiting: number;
   lateVsSchedule: number;
+  /** Populated server-side for each shipment counted in lateVsSchedule */
+  lateDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount?: number;
@@ -355,6 +357,14 @@ export function Shipments() {
             label="Open Shipment Requests"
             value={metrics.waitingInspection}
             subtitle={`${metrics.lateVsSchedule} Late`}
+            lateVsScheduleAlert={
+              metrics.lateVsSchedule > 0
+                ? {
+                    lateCount: metrics.lateVsSchedule,
+                    details: metrics.lateDetails ?? [],
+                  }
+                : undefined
+            }
           />
           <Metric label="On-Time Delivery" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
         </div>
@@ -760,11 +770,128 @@ export function Shipments() {
   );
 }
 
-function Metric({ label, value, subtitle }: { label: string; value: string | number; subtitle?: string }) {
+function LateVsScheduleAlertIcon({
+  lateCount,
+  details,
+}: {
+  lateCount: number;
+  details: Array<{ purchaseOrder: string | null; qty: number | null }>;
+}) {
+  const [hover, setHover] = useState(false);
+  const lines =
+    details.length > 0
+      ? details.map((d) => {
+          const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
+          const q = d.qty != null ? String(d.qty) : '—';
+          return `PO: ${po} · Qty: ${q}`;
+        })
+      : [`Late vs schedule: ${lateCount} (details unavailable)`];
+
+  const ariaSummary = lines.join('. ');
+
   return (
-    <div className="card">
-      <div className="card-body" style={{ padding: '0.75rem' }}>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{label}</div>
+    <div
+      style={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <button
+        type="button"
+        aria-label={ariaSummary}
+        title={lines.join('\n')}
+        onFocus={() => setHover(true)}
+        onBlur={() => setHover(false)}
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 8,
+          background: 'rgba(254, 226, 226, 0.96)',
+          border: '1px solid rgba(252, 165, 165, 0.95)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'default',
+          padding: 0,
+          margin: 0,
+          outline: 'none',
+          flexShrink: 0,
+        }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path
+            d="M12 4.2L3.3 19.5h17.4L12 4.2z"
+            stroke="#dc2626"
+            strokeWidth="1.55"
+            strokeLinejoin="round"
+          />
+          <path d="M12 9.5v4.2" stroke="#dc2626" strokeWidth="1.85" strokeLinecap="round" />
+          <circle cx="12" cy="17.3" r="0.85" fill="#dc2626" />
+        </svg>
+      </button>
+      {hover ? (
+        <>
+          <div style={{ height: 6, width: 38, flexShrink: 0 }} aria-hidden />
+          <div
+            style={{
+              minWidth: 200,
+              maxWidth: 280,
+              padding: '0.55rem 0.65rem',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 8,
+              boxShadow: 'var(--shadow-md)',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-text)',
+              lineHeight: 1.45,
+              textAlign: 'left',
+            }}
+            role="tooltip"
+          >
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Late vs schedule</div>
+            {lines.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  subtitle,
+  lateVsScheduleAlert,
+}: {
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  lateVsScheduleAlert?: { lateCount: number; details: Array<{ purchaseOrder: string | null; qty: number | null }> };
+}) {
+  const cardClass =
+    lateVsScheduleAlert != null ? 'card shipments-metric-card--overflow-visible' : 'card';
+
+  return (
+    <div className={cardClass}>
+      <div className="card-body" style={{ padding: '0.75rem', position: 'relative' }}>
+        {lateVsScheduleAlert != null ? (
+          <LateVsScheduleAlertIcon
+            lateCount={lateVsScheduleAlert.lateCount}
+            details={lateVsScheduleAlert.details}
+          />
+        ) : null}
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', paddingRight: lateVsScheduleAlert != null ? 44 : 0 }}>
+          {label}
+        </div>
         <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{value}</div>
         {subtitle ? (
           <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
