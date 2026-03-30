@@ -199,6 +199,19 @@ export function InternalManagement() {
     [projectHistories]
   );
 
+  const profitRowsActive = useMemo(
+    () => profitRows.filter((r) => r.status !== 'Inactive'),
+    [profitRows]
+  );
+  const profitRowsInactive = useMemo(
+    () => profitRows.filter((r) => r.status === 'Inactive'),
+    [profitRows]
+  );
+  const inactiveProjectsProfitTotal = useMemo(
+    () => profitRowsInactive.reduce((sum, r) => sum + r.profit, 0),
+    [profitRowsInactive]
+  );
+
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
   const loadProjectHistories = () => {
@@ -1467,41 +1480,109 @@ export function InternalManagement() {
       )}
 
       {tab === 'profit' && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Profit by project</h2>
-            <div className="table-wrap" style={{ overflowX: 'auto' }}>
-              {profitRows.length === 0 ? (
-                <p className="table-empty">No projects yet.</p>
-              ) : (
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Company</th>
-                      <th>Revenue</th>
-                      <th>Costs</th>
-                      <th>Profit</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {profitRows.map((r) => (
-                      <tr key={r.projectId}>
-                        <td>{r.projectCode}</td>
-                        <td>{r.companyName}</td>
-                        <td>{r.revenue ?? r.revenueAmount.toFixed(2)}</td>
-                        <td>{r.costs.toFixed(2)}</td>
-                        <td>{r.profit.toFixed(2)}</td>
-                        <td>{r.status}</td>
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Profit by project (Active)</h2>
+              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Active projects only so totals are not mixed with completed or inactive work.
+              </p>
+              <div className="table-wrap" style={{ overflowX: 'auto' }}>
+                {profitRows.length === 0 ? (
+                  <p className="table-empty">No projects yet.</p>
+                ) : profitRowsActive.length === 0 ? (
+                  <p className="table-empty">No active projects. See inactive projects below.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Project</th>
+                        <th>Company</th>
+                        <th>Revenue</th>
+                        <th>Costs</th>
+                        <th>Profit</th>
+                        <th>Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                    </thead>
+                    <tbody>
+                      {profitRowsActive.map((r) => (
+                        <tr key={r.projectId}>
+                          <td>{r.projectCode}</td>
+                          <td>{r.companyName}</td>
+                          <td>{r.revenue ?? r.revenueAmount.toFixed(2)}</td>
+                          <td>{r.costs.toFixed(2)}</td>
+                          <td>{r.profit.toFixed(2)}</td>
+                          <td>{r.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Inactive projects</h2>
+              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Profit and costs for projects set to Inactive are listed separately.
+              </p>
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  minWidth: 0,
+                  marginBottom: '1rem',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <MetricCard
+                  title="Total profit (inactive projects)"
+                  value={inactiveProjectsProfitTotal.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                  subtitle={
+                    profitRowsInactive.length === 0
+                      ? 'No inactive projects'
+                      : `${profitRowsInactive.length} inactive project${profitRowsInactive.length === 1 ? '' : 's'}`
+                  }
+                />
+              </div>
+              <div className="table-wrap" style={{ overflowX: 'auto' }}>
+                {profitRowsInactive.length === 0 ? (
+                  <p className="table-empty">No inactive projects.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Project</th>
+                        <th>Company</th>
+                        <th>Revenue</th>
+                        <th>Costs</th>
+                        <th>Profit</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profitRowsInactive.map((r) => (
+                        <tr key={r.projectId}>
+                          <td>{r.projectCode}</td>
+                          <td>{r.companyName}</td>
+                          <td>{r.revenue ?? r.revenueAmount.toFixed(2)}</td>
+                          <td>{r.costs.toFixed(2)}</td>
+                          <td>{r.profit.toFixed(2)}</td>
+                          <td>{r.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {tab === 'commandMedia' && (
