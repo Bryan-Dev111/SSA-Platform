@@ -452,6 +452,7 @@ export function Shipments() {
                     </th>
                     <th>Created</th>
                     <th>Approve/Reject Button</th>
+                    <th>Create Finding</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -558,17 +559,6 @@ export function Shipments() {
                               + Add record
                             </Link>
                           )}
-                        {canCreateFinding && (
-                          <Link
-                            to={`/findings/create?supplierId=${encodeURIComponent(r.supplierId)}&shipmentId=${encodeURIComponent(r.id)}`}
-                            className="btn btn-ghost"
-                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            + New Finding
-                          </Link>
-                        )}
                         </div>
                       </td>
                       <td>{r.createdAt?.slice(0, 10) ?? '—'}</td>
@@ -599,6 +589,21 @@ export function Shipments() {
                               Reject
                             </button>
                           </span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {canCreateFinding ? (
+                          <Link
+                            to={`/findings/create?supplierId=${encodeURIComponent(r.supplierId)}&shipmentId=${encodeURIComponent(r.id)}`}
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            + New Finding
+                          </Link>
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
                         )}
