@@ -237,6 +237,19 @@ body {
   overflow: visible;
 }
 
+button.shipments-late-alert-btn:focus {
+  outline: none;
+}
+
+button.shipments-late-alert-btn:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* Shipments KPI row: allow alert tooltips to paint above sibling cards */
+.shipments-metrics-kpi-grid {
+  overflow: visible;
+}
+
 .card-body {
   padding: var(--space-6);
 }

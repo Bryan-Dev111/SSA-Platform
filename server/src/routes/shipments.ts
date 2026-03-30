@@ -45,6 +45,7 @@ router.get(
           overdueWaiting: 0,
           lateVsSchedule: 0,
           lateDetails: [],
+          overdueDetails: [],
           otdPercent: null,
           fpyPercent: null,
           scheduleRowCount: 0,

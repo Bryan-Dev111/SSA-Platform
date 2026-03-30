@@ -50,9 +50,41 @@ interface Metrics {
   lateVsSchedule: number;
   /** Populated server-side for each shipment counted in lateVsSchedule */
   lateDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
+  /** Waiting inspection past requested date (same as overdueWaiting count). */
+  overdueDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount?: number;
+}
+
+type PurchaseQtyDetail = { purchaseOrder: string | null; qty: number | null };
+
+function openShipmentRequestsSubtitle(m: Metrics): string {
+  const late = m.lateVsSchedule ?? 0;
+  const ovd = m.overdueWaiting ?? 0;
+  if (ovd > 0) {
+    return `${late} late vs schedule · ${ovd} overdue`;
+  }
+  return `${late} late vs schedule`;
+}
+
+function openShipmentRequestsAlertProps(m: Metrics):
+  | {
+      lateVsSchedule: number;
+      overdueWaiting: number;
+      lateDetails: PurchaseQtyDetail[];
+      overdueDetails: PurchaseQtyDetail[];
+    }
+  | undefined {
+  const late = m.lateVsSchedule ?? 0;
+  const ovd = m.overdueWaiting ?? 0;
+  if (late <= 0 && ovd <= 0) return undefined;
+  return {
+    lateVsSchedule: late,
+    overdueWaiting: ovd,
+    lateDetails: m.lateDetails ?? [],
+    overdueDetails: m.overdueDetails ?? [],
+  };
 }
 
 export function Shipments() {
@@ -341,11 +373,13 @@ export function Shipments() {
 
       {metrics && (
         <div
+          className="shipments-metrics-kpi-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
             gap: '0.75rem',
             marginBottom: '1.5rem',
+            overflow: 'visible',
           }}
         >
           <Metric
@@ -356,15 +390,8 @@ export function Shipments() {
           <Metric
             label="Open Shipment Requests"
             value={metrics.waitingInspection}
-            subtitle={`${metrics.lateVsSchedule} Late`}
-            lateVsScheduleAlert={
-              metrics.lateVsSchedule > 0
-                ? {
-                    lateCount: metrics.lateVsSchedule,
-                    details: metrics.lateDetails ?? [],
-                  }
-                : undefined
-            }
+            subtitle={openShipmentRequestsSubtitle(metrics)}
+            openShipmentRequestsAlert={openShipmentRequestsAlertProps(metrics)}
           />
           <Metric label="On-Time Delivery" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
         </div>
@@ -770,32 +797,54 @@ export function Shipments() {
   );
 }
 
-function LateVsScheduleAlertIcon({
-  lateCount,
-  details,
+function formatPoQtyLine(d: PurchaseQtyDetail): string {
+  const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
+  const q = d.qty != null ? String(d.qty) : '—';
+  return `PO: ${po} · Qty: ${q}`;
+}
+
+function OpenShipmentRequestsAlertIcon({
+  lateVsSchedule,
+  overdueWaiting,
+  lateDetails,
+  overdueDetails,
 }: {
-  lateCount: number;
-  details: Array<{ purchaseOrder: string | null; qty: number | null }>;
+  lateVsSchedule: number;
+  overdueWaiting: number;
+  lateDetails: PurchaseQtyDetail[];
+  overdueDetails: PurchaseQtyDetail[];
 }) {
   const [hover, setHover] = useState(false);
-  const lines =
-    details.length > 0
-      ? details.map((d) => {
-          const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
-          const q = d.qty != null ? String(d.qty) : '—';
-          return `PO: ${po} · Qty: ${q}`;
-        })
-      : [`Late vs schedule: ${lateCount} (details unavailable)`];
 
-  const ariaSummary = lines.join('. ');
+  const tooltipBlocks: { heading: string; lines: string[] }[] = [];
+  if (overdueWaiting > 0) {
+    const lines =
+      overdueDetails.length > 0
+        ? overdueDetails.map(formatPoQtyLine)
+        : [`${overdueWaiting} overdue (details unavailable)`];
+    tooltipBlocks.push({ heading: 'Overdue (waiting, past inspection date)', lines });
+  }
+  if (lateVsSchedule > 0) {
+    const lines =
+      lateDetails.length > 0
+        ? lateDetails.map(formatPoQtyLine)
+        : [`${lateVsSchedule} late vs schedule (details unavailable)`];
+    tooltipBlocks.push({ heading: 'Late vs schedule (completed inspection)', lines });
+  }
+
+  const flatLines = tooltipBlocks.flatMap((b) => [b.heading, ...b.lines]);
+  const ariaSummary = flatLines.join('. ');
+  const titleAttr = tooltipBlocks
+    .map((b) => `${b.heading}\n${b.lines.join('\n')}`)
+    .join('\n\n');
 
   return (
     <div
       style={{
         position: 'absolute',
-        top: 10,
-        right: 10,
-        zIndex: 3,
+        top: 6,
+        right: 6,
+        zIndex: 25,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
@@ -805,15 +854,16 @@ function LateVsScheduleAlertIcon({
     >
       <button
         type="button"
+        className="shipments-late-alert-btn"
         aria-label={ariaSummary}
-        title={lines.join('\n')}
+        title={titleAttr}
         onFocus={() => setHover(true)}
         onBlur={() => setHover(false)}
         style={{
-          width: 38,
-          height: 38,
-          borderRadius: 8,
-          background: 'rgba(254, 226, 226, 0.96)',
+          width: 30,
+          height: 30,
+          borderRadius: 6,
+          background: 'rgba(254, 226, 226, 0.98)',
           border: '1px solid rgba(252, 165, 165, 0.95)',
           display: 'flex',
           alignItems: 'center',
@@ -821,28 +871,28 @@ function LateVsScheduleAlertIcon({
           cursor: 'default',
           padding: 0,
           margin: 0,
-          outline: 'none',
           flexShrink: 0,
+          boxSizing: 'border-box',
         }}
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path
             d="M12 4.2L3.3 19.5h17.4L12 4.2z"
             stroke="#dc2626"
-            strokeWidth="1.55"
+            strokeWidth="1.65"
             strokeLinejoin="round"
           />
-          <path d="M12 9.5v4.2" stroke="#dc2626" strokeWidth="1.85" strokeLinecap="round" />
+          <path d="M12 9.5v4.2" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" />
           <circle cx="12" cy="17.3" r="0.85" fill="#dc2626" />
         </svg>
       </button>
       {hover ? (
         <>
-          <div style={{ height: 6, width: 38, flexShrink: 0 }} aria-hidden />
+          <div style={{ height: 5, width: 30, flexShrink: 0 }} aria-hidden />
           <div
             style={{
-              minWidth: 200,
-              maxWidth: 280,
+              minWidth: 220,
+              maxWidth: 300,
               padding: '0.55rem 0.65rem',
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
@@ -855,9 +905,13 @@ function LateVsScheduleAlertIcon({
             }}
             role="tooltip"
           >
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Late vs schedule</div>
-            {lines.map((line, i) => (
-              <div key={i}>{line}</div>
+            {tooltipBlocks.map((block, bi) => (
+              <div key={block.heading} style={{ marginTop: bi > 0 ? 10 : 0 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{block.heading}</div>
+                {block.lines.map((line, i) => (
+                  <div key={`${bi}-${i}`}>{line}</div>
+                ))}
+              </div>
             ))}
           </div>
         </>
@@ -870,26 +924,47 @@ function Metric({
   label,
   value,
   subtitle,
-  lateVsScheduleAlert,
+  openShipmentRequestsAlert,
 }: {
   label: string;
   value: string | number;
   subtitle?: string;
-  lateVsScheduleAlert?: { lateCount: number; details: Array<{ purchaseOrder: string | null; qty: number | null }> };
+  openShipmentRequestsAlert?: {
+    lateVsSchedule: number;
+    overdueWaiting: number;
+    lateDetails: PurchaseQtyDetail[];
+    overdueDetails: PurchaseQtyDetail[];
+  };
 }) {
   const cardClass =
-    lateVsScheduleAlert != null ? 'card shipments-metric-card--overflow-visible' : 'card';
+    openShipmentRequestsAlert != null ? 'card shipments-metric-card--overflow-visible' : 'card';
+  const reserveIcon = openShipmentRequestsAlert != null;
 
   return (
-    <div className={cardClass}>
-      <div className="card-body" style={{ padding: '0.75rem', position: 'relative' }}>
-        {lateVsScheduleAlert != null ? (
-          <LateVsScheduleAlertIcon
-            lateCount={lateVsScheduleAlert.lateCount}
-            details={lateVsScheduleAlert.details}
+    <div className={cardClass} style={reserveIcon ? { position: 'relative', zIndex: 1 } : undefined}>
+      <div
+        className="card-body"
+        style={{
+          padding: '0.75rem',
+          position: 'relative',
+          minHeight: reserveIcon ? 88 : undefined,
+        }}
+      >
+        {openShipmentRequestsAlert != null ? (
+          <OpenShipmentRequestsAlertIcon
+            lateVsSchedule={openShipmentRequestsAlert.lateVsSchedule}
+            overdueWaiting={openShipmentRequestsAlert.overdueWaiting}
+            lateDetails={openShipmentRequestsAlert.lateDetails}
+            overdueDetails={openShipmentRequestsAlert.overdueDetails}
           />
         ) : null}
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', paddingRight: lateVsScheduleAlert != null ? 44 : 0 }}>
+        <div
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-text-muted)',
+            paddingRight: reserveIcon ? 36 : 0,
+          }}
+        >
           {label}
         </div>
         <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{value}</div>

@@ -50,6 +50,8 @@ export interface ShipmentMetricsResult {
   lateVsSchedule: number;
   /** Purchase orders / quantities for shipments counted in lateVsSchedule (for UI tooltip). */
   lateDetails: LateShipmentDetail[];
+  /** Waiting-inspection rows past requested inspection date (for UI tooltip). */
+  overdueDetails: LateShipmentDetail[];
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount: number;
@@ -66,6 +68,7 @@ export async function computeShipmentMetrics(
     overdueWaiting: 0,
     lateVsSchedule: 0,
     lateDetails: [],
+    overdueDetails: [],
     otdPercent: null,
     fpyPercent: null,
     scheduleRowCount: 0,
@@ -97,6 +100,7 @@ export async function computeShipmentMetrics(
   let overdueWaiting = 0;
   let lateVsSchedule = 0;
   const lateDetails: LateShipmentDetail[] = [];
+  const overdueDetails: LateShipmentDetail[] = [];
   let fpyPassed = 0;
   let fpyFailed = 0;
   let otdOnTime = 0;
@@ -113,7 +117,10 @@ export async function computeShipmentMetrics(
     if (sh.status === 'WaitingInspection') {
       waitingInspection++;
       const insp = dateOnlyMs(sh.inspectionDate);
-      if (insp !== null && insp < startOfTodayUtc) overdueWaiting++;
+      if (insp !== null && insp < startOfTodayUtc) {
+        overdueWaiting++;
+        overdueDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
+      }
       continue;
     }
     if (sh.status === 'Passed' || sh.result === 'Passed') {
@@ -158,6 +165,7 @@ export async function computeShipmentMetrics(
     overdueWaiting,
     lateVsSchedule,
     lateDetails,
+    overdueDetails,
     otdPercent: otdDenom > 0 ? Math.round((otdOnTime / otdDenom) * 1000) / 10 : null,
     fpyPercent: fpyDenom > 0 ? Math.round((fpyPassed / fpyDenom) * 1000) / 10 : null,
     scheduleRowCount,
