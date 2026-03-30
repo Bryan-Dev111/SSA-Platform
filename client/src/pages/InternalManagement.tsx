@@ -1,7 +1,7 @@
 /**
  * Internal Management — Admin only: Audits, Shipments (schedule), Contracts (internal docs).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
@@ -9,6 +9,7 @@ import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { Navigate } from 'react-router-dom';
 import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { MetricCard } from '../components/MetricCard';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia' | 'projectHistory' | 'profit';
@@ -184,6 +185,19 @@ export function InternalManagement() {
   const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
+
+  const projectHistoryRevenueTotal = useMemo(() => {
+    return projectHistories.reduce((sum, r) => {
+      const n = r.revenueAmount;
+      return sum + (typeof n === 'number' && Number.isFinite(n) ? n : 0);
+    }, 0);
+  }, [projectHistories]);
+
+  const projectHistoryRevenueNumericCount = useMemo(
+    () =>
+      projectHistories.filter((r) => typeof r.revenueAmount === 'number' && Number.isFinite(r.revenueAmount)).length,
+    [projectHistories]
+  );
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
@@ -739,7 +753,6 @@ export function InternalManagement() {
                     className="input"
                     value={newAudit.auditor}
                     onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
-                    placeholder="Assigned auditor name/email"
                   />
                 </div>
               </div>
@@ -1201,7 +1214,6 @@ export function InternalManagement() {
                     <thead>
                       <tr>
                         <th>Name</th>
-                        <th>Type</th>
                         <th>Note</th>
                         <th>View</th>
                         <th>Updated</th>
@@ -1212,7 +1224,6 @@ export function InternalManagement() {
                       {rows.map((r) => (
                         <tr key={r.id}>
                           <td>{r.name}</td>
-                          <td>{r.category ?? '—'}</td>
                           <td>{r.note ?? '—'}</td>
                           <td>
                             {r.filePath ? (
@@ -1336,24 +1347,6 @@ export function InternalManagement() {
                       <option value="Inactive">Inactive</option>
                     </select>
                   </div>
-                </div>
-                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                  <label className="input-label">Project description</label>
-                  <textarea
-                    className="input"
-                    rows={3}
-                    value={clientForm.projectDescription}
-                    onChange={(e) => setClientForm((p) => ({ ...p, projectDescription: e.target.value }))}
-                  />
-                </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: '0.75rem',
-                    marginBottom: '0.75rem',
-                  }}
-                >
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Period of performance</label>
                     <input
@@ -1371,6 +1364,15 @@ export function InternalManagement() {
                     />
                   </div>
                 </div>
+                <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="input-label">Project description</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={clientForm.projectDescription}
+                    onChange={(e) => setClientForm((p) => ({ ...p, projectDescription: e.target.value }))}
+                  />
+                </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button type="submit" className="btn btn-primary" disabled={projectSubmitting}>
                     {projectSubmitting ? 'Saving…' : projectEditingId ? 'Update' : 'Add'}
@@ -1383,6 +1385,23 @@ export function InternalManagement() {
                 </div>
               </form>
             </div>
+          </div>
+
+          <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, marginBottom: '1rem', boxSizing: 'border-box' }}>
+            <MetricCard
+              title="Total revenue"
+              value={projectHistoryRevenueTotal.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+              subtitle={
+                projectHistories.length === 0
+                  ? 'No projects yet'
+                  : `${projectHistoryRevenueNumericCount} of ${projectHistories.length} project${
+                      projectHistories.length === 1 ? '' : 's'
+                    } with numeric revenue`
+              }
+            />
           </div>
 
           <div className="card">
@@ -1500,6 +1519,20 @@ export function InternalManagement() {
                   }}
                 >
                   <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Type *</label>
+                    <select
+                      className="input"
+                      value={commandMedia.documentType}
+                      onChange={(e) => setCommandMedia((p) => ({ ...p, documentType: e.target.value }))}
+                    >
+                      {COMMAND_MEDIA_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Document Number *</label>
                     <input
                       className="input"
@@ -1516,20 +1549,6 @@ export function InternalManagement() {
                       onChange={(e) => setCommandMedia((p) => ({ ...p, name: e.target.value }))}
                       required
                     />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Type *</label>
-                    <select
-                      className="input"
-                      value={commandMedia.documentType}
-                      onChange={(e) => setCommandMedia((p) => ({ ...p, documentType: e.target.value }))}
-                    >
-                      {COMMAND_MEDIA_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Revision</label>
