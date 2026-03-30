@@ -92,23 +92,79 @@ export function CorrectiveActions() {
     count: list.filter((c) => c.status === status).length,
     color: statusColorMap[status],
   }));
-  const totalStatusCount = statusCounts.reduce((sum, s) => sum + s.count, 0);
-  const pieSegments = statusCounts.reduce<{ color: string; start: number; end: number; count: number; status: string }[]>(
-    (acc, item) => {
-      const start = acc.length > 0 ? acc[acc.length - 1].end : 0;
-      const pct = totalStatusCount > 0 ? (item.count / totalStatusCount) * 100 : 0;
-      const end = start + pct;
-      acc.push({ color: item.color, start, end, count: item.count, status: item.status });
-      return acc;
-    },
-    []
-  );
-  const pieBackground =
-    totalStatusCount === 0
-      ? 'conic-gradient(#e5e7eb 0deg, #e5e7eb 360deg)'
-      : `conic-gradient(${pieSegments
-          .map((s) => `${s.color} ${s.start}% ${s.end}%`)
-          .join(', ')})`;
+  const statusDonut = useMemo(() => {
+    const total = statusCounts.reduce((sum, s) => sum + s.count, 0);
+    const nonZero = statusCounts.filter((s) => s.count > 0);
+    const size = 140;
+    const cx = 70;
+    const cy = 70;
+    const radius = 46;
+    const strokeWidth = 30;
+    const separatorWidth = nonZero.length > 1 ? 2 : 0;
+    const innerRadius = radius - strokeWidth / 2;
+    const outerRadius = radius + strokeWidth / 2;
+
+    if (total === 0) {
+      return {
+        size,
+        strokeWidth,
+        cx,
+        cy,
+        radius,
+        separatorWidth,
+        segments: [] as Array<{ d: string; color: string }>,
+        separators: [] as Array<{ x1: number; y1: number; x2: number; y2: number }>,
+      };
+    }
+
+    if (nonZero.length === 1) {
+      return {
+        size,
+        strokeWidth,
+        cx,
+        cy,
+        radius,
+        separatorWidth,
+        segments: [{ d: '', color: nonZero[0].color }],
+        separators: [],
+      };
+    }
+
+    const toPoint = (angleDeg: number, r = radius) => {
+      const rad = ((angleDeg - 90) * Math.PI) / 180;
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    };
+
+    let cursor = 0;
+    const segments = nonZero
+      .map((slice) => {
+        const arcDeg = (slice.count / total) * 360;
+        const start = cursor;
+        const end = cursor + arcDeg;
+        cursor += arcDeg;
+        const p0 = toPoint(start);
+        const p1 = toPoint(end);
+        const largeArcFlag = arcDeg > 180 ? 1 : 0;
+        return { d: `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${p1.x} ${p1.y}`, color: slice.color };
+      })
+      .filter((s) => s.d);
+
+    const separatorAngles = nonZero
+      .slice(0, -1)
+      .reduce<number[]>((angles, slice, idx) => {
+        const prev = idx === 0 ? 0 : angles[idx - 1];
+        angles.push(prev + (slice.count / total) * 360);
+        return angles;
+      }, []);
+    separatorAngles.unshift(0);
+    const separators = separatorAngles.map((angle) => {
+      const inner = toPoint(angle, innerRadius);
+      const outer = toPoint(angle, outerRadius);
+      return { x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y };
+    });
+
+    return { size, strokeWidth, cx, cy, radius, separatorWidth, segments, separators };
+  }, [statusCounts]);
 
   const ageBucketDefs = [
     { label: '0-30 days', min: 0, max: 30 },
@@ -386,17 +442,56 @@ export function CorrectiveActions() {
               <div className="card-body">
                 <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by status</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div
-                    aria-label="CAR status distribution pie chart"
-                    style={{
-                      width: 140,
-                      height: 140,
-                      borderRadius: '50%',
-                      background: pieBackground,
-                      border: '1px solid var(--color-border)',
-                      flex: '0 0 auto',
-                    }}
-                  />
+                  <svg
+                    aria-label="CAR status distribution donut chart"
+                    width={statusDonut.size}
+                    height={statusDonut.size}
+                    viewBox={`0 0 ${statusDonut.size} ${statusDonut.size}`}
+                    style={{ flex: '0 0 auto', display: 'block' }}
+                  >
+                    {statusDonut.segments.length === 0 ? (
+                      <circle
+                        cx={statusDonut.cx}
+                        cy={statusDonut.cy}
+                        r={statusDonut.radius}
+                        fill="none"
+                        stroke="#e5e7eb"
+                        strokeWidth={statusDonut.strokeWidth}
+                      />
+                    ) : statusDonut.segments.length === 1 ? (
+                      <circle
+                        cx={statusDonut.cx}
+                        cy={statusDonut.cy}
+                        r={statusDonut.radius}
+                        fill="none"
+                        stroke={statusDonut.segments[0].color}
+                        strokeWidth={statusDonut.strokeWidth}
+                      />
+                    ) : (
+                      statusDonut.segments.map((segment) => (
+                        <path
+                          key={`${segment.color}-${segment.d}`}
+                          d={segment.d}
+                          fill="none"
+                          stroke={segment.color}
+                          strokeWidth={statusDonut.strokeWidth}
+                          strokeLinecap="butt"
+                        />
+                      ))
+                    )}
+                    {statusDonut.separators.map((separator, idx) => (
+                      <line
+                        key={`sep-${idx}`}
+                        x1={separator.x1}
+                        y1={separator.y1}
+                        x2={separator.x2}
+                        y2={separator.y2}
+                        stroke="var(--color-surface)"
+                        strokeWidth={statusDonut.separatorWidth}
+                        strokeLinecap="butt"
+                      />
+                    ))}
+                  </svg>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 160 }}>
                     {statusCounts.map((s) => (
                       <div key={s.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>

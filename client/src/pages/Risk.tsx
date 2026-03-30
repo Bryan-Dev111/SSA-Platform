@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { RiskDistributionCard } from '../components/RiskDistributionCard';
@@ -604,7 +604,7 @@ export function Risk() {
                 </thead>
                 <tbody>
                   {items.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} style={getRiskLevelRowStyle(row.riskLevel)}>
                       <td>{row.code}</td>
                       <td>{row.supplier.code} - {row.supplier.name}</td>
                       <td>{row.type}</td>
@@ -724,7 +724,7 @@ export function Risk() {
                 </thead>
                 <tbody>
                   {actions.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} style={getRiskLevelRowStyle(row.residualRiskLevel ?? row.risk.riskLevel)}>
                       <td>{row.supplier.code} - {row.supplier.name}</td>
                       <td>{row.risk.code}</td>
                       <td>{row.risk.description}</td>
@@ -875,4 +875,11 @@ function TrendFooter({ pct }: { pct: number | null }) {
       </span>
     </div>
   );
+}
+
+function getRiskLevelRowStyle(level: 'Low' | 'Medium' | 'High' | null | undefined): CSSProperties | undefined {
+  if (level === 'High') return { backgroundColor: 'rgba(239, 68, 68, 0.12)' };
+  if (level === 'Medium') return { backgroundColor: 'rgba(234, 179, 8, 0.16)' };
+  if (level === 'Low') return { backgroundColor: 'rgba(34, 197, 94, 0.12)' };
+  return undefined;
 }
