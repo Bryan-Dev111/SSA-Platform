@@ -29,6 +29,8 @@ router.get(
           mediumRiskSuppliers: 0,
           openCars: 0,
           overdueCars: 0,
+          openRisks: 0,
+          overdueRisks: 0,
           openFindingsMajorCritical: 0,
           shipmentRequests: 0,
           shipmentsRejected: 0,
@@ -53,11 +55,35 @@ router.get(
     const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [openCars, openFindingsMajorCritical, shipmentRequests, shipmentsRejected, rejectedDocuments, upcomingAudits, upcomingShipments] =
+    const [
+      openCars,
+      openRisks,
+      overdueRiskActions,
+      openFindingsMajorCritical,
+      shipmentRequests,
+      shipmentsRejected,
+      rejectedDocuments,
+      upcomingAudits,
+      upcomingShipments,
+    ] =
       await Promise.all([
         prisma.correctiveAction.findMany({
           where: { ...whereInScope, status: { not: 'Closed' } },
           select: { targetCompletionDate: true },
+        }),
+        prisma.opportunity.count({
+          where: { ...whereInScope, type: 'risk', status: 'Open' },
+        }),
+        prisma.riskAction.findMany({
+          where: {
+            ...whereInScope,
+            dueDate: { lt: now },
+            status: { in: ['Open', 'InProgress'] },
+          },
+          select: {
+            riskId: true,
+            risk: { select: { type: true, status: true } },
+          },
         }),
         prisma.finding.count({
           where: {
@@ -91,6 +117,11 @@ router.get(
       ]);
 
     const overdueCars = openCars.filter((c) => c.targetCompletionDate && new Date(c.targetCompletionDate) < now).length;
+    const overdueRisks = new Set(
+      overdueRiskActions
+        .filter((a) => a.risk.type === 'risk' && a.risk.status === 'Open')
+        .map((a) => a.riskId)
+    ).size;
 
     const risks: Array<{
       supplierId: string;
@@ -247,6 +278,8 @@ router.get(
         mediumRiskSuppliers,
         openCars: openCars.length,
         overdueCars,
+        openRisks,
+        overdueRisks,
         openFindingsMajorCritical,
         shipmentRequests,
         shipmentsRejected,

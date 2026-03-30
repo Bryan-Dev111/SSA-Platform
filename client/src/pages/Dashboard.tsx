@@ -17,6 +17,8 @@ interface DashboardResponse {
     mediumRiskSuppliers?: number;
     openCars: number;
     overdueCars: number;
+    openRisks: number;
+    overdueRisks: number;
     openFindingsMajorCritical: number;
     shipmentRequests: number;
     shipmentsRejected: number;
@@ -154,6 +156,8 @@ export function Dashboard() {
     mediumRiskSuppliers: 0,
     openCars: 0,
     overdueCars: 0,
+    openRisks: 0,
+    overdueRisks: 0,
     openFindingsMajorCritical: 0,
     shipmentRequests: 0,
     shipmentsRejected: 0,
@@ -195,7 +199,7 @@ export function Dashboard() {
         </label>
       </div>
 
-      <div className="dashboard-metric-grid-four">
+      <div className="dashboard-metric-grid">
         <MetricCard
           title="Total suppliers"
           value={metrics.totalSuppliers}
@@ -205,6 +209,11 @@ export function Dashboard() {
           title="Open CARs"
           value={metrics.openCars}
           subtitle={`${metrics.overdueCars} overdue CAR${metrics.overdueCars === 1 ? '' : 's'}`}
+        />
+        <MetricCard
+          title="Open risks"
+          value={metrics.openRisks}
+          subtitle={`${metrics.overdueRisks} overdue risk${metrics.overdueRisks === 1 ? '' : 's'}`}
         />
         <MetricCard
           title="Open findings"
