@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   AdminAuditTypesPanel,
   AdminBuyersSuppliersPanel,
+  AdminExpensesPanel,
   // (Employee assignments lives in separate file)
   AdminPermissionsPanel,
   AdminRiskWeightsPanel,
@@ -24,6 +25,7 @@ type Tab =
   | 'disposition'
   | 'auditTypes'
   | 'riskWeights'
+  | 'expenses'
   | 'users'
   | 'employees'
   | 'buyersSuppliers'
@@ -315,6 +317,7 @@ export function Admin() {
             ['disposition', 'Disposition codes'],
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
+            ['expenses', 'Expenses'],
             ['alertPreferences', 'Email alerts'],
             ['permissions', 'Permissions'],
           ] as const
@@ -332,6 +335,7 @@ export function Admin() {
 
       {tab === 'auditTypes' && <AdminAuditTypesPanel token={token} toast={toast} />}
       {tab === 'riskWeights' && <AdminRiskWeightsPanel token={token} toast={toast} />}
+      {tab === 'expenses' && <AdminExpensesPanel token={token} toast={toast} />}
       {tab === 'users' && (
         <AdminBuyersSuppliersPanel
           token={token}

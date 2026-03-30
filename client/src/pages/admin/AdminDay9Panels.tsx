@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MetricCard } from '../../components/MetricCard';
+import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -189,6 +190,282 @@ interface RiskWeights {
   documentationPercent: number;
 }
 
+interface ExpenseRow {
+  id: string;
+  type: string;
+  description: string;
+  project: string;
+  amount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function AdminExpensesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const [list, setList] = useState<ExpenseRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [type, setType] = useState('');
+  const [description, setDescription] = useState('');
+  const [project, setProject] = useState('');
+  const [amount, setAmount] = useState('');
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ type: string; description: string; project: string; amount: string }>({
+    type: '',
+    description: '',
+    project: '',
+    amount: '',
+  });
+  const totalExpenses = useMemo(() => list.reduce((sum, item) => sum + item.amount, 0), [list]);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const r = await apiJson<{ list: ExpenseRow[] }>('/expenses', { token });
+      setList(r.list);
+    } catch {
+      setList([]);
+      toast.error('Failed to load expenses');
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const add = async () => {
+    if (!token) return;
+    const amountNum = Number(amount);
+    if (!type.trim() || !description.trim() || !project.trim() || !Number.isFinite(amountNum)) {
+      toast.error('Type, description, project, and amount are required');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiJson('/expenses', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          type: type.trim(),
+          description: description.trim(),
+          project: project.trim(),
+          amount: amountNum,
+        }),
+      });
+      setType('');
+      setDescription('');
+      setProject('');
+      setAmount('');
+      toast.success('Expense added');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to add expense');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEdit = (row: ExpenseRow) => {
+    setEditId(row.id);
+    setEditDraft({
+      type: row.type,
+      description: row.description,
+      project: row.project,
+      amount: String(row.amount),
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!token || !editId) return;
+    const amountNum = Number(editDraft.amount);
+    if (
+      !editDraft.type.trim() ||
+      !editDraft.description.trim() ||
+      !editDraft.project.trim() ||
+      !Number.isFinite(amountNum)
+    ) {
+      toast.error('Type, description, project, and amount are required');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiJson(`/expenses/${editId}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          type: editDraft.type.trim(),
+          description: editDraft.description.trim(),
+          project: editDraft.project.trim(),
+          amount: amountNum,
+        }),
+      });
+      setEditId(null);
+      toast.success('Expense updated');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to update expense');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportExcel = () => {
+    if (list.length === 0) {
+      toast.info('No expenses to export');
+      return;
+    }
+    const rows: ExportRow[] = list.map((r) => ({
+      Type: r.type,
+      Description: r.description,
+      Project: r.project,
+      Amount: r.amount,
+      Created: new Date(r.createdAt).toLocaleString(),
+    }));
+    downloadTableXlsx('expenses', 'Expenses', rows);
+    toast.success('Exported expenses');
+  };
+
+  return (
+    <div className="card">
+      <div className="card-body">
+        <h2 style={{ marginTop: 0 }}>Expenses</h2>
+        <div
+          className="dashboard-metric-grid"
+          style={{
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            marginBottom: '0.75rem',
+          }}
+        >
+          <MetricCard title="Total Expenses" value={totalExpenses.toFixed(2)} />
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '0.6rem',
+            marginBottom: '1rem',
+          }}
+        >
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Type</label>
+            <input className="input" value={type} onChange={(e) => setType(e.target.value)} />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Description</label>
+            <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Project</label>
+            <input className="input" value={project} onChange={(e) => setProject(e.target.value)} />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Amount</label>
+            <input className="input" type="number" step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            <button type="button" className="btn btn-primary" onClick={add} disabled={busy}>
+              Add
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={exportExcel}>
+              Export Excel
+            </button>
+          </div>
+        </div>
+
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Project</th>
+                <th>Amount</th>
+                <th>Created</th>
+                <th style={{ width: 170 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="table-empty">
+                    No expenses yet.
+                  </td>
+                </tr>
+              ) : (
+                list.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      {editId === row.id ? (
+                        <input
+                          className="input"
+                          value={editDraft.type}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
+                        />
+                      ) : (
+                        row.type
+                      )}
+                    </td>
+                    <td>
+                      {editId === row.id ? (
+                        <input
+                          className="input"
+                          value={editDraft.description}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, description: e.target.value }))}
+                        />
+                      ) : (
+                        row.description
+                      )}
+                    </td>
+                    <td>
+                      {editId === row.id ? (
+                        <input
+                          className="input"
+                          value={editDraft.project}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, project: e.target.value }))}
+                        />
+                      ) : (
+                        row.project
+                      )}
+                    </td>
+                    <td>
+                      {editId === row.id ? (
+                        <input
+                          className="input"
+                          type="number"
+                          step={0.01}
+                          value={editDraft.amount}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, amount: e.target.value }))}
+                        />
+                      ) : (
+                        row.amount.toFixed(2)
+                      )}
+                    </td>
+                    <td>{new Date(row.createdAt).toLocaleString()}</td>
+                    <td>
+                      {editId === row.id ? (
+                        <>
+                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveEdit} disabled={busy}>
+                            Save
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setEditId(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" className="btn btn-ghost" onClick={() => startEdit(row)}>
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
   const [w, setW] = useState<RiskWeights | null>(null);
   const [busy, setBusy] = useState(false);
@@ -277,10 +554,10 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
             fontSize: 'var(--text-sm)',
           }}
         >
-          <strong>Risk equation:</strong>{' '}
+          <strong>Risk quality score equation:</strong>{' '}
           <code>
-            Overall Risk = (Quality x Quality%) + (Audit x Audit%) + (Delivery x Delivery%) + (CAR Closure x CAR
-            Closure%) + (Documentation x Documentation%)
+            SS = 0.5 x (1 - FPY_ship) + 0.5 x Sev_ship; AS = 0.5 x (1 - FPY_audit) + 0.5 x Sev_audit; QS = 0.5 x SS +
+            0.5 x AS; Final Risk Score = QS x 100
           </code>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
@@ -291,7 +568,7 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
           {field('documentationPercent', 'Documentation')}
         </div>
         <p style={{ marginTop: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-          Final score = sum of (Category Risk % x Category Weight %).
+          Severity index: Sev = (Critical x 1 + Major x 0.7 + Minor x 0.3) / (Total Units x Total Findings).
         </p>
         <p style={{ marginTop: '0.75rem', fontWeight: sumOk ? 400 : 600, color: sumOk ? 'inherit' : 'var(--color-danger)' }}>
           Current sum: {sum.toFixed(2)}%{sumOk ? ' ✓' : ' — must be 100'}
@@ -451,15 +728,11 @@ export function AdminBuyersSuppliersPanel({
     const contractors = pool.filter((u) => u.isContractor === true);
     const activeEmployees = employees.filter(isActive).length;
     const activeContractors = contractors.filter(isActive).length;
-    const totalInPool = pool.length;
-    const activeTotal = pool.filter(isActive).length;
     return {
       totalEmployees: employees.length,
       totalContractors: contractors.length,
       activeEmployees,
       activeContractors,
-      activeTotal,
-      totalInPool,
     };
   }, [users, usersOnlyEmployees]);
 
@@ -961,19 +1234,14 @@ export function AdminBuyersSuppliersPanel({
                 }}
               >
                 <MetricCard
-                  title="Total employees"
+                  title="Total Employees"
                   value={employeeContractorStats.totalEmployees}
-                  subtitle={`${employeeContractorStats.activeEmployees} active`}
+                  subtitle={`Total Active: ${employeeContractorStats.activeEmployees}`}
                 />
                 <MetricCard
-                  title="Total contractors"
+                  title="Total Contractors"
                   value={employeeContractorStats.totalContractors}
-                  subtitle={`${employeeContractorStats.activeContractors} active`}
-                />
-                <MetricCard
-                  title="Active (employees & contractors)"
-                  value={employeeContractorStats.activeTotal}
-                  subtitle={`of ${employeeContractorStats.totalInPool} total`}
+                  subtitle={`Total Active: ${employeeContractorStats.activeContractors}`}
                 />
               </div>
             ) : null}

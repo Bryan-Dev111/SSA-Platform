@@ -661,6 +661,20 @@ model Farm {
   @@index([country])
 }
 
+model Expense {
+  id          String   @id @default(cuid())
+  type        String
+  description String
+  project     String
+  amount      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([project])
+  @@index([type])
+  @@index([createdAt])
+}
+
 // For application-level code generation (SUP-00001, AUD-00001, etc.)
 model IdSequence {
   prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM

@@ -84,6 +84,11 @@ interface PortalData {
   };
 }
 
+interface ShipmentKpis {
+  otdPercent: number | null;
+  fpyPercent: number | null;
+}
+
 interface WeeklyRiskPoint {
   weekStartIso: string;
   label: string;
@@ -96,6 +101,7 @@ export function SupplierProfile() {
   const [searchParams] = useSearchParams();
   const supplierIdFromUrl = searchParams.get('supplierId');
   const [data, setData] = useState<PortalData | null>(null);
+  const [shipmentKpis, setShipmentKpis] = useState<ShipmentKpis | null>(null);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -167,6 +173,16 @@ export function SupplierProfile() {
     setLoading(false);
   }, [token, isSupplier, canSelectSupplier, selectedSupplierId]);
 
+  useEffect(() => {
+    if (!token || !data?.supplier?.id) {
+      setShipmentKpis(null);
+      return;
+    }
+    apiJson<ShipmentKpis>(`/shipments/metrics?supplierId=${encodeURIComponent(data.supplier.id)}`, { token })
+      .then((k) => setShipmentKpis(k))
+      .catch(() => setShipmentKpis(null));
+  }, [token, data?.supplier?.id]);
+
   const refresh = () => {
     if (!token) return;
     const url = isSupplier
@@ -208,6 +224,18 @@ export function SupplierProfile() {
     if (b.length <= 2) return b.map((x) => x.name?.trim() || x.email).join(' · ');
     return `${b.length} contacts`;
   }, [data?.assignedBuyers]);
+
+  const passPercent = useMemo(() => {
+    const audits = data?.audits ?? [];
+    if (audits.length === 0) return '0% Pass';
+    const passed = audits.filter((a) => a.result === 'Passed').length;
+    return `${Math.round((passed / audits.length) * 100)}% Pass`;
+  }, [data?.audits]);
+
+  const criticalMajorCount = useMemo(() => {
+    const findings = data?.findings ?? [];
+    return findings.filter((f) => f.severity === 'Critical' || f.severity === 'Major').length;
+  }, [data?.findings]);
 
   const submitRecord = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,8 +385,6 @@ export function SupplierProfile() {
   const supplier = data?.supplier;
   const metrics = data?.metrics;
   const latestRisk = data?.riskSnapshots[0];
-  const overdueCars = metrics?.overdueCarCount ?? 0;
-  const openFindings = metrics?.openFindingCount ?? 0;
   const waitingInspection = metrics?.waitingInspectionCount ?? 0;
 
   return (
@@ -416,35 +442,39 @@ export function SupplierProfile() {
 
       <div className="dashboard-metric-grid" style={{ marginBottom: '1.5rem' }}>
         <MetricCard
-          title="Assigned buyers"
+          title="Assigned Buyers"
           value={metrics.assignedBuyerCount}
           subtitle={assignedBuyersSubtitle}
         />
         <MetricCard
-          title="Open CARs"
-          value={metrics.openCarCount}
-          subtitle={`${overdueCars} overdue CAR${overdueCars === 1 ? '' : 's'}`}
+          title="Total CARs"
+          value={data.cars.length}
+          subtitle={`Open ${metrics.openCarCount}`}
         />
         <MetricCard
-          title="Findings"
+          title="Total Audits"
+          value={metrics.auditCount}
+          subtitle={passPercent}
+        />
+        <MetricCard
+          title="Total Findings"
           value={metrics.findingCount}
-          subtitle={`${openFindings} not closed`}
+          subtitle={`Critical/Major ${criticalMajorCount}`}
         />
-        <MetricCard title="Audits" value={metrics.auditCount} subtitle="All recorded audits" />
         <MetricCard
-          title="Shipment requests"
+          title="Total Shipments"
           value={metrics.shipmentCount}
-          subtitle={`${waitingInspection} awaiting inspection`}
+          subtitle={`FPY ${shipmentKpis?.fpyPercent != null ? `${shipmentKpis.fpyPercent}%` : '—'}`}
         />
-        <MetricCard title="Records" value={metrics.recordCount} subtitle="Uploaded documents" />
         <MetricCard
-          title="Current risk"
+          title="OTD%"
+          value={shipmentKpis?.otdPercent != null ? `${shipmentKpis.otdPercent}%` : '—'}
+          subtitle={`${waitingInspection} waiting inspection`}
+        />
+        <MetricCard
+          title="Risk"
           value={latestRisk ? `${latestRisk.level} (${latestRisk.score ?? '—'})` : '—'}
-          subtitle={
-            latestRisk
-              ? `Snapshot ${new Date(latestRisk.createdAt).toLocaleDateString()}`
-              : 'No risk snapshots yet'
-          }
+          subtitle={latestRisk ? 'Current risk snapshot' : 'No risk snapshots yet'}
         />
       </div>
 

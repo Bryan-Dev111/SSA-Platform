@@ -9,10 +9,10 @@ export type MonthlyTrendRow = {
 };
 
 const TREND = {
-  findings: { stroke: '#c2185b', fill: 'rgba(194, 24, 91, 0.14)' },
-  cars: { stroke: '#c99a17', fill: 'rgba(201, 154, 23, 0.18)' },
-  audits: { stroke: '#1f78c8', fill: 'rgba(31, 120, 200, 0.16)' },
-  shipments: { stroke: '#6e47c8', fill: 'rgba(110, 71, 200, 0.12)' },
+  findings: { stroke: '#c2185b' },
+  cars: { stroke: '#c99a17' },
+  audits: { stroke: '#1f78c8' },
+  shipments: { stroke: '#6e47c8' },
 } as const;
 
 export function MonthlyTrendsLineChart({
@@ -38,7 +38,6 @@ export function MonthlyTrendsLineChart({
 
   const xAt = (i: number) => padLeft + (rows.length <= 1 ? 0 : (i / (rows.length - 1)) * plotW);
   const yAt = (v: number) => padTop + plotH - (v / safeMax) * plotH;
-  const baselineY = padTop + plotH;
 
   const toSmoothPath = (values: number[]): string => {
     if (values.length === 0) return '';
@@ -54,14 +53,6 @@ export function MonthlyTrendsLineChart({
       d += ` C ${cx1.toFixed(2)} ${y0.toFixed(2)}, ${cx2.toFixed(2)} ${y1.toFixed(2)}, ${x1.toFixed(2)} ${y1.toFixed(2)}`;
     }
     return d;
-  };
-
-  const toAreaPath = (values: number[]): string => {
-    if (values.length === 0) return '';
-    const line = toSmoothPath(values);
-    const startX = xAt(0);
-    const endX = xAt(values.length - 1);
-    return `${line} L ${endX.toFixed(2)} ${baselineY.toFixed(2)} L ${startX.toFixed(2)} ${baselineY.toFixed(2)} Z`;
   };
 
   const findingsVals = rows.map((r) => r.findings);
@@ -81,7 +72,7 @@ export function MonthlyTrendsLineChart({
         <LegendItem color={TREND.findings.stroke} label="Findings" />
         <LegendItem color={TREND.cars.stroke} label="CARs" />
         <LegendItem color={TREND.audits.stroke} label="Audits" />
-        <LegendItem color={TREND.shipments.stroke} label="Shipments" dashed />
+        <LegendItem color={TREND.shipments.stroke} label="Shipments" />
       </div>
       <div className="table-wrap" style={{ overflowX: 'auto' }}>
         <svg
@@ -106,11 +97,6 @@ export function MonthlyTrendsLineChart({
 
           <line x1={padLeft} y1={padTop + plotH} x2={width - padRight} y2={padTop + plotH} stroke="#9ca3af" />
           <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + plotH} stroke="#9ca3af" />
-
-          <path d={toAreaPath(findingsVals)} fill={TREND.findings.fill} stroke="none" />
-          <path d={toAreaPath(carsVals)} fill={TREND.cars.fill} stroke="none" />
-          <path d={toAreaPath(auditsVals)} fill={TREND.audits.fill} stroke="none" />
-          <path d={toAreaPath(shipmentsVals)} fill={TREND.shipments.fill} stroke="none" />
 
           <path
             d={toSmoothPath(findingsVals)}
@@ -143,7 +129,6 @@ export function MonthlyTrendsLineChart({
             strokeWidth="2.35"
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeDasharray="5 3"
           />
 
           {rows.map((r, i) => (
@@ -166,10 +151,6 @@ export function MonthlyTrendsLineChart({
           {hovered && hoverX !== null ? (
             <>
               <line x1={hoverX} y1={padTop} x2={hoverX} y2={padTop + plotH} stroke="#9ca3af" strokeDasharray="4 3" />
-              <circle cx={hoverX} cy={yAt(hovered.findings)} r="3.8" fill={TREND.findings.stroke} />
-              <circle cx={hoverX} cy={yAt(hovered.cars)} r="3.8" fill={TREND.cars.stroke} />
-              <circle cx={hoverX} cy={yAt(hovered.audits)} r="3.8" fill={TREND.audits.stroke} />
-              <circle cx={hoverX} cy={yAt(hovered.shipments)} r="3.8" fill={TREND.shipments.stroke} />
               <g transform={`translate(${Math.min(hoverX + 10, width - 220)}, ${padTop + 8})`}>
                 <rect width="200" height="92" rx="8" fill="#111827" opacity="0.93" />
                 <text x="10" y="18" fill="#ffffff" fontSize="12" fontWeight="700">
@@ -196,7 +177,7 @@ export function MonthlyTrendsLineChart({
   );
 }
 
-function LegendItem({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
+function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <svg width={22} height={10} style={{ flexShrink: 0 }} aria-hidden>
@@ -208,7 +189,6 @@ function LegendItem({ color, label, dashed }: { color: string; label: string; da
           stroke={color}
           strokeWidth={2.35}
           strokeLinecap="round"
-          strokeDasharray={dashed ? '5 3' : undefined}
         />
       </svg>
       {label}

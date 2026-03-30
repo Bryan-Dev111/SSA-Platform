@@ -139,7 +139,8 @@ export function Shipments() {
     const totalByPart = new Map<string, number>();
     for (const s of shipments) {
       const qty = typeof s.qty === 'number' ? s.qty : 0;
-      const d = s.createdAt ? new Date(s.createdAt) : null;
+      const baseDate = s.inspectionDate ?? s.createdAt ?? null;
+      const d = baseDate ? new Date(baseDate) : null;
       if (!d || Number.isNaN(d.getTime())) continue;
       const monthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
       const monthLabel = d.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -357,7 +358,7 @@ export function Shipments() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Part quantity by month</h2>
+          <h2 style={{ marginTop: 0 }}>Part Quantity by Month</h2>
           {partTrend.rows.length === 0 || partTrend.parts.length === 0 ? (
             <p className="table-empty">No shipment quantity trend data.</p>
           ) : (

@@ -212,6 +212,29 @@ export function Records() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
   const paginatedRows = sortedRows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const recordStats = useMemo(() => {
+    const isApproved = (r: RecordRow) => getRecordReviewLabel(r.status) === 'Approved';
+    const isPending = (r: RecordRow) => getRecordReviewLabel(r.status) === 'Pending';
+    const source = (r: RecordRow) => (r.internalOrSupplier ?? '').trim().toLowerCase();
+
+    const total = rows.length;
+    const supplierRows = rows.filter((r) => source(r) === 'supplier');
+    const internalRows = rows.filter((r) => source(r) === 'internal');
+    const openRows = rows.filter(isPending);
+
+    const pct = (approvedCount: number, base: number): string =>
+      base > 0 ? `${Math.round((approvedCount / base) * 100)}% approved` : '0% approved';
+
+    return {
+      total,
+      totalApprovedSubtitle: pct(rows.filter(isApproved).length, total),
+      supplierTotal: supplierRows.length,
+      supplierApprovedSubtitle: pct(supplierRows.filter(isApproved).length, supplierRows.length),
+      internalTotal: internalRows.length,
+      internalApprovedSubtitle: pct(internalRows.filter(isApproved).length, internalRows.length),
+      openTotal: openRows.length,
+    };
+  }, [rows]);
 
   const load = () => {
     if (!token) return;
@@ -453,6 +476,49 @@ export function Records() {
       )}
 
       {error && <div className="alert-error">{error}</div>}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+          gap: '0.75rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <div className="card">
+          <div className="card-body" style={{ padding: '0.75rem' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Records</div>
+            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.total}</div>
+            <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
+              {recordStats.totalApprovedSubtitle}
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body" style={{ padding: '0.75rem' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Supplier</div>
+            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.supplierTotal}</div>
+            <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
+              {recordStats.supplierApprovedSubtitle}
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body" style={{ padding: '0.75rem' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Internal</div>
+            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.internalTotal}</div>
+            <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
+              {recordStats.internalApprovedSubtitle}
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body" style={{ padding: '0.75rem' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open Records</div>
+            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.openTotal}</div>
+          </div>
+        </div>
+      </div>
 
       {canUpload && !isSupplier && (
         <div className="card" style={{ marginBottom: '1rem' }}>
