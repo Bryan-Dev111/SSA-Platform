@@ -44,6 +44,8 @@ interface RecordRow {
   audit?: { id: string; code: string } | null;
   shipmentId?: string | null;
   shipment?: { id: string; code: string | null } | null;
+  carId?: string | null;
+  car?: { id: string; code: string } | null;
   uploadedBy: { id: string; email: string; name: string | null } | null;
   createdAt: string;
 }
@@ -68,6 +70,7 @@ function postRecordWithProgress(
     supplierId: string | null;
     auditId: string | null;
     shipmentId: string | null;
+    carId: string | null;
     internalOrSupplier: 'supplier' | 'internal';
     file: File | null;
     notes: string;
@@ -106,6 +109,7 @@ function postRecordWithProgress(
     form.append('supplierId', payload.supplierId ?? '');
     form.append('auditId', payload.auditId ?? '');
     form.append('shipmentId', payload.shipmentId ?? '');
+    form.append('carId', payload.carId ?? '');
     form.append('notes', payload.notes);
     if (payload.file) form.append('file', payload.file);
     xhr.send(form);
@@ -118,12 +122,14 @@ export function Records() {
   const [searchParams] = useSearchParams();
   const auditSeed = searchParams.get('auditId');
   const shipmentSeed = searchParams.get('shipmentId');
+  const carSeed = searchParams.get('carId');
   const supplierSeed = searchParams.get('supplierId');
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditListOption[]>([]);
   const [shipmentOptions, setShipmentOptions] = useState<ShipmentListOption[]>([]);
   const [uploadAuditId, setUploadAuditId] = useState('');
   const [uploadShipmentId, setUploadShipmentId] = useState('');
+  const [uploadCarId, setUploadCarId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -257,8 +263,16 @@ export function Records() {
     if (shipmentOptions.some((s) => s.id === shipmentSeed)) {
       setUploadShipmentId(shipmentSeed);
       setUploadAuditId('');
+      setUploadCarId('');
     }
   }, [shipmentSeed, shipmentOptions]);
+
+  useEffect(() => {
+    if (!carSeed) return;
+    setUploadCarId(carSeed);
+    setUploadAuditId('');
+    setUploadShipmentId('');
+  }, [carSeed]);
 
   useEffect(() => {
     if (!token) return;
@@ -294,8 +308,9 @@ export function Records() {
     }
     const auditId = uploadAuditId.trim() || null;
     const shipId = uploadShipmentId.trim() || null;
-    if (auditId && shipId) {
-      toast.error('Link this record to either an audit or a shipment, not both.');
+    const carId = uploadCarId.trim() || null;
+    if ([auditId, shipId, carId].filter(Boolean).length > 1) {
+      toast.error('Link this record to one item only (audit, shipment, or CAR).');
       return;
     }
     setSubmitting(true);
@@ -306,6 +321,7 @@ export function Records() {
         supplierId: effectiveSupplierId,
         auditId,
         shipmentId: shipId,
+        carId,
         internalOrSupplier: 'internal' as const,
         file,
         notes: uploadNotes.trim(),
@@ -315,6 +331,7 @@ export function Records() {
       setUploadNotes('');
       setUploadAuditId('');
       setUploadShipmentId('');
+      setUploadCarId('');
       setFile(null);
       setUploadProgress(null);
       toast.success('Record submitted');
@@ -485,6 +502,23 @@ export function Records() {
                   </span>
                 ) : null}
               </div>
+              <div className="input-group">
+                <label className="input-label">CAR (optional)</label>
+                <input
+                  className="input"
+                  value={uploadCarId}
+                  onChange={(e) => {
+                    setUploadCarId(e.target.value);
+                    setUploadAuditId('');
+                    setUploadShipmentId('');
+                  }}
+                  placeholder="CAR id"
+                  style={{ maxWidth: 480 }}
+                />
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                  Tip: from CAR Record page this is prefilled automatically.
+                </span>
+              </div>
               <div className="input-group" style={{ position: 'relative' }}>
                 <label className="input-label">File *</label>
                 <input
@@ -574,6 +608,7 @@ export function Records() {
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
                     <th>Audit</th>
                     <th>Shipment</th>
+                    <th>CAR</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
                     <th>File</th>
                     <th>Uploaded by</th>
@@ -591,6 +626,7 @@ export function Records() {
                       <td>{r.supplier?.code ?? 'None'}</td>
                       <td>{r.audit?.code ?? 'None'}</td>
                       <td>{r.shipment?.code ?? 'None'}</td>
+                      <td>{r.car?.code ?? 'None'}</td>
                       <td>{getRecordReviewLabel(r.status)}</td>
                       <td>
                         {r.filePath ? (

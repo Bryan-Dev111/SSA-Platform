@@ -32,7 +32,8 @@ router.get(
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
     const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId : undefined;
-    const where: { supplierId?: string | { in: string[] } } = {};
+    const carId = typeof req.query.carId === 'string' ? req.query.carId : undefined;
+    const where: { supplierId?: string | { in: string[] }; carId?: string } = {};
     if (allowedIds !== null) {
       where.supplierId = { in: allowedIds };
       if (allowedIds.length === 0) {
@@ -51,6 +52,7 @@ router.get(
           supplier: { select: { id: true, code: true, name: true } },
           audit: { select: { id: true, code: true } },
           shipment: { select: { id: true, code: true } },
+          car: { select: { id: true, code: true } },
           uploadedBy: { select: { id: true, email: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -64,12 +66,29 @@ router.get(
       }
       where.supplierId = supplierId;
     }
+    if (carId) {
+      const car = await prisma.correctiveAction.findUnique({
+        where: { id: carId },
+        select: { id: true, supplierId: true },
+      });
+      if (!car) {
+        res.json([]);
+        return;
+      }
+      if (allowedIds !== null && !allowedIds.includes(car.supplierId)) {
+        res.json([]);
+        return;
+      }
+      where.carId = car.id;
+      where.supplierId = car.supplierId;
+    }
     const list = await prisma.record.findMany({
       where,
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true } },
         shipment: { select: { id: true, code: true } },
+        car: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -221,6 +240,11 @@ router.post(
       shipmentIdRaw === null || shipmentIdRaw === undefined || shipmentIdRaw === ''
         ? null
         : String(shipmentIdRaw);
+    const carIdRaw = req.body?.carId;
+    const carIdBody =
+      carIdRaw === null || carIdRaw === undefined || carIdRaw === ''
+        ? null
+        : String(carIdRaw);
     const internalOrSupplier = req.body?.internalOrSupplier === 'internal' ? 'internal' : 'supplier';
     const notesRaw = req.body?.notes;
     const notes =
@@ -257,11 +281,13 @@ router.post(
       res.status(403).json({ error: 'Supplier not in scope' });
       return;
     }
-    if (auditId && shipmentIdBody) {
-      res.status(400).json({ error: 'Link a record to either an audit or a shipment, not both' });
+    const linksCount = [auditId ? 1 : 0, shipmentIdBody ? 1 : 0, carIdBody ? 1 : 0].reduce((a, b) => a + b, 0);
+    if (linksCount > 1) {
+      res.status(400).json({ error: 'Link a record to one related item (audit, shipment, or CAR), not multiple' });
       return;
     }
     let shipmentId: string | null = null;
+    let carId: string | null = null;
     if (auditId) {
       const audit = await prisma.audit.findUnique({
         where: { id: auditId },
@@ -301,6 +327,26 @@ router.post(
         return;
       }
       shipmentId = ship.id;
+    }
+    if (carIdBody) {
+      const car = await prisma.correctiveAction.findUnique({
+        where: { id: carIdBody },
+        select: { id: true, supplierId: true },
+      });
+      if (!car) {
+        res.status(400).json({ error: 'Invalid CAR id' });
+        return;
+      }
+      if (supplierId && supplierId !== car.supplierId) {
+        res.status(400).json({ error: 'Selected CAR does not belong to selected supplier' });
+        return;
+      }
+      supplierId = supplierId ?? car.supplierId;
+      if (allowedIds !== null && !allowedIds.includes(car.supplierId)) {
+        res.status(403).json({ error: 'Supplier not in scope' });
+        return;
+      }
+      carId = car.id;
     }
     if (isSupplierUser) {
       const own = await prisma.supplier.findFirst({ where: { userId: req.user.id }, select: { id: true } });
@@ -369,6 +415,7 @@ router.post(
         supplierId,
         auditId,
         shipmentId,
+        carId,
         internalOrSupplier: internalOrSupplier as RecordSource,
         status: RecordStatus.PENDING,
         filePath,
@@ -381,6 +428,7 @@ router.post(
         supplier: { select: { id: true, code: true, name: true } },
         audit: { select: { id: true, code: true } },
         shipment: { select: { id: true, code: true } },
+        car: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
       },
     });

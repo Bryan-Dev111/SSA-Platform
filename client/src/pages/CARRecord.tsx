@@ -73,6 +73,14 @@ interface StatusHistoryEntry {
   at: string;
 }
 
+interface CarAttachment {
+  id: string;
+  name: string;
+  notes: string | null;
+  status: string;
+  createdAt: string;
+}
+
 const SEVERITIES = ['Critical', 'Major', 'Minor'] as const;
 const FINDING_NONE_OPTION = '__NONE__';
 
@@ -234,6 +242,7 @@ export function CARRecord() {
   const [createFindingChoice, setCreateFindingChoice] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchMissNoCreate, setSearchMissNoCreate] = useState(false);
+  const [attachments, setAttachments] = useState<CarAttachment[]>([]);
   // Requirement: On the CAR Record (create) page, fields must be locked until user clicks "Create CAR".
   const [createEnabled, setCreateEnabled] = useState(false);
   const activeLoadIdRef = useRef(0);
@@ -411,6 +420,16 @@ export function CARRecord() {
       .then((r) => setDefectCodeOptions(r.list))
       .catch(() => setDefectCodeOptions([]));
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !car?.id) {
+      setAttachments([]);
+      return;
+    }
+    apiJson<CarAttachment[]>(`/records?carId=${encodeURIComponent(car.id)}`, { token })
+      .then((rows) => setAttachments(rows))
+      .catch(() => setAttachments([]));
+  }, [token, car?.id]);
 
   /** Deep-link from Findings / Findings Record: prefill Finding # (works for DRAFT findings not on GET /findings list). */
   useEffect(() => {
@@ -1011,6 +1030,47 @@ export function CARRecord() {
               <div className="input-group">
                 <label className="input-label">Closing Comments</label>
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                  <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Attachments</h2>
+                  <Link
+                    to={`/records?supplierId=${encodeURIComponent(car.supplierId)}&carId=${encodeURIComponent(car.id)}`}
+                    className="btn btn-ghost"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    + Add attachment
+                  </Link>
+                </div>
+                {attachments.length === 0 ? (
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                    No attachments linked to this CAR.
+                  </div>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Notes</th>
+                          <th>Review</th>
+                          <th>Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attachments.map((row) => (
+                          <tr key={row.id}>
+                            <td>{row.name}</td>
+                            <td>{row.notes?.trim() ? row.notes : '—'}</td>
+                            <td>{row.status}</td>
+                            <td>{new Date(row.createdAt).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>

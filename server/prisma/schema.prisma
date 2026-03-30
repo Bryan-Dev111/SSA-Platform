@@ -300,6 +300,7 @@ model CorrectiveAction {
   verificationOfEffectiveness  String?
   closingComments             String?
   approvalLogs                CarApprovalLog[]
+  records                     Record[]
   createdById                 String?
   createdBy                   User?     @relation(fields: [createdById], references: [id])
   createdAt                   DateTime  @default(now())
@@ -432,6 +433,8 @@ model Record {
   audit            Audit?      @relation(fields: [auditId], references: [id], onDelete: SetNull)
   shipmentId       String?
   shipment         Shipment?   @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  carId            String?
+  car              CorrectiveAction? @relation(fields: [carId], references: [id], onDelete: SetNull)
   status          RecordStatus @default(PENDING)
   filePath        String?
   fileName        String?
