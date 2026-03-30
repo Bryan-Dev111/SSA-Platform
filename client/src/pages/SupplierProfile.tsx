@@ -109,6 +109,7 @@ export function SupplierProfile() {
   const [shipQty, setShipQty] = useState('');
   const [shipDate, setShipDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [carSummaryModal, setCarSummaryModal] = useState<{ code: string; summary: string } | null>(null);
 
   const isSupplier = user?.roleNames?.includes('Supplier');
   const roleNames = user?.roleNames ?? [];
@@ -119,6 +120,10 @@ export function SupplierProfile() {
       setSelectedSupplierId(supplierIdFromUrl);
     }
   }, [supplierIdFromUrl, canSelectSupplier]);
+
+  useEffect(() => {
+    setCarSummaryModal(null);
+  }, [data?.supplier?.id]);
 
   useEffect(() => {
     if (!token) {
@@ -612,7 +617,31 @@ export function SupplierProfile() {
                 </td>
                 <td>{c.status}</td>
                 <td>{c.severity}</td>
-                <td>{c.summary}</td>
+                <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                  {(c.summary ?? '').length > 120 ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setCarSummaryModal({ code: c.code, summary: c.summary ?? '' })}
+                      style={{
+                        padding: 0,
+                        textAlign: 'left',
+                        lineHeight: 1.35,
+                        color: 'inherit',
+                        width: '100%',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                      title="Click to view full summary"
+                    >
+                      {c.summary}
+                    </button>
+                  ) : (
+                    <div style={{ lineHeight: 1.35 }}>{c.summary?.trim() ? c.summary : '—'}</div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -721,6 +750,28 @@ export function SupplierProfile() {
         </table>
       </SectionTable>
       </>
+      )}
+
+      {carSummaryModal && (
+        <div
+          className="confirm-dialog-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="supplier-profile-car-summary-title"
+          onClick={() => setCarSummaryModal(null)}
+        >
+          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="supplier-profile-car-summary-title" className="confirm-dialog-title">
+              CAR Summary — {carSummaryModal.code}
+            </h3>
+            <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{carSummaryModal.summary}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-primary" onClick={() => setCarSummaryModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
