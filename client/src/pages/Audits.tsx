@@ -154,6 +154,21 @@ export function Audits() {
     return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 12);
   }, [audits]);
   const maxAuditsBySupplier = Math.max(1, ...auditsBySupplier.map((x) => x.count));
+  const auditsByType = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of audits) {
+      const label = a.auditType?.name?.trim() || a.auditType?.code?.trim() || 'Unspecified';
+      map.set(label, (map.get(label) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      .slice(0, 12);
+  }, [audits]);
+  const maxAuditsByType = Math.max(1, ...auditsByType.map((x) => x.count));
+  const passedCount = audits.filter((a) => a.result === 'Passed').length;
+  const passedPercent = audits.length > 0 ? Math.round((passedCount / audits.length) * 1000) / 10 : 0;
+  const scheduledCount = audits.filter((a) => a.derivedStatus === 'Scheduled').length;
 
   useEffect(() => {
     if (!token) return;
@@ -288,33 +303,86 @@ export function Audits() {
         </label>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Audits by supplier</h2>
-          {auditsBySupplier.length === 0 ? (
-            <p className="table-empty">No audits in scope.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {auditsBySupplier.map((row) => (
-                <div key={row.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
-                    <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{row.count}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total audits</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{audits.length}</div>
+          <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
+            {passedPercent}% passed
+          </div>
+        </div>
+        <div className="card" style={{ padding: '1rem' }}>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Scheduled</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{scheduledCount}</div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '1rem',
+          marginBottom: '1rem',
+        }}
+      >
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Audits by supplier</h2>
+            {auditsBySupplier.length === 0 ? (
+              <p className="table-empty">No audits in scope.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {auditsBySupplier.map((row) => (
+                  <div key={row.label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+                      <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{row.count}</span>
+                    </div>
+                    <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${(row.count / maxAuditsBySupplier) * 100}%`,
+                          height: '100%',
+                          background: '#2563eb',
+                          borderRadius: 4,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: `${(row.count / maxAuditsBySupplier) * 100}%`,
-                        height: '100%',
-                        background: '#2563eb',
-                        borderRadius: 4,
-                      }}
-                    />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Audits by type</h2>
+            {auditsByType.length === 0 ? (
+              <p className="table-empty">No audits in scope.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {auditsByType.map((row) => (
+                  <div key={row.label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+                      <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{row.count}</span>
+                    </div>
+                    <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${(row.count / maxAuditsByType) * 100}%`,
+                          height: '100%',
+                          background: '#7c3aed',
+                          borderRadius: 4,
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -327,11 +395,11 @@ export function Audits() {
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('date')}>Date {sortIndicator('date')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('type')}>Type {sortIndicator('type')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('auditor')}>Auditor {sortIndicator('auditor')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('result')}>Result {sortIndicator('result')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('findings')}>Findings {sortIndicator('findings')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>Records {sortIndicator('records')}</th>
                 {isAdmin && <th>Delete</th>}
               </tr>
@@ -350,6 +418,31 @@ export function Audits() {
                     <td>{a.supplier.code} — {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate)}</td>
                     <td>{a.auditType?.name?.trim() ? a.auditType.name : '—'}</td>
+                    <td style={{ maxWidth: 280, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                      {(a.summary ?? '').length > 120 ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setSummaryModal({ code: a.code, summary: a.summary ?? '' })}
+                          style={{
+                            padding: 0,
+                            textAlign: 'left',
+                            lineHeight: 1.35,
+                            color: 'inherit',
+                            width: '100%',
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                          title="Click to view full summary"
+                        >
+                          {a.summary}
+                        </button>
+                      ) : (
+                        <div style={{ lineHeight: 1.35 }}>{a.summary ?? '—'}</div>
+                      )}
+                    </td>
                     <td>{a.auditor?.trim() ? a.auditor : '—'}</td>
                     <td>
                       <span className={`audit-status-badge audit-status-badge--${getAuditStatusSlug(a.derivedStatus)}`}>
@@ -409,31 +502,6 @@ export function Audits() {
                           </Link>
                         )}
                       </div>
-                    </td>
-                    <td style={{ maxWidth: 280, whiteSpace: 'normal', verticalAlign: 'top' }}>
-                      {(a.summary ?? '').length > 120 ? (
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => setSummaryModal({ code: a.code, summary: a.summary ?? '' })}
-                          style={{
-                            padding: 0,
-                            textAlign: 'left',
-                            lineHeight: 1.35,
-                            color: 'inherit',
-                            width: '100%',
-                            overflow: 'hidden',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                          }}
-                          title="Click to view full summary"
-                        >
-                          {a.summary}
-                        </button>
-                      ) : (
-                        <div style={{ lineHeight: 1.35 }}>{a.summary ?? '—'}</div>
-                      )}
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
