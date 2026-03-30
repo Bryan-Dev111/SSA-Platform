@@ -524,7 +524,7 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
   const field = (key: keyof RiskWeights, label: string) => {
     if (key === 'id') return null;
     return (
-      <div className="input-group" key={key}>
+      <div className="input-group risk-weights-field" key={key}>
         <label className="input-label">{label} (%)</label>
         <input
           className="input"
@@ -542,8 +542,7 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Risk category weights</h2>
-        {/* <p style={{ color: 'var(--color-text-muted)' }}>Used for risk calculation (Day 11). All five must sum to exactly 100%.</p> */}
+        <h2 style={{ marginTop: 0 }}>Risk weights</h2>
         <div
           style={{
             marginBottom: '0.75rem',
@@ -552,23 +551,56 @@ export function AdminRiskWeightsPanel({ token, toast }: { token: string | null; 
             background: 'var(--color-surface-muted)',
             border: '1px solid var(--color-border-subtle)',
             fontSize: 'var(--text-sm)',
+            lineHeight: 1.5,
           }}
         >
-          <strong>Risk quality score equation:</strong>{' '}
-          <code>
-            SS = 0.5 x (1 - FPY_ship) + 0.5 x Sev_ship; AS = 0.5 x (1 - FPY_audit) + 0.5 x Sev_audit; QS = 0.5 x SS +
-            0.5 x AS; Final Risk Score = QS x 100
-          </code>
+          <p style={{ margin: '0 0 0.5rem', color: 'var(--color-text-muted)' }}>
+            The supplier risk score is built from <strong>shipments</strong> and <strong>audits</strong> only:{' '}
+            <strong>first-pass yield (FPY)</strong> (pass rate) plus a <strong>severity index</strong> from findings tied to each side. It is not a single generic “overall quality” index.
+          </p>
+          <p style={{ margin: '0 0 0.35rem', fontWeight: 600 }}>Definitions</p>
+          <ul style={{ margin: '0 0 0.6rem 1.1rem', padding: 0 }}>
+            <li>
+              <strong>FPY_ship</strong>: Passed ÷ (Passed + Failed) from shipment inspections; 1 if there are no pass/fail outcomes.
+            </li>
+            <li>
+              <strong>FPY_audit</strong>: Passed ÷ (Passed + Failed) from audits; 1 if there are no pass/fail outcomes.
+            </li>
+            <li>
+              <strong>Sev_ship</strong> / <strong>Sev_audit</strong>: severity index from findings linked to shipments vs audits (formula below).
+            </li>
+          </ul>
+          <pre
+            style={{
+              margin: 0,
+              padding: '0.5rem 0.6rem',
+              borderRadius: 6,
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border-subtle)',
+              fontSize: 'var(--text-xs)',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {`SS = 0.5 · (1 − FPY_ship) + 0.5 · Sev_ship     ← shipment-side composite
+AS = 0.5 · (1 − FPY_audit) + 0.5 · Sev_audit   ← audit-side composite
+QS = 0.5 · SS + 0.5 · AS                        (SS, AS clamped to [0, 1])
+Risk score (0–100, higher = worse) = QS × 100`}
+          </pre>
+          <p style={{ margin: '0.6rem 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
+            <strong>Severity index</strong> (for each side): Sev = (C·1 + M·0.7 + m·0.3) ÷ (U × n), where C/M/m are counts of Critical/Major/Minor findings, U is total shipments or total audits (depending on bucket), and n is the number of findings in that bucket. If there are no findings or U is zero, Sev is 0.
+          </p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
-          {field('qualityPercent', 'Quality')}
-          {field('auditPercent', 'Audit')}
-          {field('deliveryPercent', 'Delivery')}
-          {field('carClosurePercent', 'CAR closure')}
-          {field('documentationPercent', 'Documentation')}
+        <div className="risk-weights-form-grid">
+          {field('qualityPercent', 'Shipment composite (SS)')}
+          {field('auditPercent', 'Audit composite (AS)')}
+          {field('deliveryPercent', 'Shipment pass gap (1 − FPY)')}
+          {field('carClosurePercent', 'Shipment severity (Sev_ship)')}
+          {field('documentationPercent', 'Audit severity (Sev_audit)')}
         </div>
         <p style={{ marginTop: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-          Severity index: Sev = (Critical x 1 + Major x 0.7 + Minor x 0.3) / (Total Units x Total Findings).
+          These labels align with the shipment/audit factor breakdown used for supplier risk. All five percentages must sum to 100%.
         </p>
         <p style={{ marginTop: '0.75rem', fontWeight: sumOk ? 400 : 600, color: sumOk ? 'inherit' : 'var(--color-danger)' }}>
           Current sum: {sum.toFixed(2)}%{sumOk ? ' ✓' : ' — must be 100'}

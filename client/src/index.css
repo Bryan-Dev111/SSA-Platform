@@ -345,6 +345,38 @@ a.btn:focus {
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
+/* Admin — Risk weights: equal-height columns so number inputs share one baseline */
+.risk-weights-form-grid {
+  display: grid;
+  gap: 0.75rem;
+  align-items: stretch;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .risk-weights-form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  }
+}
+
+.risk-weights-form-grid .risk-weights-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+  min-height: 100%;
+  align-self: stretch;
+}
+
+.risk-weights-form-grid .risk-weights-field .input-label {
+  margin-bottom: 0;
+  line-height: 1.35;
+  padding-bottom: var(--space-1);
+}
+
+.risk-weights-form-grid .risk-weights-field .input {
+  margin-top: auto;
+}
+
 /* ----- Tables ----- */
 .table-wrap {
   overflow-x: auto;
