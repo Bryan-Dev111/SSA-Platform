@@ -1,9 +1,10 @@
 /**
  * Day 9 Admin: Audit types, Risk weights, Buyers & suppliers; Permissions matrix is Admin → Permissions tab only.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { MetricCard } from '../../components/MetricCard';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -437,8 +438,30 @@ export function AdminBuyersSuppliersPanel({
 
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
   const supplierUsers = users.filter((u) => u.roleNames.includes('Supplier'));
-  const visibleUsers = usersOnlyEmployees ? users.filter((u) => u.isEmployee === true) : users;
+  const visibleUsers = usersOnlyEmployees
+    ? users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
+    : users;
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
+
+  const employeeContractorStats = useMemo(() => {
+    if (!usersOnlyEmployees) return null;
+    const pool = users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor));
+    const isActive = (u: UserRow) => (u.employmentStatus ?? 'Active') === 'Active';
+    const employees = pool.filter((u) => u.isEmployee === true);
+    const contractors = pool.filter((u) => u.isContractor === true);
+    const activeEmployees = employees.filter(isActive).length;
+    const activeContractors = contractors.filter(isActive).length;
+    const totalInPool = pool.length;
+    const activeTotal = pool.filter(isActive).length;
+    return {
+      totalEmployees: employees.length,
+      totalContractors: contractors.length,
+      activeEmployees,
+      activeContractors,
+      activeTotal,
+      totalInPool,
+    };
+  }, [users, usersOnlyEmployees]);
 
   const assign = async () => {
     if (!token || !buyerId || !supplierId) return;
@@ -929,6 +952,31 @@ export function AdminBuyersSuppliersPanel({
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>{usersTableTitle}</h2>
+            {usersOnlyEmployees && employeeContractorStats ? (
+              <div
+                className="dashboard-metric-grid"
+                style={{
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  marginTop: '0.75rem',
+                }}
+              >
+                <MetricCard
+                  title="Total employees"
+                  value={employeeContractorStats.totalEmployees}
+                  subtitle={`${employeeContractorStats.activeEmployees} active`}
+                />
+                <MetricCard
+                  title="Total contractors"
+                  value={employeeContractorStats.totalContractors}
+                  subtitle={`${employeeContractorStats.activeContractors} active`}
+                />
+                <MetricCard
+                  title="Active (employees & contractors)"
+                  value={employeeContractorStats.activeTotal}
+                  subtitle={`of ${employeeContractorStats.totalInPool} total`}
+                />
+              </div>
+            ) : null}
             <div className="table-wrap">
               <table className="table">
               <thead>

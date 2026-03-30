@@ -1,5 +1,12 @@
 import { prisma } from './prisma';
 
+/**
+ * Column order for Admin → Permissions matrix and related DB seeding.
+ * Match app nav order in `client/src/components/Layout.tsx` (`MENU_ITEMS`) /
+ * `client/src/config/rolePageAccess.ts` (`SIDEBAR_PATH_ORDER`). Place record/detail
+ * pages immediately after their primary section (CAR Record after Corrective Actions,
+ * Findings Record after Findings).
+ */
 export const PAGE_DEFINITIONS = [
   { key: 'Dashboard', label: 'Dashboard', path: '/dashboard' },
   { key: 'Risk', label: 'Risk', path: '/risk' },
@@ -8,12 +15,12 @@ export const PAGE_DEFINITIONS = [
   { key: 'Findings', label: 'Findings', path: '/findings' },
   { key: 'FindingsRecord', label: 'Findings Record', path: '/findings-record' },
   { key: 'Audits', label: 'Audits', path: '/audits' },
+  { key: 'Shipments', label: 'Shipments', path: '/shipments' },
+  { key: 'Records', label: 'Records', path: '/records' },
   { key: 'SupplierProfile', label: 'Supplier Profile', path: '/supplier-profile' },
   { key: 'SupplierList', label: 'Suppliers', path: '/supplier-list' },
   { key: 'SuppliersMap', label: 'Suppliers Map', path: '/suppliers-map' },
-  { key: 'Records', label: 'Records', path: '/records' },
-  { key: 'Shipments', label: 'Shipments', path: '/shipments' },
-  { key: 'Documents', label: 'Documents', path: '/documents' },
+  { key: 'Documents', label: 'Command Media', path: '/documents' },
   { key: 'InternalManagement', label: 'Internal Management', path: '/internal-management' },
   { key: 'Admin', label: 'Admin', path: '/admin' },
 ] as const;
