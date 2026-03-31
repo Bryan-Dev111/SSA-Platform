@@ -35,6 +35,10 @@ import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
 import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
 import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
 import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
+import { PurchaseOrdersPage } from './pages/globalVendors/PurchaseOrdersPage';
+import { SamplesPage } from './pages/globalVendors/SamplesPage';
+import { FarmProfilePage } from './pages/globalVendors/FarmProfilePage';
+import { FarmProcessingPage } from './pages/globalVendors/FarmProcessingPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -124,6 +128,38 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/relationship">
                     <RelationshipTrustPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="purchase-orders"
+                element={
+                  <ProtectedRoute path="/global-vendors/purchase-orders">
+                    <PurchaseOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="samples"
+                element={
+                  <ProtectedRoute path="/global-vendors/samples">
+                    <SamplesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farmers/:farmId/profile"
+                element={
+                  <ProtectedRoute path="/global-vendors/farmers">
+                    <FarmProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farmers/:farmId/processing"
+                element={
+                  <ProtectedRoute path="/global-vendors/farmers">
+                    <FarmProcessingPage />
                   </ProtectedRoute>
                 }
               />

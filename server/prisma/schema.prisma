@@ -673,8 +673,95 @@ model Farm {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  purchaseOrders PurchaseOrder[]
+  samples        Sample[]
+
+  profileContents FarmProfileContent[]
+  profileImages   FarmProfileImage[]
+
   @@index([code])
   @@index([country])
+}
+
+model FarmProfileContent {
+  id        String   @id @default(cuid())
+  farmId    String
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  /// 'Profile' or 'Processing'
+  section   String
+  body      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([farmId, section])
+}
+
+model FarmProfileImage {
+  id        String   @id @default(cuid())
+  farmId    String
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  /// 'Profile' or 'Processing'
+  section   String
+  filePath  String?
+  fileName  String?
+  fileMime  String?
+  sortOrder Int?
+  createdAt DateTime @default(now())
+
+  @@index([farmId, section])
+}
+
+model PurchaseOrder {
+  id        String   @id @default(cuid())
+  code      String   @unique // PO-00001
+  farmId    String?
+  farm      Farm?    @relation(fields: [farmId], references: [id])
+  buyerName String
+  buyerEmail String?
+  crop      String?
+  quantityKg Float?
+  pricePerKg Float?
+  totalAmount Float?
+  status    String? // e.g. Open, Closed
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  attachments PurchaseOrderAttachment[]
+
+  @@index([code])
+  @@index([farmId])
+}
+
+model PurchaseOrderAttachment {
+  id             String   @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  kind           String   // Invoice | Certificate | Contract | NoteFile
+  filePath       String?
+  fileName       String?
+  fileMime       String?
+  createdAt      DateTime @default(now())
+
+  @@index([purchaseOrderId])
+}
+
+model Sample {
+  id        String   @id @default(cuid())
+  code      String   @unique // SAMP-00001
+  farmId    String?
+  farm      Farm?    @relation(fields: [farmId], references: [id])
+  buyerName String
+  crop      String?
+  shipmentAddress String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  notesFilePath String?
+  notesFileName String?
+  notesFileMime String?
+
+  @@index([code])
+  @@index([farmId])
 }
 
 model Expense {
@@ -693,6 +780,6 @@ model Expense {
 
 // For application-level code generation (SUP-00001, AUD-00001, etc.)
 model IdSequence {
-  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM
+  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM, PO, SAMP, EXP
   lastValue Int    @default(0)
 }

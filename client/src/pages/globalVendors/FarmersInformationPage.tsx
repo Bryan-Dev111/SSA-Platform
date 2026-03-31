@@ -2,6 +2,7 @@
  * Global Vendors — Farmer Information: list farms, add via modal.
  */
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
@@ -243,13 +244,34 @@ export function FarmersInformationPage() {
                       })}
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={() => openEdit(f)}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 4,
+                          justifyContent: 'flex-end',
+                          flexWrap: 'wrap',
+                        }}
                       >
-                        Edit
-                      </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => openEdit(f)}
+                        >
+                          Edit
+                        </button>
+                        <Link
+                          to={`/global-vendors/farmers/${f.id}/profile`}
+                          className="btn btn-sm"
+                        >
+                          Profile
+                        </Link>
+                        <Link
+                          to={`/global-vendors/farmers/${f.id}/processing`}
+                          className="btn btn-sm"
+                        >
+                          Processing
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))
