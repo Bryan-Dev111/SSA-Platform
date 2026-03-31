@@ -60,6 +60,7 @@ interface RecordRow {
   car?: { id: string; code: string } | null;
   uploadedBy: { id: string; email: string; name: string | null } | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 function getRecordReviewLabel(status: string): 'Pending' | 'Approved' | 'Rejected' {
@@ -721,6 +722,7 @@ export function Records() {
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
                     <th>File</th>
                     <th>Uploaded by</th>
+                    <th>Reviewed At</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>Created {sortIndicator('created')}</th>
                     {canReview ? <th>Review</th> : null}
                   </tr>
@@ -760,7 +762,22 @@ export function Records() {
                         )}
                       </td>
                       <td>{r.uploadedBy?.name?.trim() || '—'}</td>
-                      <td>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td>
+                        {getRecordReviewLabel(r.status) === 'Pending'
+                          ? '—'
+                          : new Date(r.updatedAt).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                      </td>
+                      <td>
+                        {new Date(r.createdAt).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </td>
                       {canReview ? (
                         <td>
                           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

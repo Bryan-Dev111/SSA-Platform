@@ -384,7 +384,6 @@ export function SupplierProfile() {
 
   const supplier = data?.supplier;
   const metrics = data?.metrics;
-  const latestRisk = data?.riskSnapshots[0];
   const waitingInspection = metrics?.waitingInspectionCount ?? 0;
 
   return (
@@ -426,20 +425,6 @@ export function SupplierProfile() {
         </strong>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-            New items by month for this supplier (same view as the main dashboard).
-          </p>
-          {monthlyTrends.length === 0 ? (
-            <p className="table-empty">No trend data yet.</p>
-          ) : (
-            <MonthlyTrendsLineChart rows={monthlyTrends} maxY={profileTrendMax} />
-          )}
-        </div>
-      </div>
-
       <div className="dashboard-metric-grid" style={{ marginBottom: '1.5rem' }}>
         <MetricCard
           title="Assigned Buyers"
@@ -449,7 +434,7 @@ export function SupplierProfile() {
         <MetricCard
           title="Total CARs"
           value={data.cars.length}
-          subtitle={`Open ${metrics.openCarCount}`}
+          subtitle={`${metrics.openCarCount} open`}
         />
         <MetricCard
           title="Total Audits"
@@ -459,7 +444,7 @@ export function SupplierProfile() {
         <MetricCard
           title="Total Findings"
           value={metrics.findingCount}
-          subtitle={`Critical/Major ${criticalMajorCount}`}
+          subtitle={`${criticalMajorCount} Critical/Major`}
         />
         <MetricCard
           title="Total Shipments"
@@ -471,11 +456,20 @@ export function SupplierProfile() {
           value={shipmentKpis?.otdPercent != null ? `${shipmentKpis.otdPercent}%` : '—'}
           subtitle={`${waitingInspection} waiting inspection`}
         />
-        <MetricCard
-          title="Risk"
-          value={latestRisk ? `${latestRisk.level} (${latestRisk.score ?? '—'})` : '—'}
-          subtitle={latestRisk ? 'Current risk snapshot' : 'No risk snapshots yet'}
-        />
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
+            New items by month for this supplier (same view as the main dashboard).
+          </p>
+          {monthlyTrends.length === 0 ? (
+            <p className="table-empty">No trend data yet.</p>
+          ) : (
+            <MonthlyTrendsLineChart rows={monthlyTrends} maxY={profileTrendMax} />
+          )}
+        </div>
       </div>
 
       {isSupplier && (
@@ -548,26 +542,6 @@ export function SupplierProfile() {
         </div>
       </div>
       )}
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Assigned buyers</h2>
-          {data.assignedBuyers.length === 0 ? (
-            <p className="table-empty">No buyer assigned yet.</p>
-          ) : (
-            <ul>
-              {data.assignedBuyers.map((b) => (
-                <li key={b.id}>
-                  {b.name || b.email} ({b.email})
-                </li>
-              ))}
-            </ul>
-          )}
-          <p style={{ marginBottom: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Commodity: {supplier.commodityType?.name ?? '—'} · {supplier.city ?? '—'}, {supplier.country ?? '—'}
-          </p>
-        </div>
-      </div>
 
       <SectionTable
         title="Audits"
@@ -660,6 +634,8 @@ export function SupplierProfile() {
                         color: 'inherit',
                         width: '100%',
                         overflow: 'hidden',
+                        maxHeight: '2.7em',
+                        textOverflow: 'ellipsis',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
