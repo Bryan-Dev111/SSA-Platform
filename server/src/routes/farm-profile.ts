@@ -14,6 +14,16 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(authMiddleware);
 
+// Defensive helper so routes degrade gracefully when the Prisma client
+// has not been regenerated for the FarmProfile models yet.
+function getFarmProfileClient() {
+  const anyPrisma = prisma as any;
+  if (!anyPrisma.farmProfileContent || !anyPrisma.farmProfileImage || !anyPrisma.farm) {
+    return null;
+  }
+  return anyPrisma;
+}
+
 function normalizeSection(raw: unknown): 'Profile' | 'Processing' {
   const v = typeof raw === 'string' ? raw.trim() : '';
   if (v.toLowerCase() === 'processing') return 'Processing';
@@ -30,14 +40,34 @@ router.get(
       return;
     }
     const section = normalizeSection(req.query.section);
-    const content = await prisma.farmProfileContent.findUnique({
-      where: {
-        farmId_section: {
-          farmId,
-          section,
+    const client = getFarmProfileClient();
+    if (!client) {
+      res.status(501).json({
+        error:
+          'Farm profile content storage is not available until database migrations and Prisma client are updated.',
+      });
+      return;
+    }
+    let content: any = null;
+    try {
+      content = await client.farmProfileContent.findUnique({
+        where: {
+          farmId_section: {
+            farmId,
+            section,
+          },
         },
-      },
-    });
+      });
+    } catch (e: any) {
+      if (e && typeof e === 'object' && e.code === 'P2021') {
+        res.status(501).json({
+          error:
+            'Farm profile content storage is not available until database migrations are applied for FarmProfileContent.',
+        });
+        return;
+      }
+      throw e;
+    }
     res.json(
       content ?? {
         id: null,
@@ -61,26 +91,46 @@ router.put(
     const section = normalizeSection(req.body?.section);
     const body = typeof req.body?.body === 'string' ? req.body.body : '';
 
-    const exists = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true } });
+    const client = getFarmProfileClient();
+    if (!client) {
+      res.status(501).json({
+        error:
+          'Farm profile content storage is not available until database migrations and Prisma client are updated.',
+      });
+      return;
+    }
+    const exists = await client.farm.findUnique({ where: { id: farmId }, select: { id: true } });
     if (!exists) {
       res.status(404).json({ error: 'Farm not found' });
       return;
     }
 
-    const saved = await prisma.farmProfileContent.upsert({
-      where: {
-        farmId_section: {
+    let saved;
+    try {
+      saved = await client.farmProfileContent.upsert({
+        where: {
+          farmId_section: {
+            farmId,
+            section,
+          },
+        },
+        update: { body },
+        create: {
           farmId,
           section,
+          body,
         },
-      },
-      update: { body },
-      create: {
-        farmId,
-        section,
-        body,
-      },
-    });
+      });
+    } catch (e: any) {
+      if (e && typeof e === 'object' && e.code === 'P2021') {
+        res.status(501).json({
+          error:
+            'Farm profile content storage is not available until database migrations are applied for FarmProfileContent.',
+        });
+        return;
+      }
+      throw e;
+    }
 
     res.json(saved);
   })
@@ -96,15 +146,35 @@ router.get(
       return;
     }
     const section = normalizeSection(req.query.section);
-    const images = await prisma.farmProfileImage.findMany({
-      where: { farmId, section },
-      orderBy: { sortOrder: 'asc' },
-      select: {
-        id: true,
-        section: true,
-        fileName: true,
-      },
-    });
+    const client = getFarmProfileClient();
+    if (!client) {
+      res.status(501).json({
+        error:
+          'Farm profile images storage is not available until database migrations and Prisma client are updated.',
+      });
+      return;
+    }
+    let images: any[] = [];
+    try {
+      images = await client.farmProfileImage.findMany({
+        where: { farmId, section },
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          section: true,
+          fileName: true,
+        },
+      });
+    } catch (e: any) {
+      if (e && typeof e === 'object' && e.code === 'P2021') {
+        res.status(501).json({
+          error:
+            'Farm profile images storage is not available until database migrations are applied for FarmProfileImage.',
+        });
+        return;
+      }
+      throw e;
+    }
     res.json(images);
   })
 );
@@ -120,7 +190,15 @@ router.post(
       return;
     }
     const section = normalizeSection(req.body?.section);
-    const exists = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true } });
+    const client = getFarmProfileClient();
+    if (!client) {
+      res.status(501).json({
+        error:
+          'Farm profile images storage is not available until database migrations and Prisma client are updated.',
+      });
+      return;
+    }
+    const exists = await client.farm.findUnique({ where: { id: farmId }, select: { id: true } });
     if (!exists) {
       res.status(404).json({ error: 'Farm not found' });
       return;
@@ -152,21 +230,33 @@ router.post(
       return;
     }
 
-    const maxSort = await prisma.farmProfileImage.aggregate({
-      where: { farmId, section },
-      _max: { sortOrder: true },
-    });
+    let created;
+    try {
+      const maxSort = await client.farmProfileImage.aggregate({
+        where: { farmId, section },
+        _max: { sortOrder: true },
+      });
 
-    const created = await prisma.farmProfileImage.create({
-      data: {
-        farmId,
-        section,
-        filePath,
-        fileName,
-        fileMime,
-        sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
-      },
-    });
+      created = await client.farmProfileImage.create({
+        data: {
+          farmId,
+          section,
+          filePath,
+          fileName,
+          fileMime,
+          sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
+        },
+      });
+    } catch (e: any) {
+      if (e && typeof e === 'object' && e.code === 'P2021') {
+        res.status(501).json({
+          error:
+            'Farm profile images storage is not available until database migrations are applied for FarmProfileImage.',
+        });
+        return;
+      }
+      throw e;
+    }
 
     res.status(201).json(created);
   })
@@ -184,7 +274,12 @@ router.get(
       res.status(400).json({ error: 'imageId is required' });
       return;
     }
-    const img = await prisma.farmProfileImage.findUnique({
+    const client = getFarmProfileClient();
+    if (!client) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+    const img = await client.farmProfileImage.findUnique({
       where: { id: imageId },
       select: { filePath: true },
     });

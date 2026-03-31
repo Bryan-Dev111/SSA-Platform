@@ -4,7 +4,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { apiFetch, apiJson } from '../../api/client';
+import { apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 
 type SampleRow = {
@@ -36,7 +36,6 @@ export function SamplesPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const [farmId, setFarmId] = useState<string>('');
   const [buyerName, setBuyerName] = useState('');
@@ -113,36 +112,8 @@ export function SamplesPage() {
     }
   };
 
-  const uploadNotesFile = async (sampleId: string, file: File) => {
-    if (!token) return;
-    setUploadingId(sampleId);
-    try {
-      const form = new FormData();
-      form.append('notesFile', file);
-      await apiFetch('/samples', {
-        token,
-        method: 'POST',
-        body: form,
-      });
-      // The API currently only supports file on create; for Day 3 we just allow attaching during creation.
-      // This handler is kept for future extension.
-      toast.success('Notes file uploaded');
-      load({ silent: true });
-    } catch (err) {
-      let msg = 'Could not upload notes file';
-      if (err instanceof Error) {
-        try {
-          const j = JSON.parse(err.message) as { error?: string };
-          if (j.error) msg = j.error;
-        } catch {
-          msg = err.message || msg;
-        }
-      }
-      toast.error(msg);
-    } finally {
-      setUploadingId(null);
-    }
-  };
+  // Placeholder for future extension: attach notes files after creation.
+  // Currently unused; samples only support optional notes file on create.
 
   if (loading && samples.length === 0) {
     return (
@@ -335,7 +306,7 @@ export function SamplesPage() {
                   type="button"
                   className="btn btn-ghost"
                   onClick={closeModal}
-                  disabled={saving || uploadingId !== null}
+                  disabled={saving}
                 >
                   Cancel
                 </button>
