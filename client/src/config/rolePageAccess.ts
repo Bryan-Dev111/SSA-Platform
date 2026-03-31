@@ -4,19 +4,9 @@
  *
  * Keep aligned with server `API_PAGE_ROLES` in `server/src/middleware/rbac.ts` (same roles per feature).
  */
-const ALL_APP_ROLES = [
-  'Admin',
-  'Viewer',
-  'QualityEngineer',
-  'QualityManager',
-  'Buyer',
-  'Auditor',
-  'Supplier',
-] as const;
-
 export const PATH_ROLES: Record<string, string[]> = {
-  /** Product chooser after login; all authenticated roles */
-  '/product-hub': [...ALL_APP_ROLES],
+  /** Product chooser after login; Admin only */
+  '/product-hub': ['Admin'],
   '/global-vendors': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/global-vendors/farmers': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/global-vendors/approved': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],

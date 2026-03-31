@@ -60,7 +60,7 @@ const ALL_APP_ROLES_HUB = [
 ] as const;
 
 export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
-  '/product-hub': [...ALL_APP_ROLES_HUB],
+  '/product-hub': ['Admin'],
   '/dashboard': DEFAULT_API_PAGE_ROLES.Dashboard,
   '/risk': DEFAULT_API_PAGE_ROLES.Risk,
   '/corrective-actions': DEFAULT_API_PAGE_ROLES.CorrectiveActions,

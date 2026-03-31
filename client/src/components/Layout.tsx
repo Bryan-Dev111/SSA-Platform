@@ -84,8 +84,6 @@ export function Layout() {
   const visibleItems = MENU_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
   const visibleGlobalVendor = GLOBAL_VENDOR_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
 
-  const sidebarNavItems = globalVendorsShell ? visibleGlobalVendor : visibleItems;
-
   return (
     <div className="app-layout">
       <div
@@ -109,12 +107,38 @@ export function Layout() {
           </button>
         </div>
         <nav className="sidebar-nav" onClick={closeMenu}>
-          {globalVendorsShell ? (
+          {roleNames.includes('Admin') ? (
+            // Admin: use Product Hub to switch; sidebar only shows the current area's pages.
+            globalVendorsShell ? (
+              <>
+                <div className="sidebar-nav-section" role="presentation">
+                  Global Vendors
+                </div>
+                {visibleGlobalVendor.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </>
+            ) : (
+              visibleItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))
+            )
+          ) : (
+            // Non-admin: unified sidebar showing Sentinel + Global Vendors together.
             <>
-              <div className="sidebar-nav-section" role="presentation">
-                Navigation
-              </div>
-              {sidebarNavItems.map((item) => (
+              {visibleItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -123,17 +147,23 @@ export function Layout() {
                   {item.label}
                 </NavLink>
               ))}
+              {visibleGlobalVendor.length > 0 && (
+                <>
+                  <div className="sidebar-nav-section" role="presentation">
+                    Global Vendors
+                  </div>
+                  {visibleGlobalVendor.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </>
+              )}
             </>
-          ) : (
-            sidebarNavItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-              >
-                {item.label}
-              </NavLink>
-            ))
           )}
         </nav>
       </aside>
@@ -151,13 +181,15 @@ export function Layout() {
             {globalVendorsShell ? 'Global Vendors' : 'Supplier Assurance Platform'}
           </span>
           <div className="app-header-actions">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => navigate('/product-hub')}
-            >
-              Product hub
-            </button>
+            {roleNames.includes('Admin') && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => navigate('/product-hub')}
+              >
+                Product hub
+              </button>
+            )}
             <span className="app-header-user">
               {user?.email}
               {user?.roleNames?.length ? (
