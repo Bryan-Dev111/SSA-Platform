@@ -5,6 +5,7 @@ import { requirePageAccess } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getAllowedSupplierIds } from '../services/scope';
 import { computeSupplierRisk } from '../services/riskScoring';
+import { computeShipmentMetrics } from '../services/shipmentMetrics';
 
 const router = Router();
 
@@ -35,6 +36,11 @@ router.get(
           shipmentRequests: 0,
           shipmentsRejected: 0,
           rejectedDocuments: 0,
+          openCarsWaitingApproval: 0,
+          openCarsOverdue: 0,
+          openFindingsTotal: 0,
+          shipmentLate: 0,
+          shipmentOverdue: 0,
         },
         charts: { topRiskSuppliers: [], upcomingEvents: [], recentUpdates: [], monthlyTrends: [] },
       });
@@ -65,11 +71,11 @@ router.get(
       rejectedDocuments,
       upcomingAudits,
       upcomingShipments,
-    ] =
-      await Promise.all([
+      shipmentMetrics,
+    ] = await Promise.all([
         prisma.correctiveAction.findMany({
           where: { ...whereInScope, status: { not: 'Closed' } },
-          select: { targetCompletionDate: true },
+          select: { targetCompletionDate: true, status: true, correctiveAction: true },
         }),
         prisma.opportunity.count({
           where: { ...whereInScope, type: 'risk', status: 'Open' },
@@ -114,9 +120,13 @@ router.get(
           orderBy: { inspectionDate: 'asc' },
           take: 8,
         }),
+        computeShipmentMetrics(scopeIds),
       ]);
 
     const overdueCars = openCars.filter((c) => c.targetCompletionDate && new Date(c.targetCompletionDate) < now).length;
+    const openCarsWaitingApproval = openCars.filter(
+      (c) => c.status !== 'Closed' && (c.correctiveAction === 'RCCA' || c.correctiveAction === 'FollowUp')
+    ).length;
     const overdueRisks = new Set(
       overdueRiskActions
         .filter((a) => a.risk.type === 'risk' && a.risk.status === 'Open')
@@ -284,6 +294,11 @@ router.get(
         shipmentRequests,
         shipmentsRejected,
         rejectedDocuments,
+        openCarsWaitingApproval,
+        openCarsOverdue: overdueCars,
+        openFindingsTotal: openRisks /* placeholder: could be full open findings count if needed */,
+        shipmentLate: shipmentMetrics.shortDeliveries,
+        shipmentOverdue: shipmentMetrics.overdueWaiting,
       },
       charts: {
         topRiskSuppliers,

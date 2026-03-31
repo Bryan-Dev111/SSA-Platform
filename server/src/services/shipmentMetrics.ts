@@ -41,6 +41,11 @@ export interface LateShipmentDetail {
   qty: number | null;
 }
 
+export interface ShortDeliveryDetail {
+  purchaseOrder: string | null;
+  missingQty: number;
+}
+
 export interface ShipmentMetricsResult {
   totalInspectionRequests: number;
   waitingInspection: number;
@@ -52,6 +57,9 @@ export interface ShipmentMetricsResult {
   lateDetails: LateShipmentDetail[];
   /** Waiting-inspection rows past requested inspection date (for UI tooltip). */
   overdueDetails: LateShipmentDetail[];
+  /** Schedules where shipped quantity is less than planned after scheduled date. */
+  shortDeliveries: number;
+  shortDeliveryDetails: ShortDeliveryDetail[];
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount: number;
@@ -69,6 +77,8 @@ export async function computeShipmentMetrics(
     lateVsSchedule: 0,
     lateDetails: [],
     overdueDetails: [],
+    shortDeliveries: 0,
+    shortDeliveryDetails: [],
     otdPercent: null,
     fpyPercent: null,
     scheduleRowCount: 0,
@@ -101,6 +111,8 @@ export async function computeShipmentMetrics(
   let lateVsSchedule = 0;
   const lateDetails: LateShipmentDetail[] = [];
   const overdueDetails: LateShipmentDetail[] = [];
+  const shortDeliveryDetails: ShortDeliveryDetail[] = [];
+  let shortDeliveries = 0;
   let fpyPassed = 0;
   let fpyFailed = 0;
   let otdOnTime = 0;
@@ -113,7 +125,19 @@ export async function computeShipmentMetrics(
 
   const scheduleRowCount = scopedSchedules.length;
 
+  // Aggregate shipped quantity by (supplier, PO, part) for short-delivery checks.
+  const shippedByKey = new Map<string, number>();
+
+  const makeKey = (supplierId: string, purchaseOrder: string | null, partNumber: string | null): string =>
+    `${supplierId}::${norm(purchaseOrder)}::${norm(partNumber)}`;
+
   for (const sh of shipments) {
+    const shippedQty = typeof sh.qty === 'number' ? sh.qty : 0;
+    if (shippedQty > 0) {
+      const key = makeKey(sh.supplierId, sh.purchaseOrder, sh.partNumber);
+      shippedByKey.set(key, (shippedByKey.get(key) ?? 0) + shippedQty);
+    }
+
     if (sh.status === 'WaitingInspection') {
       waitingInspection++;
       const insp = dateOnlyMs(sh.inspectionDate);
@@ -153,6 +177,22 @@ export async function computeShipmentMetrics(
     }
   }
 
+  // Short deliveries: planned qty on schedule vs total shipped qty, after scheduled date.
+  for (const sch of scopedSchedules) {
+    const plannedQty = typeof sch.qty === 'number' ? sch.qty : 0;
+    const schedDateMs = sch.scheduledDate ? dateOnlyMs(sch.scheduledDate) : null;
+    if (!plannedQty || schedDateMs === null || schedDateMs >= startOfTodayUtc) continue;
+    const key = makeKey(sch.supplierId ?? '', sch.purchaseOrder ?? null, sch.partNumber ?? null);
+    const shippedTotal = shippedByKey.get(key) ?? 0;
+    if (shippedTotal < plannedQty) {
+      shortDeliveries++;
+      shortDeliveryDetails.push({
+        purchaseOrder: sch.purchaseOrder,
+        missingQty: plannedQty - shippedTotal,
+      });
+    }
+  }
+
   const total = shipments.length;
   const fpyDenom = fpyPassed + fpyFailed;
   const otdDenom = otdOnTime + otdLate;
@@ -166,6 +206,8 @@ export async function computeShipmentMetrics(
     lateVsSchedule,
     lateDetails,
     overdueDetails,
+    shortDeliveries,
+    shortDeliveryDetails,
     otdPercent: otdDenom > 0 ? Math.round((otdOnTime / otdDenom) * 1000) / 10 : null,
     fpyPercent: fpyDenom > 0 ? Math.round((fpyPassed / fpyDenom) * 1000) / 10 : null,
     scheduleRowCount,

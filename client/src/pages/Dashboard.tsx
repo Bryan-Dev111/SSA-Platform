@@ -19,12 +19,16 @@ interface DashboardResponse {
     mediumRiskSuppliers?: number;
     openCars: number;
     overdueCars: number;
+    openCarsWaitingApproval?: number;
     openRisks: number;
     overdueRisks: number;
+    openFindingsTotal?: number;
     openFindingsMajorCritical: number;
     shipmentRequests: number;
     shipmentsRejected: number;
     rejectedDocuments: number;
+    shipmentLate?: number;
+    shipmentOverdue?: number;
   };
   charts: {
     upcomingEvents: Array<{
@@ -152,12 +156,16 @@ export function Dashboard() {
     mediumRiskSuppliers: 0,
     openCars: 0,
     overdueCars: 0,
+    openCarsWaitingApproval: 0,
     openRisks: 0,
     overdueRisks: 0,
+    openFindingsTotal: 0,
     openFindingsMajorCritical: 0,
     shipmentRequests: 0,
     shipmentsRejected: 0,
     rejectedDocuments: 0,
+    shipmentLate: 0,
+    shipmentOverdue: 0,
   };
   const upcoming = data?.charts.upcomingEvents ?? [];
   const recentUpdates = data?.charts.recentUpdates ?? [];
@@ -204,7 +212,7 @@ export function Dashboard() {
         <MetricCard
           title="Open CARs"
           value={metrics.openCars}
-          subtitle={`${metrics.overdueCars} overdue CAR${metrics.overdueCars === 1 ? '' : 's'}`}
+          subtitle={`${metrics.overdueCars} overdue · ${metrics.openCarsWaitingApproval ?? 0} waiting approval`}
         />
         <MetricCard
           title="Open risks"
@@ -213,13 +221,13 @@ export function Dashboard() {
         />
         <MetricCard
           title="Open findings"
-          value={metrics.openFindingsMajorCritical}
-          subtitle="Open Major or Critical findings"
+          value={metrics.openFindingsTotal || metrics.openFindingsMajorCritical}
+          subtitle={`${metrics.openFindingsMajorCritical} Major/Critical open`}
         />
         <MetricCard
           title="Shipment Requests"
           value={metrics.shipmentRequests}
-          subtitle="Awaiting inspection"
+          subtitle={`${metrics.shipmentLate ?? 0} late · ${metrics.shipmentOverdue ?? 0} overdue`}
         />
       </div>
 

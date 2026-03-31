@@ -52,6 +52,9 @@ interface Metrics {
   lateDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
   /** Waiting inspection past requested date (same as overdueWaiting count). */
   overdueDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
+  /** Schedules where shipped quantity is less than planned after scheduled date. */
+  shortDeliveries?: number;
+  shortDeliveryDetails?: Array<{ purchaseOrder: string | null; missingQty: number }>;
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount?: number;
@@ -60,29 +63,26 @@ interface Metrics {
 type PurchaseQtyDetail = { purchaseOrder: string | null; qty: number | null };
 
 function openShipmentRequestsSubtitle(m: Metrics): string {
-  const late = m.lateVsSchedule ?? 0;
+  const late = m.shortDeliveries ?? 0;
   const ovd = m.overdueWaiting ?? 0;
-  if (ovd > 0) {
-    return `${late} late vs schedule · ${ovd} overdue`;
-  }
-  return `${late} late vs schedule`;
+  return `${late} late · ${ovd} overdue`;
 }
 
 function openShipmentRequestsAlertProps(m: Metrics):
   | {
-      lateVsSchedule: number;
+      shortDeliveries: number;
       overdueWaiting: number;
-      lateDetails: PurchaseQtyDetail[];
+      shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
       overdueDetails: PurchaseQtyDetail[];
     }
   | undefined {
-  const late = m.lateVsSchedule ?? 0;
+  const late = m.shortDeliveries ?? 0;
   const ovd = m.overdueWaiting ?? 0;
   if (late <= 0 && ovd <= 0) return undefined;
   return {
-    lateVsSchedule: late,
+    shortDeliveries: late,
     overdueWaiting: ovd,
-    lateDetails: m.lateDetails ?? [],
+    shortDetails: m.shortDeliveryDetails ?? [],
     overdueDetails: m.overdueDetails ?? [],
   };
 }
@@ -804,32 +804,36 @@ function formatPoQtyLine(d: PurchaseQtyDetail): string {
 }
 
 function OpenShipmentRequestsAlertIcon({
-  lateVsSchedule,
+  shortDeliveries,
   overdueWaiting,
-  lateDetails,
+  shortDetails,
   overdueDetails,
 }: {
-  lateVsSchedule: number;
+  shortDeliveries: number;
   overdueWaiting: number;
-  lateDetails: PurchaseQtyDetail[];
+  shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
   overdueDetails: PurchaseQtyDetail[];
 }) {
   const [hover, setHover] = useState(false);
 
   const tooltipBlocks: { heading: string; lines: string[] }[] = [];
+  if (shortDeliveries > 0) {
+    const lines =
+      shortDetails.length > 0
+        ? shortDetails.map((d) => {
+            const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
+            const missing = d.missingQty;
+            return `PO: ${po} · Quantity missing: ${missing}`;
+          })
+        : [`${shortDeliveries} late (quantity short vs planned; details unavailable)`];
+    tooltipBlocks.push({ heading: 'Late (quantity short vs planned)', lines });
+  }
   if (overdueWaiting > 0) {
     const lines =
       overdueDetails.length > 0
         ? overdueDetails.map(formatPoQtyLine)
         : [`${overdueWaiting} overdue (details unavailable)`];
     tooltipBlocks.push({ heading: 'Overdue (waiting, past inspection date)', lines });
-  }
-  if (lateVsSchedule > 0) {
-    const lines =
-      lateDetails.length > 0
-        ? lateDetails.map(formatPoQtyLine)
-        : [`${lateVsSchedule} late vs schedule (details unavailable)`];
-    tooltipBlocks.push({ heading: 'Late vs schedule (completed inspection)', lines });
   }
 
   const flatLines = tooltipBlocks.flatMap((b) => [b.heading, ...b.lines]);
@@ -930,9 +934,9 @@ function Metric({
   value: string | number;
   subtitle?: string;
   openShipmentRequestsAlert?: {
-    lateVsSchedule: number;
+    shortDeliveries: number;
     overdueWaiting: number;
-    lateDetails: PurchaseQtyDetail[];
+    shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
     overdueDetails: PurchaseQtyDetail[];
   };
 }) {
@@ -952,9 +956,9 @@ function Metric({
       >
         {openShipmentRequestsAlert != null ? (
           <OpenShipmentRequestsAlertIcon
-            lateVsSchedule={openShipmentRequestsAlert.lateVsSchedule}
+            shortDeliveries={openShipmentRequestsAlert.shortDeliveries}
             overdueWaiting={openShipmentRequestsAlert.overdueWaiting}
-            lateDetails={openShipmentRequestsAlert.lateDetails}
+            shortDetails={openShipmentRequestsAlert.shortDetails}
             overdueDetails={openShipmentRequestsAlert.overdueDetails}
           />
         ) : null}
