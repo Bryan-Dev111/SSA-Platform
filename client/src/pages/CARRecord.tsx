@@ -736,9 +736,9 @@ export function CARRecord() {
         <h1 className="page-title">
           {car ? `${car.code} — CAR` : 'CAR Record'}
         </h1>
-          <p className="page-description">
-            {car ? `Status: ${car.status}` : isNew ? '' : 'CAR not found.'}
-          </p>
+        <p className="page-description">
+          {car ? `Status: ${formatCarStatusForDisplay(car.status)}` : isNew ? '' : 'CAR not found.'}
+        </p>
         <p style={{ marginTop: 4 }}>
           <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions</Link>
         </p>
@@ -929,7 +929,7 @@ export function CARRecord() {
                   style={{
                     gridColumn: '1 / -1',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(170px, 1fr)) auto',
+                    gridTemplateColumns: 'repeat(4, minmax(170px, 1fr)) auto',
                     gap: '1rem',
                     alignItems: 'end',
                   }}
@@ -946,6 +946,15 @@ export function CARRecord() {
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Status</label>
+                    <input
+                      className="input"
+                      value={formatCarStatusForDisplay(car.status)}
+                      readOnly
+                      disabled
+                    />
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">CAR Owner</label>
