@@ -675,6 +675,8 @@ export function CorrectiveActions() {
                             color: 'inherit',
                             width: '100%',
                             overflow: 'hidden',
+                            maxHeight: '2.7em',
+                            textOverflow: 'ellipsis',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
