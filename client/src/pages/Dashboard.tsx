@@ -225,9 +225,11 @@ export function Dashboard() {
           subtitle={`${metrics.openFindingsMajorCritical} Major/Critical open`}
         />
         <MetricCard
-          title="Shipment Requests"
+          title="Shipments"
           value={metrics.shipmentRequests}
           subtitle={`${metrics.shipmentLate ?? 0} late · ${metrics.shipmentOverdue ?? 0} overdue`}
+          showAlert={(metrics.shipmentLate ?? 0) > 0 || (metrics.shipmentOverdue ?? 0) > 0}
+          alertLabel={`Shipments: ${metrics.shipmentLate ?? 0} late, ${metrics.shipmentOverdue ?? 0} overdue`}
         />
       </div>
 
