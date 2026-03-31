@@ -576,6 +576,14 @@ model RiskAction {
   updatedAt          DateTime         @updatedAt
 }
 
+// ============== Legal content (Terms & Privacy) ==============
+model LegalDocument {
+  key       String   @id // 'terms' or 'privacy'
+  title     String
+  content   String   // markdown or plain text
+  updatedAt DateTime @updatedAt
+}
+
 enum RiskItemType {
   risk
   opportunity

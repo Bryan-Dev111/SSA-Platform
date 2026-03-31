@@ -206,6 +206,26 @@ router.post(
       return;
     }
     const inspectionDate = new Date(inspectionDateStr.slice(0, 10) + 'T12:00:00.000Z');
+
+    // Validate that there is at least one scheduled row for this supplier + PO,
+    // so OTD / short-delivery logic can reliably match on the same pair.
+    const normalizedPo = purchaseOrder.toLowerCase();
+    const matchingSchedule = await prisma.shipmentSchedule.findFirst({
+      where: {
+        supplierId,
+        purchaseOrder: {
+          not: null,
+          mode: 'insensitive',
+          equals: normalizedPo,
+        },
+      },
+    });
+    if (!matchingSchedule) {
+      res.status(400).json({
+        error: 'This purchase order does not exist on the shipment schedule for this supplier. Please check the PO number or ask your buyer to add it to the schedule.',
+      });
+      return;
+    }
     const code = await getNextCode('SHIP');
     const createdBy = req.user.name?.trim() ? req.user.name.trim() : req.user.email;
     const shipment = await prisma.shipment.create({

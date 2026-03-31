@@ -45,6 +45,7 @@ import alertsRoutes from './routes/alerts';
 import geocodeRoutes from './routes/geocode';
 import farmsRoutes from './routes/farms';
 import expensesRoutes from './routes/expenses';
+import legalRoutes from './routes/legal';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -92,10 +93,12 @@ app.use('/alerts', alertsRoutes);
 app.use('/geocode', geocodeRoutes);
 app.use('/farms', farmsRoutes);
 app.use('/expenses', expensesRoutes);
+app.use('/legal', legalRoutes);
 /** Same router: supports clients whose VITE_API_URL includes /api while hitting Express directly (no Vercel strip). */
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/farms', farmsRoutes);
 app.use('/api/expenses', expensesRoutes);
+app.use('/api/legal', legalRoutes);
 
 app.use(errorHandler);
 

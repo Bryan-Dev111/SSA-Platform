@@ -15,6 +15,7 @@ import {
   AdminRiskWeightsPanel,
 } from './admin/AdminDay9Panels';
 import { AdminAlertPreferencesPanel } from './admin/AdminAlertPreferencesPanel';
+import { LegalAdminEditor } from './admin/LegalAdminEditor';
 
 type Tab =
   | 'commodity'
@@ -27,7 +28,8 @@ type Tab =
   | 'employees'
   | 'buyersSuppliers'
   | 'permissions'
-  | 'alertPreferences';
+  | 'alertPreferences'
+  | 'legal';
 
 interface CommodityType {
   id: string;
@@ -311,6 +313,7 @@ export function Admin() {
             ['expenses', 'Expenses'],
             ['alertPreferences', 'Email alerts'],
             ['permissions', 'Permissions'],
+            ['legal', 'Legal (Terms & Privacy)'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -360,6 +363,17 @@ export function Admin() {
       )}
       {tab === 'permissions' && <AdminPermissionsPanel token={token} toast={toast} scope="sentinel" />}
       {tab === 'alertPreferences' && <AdminAlertPreferencesPanel token={token} toast={toast} />}
+      {tab === 'legal' && (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Legal content</h2>
+            <p style={{ marginTop: 0, marginBottom: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              Update the Terms and Conditions and Privacy Policy shown on the login page.
+            </p>
+            <LegalAdminEditor token={token} />
+          </div>
+        </div>
+      )}
 
       {tab === 'commodity' && (
         <div className="card">
