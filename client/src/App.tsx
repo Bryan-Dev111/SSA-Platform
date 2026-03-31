@@ -33,6 +33,8 @@ import { GlobalVendorsIndex } from './pages/globalVendors/GlobalVendorsIndex';
 import { FarmersInformationPage } from './pages/globalVendors/FarmersInformationPage';
 import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
 import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
+import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
+import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -106,6 +108,22 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/approved">
                     <ApprovedFarmersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="map"
+                element={
+                  <ProtectedRoute path="/global-vendors/map">
+                    <FarmsMapPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="relationship"
+                element={
+                  <ProtectedRoute path="/global-vendors/relationship">
+                    <RelationshipTrustPage />
                   </ProtectedRoute>
                 }
               />

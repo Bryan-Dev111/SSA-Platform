@@ -413,6 +413,13 @@ a.btn:focus {
   font-size: var(--text-sm);
 }
 
+/* Optional sticky header for wide master tables (e.g. Farmer Information) */
+.table--sticky-header thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .table th {
   padding: var(--space-3) var(--space-4);
   text-align: left;

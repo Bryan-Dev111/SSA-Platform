@@ -26,6 +26,10 @@ const farmSelect = {
   mainCrop: true,
   elevationMeters: true,
   productionStyle: true,
+  firstContactDate: true,
+  lastVisitDate: true,
+  visitCount: true,
+  relationshipStatus: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -36,6 +40,29 @@ router.get(
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const farms = await prisma.farm.findMany({
       select: farmSelect,
+      orderBy: { code: 'asc' },
+    });
+    res.json(farms);
+  })
+);
+
+// Lightweight payload for map pins
+router.get(
+  '/map',
+  requirePageAccessAny(['GlobalSupplyFarmers', 'GlobalSupplyApproved']),
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const farms = await prisma.farm.findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        id: true,
+        code: true,
+        farmName: true,
+        latitude: true,
+        longitude: true,
+      },
       orderBy: { code: 'asc' },
     });
     res.json(farms);
@@ -70,6 +97,129 @@ router.post(
       select: farmSelect,
     });
     res.status(201).json(created);
+  })
+);
+
+// Relationship & trust + general farm updates
+router.patch(
+  '/:id',
+  requirePageAccess('GlobalSupplyFarmers'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = req.params.id;
+    const {
+      farmName,
+      farmerName,
+      country,
+      city,
+      latitude,
+      longitude,
+      region,
+      farmCategory,
+      mainCrop,
+      elevationMeters,
+      productionStyle,
+      firstContactDate,
+      lastVisitDate,
+      visitCount,
+      relationshipStatus,
+    } = req.body ?? {};
+
+    const data: any = {};
+
+    // Core identity/location fields
+    if (typeof farmName === 'string' && farmName.trim()) {
+      data.farmName = farmName.trim();
+    }
+    if (typeof farmerName === 'string' && farmerName.trim()) {
+      data.farmerName = farmerName.trim();
+    }
+    if (typeof country === 'string' && country.trim()) {
+      data.country = country.trim();
+    }
+    if (typeof city === 'string') {
+      data.city = city.trim() || null;
+    }
+
+    // Optional numeric coordinates
+    if (latitude !== undefined) {
+      if (latitude === null || latitude === '') {
+        data.latitude = null;
+      } else {
+        const latNum = Number(latitude);
+        if (Number.isFinite(latNum) && latNum >= -90 && latNum <= 90) {
+          data.latitude = latNum;
+        }
+      }
+    }
+    if (longitude !== undefined) {
+      if (longitude === null || longitude === '') {
+        data.longitude = null;
+      } else {
+        const lonNum = Number(longitude);
+        if (Number.isFinite(lonNum) && lonNum >= -180 && lonNum <= 180) {
+          data.longitude = lonNum;
+        }
+      }
+    }
+
+    // Additional descriptive fields
+    if (typeof region === 'string') {
+      data.region = region.trim() || null;
+    }
+    if (typeof farmCategory === 'string') {
+      data.farmCategory = farmCategory.trim() || null;
+    }
+    if (typeof mainCrop === 'string') {
+      data.mainCrop = mainCrop.trim() || null;
+    }
+    if (elevationMeters !== undefined) {
+      if (elevationMeters === null || elevationMeters === '') {
+        data.elevationMeters = null;
+      } else {
+        const elevNum = Number(elevationMeters);
+        if (Number.isFinite(elevNum)) {
+          data.elevationMeters = elevNum;
+        }
+      }
+    }
+    if (typeof productionStyle === 'string') {
+      data.productionStyle = productionStyle.trim() || null;
+    }
+
+    if (typeof firstContactDate === 'string' && firstContactDate.trim()) {
+      data.firstContactDate = new Date(firstContactDate.slice(0, 10) + 'T12:00:00.000Z');
+    } else if (firstContactDate === null) {
+      data.firstContactDate = null;
+    }
+
+    if (typeof lastVisitDate === 'string' && lastVisitDate.trim()) {
+      data.lastVisitDate = new Date(lastVisitDate.slice(0, 10) + 'T12:00:00.000Z');
+    } else if (lastVisitDate === null) {
+      data.lastVisitDate = null;
+    }
+
+    if (typeof visitCount === 'number') {
+      data.visitCount = visitCount;
+    } else if (visitCount === null) {
+      data.visitCount = null;
+    }
+
+    if (typeof relationshipStatus === 'string') {
+      data.relationshipStatus = relationshipStatus.trim() || null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'No updatable fields provided' });
+      return;
+    }
+
+    const updated = await prisma.farm.update({
+      where: { id },
+      data,
+      select: farmSelect,
+    });
+
+    res.json(updated);
   })
 );
 

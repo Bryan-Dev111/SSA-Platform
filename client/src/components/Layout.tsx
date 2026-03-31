@@ -27,6 +27,8 @@ const MENU_ITEMS: { path: string; label: string }[] = [
 const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
   { path: '/global-vendors/farmers', label: 'Farmer Information' },
   { path: '/global-vendors/approved', label: 'Approved Farmers' },
+  { path: '/global-vendors/map', label: 'Farms Map' },
+  { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
   { path: '/global-vendors/admin', label: 'Permissions' },
 ];
 
