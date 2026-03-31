@@ -27,6 +27,7 @@ const MENU_ITEMS: { path: string; label: string }[] = [
 const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
   { path: '/global-vendors/farmers', label: 'Farmer Information' },
   { path: '/global-vendors/approved', label: 'Approved Farmers' },
+  { path: '/global-vendors/admin', label: 'Permissions' },
 ];
 
 /** Routes under this prefix use the Global Vendors shell only (sidebar + header). */

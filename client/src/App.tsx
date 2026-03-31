@@ -32,6 +32,7 @@ import { ProductHub } from './pages/ProductHub';
 import { GlobalVendorsIndex } from './pages/globalVendors/GlobalVendorsIndex';
 import { FarmersInformationPage } from './pages/globalVendors/FarmersInformationPage';
 import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
+import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -84,7 +85,14 @@ function App() {
             <Route path="admin" element={<ProtectedRoute path="/admin"><Admin /></ProtectedRoute>} />
             <Route path="no-access" element={<ProtectedRoute path="/no-access"><NoAccess /></ProtectedRoute>} />
             <Route path="global-vendors">
-              <Route index element={<ProtectedRoute path="/global-vendors"><GlobalVendorsIndex /></ProtectedRoute>} />
+              <Route
+                index
+                element={
+                  <ProtectedRoute path="/global-vendors">
+                    <GlobalVendorsIndex />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="farmers"
                 element={
@@ -98,6 +106,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/approved">
                     <ApprovedFarmersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin"
+                element={
+                  <ProtectedRoute path="/global-vendors/admin">
+                    <GlobalVendorsAdmin />
                   </ProtectedRoute>
                 }
               />

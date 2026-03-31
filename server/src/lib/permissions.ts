@@ -75,6 +75,7 @@ export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/global-vendors': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
   '/global-vendors/farmers': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
   '/global-vendors/approved': DEFAULT_API_PAGE_ROLES.GlobalSupplyApproved,
+  '/global-vendors/admin': DEFAULT_API_PAGE_ROLES.Admin,
   '/records': DEFAULT_API_PAGE_ROLES.Records,
   '/shipments': DEFAULT_API_PAGE_ROLES.Shipments,
   '/documents': DEFAULT_API_PAGE_ROLES.Documents,
