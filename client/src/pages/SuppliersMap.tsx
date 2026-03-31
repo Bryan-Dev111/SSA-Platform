@@ -13,6 +13,8 @@ interface SupplierRow {
   city: string | null;
   country: string | null;
   status: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface RiskCurrentRow {
@@ -68,12 +70,24 @@ export function SuppliersMap() {
   useEffect(() => {
     if (!token) return;
 
-    const withLocationText = suppliers
-      .filter((s) => Boolean(s.city || s.country))
+    const next: Record<string, GeoPoint> = {};
+    const toGeocode = suppliers
+      .filter((s) => {
+        const hasCoords =
+          typeof s.latitude === 'number' &&
+          Number.isFinite(s.latitude) &&
+          typeof s.longitude === 'number' &&
+          Number.isFinite(s.longitude);
+        if (hasCoords) {
+          next[s.id] = { lat: s.latitude as number, lon: s.longitude as number };
+          return false;
+        }
+        return Boolean(s.city || s.country);
+      })
       .map((s) => ({ id: s.id, q: [s.city, s.country].filter(Boolean).join(', ') }));
 
-    if (withLocationText.length === 0) {
-      setGeoBySupplierId({});
+    if (toGeocode.length === 0) {
+      setGeoBySupplierId(next);
       return;
     }
 
@@ -81,14 +95,20 @@ export function SuppliersMap() {
     setGeoLoading(true);
     (async () => {
       try {
-        const next = await apiJson<Record<string, GeoPoint>>('/geocode/batch', {
+        const geocoded = await apiJson<Record<string, GeoPoint>>('/geocode/batch', {
           method: 'POST',
           token,
-          body: JSON.stringify({ items: withLocationText }),
+          body: JSON.stringify({ items: toGeocode }),
         });
-        if (active) setGeoBySupplierId(next && typeof next === 'object' ? next : {});
+        if (active) {
+          const merged =
+            geocoded && typeof geocoded === 'object'
+              ? { ...next, ...geocoded }
+              : { ...next };
+          setGeoBySupplierId(merged);
+        }
       } catch {
-        if (active) setGeoBySupplierId({});
+        if (active) setGeoBySupplierId(next);
       } finally {
         if (active) setGeoLoading(false);
       }

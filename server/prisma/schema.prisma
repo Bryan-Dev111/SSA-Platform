@@ -112,6 +112,8 @@ model Supplier {
   name            String
   city            String?
   country         String?
+  latitude        Float?
+  longitude       Float?
   status          String    @default("Active")
   notes           String?
   commodityTypeId String?

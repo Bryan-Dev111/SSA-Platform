@@ -647,6 +647,8 @@ interface SupplierRow {
   commodityType: { id: string; name: string } | null;
   userId?: string | null;
   user?: { id: string; email: string; name: string | null } | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'] as const;
@@ -712,6 +714,8 @@ export function AdminBuyersSuppliersPanel({
   const [newSupStatus, setNewSupStatus] = useState<'Active' | 'Inactive'>('Active');
   const [newSupNotes, setNewSupNotes] = useState('');
   const [newSupCommodityTypeId, setNewSupCommodityTypeId] = useState('');
+  const [newSupLatitude, setNewSupLatitude] = useState('');
+  const [newSupLongitude, setNewSupLongitude] = useState('');
   const [commodityTypes, setCommodityTypes] = useState<CommodityTypeRow[]>([]);
   const [editSup, setEditSup] = useState<SupplierRow | null>(null);
   const [editUser, setEditUser] = useState<UserRow | null>(null);
@@ -892,6 +896,8 @@ export function AdminBuyersSuppliersPanel({
           country: newSupCountry.trim() || null,
           status: newSupStatus,
           notes: newSupNotes.trim() || null,
+          latitude: newSupLatitude.trim() === '' ? null : Number(newSupLatitude),
+          longitude: newSupLongitude.trim() === '' ? null : Number(newSupLongitude),
           commodityTypeId: newSupCommodityTypeId.trim() ? newSupCommodityTypeId.trim() : null,
         }),
       });
@@ -901,6 +907,8 @@ export function AdminBuyersSuppliersPanel({
       setNewSupStatus('Active');
       setNewSupNotes('');
       setNewSupCommodityTypeId('');
+      setNewSupLatitude('');
+      setNewSupLongitude('');
       toast.success('Supplier created');
       await load();
     } catch (e) {
@@ -921,6 +929,14 @@ export function AdminBuyersSuppliersPanel({
           name: editSup.name.trim(),
           city: editSup.city?.trim() || null,
           country: editSup.country?.trim() || null,
+          latitude:
+            editSup.latitude === null || editSup.latitude === undefined
+              ? null
+              : Number(editSup.latitude),
+          longitude:
+            editSup.longitude === null || editSup.longitude === undefined
+              ? null
+              : Number(editSup.longitude),
           status: editSup.status,
           notes: editSup.notes?.trim() || null,
           commodityTypeId: editSup.commodityTypeId,
@@ -1090,6 +1106,30 @@ export function AdminBuyersSuppliersPanel({
               <input className="input" value={newSupCountry} onChange={(e) => setNewSupCountry(e.target.value)} />
             </div>
             <div className="input-group">
+              <label className="input-label">Latitude</label>
+              <input
+                className="input"
+                type="number"
+                step="0.000001"
+                min={-90}
+                max={90}
+                value={newSupLatitude}
+                onChange={(e) => setNewSupLatitude(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Longitude</label>
+              <input
+                className="input"
+                type="number"
+                step="0.000001"
+                min={-180}
+                max={180}
+                value={newSupLongitude}
+                onChange={(e) => setNewSupLongitude(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
               <label className="input-label">Status</label>
               <select className="input" value={newSupStatus} onChange={(e) => setNewSupStatus(e.target.value as 'Active' | 'Inactive')}>
                 <option value="Active">Active</option>
@@ -1136,6 +1176,8 @@ export function AdminBuyersSuppliersPanel({
                   <th>Name</th>
                   <th>City</th>
                   <th>Country</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
                   <th>Commodity</th>
                   <th>Status</th>
                   <th>Notes</th>
@@ -1169,6 +1211,50 @@ export function AdminBuyersSuppliersPanel({
                         />
                       ) : (
                         s.country ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input
+                          className="input"
+                          type="number"
+                          step="0.000001"
+                          min={-90}
+                          max={90}
+                          value={editSup.latitude ?? ''}
+                          onChange={(e) =>
+                            setEditSup({
+                              ...editSup,
+                              latitude: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                        />
+                      ) : typeof s.latitude === 'number' ? (
+                        s.latitude
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td>
+                      {editSup?.id === s.id ? (
+                        <input
+                          className="input"
+                          type="number"
+                          step="0.000001"
+                          min={-180}
+                          max={180}
+                          value={editSup.longitude ?? ''}
+                          onChange={(e) =>
+                            setEditSup({
+                              ...editSup,
+                              longitude: e.target.value === '' ? null : Number(e.target.value),
+                            })
+                          }
+                        />
+                      ) : typeof s.longitude === 'number' ? (
+                        s.longitude
+                      ) : (
+                        '—'
                       )}
                     </td>
                     <td>

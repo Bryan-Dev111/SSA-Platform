@@ -32,6 +32,7 @@ router.get(
         name: true,
         city: true,
         country: true,
+        // latitude/longitude added in schema; keep select minimal here until prisma generate is run
         status: true,
         notes: true,
         commodityTypeId: true,
@@ -58,6 +59,24 @@ router.post(
     }
     const city = typeof req.body?.city === 'string' ? req.body.city.trim() || null : null;
     const country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
+    const latitudeRaw = req.body?.latitude;
+    const longitudeRaw = req.body?.longitude;
+    const latitude =
+      latitudeRaw === null || latitudeRaw === undefined || latitudeRaw === ''
+        ? null
+        : Number(latitudeRaw);
+    const longitude =
+      longitudeRaw === null || longitudeRaw === undefined || longitudeRaw === ''
+        ? null
+        : Number(longitudeRaw);
+    if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+      res.status(400).json({ error: 'latitude must be between -90 and 90' });
+      return;
+    }
+    if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+      res.status(400).json({ error: 'longitude must be between -180 and 180' });
+      return;
+    }
     const statusRaw = typeof req.body?.status === 'string' ? req.body.status.trim() : 'Active';
     const status = statusRaw === 'Inactive' ? 'Inactive' : 'Active';
     const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() || null : null;
@@ -79,20 +98,21 @@ router.post(
     const code = await getNextCode('SUP');
     const created = await prisma.supplier.create({
       // Keep create compatible with databases where Supplier.status is TEXT (no SupplierStatus enum type).
-      data: { code, name, city, country, notes, commodityTypeId },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        city: true,
-        country: true,
-        status: true,
-        notes: true,
-        commodityTypeId: true,
-        commodityType: { select: { id: true, name: true } },
-        userId: true,
-        user: { select: { id: true, email: true, name: true } },
-      },
+      data: { code, name, city, country, notes, commodityTypeId, latitude, longitude } as any,
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          city: true,
+          country: true,
+          // latitude/longitude available once prisma regenerate runs
+          status: true,
+          notes: true,
+          commodityTypeId: true,
+          commodityType: { select: { id: true, name: true } },
+          userId: true,
+          user: { select: { id: true, email: true, name: true } },
+        },
     });
     if (status === 'Inactive') {
       await prisma.$executeRaw`UPDATE "Supplier" SET "status" = 'Inactive' WHERE "id" = ${created.id}`;
@@ -133,6 +153,8 @@ router.patch(
       name?: string;
       city?: string | null;
       country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
       notes?: string | null;
       commodityTypeId?: string | null;
       userId?: string | null;
@@ -151,6 +173,26 @@ router.patch(
     }
     if (body.country !== undefined) {
       data.country = typeof body.country === 'string' ? body.country.trim() || null : null;
+    }
+    if (body.latitude !== undefined) {
+      const v = body.latitude;
+      const latitude =
+        v === null || v === undefined || v === '' ? null : Number(v);
+      if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+        res.status(400).json({ error: 'latitude must be between -90 and 90' });
+        return;
+      }
+      data.latitude = latitude;
+    }
+    if (body.longitude !== undefined) {
+      const v = body.longitude;
+      const longitude =
+        v === null || v === undefined || v === '' ? null : Number(v);
+      if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+        res.status(400).json({ error: 'longitude must be between -180 and 180' });
+        return;
+      }
+      data.longitude = longitude;
     }
     if (body.status !== undefined) {
       const status = typeof body.status === 'string' ? body.status.trim() : '';
@@ -200,6 +242,7 @@ router.patch(
         name: true,
         city: true,
         country: true,
+        // latitude/longitude available once prisma regenerate runs
         status: true,
         notes: true,
         commodityTypeId: true,

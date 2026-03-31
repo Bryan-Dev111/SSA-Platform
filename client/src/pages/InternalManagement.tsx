@@ -1525,9 +1525,7 @@ export function InternalManagement() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
               <h2 style={{ marginTop: 0 }}>Inactive projects</h2>
-              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Profit and costs for projects set to Inactive are listed separately.
-              </p>
+
               <div
                 style={{
                   width: '100%',
