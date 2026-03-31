@@ -391,9 +391,12 @@ export function Shipments() {
             label="Open Shipment Requests"
             value={metrics.waitingInspection}
             subtitle={openShipmentRequestsSubtitle(metrics)}
+          />
+          <Metric
+            label="On-Time Delivery"
+            value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'}
             openShipmentRequestsAlert={openShipmentRequestsAlertProps(metrics)}
           />
-          <Metric label="On-Time Delivery" value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'} />
         </div>
       )}
 
