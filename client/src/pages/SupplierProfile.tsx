@@ -425,7 +425,13 @@ export function SupplierProfile() {
         </strong>
       </div>
 
-      <div className="dashboard-metric-grid" style={{ marginBottom: '1.5rem' }}>
+      <div
+        className="dashboard-metric-grid"
+        style={{
+          marginBottom: '1.5rem',
+          gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+        }}
+      >
         <MetricCard
           title="Assigned Buyers"
           value={metrics.assignedBuyerCount}
