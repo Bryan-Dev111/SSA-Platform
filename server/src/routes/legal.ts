@@ -47,15 +47,11 @@ router.put(
   '/:key',
   ...adminOnly,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const key = req.params.key;
+    const key = req.params.key === 'privacy' ? 'privacy' : 'terms';
     const title =
-      typeof req.body?.title === 'string' && req.body.title.trim()
-        ? req.body.title.trim()
-        : key === 'terms'
-          ? 'Terms and Conditions'
-          : key === 'privacy'
-            ? 'Privacy Policy'
-            : 'Legal';
+      key === 'terms'
+        ? 'Terms and Conditions'
+        : 'Privacy Policy';
     const content =
       typeof req.body?.content === 'string' && req.body.content.trim()
         ? req.body.content
