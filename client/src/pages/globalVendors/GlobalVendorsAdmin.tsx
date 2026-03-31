@@ -11,7 +11,7 @@ export function GlobalVendorsAdmin() {
       <header className="page-header">
         <h1 className="page-title">Global Vendors — Permissions</h1>
       </header>
-      <AdminPermissionsPanel token={token} toast={toast} />
+      <AdminPermissionsPanel token={token} toast={toast} scope="globalVendors" />
     </div>
   );
 }

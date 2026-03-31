@@ -14,9 +14,6 @@ import {
   AdminPermissionsPanel,
   AdminRiskWeightsPanel,
 } from './admin/AdminDay9Panels';
-import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
-import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
-import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { AdminAlertPreferencesPanel } from './admin/AdminAlertPreferencesPanel';
 
 type Tab =
@@ -29,9 +26,6 @@ type Tab =
   | 'users'
   | 'employees'
   | 'buyersSuppliers'
-  | 'employeeAssignments'
-  | 'workLogs'
-  | 'laborCosts'
   | 'permissions'
   | 'alertPreferences';
 
@@ -308,10 +302,7 @@ export function Admin() {
           [
             ['users', 'Users'],
             ['employees', 'Employees'],
-            ['employeeAssignments', 'Employee Assignments'],
             ['buyersSuppliers', 'Buyers & Suppliers'],
-            ['workLogs', 'Work Logs'],
-            ['laborCosts', 'Labor Costs'],
             ['commodity', 'Commodity types'],
             ['defect', 'Defect codes'],
             ['disposition', 'Disposition codes'],
@@ -367,16 +358,7 @@ export function Admin() {
           showBuyerSupplierSections
         />
       )}
-      {tab === 'employeeAssignments' && (
-        <AdminEmployeeAssignmentsPanel token={token} toast={toast} />
-      )}
-      {tab === 'workLogs' && (
-        <AdminWorkLogsPanel token={token} />
-      )}
-      {tab === 'laborCosts' && (
-        <AdminLaborCostsPanel token={token} />
-      )}
-      {tab === 'permissions' && <AdminPermissionsPanel token={token} toast={toast} />}
+      {tab === 'permissions' && <AdminPermissionsPanel token={token} toast={toast} scope="sentinel" />}
       {tab === 'alertPreferences' && <AdminAlertPreferencesPanel token={token} toast={toast} />}
 
       {tab === 'commodity' && (

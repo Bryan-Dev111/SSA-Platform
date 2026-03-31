@@ -10,9 +10,22 @@ import { Navigate } from 'react-router-dom';
 import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MetricCard } from '../components/MetricCard';
+import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
+import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
+import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-type ImTab = 'audits' | 'shipments' | 'contracts' | 'documents' | 'commandMedia' | 'projectHistory' | 'profit';
+type ImTab =
+  | 'audits'
+  | 'shipments'
+  | 'contracts'
+  | 'documents'
+  | 'commandMedia'
+  | 'projectHistory'
+  | 'profit'
+  | 'employeeAssignments'
+  | 'workLogs'
+  | 'laborCosts';
 
 const COMMAND_MEDIA_TYPES: { value: string; label: string }[] = [
   { value: 'Procedure', label: 'Procedure' },
@@ -690,6 +703,9 @@ export function InternalManagement() {
             ['commandMedia', 'Command Media'],
             ['projectHistory', 'Project History'],
             ['profit', 'Profit'],
+            ['employeeAssignments', 'Employee Assignments'],
+            ['workLogs', 'Work Logs'],
+            ['laborCosts', 'Labor Costs'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -1581,6 +1597,24 @@ export function InternalManagement() {
             </div>
           </div>
         </>
+      )}
+
+      {tab === 'employeeAssignments' && (
+        <div style={{ marginTop: '1rem' }}>
+          <AdminEmployeeAssignmentsPanel token={token} toast={toast} />
+        </div>
+      )}
+
+      {tab === 'workLogs' && (
+        <div style={{ marginTop: '1rem' }}>
+          <AdminWorkLogsPanel token={token} />
+        </div>
+      )}
+
+      {tab === 'laborCosts' && (
+        <div style={{ marginTop: '1rem' }}>
+          <AdminLaborCostsPanel token={token} />
+        </div>
       )}
 
       {tab === 'commandMedia' && (

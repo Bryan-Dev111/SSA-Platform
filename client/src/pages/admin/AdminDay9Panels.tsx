@@ -1748,7 +1748,15 @@ export function AdminBuyersSuppliersPanel({
 /**
  * Day 9.4: Client routes (menu/guards) + live server matrix from GET /users/permission-matrix.
  */
-export function AdminPermissionsPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+export function AdminPermissionsPanel({
+  token,
+  toast,
+  scope = 'all',
+}: {
+  token: string | null;
+  toast: ToastApi;
+  scope?: 'all' | 'sentinel' | 'globalVendors';
+}) {
   const [serverData, setServerData] = useState<PermissionMatrixResponse | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1822,6 +1830,17 @@ export function AdminPermissionsPanel({ token, toast }: { token: string | null; 
     }
   };
 
+  const filteredPages = useMemo(() => {
+    if (!serverData) return [];
+    if (scope === 'globalVendors') {
+      return serverData.pages.filter((p) => p.path.startsWith('/global-vendors'));
+    }
+    if (scope === 'sentinel') {
+      return serverData.pages.filter((p) => !p.path.startsWith('/global-vendors'));
+    }
+    return serverData.pages;
+  }, [serverData, scope]);
+
   return (
     <div className="card">
       <div className="card-body">
@@ -1850,7 +1869,7 @@ export function AdminPermissionsPanel({ token, toast }: { token: string | null; 
               <thead>
                 <tr>
                   <th>Role</th>
-                  {serverData.pages.map((p) => (
+                  {filteredPages.map((p) => (
                     <th key={p.key}>{p.label}</th>
                   ))}
                 </tr>
@@ -1859,7 +1878,7 @@ export function AdminPermissionsPanel({ token, toast }: { token: string | null; 
                 {serverData.roles.map((roleName) => (
                   <tr key={roleName}>
                     <td>{formatUserRoleLabel(roleName)}</td>
-                    {serverData.pages.map((p) => (
+                    {filteredPages.map((p) => (
                       <td key={`${roleName}-${p.key}`}>
                         <input
                           type="checkbox"
