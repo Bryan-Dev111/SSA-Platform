@@ -239,9 +239,23 @@ export function CorrectiveActions() {
         Status: formatCarStatusLabel(c.status),
         Summary: c.summary,
         Owner: c.carOwner?.trim() ? c.carOwner : '—',
-        'Target Completion Date': c.targetCompletionDate ? new Date(c.targetCompletionDate).toLocaleDateString() : '—',
-        Created: new Date(c.createdAt).toLocaleDateString(),
-        Updated: new Date(c.updatedAt).toLocaleDateString(),
+        'Target Completion Date': c.targetCompletionDate
+          ? new Date(c.targetCompletionDate).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+          : '—',
+        Created: new Date(c.createdAt).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+        Updated: new Date(c.updatedAt).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
       }));
       if (rows.length === 0) return;
       const supplierSuffix =
@@ -690,8 +704,20 @@ export function CorrectiveActions() {
                       )}
                     </td>
                     <td>{c.carOwner?.trim() ? c.carOwner : '—'}</td>
-                    <td>{new Date(c.createdAt).toLocaleDateString()}</td>
-                    <td>{new Date(c.updatedAt).toLocaleDateString()}</td>
+                    <td>
+                      {new Date(c.createdAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
+                    <td>
+                      {new Date(c.updatedAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
                     {isAdmin && (
                       <td>
                         <button

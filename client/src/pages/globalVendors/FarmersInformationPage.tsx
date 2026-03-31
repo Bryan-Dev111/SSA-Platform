@@ -157,7 +157,13 @@ export function FarmersInformationPage() {
                     <td>{f.farmerName}</td>
                     <td>{f.country}</td>
                     <td>{f.city ?? '—'}</td>
-                    <td>{new Date(f.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      {new Date(f.createdAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
                   </tr>
                 ))
               )}

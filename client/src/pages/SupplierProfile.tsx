@@ -767,7 +767,13 @@ export function SupplierProfile() {
                 <td>{s.qty ?? '—'}</td>
                 <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
                 <td>{s.createdBy ?? '—'}</td>
-                <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                <td>
+                  {new Date(s.createdAt).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </td>
                 <td
                   style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                   title={s.notes ?? ''}

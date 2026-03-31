@@ -264,7 +264,13 @@ export function Dashboard() {
                         }}
                       >
                         <span style={{ color: 'var(--color-text-muted)' }}>
-                          {e.date ? new Date(e.date).toLocaleDateString() : 'N/A'}
+                          {e.date
+                            ? new Date(e.date).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : 'N/A'}
                         </span>
                         <span>
                           <strong>{e.type}</strong> {e.code} - {e.supplierCode} — {e.supplierName}
@@ -296,7 +302,13 @@ export function Dashboard() {
                   <tbody>
                     {recentUpdates.map((u) => (
                       <tr key={u.id}>
-                        <td>{new Date(u.date).toLocaleDateString()}</td>
+                        <td>
+                          {new Date(u.date).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </td>
                         <td>{u.type}</td>
                         <td title={u.code} style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {u.code}

@@ -731,7 +731,15 @@ export function Risk() {
                       <td>{row.risk.riskLevel ?? 'TBD'}</td>
                       <td>{row.description}</td>
                       <td>{row.owner || row.createdBy?.name || row.createdBy?.email || 'Unassigned'}</td>
-                      <td>{row.dueDate ? new Date(row.dueDate).toLocaleDateString() : '—'}</td>
+                      <td>
+                        {row.dueDate
+                          ? new Date(row.dueDate).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : '—'}
+                      </td>
                       <td>{row.status}</td>
                       <td>{row.residualLikelihood ?? '—'}</td>
                       <td>{row.residualSeverity ?? '—'}</td>

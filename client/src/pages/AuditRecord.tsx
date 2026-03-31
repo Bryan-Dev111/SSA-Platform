@@ -34,6 +34,18 @@ interface Audit {
   findingCodes: string[];
 }
 
+function formatAuditRecordDate(isoOrDateStr: string | null | undefined): string {
+  if (!isoOrDateStr) return '—';
+  const ymd = isoOrDateStr.trim().slice(0, 10);
+  const d = new Date(ymd);
+  if (Number.isNaN(d.getTime())) return isoOrDateStr;
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export function AuditRecord() {
   const { token } = useAuth();
   const [searchParams] = useSearchParams();
@@ -108,7 +120,7 @@ export function AuditRecord() {
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Audit date</label>
                 <div className="input" style={{ userSelect: 'text' }}>
-                  {audit.auditDate}
+                  {formatAuditRecordDate(audit.auditDate)}
                 </div>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>

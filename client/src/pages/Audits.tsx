@@ -34,11 +34,15 @@ interface Audit {
   records: Array<{ id: string; name: string; hasFile: boolean }>;
 }
 
-/** Format ISO/YYYY-MM-DD date as locale date string without timezone shift */
+/** Format ISO/YYYY-MM-DD date as locale date string without timezone shift, with short month name */
 function formatCalendarDate(isoOrDateStr: string): string {
   const ymd = isoOrDateStr.trim().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return isoOrDateStr;
-  return new Date(ymd + 'T12:00:00').toLocaleDateString();
+  return new Date(ymd + 'T12:00:00').toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 /** Slug for audit row CSS by derivedStatus */
