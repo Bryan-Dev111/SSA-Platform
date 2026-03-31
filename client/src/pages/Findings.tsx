@@ -101,11 +101,13 @@ export function Findings() {
   const topDefectCodes = defectCodeCounts.slice(0, 10);
   const maxDefectCount = Math.max(1, ...defectCodeCounts.map((d) => d.count));
   const auditFindingsCount = list.filter((f) => !!f.audit).length;
-  const shipmentFindingsCount = Math.max(0, list.length - auditFindingsCount);
+  const shipmentFindingsCount = list.filter((f) => !f.audit && !!f.shipment).length;
+  const noneFindingsCount = Math.max(0, list.length - auditFindingsCount - shipmentFindingsCount);
   const sourceDonut = useMemo(() => {
     const slices = [
       { key: 'audit', count: auditFindingsCount, color: '#2563eb' },
       { key: 'shipment', count: shipmentFindingsCount, color: '#8b5cf6' },
+      { key: 'none', count: noneFindingsCount, color: '#6b7280' },
     ];
     const total = slices.reduce((sum, s) => sum + s.count, 0);
     const nonZero = slices.filter((s) => s.count > 0);
@@ -321,20 +323,20 @@ export function Findings() {
         </label>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 240px))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 260px))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total</div>
-          <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Critical/Major
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total findings</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalAll}</div>
+          <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.4 }}>
+            {stats.criticalMajor} Critical/Major
           </div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.criticalMajor}</div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open</div>
-          <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Critical/Major
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open findings</div>
+          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
+          <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.4 }}>
+            {stats.openCriticalMajor} Critical/Major open
           </div>
-          <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openCriticalMajor}</div>
         </div>
       </div>
 
@@ -394,11 +396,15 @@ export function Findings() {
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{shipmentFindingsCount}</span>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#6b7280', display: 'inline-block' }} />
+                    None
+                  </span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{noneFindingsCount}</span>
+                </div>
               </div>
             </div>
-            <p style={{ marginBottom: 0, marginTop: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-              Shipment findings are currently inferred from findings without an audit link.
-            </p>
           </div>
         </div>
 
