@@ -60,30 +60,31 @@ interface Metrics {
   scheduleRowCount?: number;
 }
 
-type PurchaseQtyDetail = { purchaseOrder: string | null; qty: number | null };
+function openShipmentRequestsSubtitle(_m: Metrics): string {
+  // Client requested: remove "late / overdue" breakdown from this card;
+  // we keep a simple status label instead.
+  return 'Waiting inspection';
+}
 
-function openShipmentRequestsSubtitle(m: Metrics): string {
+function onTimeDeliverySubtitle(m: Metrics): string {
   const late = m.shortDeliveries ?? 0;
-  const ovd = m.overdueWaiting ?? 0;
-  return `${late} late · ${ovd} overdue`;
+  if (late <= 0) return 'No late POs';
+  return `${late} late`;
 }
 
 function openShipmentRequestsAlertProps(m: Metrics):
   | {
       shortDeliveries: number;
-      overdueWaiting: number;
       shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
-      overdueDetails: PurchaseQtyDetail[];
     }
   | undefined {
   const late = m.shortDeliveries ?? 0;
-  const ovd = m.overdueWaiting ?? 0;
-  if (late <= 0 && ovd <= 0) return undefined;
+  // Alert triangle should only reflect "quantity short vs planned" (late),
+  // not overdue inspection dates.
+  if (late <= 0) return undefined;
   return {
     shortDeliveries: late,
-    overdueWaiting: ovd,
     shortDetails: m.shortDeliveryDetails ?? [],
-    overdueDetails: m.overdueDetails ?? [],
   };
 }
 
@@ -395,6 +396,7 @@ export function Shipments() {
           <Metric
             label="On-Time Delivery"
             value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'}
+            subtitle={onTimeDeliverySubtitle(metrics)}
             openShipmentRequestsAlert={openShipmentRequestsAlertProps(metrics)}
           />
         </div>
@@ -800,22 +802,12 @@ export function Shipments() {
   );
 }
 
-function formatPoQtyLine(d: PurchaseQtyDetail): string {
-  const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
-  const q = d.qty != null ? String(d.qty) : '—';
-  return `PO: ${po} · Qty: ${q}`;
-}
-
 function OpenShipmentRequestsAlertIcon({
   shortDeliveries,
-  overdueWaiting,
   shortDetails,
-  overdueDetails,
 }: {
   shortDeliveries: number;
-  overdueWaiting: number;
   shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
-  overdueDetails: PurchaseQtyDetail[];
 }) {
   const [hover, setHover] = useState(false);
 
@@ -830,13 +822,6 @@ function OpenShipmentRequestsAlertIcon({
           })
         : [`${shortDeliveries} late (quantity short vs planned; details unavailable)`];
     tooltipBlocks.push({ heading: 'Late (quantity short vs planned)', lines });
-  }
-  if (overdueWaiting > 0) {
-    const lines =
-      overdueDetails.length > 0
-        ? overdueDetails.map(formatPoQtyLine)
-        : [`${overdueWaiting} overdue (details unavailable)`];
-    tooltipBlocks.push({ heading: 'Overdue (waiting, past inspection date)', lines });
   }
 
   const flatLines = tooltipBlocks.flatMap((b) => [b.heading, ...b.lines]);
@@ -938,9 +923,7 @@ function Metric({
   subtitle?: string;
   openShipmentRequestsAlert?: {
     shortDeliveries: number;
-    overdueWaiting: number;
     shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
-    overdueDetails: PurchaseQtyDetail[];
   };
 }) {
   const cardClass =
@@ -960,9 +943,7 @@ function Metric({
         {openShipmentRequestsAlert != null ? (
           <OpenShipmentRequestsAlertIcon
             shortDeliveries={openShipmentRequestsAlert.shortDeliveries}
-            overdueWaiting={openShipmentRequestsAlert.overdueWaiting}
             shortDetails={openShipmentRequestsAlert.shortDetails}
-            overdueDetails={openShipmentRequestsAlert.overdueDetails}
           />
         ) : null}
         <div

@@ -100,7 +100,7 @@ export function Layout() {
       />
       <aside className={`sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Main navigation">
         <div className="sidebar-brand-wrap">
-          <div className="sidebar-brand">{globalVendorsShell ? 'Global Vendors' : 'Sentinel'}</div>
+          <div className="sidebar-brand">Sentinel</div>
           <button
             type="button"
             className="sidebar-close-btn"
@@ -181,9 +181,7 @@ export function Layout() {
           >
             <MenuIcon />
           </button>
-          <span className="app-header-title">
-            {globalVendorsShell ? 'Global Vendors' : 'Supplier Assurance Platform'}
-          </span>
+          <span className="app-header-title">Supplier Assurance Platform</span>
           <div className="app-header-actions">
             {roleNames.includes('Admin') && (
               <button
