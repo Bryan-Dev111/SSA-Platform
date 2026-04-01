@@ -9,9 +9,6 @@ export function LoginBrandedShell({ children }: { children: ReactNode }) {
           <div className="login-brand-content">
             <p className="login-brand-kicker">Supplier Assurance Platform</p>
             <h2 className="login-brand-title">Welcome back</h2>
-            <p className="login-brand-copy">
-              Monitor supplier quality, audits, risk, and delivery performance from one place.
-            </p>
           </div>
         </aside>
         {children}
