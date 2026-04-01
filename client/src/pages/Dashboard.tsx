@@ -217,7 +217,7 @@ export function Dashboard() {
         <MetricCard
           title="Open risks"
           value={metrics.openRisks}
-          subtitle={`${metrics.overdueRisks} overdue risk${metrics.overdueRisks === 1 ? '' : 's'}`}
+          subtitle={`${metrics.overdueRisks} overdue risk action${metrics.overdueRisks === 1 ? '' : 's'}`}
         />
         <MetricCard
           title="Open findings"
