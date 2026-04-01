@@ -114,20 +114,15 @@ export function Layout() {
           {roleNames.includes('Admin') ? (
             // Admin: use Product Hub to switch; sidebar only shows the current area's pages.
             globalVendorsShell ? (
-              <>
-                <div className="sidebar-nav-section" role="presentation">
-                  Global Vendors
-                </div>
-                {visibleGlobalVendor.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </>
+              visibleGlobalVendor.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))
             ) : (
               visibleItems.map((item) => (
                 <NavLink
@@ -151,22 +146,16 @@ export function Layout() {
                   {item.label}
                 </NavLink>
               ))}
-              {visibleGlobalVendor.length > 0 && (
-                <>
-                  <div className="sidebar-nav-section" role="presentation">
-                    Global Vendors
-                  </div>
-                  {visibleGlobalVendor.map((item) => (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </>
-              )}
+              {visibleGlobalVendor.length > 0 &&
+                visibleGlobalVendor.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
             </>
           )}
         </nav>

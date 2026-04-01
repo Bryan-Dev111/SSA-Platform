@@ -21,6 +21,9 @@ type ProcessingImage = {
   fileName: string | null;
 };
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const IMAGE_BASE = API_BASE.replace(/\/$/, '');
+
 export function FarmProcessingPage() {
   const { farmId } = useParams<{ farmId: string }>();
   const { token, user } = useAuth();
@@ -332,21 +335,23 @@ export function FarmProcessingPage() {
                   }}
                 >
                   <img
-                    src={`/farm-profile/images/${img.id}/download`}
+                    src={`${IMAGE_BASE}/farm-profile/images/${img.id}/download`}
                     alt={img.fileName ?? 'Processing image'}
                     style={{ width: '100%', display: 'block', objectFit: 'cover' }}
                   />
-                  {img.fileName && (
-                    <figcaption
-                      style={{
-                        padding: '0.35rem 0.5rem',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                      }}
-                    >
-                      {img.fileName}
-                    </figcaption>
-                  )}
+                  <figcaption
+                    style={{
+                      padding: '0.35rem 0.5rem',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={img.fileName ?? 'Processing image'}
+                  >
+                    {img.fileName ?? 'Processing image'}
+                  </figcaption>
                 </figure>
               ))}
             </div>
