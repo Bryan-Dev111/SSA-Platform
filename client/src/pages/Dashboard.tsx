@@ -227,9 +227,9 @@ export function Dashboard() {
         <MetricCard
           title="Shipments"
           value={metrics.shipmentRequests}
-          subtitle={`${metrics.shipmentLate ?? 0} PO late · ${metrics.shipmentOverdue ?? 0} Inspection overdue`}
+          subtitle={`${metrics.shipmentLate ?? 0} Late PO · ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
           showAlert={(metrics.shipmentLate ?? 0) > 0 || (metrics.shipmentOverdue ?? 0) > 0}
-          alertLabel={`Shipments: ${metrics.shipmentLate ?? 0} PO late, ${metrics.shipmentOverdue ?? 0} Inspection overdue`}
+          alertLabel={`Shipments: ${metrics.shipmentLate ?? 0} Late PO, ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
         />
       </div>
 
