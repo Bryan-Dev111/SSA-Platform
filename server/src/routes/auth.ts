@@ -9,9 +9,25 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { prisma, prismaBase } from '../lib/prisma';
 import { getPathRolesMatrix } from '../lib/permissions';
 import { encryptPassword } from '../lib/passwordCrypto';
-import { sendPasswordResetEmail } from '../lib/mail';
+import { sendPasswordResetEmail, sendAccessRequestNotification } from '../lib/mail';
 
 const router = Router();
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Comma/semicolon-separated ACCESS_REQUEST_NOTIFY_EMAIL, else SMTP_USER if it looks like an email. */
+function accessRequestNotifyRecipients(): string[] {
+  const raw = process.env.ACCESS_REQUEST_NOTIFY_EMAIL?.trim();
+  if (raw) {
+    return raw
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter((s) => EMAIL_RE.test(s));
+  }
+  const fallback = process.env.SMTP_USER?.trim();
+  if (fallback && EMAIL_RE.test(fallback)) return [fallback];
+  return [];
+}
 
 const RESET_TOKEN_BYTES = 32;
 const RESET_EXPIRY_MS = 60 * 60 * 1000;
@@ -181,6 +197,74 @@ router.post(
       prismaBase.passwordResetToken.deleteMany({ where: { userId: row.userId } }),
     ]);
     res.json({ ok: true, message: 'Your password has been updated. You can sign in now.' });
+  })
+);
+
+router.post(
+  '/request-access',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const body = req.body as {
+      email?: string;
+      fullName?: string;
+      name?: string;
+      organization?: string;
+      company?: string;
+      message?: string;
+    };
+    const emailRaw = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const fullNameRaw = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+    const nameRaw = typeof body.name === 'string' ? body.name.trim() : '';
+    const fullName = (fullNameRaw || nameRaw).trim();
+    const organization =
+      typeof body.organization === 'string'
+        ? body.organization.trim().slice(0, 200)
+        : typeof body.company === 'string'
+          ? body.company.trim().slice(0, 200)
+          : '';
+    const message =
+      typeof body.message === 'string' ? body.message.trim().slice(0, 4000) : '';
+
+    if (!emailRaw || !EMAIL_RE.test(emailRaw)) {
+      res.status(400).json({ error: 'A valid email address is required' });
+      return;
+    }
+    if (!fullName || fullName.length > 200) {
+      res.status(400).json({ error: 'Your name is required (max 200 characters)' });
+      return;
+    }
+
+    const orgNull = organization.length > 0 ? organization : null;
+    const msgNull = message.length > 0 ? message : null;
+
+    await prismaBase.accessRequest.create({
+      data: {
+        email: emailRaw,
+        fullName,
+        organization: orgNull,
+        message: msgNull,
+      },
+    });
+
+    try {
+      await sendAccessRequestNotification({
+        recipients: accessRequestNotifyRecipients(),
+        request: {
+          email: emailRaw,
+          fullName,
+          organization: orgNull,
+          message: msgNull,
+        },
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[auth/request-access] notification email failed:', err);
+    }
+
+    res.json({
+      ok: true,
+      message:
+        'Thank you. Your request has been submitted. An administrator will contact you if your access is approved.',
+    });
   })
 );
 

@@ -16,8 +16,27 @@ function getSmtpConfig(): {
   return { host, port, secure, auth: { user, pass } };
 }
 
+function buildSmtpTransport() {
+  const cfg = getSmtpConfig();
+  if (!cfg) return null;
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: cfg.auth,
+    ...(!cfg.secure && cfg.port === 587 ? { requireTLS: true } : {}),
+    tls: { minVersion: 'TLSv1.2' as const },
+  });
+}
+
 export function isSmtpConfigured(): boolean {
   return getSmtpConfig() !== null;
+}
+
+function defaultFrom(appName: string): string {
+  return (
+    process.env.SMTP_FROM?.trim() || `"${appName}" <${process.env.SMTP_USER || 'noreply@localhost'}>`
+  );
 }
 
 /**
@@ -30,10 +49,10 @@ export async function sendPasswordResetEmail(params: {
 }): Promise<{ sent: boolean; devLogged?: boolean }> {
   const { to, resetUrl } = params;
   const appName = params.appName ?? 'Sentinel Supplier Assurance';
-  const from = process.env.SMTP_FROM?.trim() || `"${appName}" <${process.env.SMTP_USER || 'noreply@localhost'}>`;
+  const from = defaultFrom(appName);
 
-  const cfg = getSmtpConfig();
-  if (!cfg) {
+  const transporter = buildSmtpTransport();
+  if (!transporter) {
     if (process.env.NODE_ENV !== 'production') {
       // eslint-disable-next-line no-console
       console.warn(`[mail] SMTP not configured. Password reset link for ${to}:\n${resetUrl}`);
@@ -44,16 +63,6 @@ export async function sendPasswordResetEmail(params: {
     return { sent: false };
   }
 
-  // Port 587: STARTTLS (e.g. Microsoft 365 / smtp.office365.com). Port 465: implicit TLS (secure: true).
-  const transporter = nodemailer.createTransport({
-    host: cfg.host,
-    port: cfg.port,
-    secure: cfg.secure,
-    auth: cfg.auth,
-    ...(!cfg.secure && cfg.port === 587 ? { requireTLS: true } : {}),
-    tls: { minVersion: 'TLSv1.2' as const },
-  });
-
   await transporter.sendMail({
     from,
     to,
@@ -63,4 +72,89 @@ export async function sendPasswordResetEmail(params: {
   });
 
   return { sent: true };
+}
+
+export type AccessRequestMailPayload = {
+  email: string;
+  fullName: string;
+  organization: string | null;
+  message: string | null;
+};
+
+/**
+ * Notify administrators of a new access request. Recipients from ACCESS_REQUEST_NOTIFY_EMAIL (comma-separated).
+ */
+export async function sendAccessRequestNotification(params: {
+  recipients: string[];
+  request: AccessRequestMailPayload;
+  appName?: string;
+}): Promise<{ sent: boolean; devLogged?: boolean }> {
+  const { recipients, request: r } = params;
+  const appName = params.appName ?? 'Sentinel Supplier Assurance';
+  const from = defaultFrom(appName);
+  const to = recipients.filter(Boolean);
+  if (to.length === 0) {
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mail] No ACCESS_REQUEST_NOTIFY_EMAIL; access request logged only.\n` +
+          `Email: ${r.email}\nName: ${r.fullName}\nOrg: ${r.organization ?? '—'}\nMessage: ${r.message ?? '—'}`
+      );
+      return { sent: false, devLogged: true };
+    }
+    // eslint-disable-next-line no-console
+    console.error('[mail] ACCESS_REQUEST_NOTIFY_EMAIL not set; cannot notify admins in production');
+    return { sent: false };
+  }
+
+  const transporter = buildSmtpTransport();
+  if (!transporter) {
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mail] SMTP not configured. Access request (notify admins):\n` +
+          `To: ${to.join(', ')}\nEmail: ${r.email}\nName: ${r.fullName}\nOrg: ${r.organization ?? '—'}\nMessage: ${r.message ?? '—'}`
+      );
+      return { sent: false, devLogged: true };
+    }
+    // eslint-disable-next-line no-console
+    console.error('[mail] SMTP not configured; cannot send access-request notification in production');
+    return { sent: false };
+  }
+
+  const lines = [
+    `A new Sentinel access request was submitted.`,
+    ``,
+    `Email: ${r.email}`,
+    `Name: ${r.fullName}`,
+    `Organization: ${r.organization ?? '—'}`,
+    `Message: ${r.message ?? '—'}`,
+    ``,
+    `Review pending requests in your admin tools or database (AccessRequest table).`,
+  ];
+
+  await transporter.sendMail({
+    from,
+    to: to.join(', '),
+    subject: `[${appName}] New access request: ${r.fullName}`,
+    text: lines.join('\n'),
+    html: `<p><strong>New access request</strong> for ${appName}</p>
+<ul>
+<li><strong>Email:</strong> ${escapeHtml(r.email)}</li>
+<li><strong>Name:</strong> ${escapeHtml(r.fullName)}</li>
+<li><strong>Organization:</strong> ${escapeHtml(r.organization ?? '—')}</li>
+</ul>
+<p><strong>Message:</strong></p>
+<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(r.message ?? '—')}</pre>`,
+  });
+
+  return { sent: true };
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

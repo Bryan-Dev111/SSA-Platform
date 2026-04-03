@@ -85,6 +85,19 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+/// Self-service "request access" submissions from the public login flow (stored for admins; notification email sent when SMTP is configured).
+model AccessRequest {
+  id             String   @id @default(cuid())
+  email          String
+  fullName       String
+  organization   String?
+  message        String?
+  createdAt      DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
 model UserRole {
   userId String
   roleId String
