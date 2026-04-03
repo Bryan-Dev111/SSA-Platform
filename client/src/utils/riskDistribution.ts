@@ -1,6 +1,6 @@
 /**
  * Risk-register distribution (Low / Medium / High), matching the Risk page:
- * Mitigated risks use the opportunity row; otherwise latest closed action residual overrides when present.
+ * Mitigated risks use the opportunity row (server syncs it from actions and from risk-table edits).
  */
 
 export type RiskDistribution = { low: number; medium: number; high: number };

@@ -5,7 +5,7 @@
  * risk_level is derived from likelihood x severity for risk rows.
  */
 import { Router, Request, Response } from 'express';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaBase } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
@@ -233,14 +233,45 @@ router.patch(
       return;
     }
 
-    const updated = await prisma.opportunity.update({
-      where: { id: req.params.id },
-      data,
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        createdBy: { select: { id: true, email: true, name: true } },
+    const finalStatus = data.status ?? existing.status;
+    const syncLatestClosedActionResidual =
+      (data.likelihood !== undefined || data.severity !== undefined) &&
+      finalType === 'risk' &&
+      finalStatus === 'Mitigated' &&
+      !!finalLikelihood &&
+      !!finalSeverity;
+
+    const updated = await prismaBase.$transaction(
+      async (tx) => {
+        const row = await tx.opportunity.update({
+          where: { id: req.params.id },
+          data,
+          include: {
+            supplier: { select: { id: true, code: true, name: true } },
+            createdBy: { select: { id: true, email: true, name: true } },
+          },
+        });
+        if (syncLatestClosedActionResidual && finalLikelihood && finalSeverity) {
+          const latest = await tx.riskAction.findFirst({
+            where: { riskId: row.id, status: 'Mitigated' },
+            orderBy: { createdAt: 'desc' },
+          });
+          if (latest) {
+            const rl = deriveRiskLevel(finalLikelihood as RiskLikelihood, finalSeverity as RiskSeverity);
+            await tx.riskAction.update({
+              where: { id: latest.id },
+              data: {
+                residualLikelihood: finalLikelihood as RiskLikelihood,
+                residualSeverity: finalSeverity as RiskSeverity,
+                residualRiskLevel: rl,
+              },
+            });
+          }
+        }
+        return row;
       },
-    });
+      { timeout: 20_000, maxWait: 10_000 },
+    );
     res.json(updated);
   })
 );

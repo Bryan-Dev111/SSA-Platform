@@ -184,8 +184,8 @@ export function Risk() {
     return items
       .filter((r) => r.type === 'risk')
       .map((r) => {
-        // Mitigated risks: matrix + KPIs follow the risk table (likelihood/severity/level), which users edit when reassessing.
-        // Closed actions still hold historical residual; those values can be stale after a table-only update.
+        // Mitigated risks: matrix uses the opportunity row. Server keeps it in sync from both tables:
+        // PATCH risk-actions (closed) updates opportunity; PATCH opportunities updates latest closed action residual.
         if (r.status === 'Mitigated') {
           return {
             ...r,

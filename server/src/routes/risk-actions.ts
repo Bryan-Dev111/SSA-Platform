@@ -76,6 +76,7 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
+    const createdById = req.user.id;
     const supplierId = typeof req.body?.supplierId === 'string' ? req.body.supplierId : '';
     const riskId = typeof req.body?.riskId === 'string' ? req.body.riskId : '';
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
@@ -129,26 +130,54 @@ router.post(
       residualRiskLevel = deriveRiskLevel(residualLikelihood, residualSeverity);
     }
 
-    const created = await prisma.riskAction.create({
-      data: {
-        code: await getNextCode('ACT', 4),
-        supplierId,
-        riskId,
-        description,
-        owner,
-        dueDate: dueDate ? new Date(`${dueDate.slice(0, 10)}T12:00:00.000Z`) : null,
-        status: dbStatus,
-        residualLikelihood,
-        residualSeverity,
-        residualRiskLevel,
-        createdById: req.user.id,
+    const syncOpportunity =
+      dbStatus === 'Mitigated' &&
+      risk.type === 'risk' &&
+      residualLikelihood != null &&
+      residualSeverity != null &&
+      residualRiskLevel != null;
+
+    const actionInclude = {
+      supplier: { select: { id: true, code: true, name: true } },
+      risk: { select: { id: true, code: true, description: true, riskLevel: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+    };
+
+    const code = await getNextCode('ACT', 4);
+    const created = await prismaBase.$transaction(
+      async (tx) => {
+        const row = await tx.riskAction.create({
+          data: {
+            code,
+            supplierId,
+            riskId,
+            description,
+            owner,
+            dueDate: dueDate ? new Date(`${dueDate.slice(0, 10)}T12:00:00.000Z`) : null,
+            status: dbStatus,
+            residualLikelihood,
+            residualSeverity,
+            residualRiskLevel,
+            createdById,
+          },
+          include: actionInclude,
+        });
+        if (syncOpportunity && residualLikelihood && residualSeverity && residualRiskLevel) {
+          await tx.opportunity.update({
+            where: { id: riskId },
+            data: {
+              likelihood: residualLikelihood,
+              severity: residualSeverity,
+              riskLevel: residualRiskLevel,
+              status: 'Mitigated',
+            },
+          });
+          return { ...row, risk: { ...row.risk, riskLevel: residualRiskLevel } };
+        }
+        return row;
       },
-      include: {
-        supplier: { select: { id: true, code: true, name: true } },
-        risk: { select: { id: true, code: true, description: true, riskLevel: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
-    });
+      { timeout: 20_000, maxWait: 10_000 },
+    );
     // Translate DB status to UI status for the frontend.
     const statusForUi = created.status === 'Mitigated' ? 'Closed' : 'Open';
     res.status(201).json({ ...created, status: statusForUi });
