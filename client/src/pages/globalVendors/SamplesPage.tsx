@@ -4,7 +4,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { apiJson } from '../../api/client';
+import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 
 type SampleRow = {
@@ -12,6 +12,7 @@ type SampleRow = {
   code: string;
   farmId: string | null;
   buyerName: string;
+  buyerEmail: string | null;
   crop: string | null;
   shipmentAddress: string | null;
   notes: string | null;
@@ -39,9 +40,11 @@ export function SamplesPage() {
 
   const [farmId, setFarmId] = useState<string>('');
   const [buyerName, setBuyerName] = useState('');
+  const [buyerEmail, setBuyerEmail] = useState('');
   const [crop, setCrop] = useState('');
   const [shipmentAddress, setShipmentAddress] = useState('');
   const [notes, setNotes] = useState('');
+  const [notesFile, setNotesFile] = useState<File | null>(null);
 
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
@@ -72,9 +75,11 @@ export function SamplesPage() {
     setModalOpen(false);
     setFarmId('');
     setBuyerName('');
+    setBuyerEmail('');
     setCrop('');
     setShipmentAddress('');
     setNotes('');
+    setNotesFile(null);
   };
 
   const submit = async (e: FormEvent) => {
@@ -82,16 +87,19 @@ export function SamplesPage() {
     if (!token) return;
     setSaving(true);
     try {
-      await apiJson<SampleRow>('/samples', {
+      const form = new FormData();
+      if (farmId) form.append('farmId', farmId);
+      form.append('buyerName', buyerName);
+      if (buyerEmail) form.append('buyerEmail', buyerEmail);
+      if (crop) form.append('crop', crop);
+      if (shipmentAddress) form.append('shipmentAddress', shipmentAddress);
+      if (notes) form.append('notes', notes);
+      if (notesFile) form.append('notesFile', notesFile);
+
+      await apiFetch('/samples', {
         token,
         method: 'POST',
-        body: JSON.stringify({
-          farmId: farmId || null,
-          buyerName,
-          crop: crop || null,
-          shipmentAddress: shipmentAddress || null,
-          notes: notes || null,
-        }),
+        body: form,
       });
       toast.success('Sample created');
       closeModal();
@@ -172,13 +180,16 @@ export function SamplesPage() {
             <thead>
               <tr>
                 <th>Sample ID</th>
-                <th>Farm</th>
                 <th>Buyer</th>
+                <th>Buyer email</th>
+                <th>Date sent</th>
+                <th>Farm ID</th>
+                <th>Farm name</th>
+                <th>Country</th>
                 <th>Crop</th>
-                <th>Shipping address</th>
+                <th>Delivery address</th>
                 <th>Notes</th>
                 <th>Notes file</th>
-                <th>Created</th>
               </tr>
             </thead>
             <tbody>
@@ -195,12 +206,18 @@ export function SamplesPage() {
                     <td>
                       <strong>{s.code}</strong>
                     </td>
-                    <td>
-                      {s.farm
-                        ? `${s.farm.code} — ${s.farm.farmName}`
-                        : '—'}
-                    </td>
                     <td>{s.buyerName}</td>
+                    <td>{s.buyerEmail ?? '—'}</td>
+                    <td>
+                      {new Date(s.createdAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
+                    <td>{s.farm ? s.farm.code : '—'}</td>
+                    <td>{s.farm ? s.farm.farmName : '—'}</td>
+                    <td>{s.farm ? s.farm.country : '—'}</td>
                     <td>{s.crop ?? '—'}</td>
                     <td>{s.shipmentAddress ?? '—'}</td>
                     <td>{s.notes ?? '—'}</td>
@@ -260,6 +277,15 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
+                <span className="field-label">Buyer email</span>
+                <input
+                  className="input"
+                  type="email"
+                  value={buyerEmail}
+                  onChange={(e) => setBuyerEmail(e.target.value)}
+                />
+              </label>
+              <label className="field">
                 <span className="field-label">Farm (optional)</span>
                 <select
                   className="input"
@@ -299,6 +325,17 @@ export function SamplesPage() {
                   rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Notes file (optional)</span>
+                <input
+                  className="input"
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setNotesFile(file);
+                  }}
                 />
               </label>
               <div className="confirm-dialog-actions" style={{ marginTop: 8 }}>

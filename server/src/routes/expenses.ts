@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { getNextCode } from '../services/idGenerator';
 
 const router = Router();
 
@@ -31,8 +32,10 @@ router.post(
       return;
     }
 
+    const code = await getNextCode('EXP');
+
     const created = await prisma.expense.create({
-      data: { type, description, project, amount },
+      data: { code, type, description, project, amount },
     });
     res.status(201).json(created);
   })

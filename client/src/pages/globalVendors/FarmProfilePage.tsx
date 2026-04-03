@@ -241,6 +241,65 @@ export function FarmProfilePage() {
                   <td>{selectedFarm.city ?? '—'}</td>
                 </tr>
                 <tr>
+                  <th>Total farm size (ha)</th>
+                  <td>
+                    {typeof selectedFarm.totalFarmSizeHa === 'number'
+                      ? selectedFarm.totalFarmSizeHa
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Production area (ha) — main / secondary</th>
+                  <td>
+                    {typeof selectedFarm.mainCropAreaHa === 'number'
+                      ? selectedFarm.mainCropAreaHa
+                      : '—'}
+                    {' / '}
+                    {typeof selectedFarm.secondaryCropAreaHa === 'number'
+                      ? selectedFarm.secondaryCropAreaHa
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Annual output (kg) — main / secondary</th>
+                  <td>
+                    {typeof selectedFarm.mainCropAnnualOutputKg === 'number'
+                      ? selectedFarm.mainCropAnnualOutputKg.toLocaleString()
+                      : '—'}
+                    {' / '}
+                    {typeof selectedFarm.secondaryCropAnnualOutputKg ===
+                    'number'
+                      ? selectedFarm.secondaryCropAnnualOutputKg.toLocaleString()
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Varieties (main / secondary)</th>
+                  <td>
+                    {selectedFarm.mainVarieties ?? '—'}
+                    {' / '}
+                    {selectedFarm.secondaryVarieties ?? '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Main harvest window</th>
+                  <td>
+                    {selectedFarm.harvestStartMonth &&
+                    selectedFarm.harvestEndMonth
+                      ? `${selectedFarm.harvestStartMonth}–${selectedFarm.harvestEndMonth}`
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Secondary harvest window</th>
+                  <td>
+                    {selectedFarm.secondaryHarvestStartMonth &&
+                    selectedFarm.secondaryHarvestEndMonth
+                      ? `${selectedFarm.secondaryHarvestStartMonth}–${selectedFarm.secondaryHarvestEndMonth}`
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
                   <th>Latitude</th>
                   <td>
                     {typeof selectedFarm.latitude === 'number'

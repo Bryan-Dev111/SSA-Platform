@@ -13,12 +13,17 @@ type PurchaseOrderRow = {
   farmId: string | null;
   buyerName: string;
   buyerEmail: string | null;
+  orderDate: string | null;
   crop: string | null;
   quantityKg: number | null;
   pricePerKg: number | null;
   totalAmount: number | null;
   status: string | null;
   notes: string | null;
+  estimatedFarmerDeliveryDate: string | null;
+  estimatedArrivalAtBuyer: string | null;
+  destinationCountry: string | null;
+  portOfDischarge: string | null;
   createdAt: string;
   updatedAt: string;
   farm: {
@@ -54,6 +59,13 @@ export function PurchaseOrdersPage() {
   const [pricePerKg, setPricePerKg] = useState('');
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
+  const [orderDate, setOrderDate] = useState('');
+  const [estimatedFarmerDeliveryDate, setEstimatedFarmerDeliveryDate] =
+    useState('');
+  const [estimatedArrivalAtBuyer, setEstimatedArrivalAtBuyer] =
+    useState('');
+  const [destinationCountry, setDestinationCountry] = useState('');
+  const [portOfDischarge, setPortOfDischarge] = useState('');
 
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
@@ -92,6 +104,11 @@ export function PurchaseOrdersPage() {
     setPricePerKg('');
     setStatus('');
     setNotes('');
+    setOrderDate('');
+    setEstimatedFarmerDeliveryDate('');
+    setEstimatedArrivalAtBuyer('');
+    setDestinationCountry('');
+    setPortOfDischarge('');
   };
 
   const submit = async (e: FormEvent) => {
@@ -106,11 +123,17 @@ export function PurchaseOrdersPage() {
           farmId: farmId || null,
           buyerName,
           buyerEmail: buyerEmail || null,
+          orderDate: orderDate || null,
           crop: crop || null,
           quantityKg: quantityKg === '' ? null : Number(quantityKg),
           pricePerKg: pricePerKg === '' ? null : Number(pricePerKg),
           status: status || null,
           notes: notes || null,
+          estimatedFarmerDeliveryDate:
+            estimatedFarmerDeliveryDate || null,
+          estimatedArrivalAtBuyer: estimatedArrivalAtBuyer || null,
+          destinationCountry: destinationCountry || null,
+          portOfDischarge: portOfDischarge || null,
         }),
       });
       toast.success('Purchase order created');
@@ -233,11 +256,16 @@ export function PurchaseOrdersPage() {
                 <th>PO ID</th>
                 <th>Farm</th>
                 <th>Buyer</th>
+                <th>Order date</th>
                 <th>Crop</th>
                 <th>Qty (kg)</th>
                 <th>Price/kg</th>
                 <th>Total</th>
                 <th>Status</th>
+                <th>Est. farmer delivery</th>
+                <th>Est. arrival at buyer</th>
+                <th>Destination country</th>
+                <th>Port of discharge</th>
                 <th>Created</th>
                 <th>Attachments</th>
               </tr>
@@ -274,6 +302,18 @@ export function PurchaseOrdersPage() {
                         </div>
                       )}
                     </td>
+                    <td>
+                      {o.orderDate
+                        ? new Date(o.orderDate).toLocaleDateString(
+                            undefined,
+                            {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            }
+                          )
+                        : '—'}
+                    </td>
                     <td>{o.crop ?? '—'}</td>
                     <td>
                       {o.quantityKg != null ? (
@@ -297,6 +337,30 @@ export function PurchaseOrdersPage() {
                       )}
                     </td>
                     <td>{o.status ?? 'Open'}</td>
+                    <td>
+                      {o.estimatedFarmerDeliveryDate
+                        ? new Date(
+                            o.estimatedFarmerDeliveryDate
+                          ).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : '—'}
+                    </td>
+                    <td>
+                      {o.estimatedArrivalAtBuyer
+                        ? new Date(
+                            o.estimatedArrivalAtBuyer
+                          ).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : '—'}
+                    </td>
+                    <td>{o.destinationCountry ?? '—'}</td>
+                    <td>{o.portOfDischarge ?? '—'}</td>
                     <td>
                       {new Date(o.createdAt).toLocaleDateString(undefined, {
                         year: 'numeric',
@@ -450,6 +514,15 @@ export function PurchaseOrdersPage() {
                 />
               </label>
               <label className="field">
+                <span className="field-label">Order date</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={orderDate}
+                  onChange={(e) => setOrderDate(e.target.value)}
+                />
+              </label>
+              <label className="field">
                 <span className="field-label">Crop</span>
                 <input
                   className="input"
@@ -491,6 +564,52 @@ export function PurchaseOrdersPage() {
                   placeholder="e.g. Open, Closed"
                 />
               </label>
+              <div className="field-grid">
+                <label className="field">
+                  <span className="field-label">
+                    Estimated farmer delivery date
+                  </span>
+                  <input
+                    className="input"
+                    type="date"
+                    value={estimatedFarmerDeliveryDate}
+                    onChange={(e) =>
+                      setEstimatedFarmerDeliveryDate(e.target.value)
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">
+                    Estimated arrival at buyer
+                  </span>
+                  <input
+                    className="input"
+                    type="date"
+                    value={estimatedArrivalAtBuyer}
+                    onChange={(e) =>
+                      setEstimatedArrivalAtBuyer(e.target.value)
+                    }
+                  />
+                </label>
+              </div>
+              <div className="field-grid">
+                <label className="field">
+                  <span className="field-label">Destination country</span>
+                  <input
+                    className="input"
+                    value={destinationCountry}
+                    onChange={(e) => setDestinationCountry(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">Port of discharge</span>
+                  <input
+                    className="input"
+                    value={portOfDischarge}
+                    onChange={(e) => setPortOfDischarge(e.target.value)}
+                  />
+                </label>
+              </div>
               <label className="field">
                 <span className="field-label">Notes</span>
                 <textarea

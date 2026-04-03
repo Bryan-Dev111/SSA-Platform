@@ -220,7 +220,11 @@ export function FarmProcessingPage() {
     );
   }
 
-  const hasSecondary = Boolean(selectedFarm.mainCrop && selectedFarm.farmCategory);
+  const hasSecondary = Boolean(
+    selectedFarm.secondaryCrop ||
+      selectedFarm.secondaryProcessingMethods ||
+      selectedFarm.secondaryQualityScore != null
+  );
 
   return (
     <div className="page">
@@ -254,6 +258,10 @@ export function FarmProcessingPage() {
               <div>{selectedFarm.mainCrop ?? '—'}</div>
             </div>
             <div>
+              <div className="input-label">Secondary crop</div>
+              <div>{selectedFarm.secondaryCrop ?? '—'}</div>
+            </div>
+            <div>
               <div className="input-label">Farm category</div>
               <div>{selectedFarm.farmCategory ?? '—'}</div>
             </div>
@@ -274,6 +282,66 @@ export function FarmProcessingPage() {
               Step 2 is intended for secondary processing details.
             </p>
           )}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Processing &amp; quality details</h2>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th />
+                  <th>Main</th>
+                  <th>Secondary</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Processing methods</th>
+                  <td>{selectedFarm.mainProcessingMethods ?? '—'}</td>
+                  <td>{selectedFarm.secondaryProcessingMethods ?? '—'}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Fermentation days</th>
+                  <td>
+                    {selectedFarm.mainFermentationDays != null
+                      ? selectedFarm.mainFermentationDays
+                      : '—'}
+                  </td>
+                  <td>
+                    {selectedFarm.secondaryFermentationDays != null
+                      ? selectedFarm.secondaryFermentationDays
+                      : '—'}
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Drying method</th>
+                  <td>{selectedFarm.mainDryingMethod ?? '—'}</td>
+                  <td>{selectedFarm.secondaryDryingMethod ?? '—'}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Bean size</th>
+                  <td>{selectedFarm.mainBeanSize ?? '—'}</td>
+                  <td>{selectedFarm.secondaryBeanSize ?? '—'}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Quality score</th>
+                  <td>
+                    {selectedFarm.mainQualityScore != null
+                      ? selectedFarm.mainQualityScore.toFixed(1)
+                      : '—'}
+                  </td>
+                  <td>
+                    {selectedFarm.secondaryQualityScore != null
+                      ? selectedFarm.secondaryQualityScore.toFixed(1)
+                      : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

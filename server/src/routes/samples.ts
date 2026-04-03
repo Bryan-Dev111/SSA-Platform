@@ -48,6 +48,10 @@ router.post(
         : String(farmIdRaw);
     const buyerName =
       typeof req.body?.buyerName === 'string' ? req.body.buyerName.trim() : '';
+    const buyerEmail =
+      typeof req.body?.buyerEmail === 'string'
+        ? req.body.buyerEmail.trim() || null
+        : null;
     const crop =
       typeof req.body?.crop === 'string' ? req.body.crop.trim() || null : null;
     const shipmentAddress =
@@ -100,6 +104,7 @@ router.post(
         code,
         farmId,
         buyerName,
+        buyerEmail,
         crop,
         shipmentAddress,
         notes,

@@ -88,14 +88,37 @@ router.post(
         ? req.body.notes.trim() || null
         : null;
 
+    const orderDateRaw = req.body?.orderDate;
+    const estimatedFarmerDeliveryDateRaw = req.body?.estimatedFarmerDeliveryDate;
+    const estimatedArrivalAtBuyerRaw = req.body?.estimatedArrivalAtBuyer;
+    const destinationCountry =
+      typeof req.body?.destinationCountry === 'string'
+        ? req.body.destinationCountry.trim() || null
+        : null;
+    const portOfDischarge =
+      typeof req.body?.portOfDischarge === 'string'
+        ? req.body.portOfDischarge.trim() || null
+        : null;
+
     if (!buyerName) {
       res.status(400).json({ error: 'buyerName is required' });
       return;
     }
 
-    if ((quantityKgRaw !== undefined && quantityKgRaw !== null && !Number.isFinite(quantityKg)) ||
-        (pricePerKgRaw !== undefined && pricePerKgRaw !== null && !Number.isFinite(pricePerKg))) {
-      res.status(400).json({ error: 'quantityKg and pricePerKg must be numeric when provided' });
+    if (
+      (quantityKgRaw !== undefined &&
+        quantityKgRaw !== null &&
+        !Number.isFinite(quantityKg)) ||
+      (pricePerKgRaw !== undefined &&
+        pricePerKgRaw !== null &&
+        !Number.isFinite(pricePerKg))
+    ) {
+      res
+        .status(400)
+        .json({
+          error:
+            'quantityKg and pricePerKg must be numeric when provided',
+        });
       return;
     }
 
@@ -103,6 +126,18 @@ router.post(
       quantityKg != null && pricePerKg != null
         ? quantityKg * pricePerKg
         : null;
+
+    const parseDate = (val: unknown): Date | null => {
+      if (typeof val !== 'string' || !val.trim()) return null;
+      // Expect YYYY-MM-DD from the UI
+      return new Date(val.slice(0, 10) + 'T12:00:00.000Z');
+    };
+
+    const orderDate = parseDate(orderDateRaw);
+    const estimatedFarmerDeliveryDate = parseDate(
+      estimatedFarmerDeliveryDateRaw
+    );
+    const estimatedArrivalAtBuyer = parseDate(estimatedArrivalAtBuyerRaw);
 
     const code = await getNextCode('PO');
 
@@ -113,12 +148,17 @@ router.post(
         farmId,
         buyerName,
         buyerEmail,
+        orderDate,
         crop,
         quantityKg,
         pricePerKg,
         totalAmount,
         status,
         notes,
+        estimatedFarmerDeliveryDate,
+        estimatedArrivalAtBuyer,
+        destinationCountry,
+        portOfDischarge,
       },
       include: {
         farm: {

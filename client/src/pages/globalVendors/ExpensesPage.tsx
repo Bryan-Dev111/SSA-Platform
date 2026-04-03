@@ -9,6 +9,7 @@ import { apiJson } from '../../api/client';
 
 type ExpenseRow = {
   id: string;
+  code: string;
   type: string;
   description: string;
   project: string;
@@ -172,7 +173,7 @@ export function ExpensesPage() {
             <table className="table table--sticky-header">
               <thead>
                 <tr>
-                  <th>ID</th>
+                <th>EXP ID</th>
                   <th>Description</th>
                   <th>Price</th>
                   <th>Date</th>
@@ -188,7 +189,7 @@ export function ExpensesPage() {
                 ) : (
                   rows.map((r) => (
                     <tr key={r.id}>
-                      <td>{r.id}</td>
+                      <td>{r.code}</td>
                       <td>{r.description}</td>
                       <td>${r.amount.toFixed(2)}</td>
                       <td>

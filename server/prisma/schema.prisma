@@ -753,12 +753,19 @@ model PurchaseOrder {
   farm      Farm?    @relation(fields: [farmId], references: [id])
   buyerName String
   buyerEmail String?
+  /// When the order was placed (client-visible Order Date). Defaults to createdAt when not set.
+  orderDate   DateTime? @db.Date
   crop      String?
   quantityKg Float?
   pricePerKg Float?
   totalAmount Float?
-  status    String? // e.g. Open, Closed
+  status    String? // e.g. Open, Closed, Pending
   notes     String?
+  /// Optional logistics fields per Global Vendors spec
+  estimatedFarmerDeliveryDate DateTime? @db.Date
+  estimatedArrivalAtBuyer     DateTime? @db.Date
+  destinationCountry          String?
+  portOfDischarge             String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   attachments PurchaseOrderAttachment[]
@@ -786,6 +793,7 @@ model Sample {
   farmId    String?
   farm      Farm?    @relation(fields: [farmId], references: [id])
   buyerName String
+  buyerEmail String?
   crop      String?
   shipmentAddress String?
   notes     String?
@@ -801,6 +809,8 @@ model Sample {
 
 model Expense {
   id          String   @id @default(cuid())
+  /// Human-friendly code like EXP-00001 for display in the UI.
+  code        String   @unique
   type        String
   description String
   project     String
