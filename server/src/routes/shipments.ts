@@ -309,7 +309,9 @@ router.patch(
     // Result update: only Admin/QE. Also requires pending status.
     if (hasResultUpdate) {
       if (!canResult) {
-        res.status(403).json({ error: 'Only Admin or Quality Engineer can record inspection results' });
+        res.status(403).json({
+          error: 'Only Admin, Quality Engineer, or Quality Manager can record inspection results',
+        });
         return;
       }
       if (!shouldBePending) {

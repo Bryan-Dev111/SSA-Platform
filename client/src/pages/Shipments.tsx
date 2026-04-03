@@ -179,6 +179,8 @@ export function Shipments() {
     const monthMap = new Map<string, { label: string; parts: Map<string, number> }>();
     const totalByPart = new Map<string, number>();
     for (const s of shipments) {
+      // Match server metrics: only approved (Passed) quantities count toward shipped volume vs schedule.
+      if (s.status !== 'Passed') continue;
       const qty = typeof s.qty === 'number' ? s.qty : 0;
       const baseDate = s.inspectionDate ?? s.createdAt ?? null;
       const d = baseDate ? new Date(baseDate) : null;
@@ -595,6 +597,7 @@ export function Shipments() {
                     </th>
                     <th>Inspector</th>
                     <th>Approval</th>
+                    <th>Notes</th>
                     <th>Approval Date</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>
                       Records {sortIndicator('records')}
@@ -665,6 +668,23 @@ export function Shipments() {
                       </td>
 
                       <td>{r.status === 'Passed' ? 'Approved' : r.status === 'Failed' ? 'Rejected' : '—'}</td>
+                      <td
+                        style={{
+                          maxWidth: 200,
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-text-muted)',
+                          verticalAlign: 'top',
+                        }}
+                        title={r.notes?.trim() ? r.notes : undefined}
+                      >
+                        {r.status === 'Failed' && r.notes?.trim() ? (
+                          <span style={{ color: 'var(--color-text)' }}>{r.notes.trim()}</span>
+                        ) : r.status === 'Failed' ? (
+                          <span style={{ fontStyle: 'italic' }}>—</span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td>{r.status === 'WaitingInspection' ? '—' : r.updatedAt?.slice(0, 10) ?? '—'}</td>
 
                       <td>
@@ -781,9 +801,12 @@ export function Shipments() {
         message={
           rejectDialog ? (
             <div>
-              <p style={{ margin: '0 0 0.75rem' }}>Mark this request as failed (rejected)?</p>
+              <p style={{ margin: '0 0 0.75rem' }}>
+                Mark this request as failed (rejected)? Rejection details are saved on the shipment and shown in the
+                table <strong>Notes</strong> column.
+              </p>
               <label className="input-label" htmlFor="reject-note">
-                Note (optional)
+                Rejection notes
               </label>
               <textarea
                 id="reject-note"
@@ -791,7 +814,7 @@ export function Shipments() {
                 rows={3}
                 value={rejectDialog.note}
                 onChange={(e) => setRejectDialog((d) => (d ? { ...d, note: e.target.value } : null))}
-                placeholder="Reason for rejection…"
+                placeholder="Reason for rejection (visible to reviewers in Notes)…"
                 style={{ width: '100%', resize: 'vertical' }}
               />
             </div>

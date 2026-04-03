@@ -132,12 +132,6 @@ export async function computeShipmentMetrics(
     `${supplierId}::${norm(purchaseOrder)}::${norm(partNumber)}`;
 
   for (const sh of shipments) {
-    const shippedQty = typeof sh.qty === 'number' ? sh.qty : 0;
-    if (shippedQty > 0) {
-      const key = makeKey(sh.supplierId, sh.purchaseOrder, sh.partNumber);
-      shippedByKey.set(key, (shippedByKey.get(key) ?? 0) + shippedQty);
-    }
-
     if (sh.status === 'WaitingInspection') {
       waitingInspection++;
       const insp = dateOnlyMs(sh.inspectionDate);
@@ -146,6 +140,13 @@ export async function computeShipmentMetrics(
         overdueDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
       }
       continue;
+    }
+
+    // Only approved (Passed) inspections count toward quantity vs schedule — not pending or rejected.
+    const shippedQty = typeof sh.qty === 'number' ? sh.qty : 0;
+    if (shippedQty > 0 && sh.status === 'Passed') {
+      const key = makeKey(sh.supplierId, sh.purchaseOrder, sh.partNumber);
+      shippedByKey.set(key, (shippedByKey.get(key) ?? 0) + shippedQty);
     }
     if (sh.status === 'Passed' || sh.result === 'Passed') {
       passed++;
