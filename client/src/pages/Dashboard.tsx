@@ -13,6 +13,34 @@ interface SupplierOption {
   name: string;
 }
 
+/** Same payload as GET /shipments/metrics — used to align shipment tooltip lines with the Shipments page. */
+interface ShipmentsMetricsSnapshot {
+  shortDeliveries?: number;
+  shortDeliveryDetails?: Array<{
+    purchaseOrder: string | null;
+    partNumber: string | null;
+    missingQty: number;
+  }>;
+  overdueWaiting?: number;
+  overdueDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
+}
+
+function mergeShipmentTooltipFromShipmentsPage(
+  dash: DashboardResponse['metrics'],
+  sm: ShipmentsMetricsSnapshot | null
+): DashboardResponse['metrics'] {
+  if (!sm) return dash;
+  const shortFromSm = sm.shortDeliveryDetails ?? [];
+  const shortFromDash = dash.shipmentShortDeliveryDetails ?? [];
+  const overdueFromSm = sm.overdueDetails ?? [];
+  const overdueFromDash = dash.shipmentOverdueInspectionDetails ?? [];
+  return {
+    ...dash,
+    shipmentShortDeliveryDetails: shortFromSm.length > 0 ? shortFromSm : shortFromDash,
+    shipmentOverdueInspectionDetails: overdueFromSm.length > 0 ? overdueFromSm : overdueFromDash,
+  };
+}
+
 interface DashboardResponse {
   metrics: {
     totalSuppliers: number;
@@ -103,12 +131,16 @@ export function Dashboard() {
     const q = filterSupplierId ? `?supplierId=${encodeURIComponent(filterSupplierId)}` : '';
     (async () => {
       try {
-        const [dashData, opportunities, riskActions] = await Promise.all([
+        const [dashData, opportunities, riskActions, shipmentsMetrics] = await Promise.all([
           apiJson<DashboardResponse>(`/dashboard${q}`, { token }),
           apiJson<DashboardOpportunityRow[]>(`/opportunities${q}`, { token }),
           apiJson<DashboardRiskActionRow[]>(`/risk-actions${q}`, { token }),
+          apiJson<ShipmentsMetricsSnapshot>(`/shipments/metrics${q}`, { token }).catch(() => null),
         ]);
-        setData(dashData);
+        setData({
+          ...dashData,
+          metrics: mergeShipmentTooltipFromShipmentsPage(dashData.metrics, shipmentsMetrics),
+        });
         setRiskRegisterItems(
           [...opportunities].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
         );
@@ -244,6 +276,8 @@ export function Dashboard() {
                 shortDetails={metrics.shipmentShortDeliveryDetails ?? []}
                 overdueInspectionCount={metrics.shipmentOverdue ?? 0}
                 overdueInspectionDetails={metrics.shipmentOverdueInspectionDetails ?? []}
+                includeOverdueInspectionInTooltip={false}
+                summaryFallbackWhenNoTooltipLines={`${metrics.shipmentLate ?? 0} Late PO · ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
               />
             ) : undefined
           }

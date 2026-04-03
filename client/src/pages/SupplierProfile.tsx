@@ -15,6 +15,20 @@ import { Link, useSearchParams } from 'react-router-dom';
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const MAX_RECORD_UPLOAD_BYTES = 75 * 1024 * 1024;
 
+/** Shipment row status for supplier-facing table (matches Records-style labels). */
+function shipmentInspectionStatusLabel(status: string | undefined | null): string {
+  switch (status) {
+    case 'Passed':
+      return 'Approved';
+    case 'Failed':
+      return 'Rejected';
+    case 'WaitingInspection':
+      return 'Pending';
+    default:
+      return 'Pending';
+  }
+}
+
 interface Buyer {
   id: string;
   email: string;
@@ -64,6 +78,7 @@ interface PortalData {
     lot: string | null;
     qty: number | null;
     inspectionDate: string | null;
+    status: string;
     createdBy: string | null;
     createdAt: string;
     notes: string | null;
@@ -734,6 +749,7 @@ export function SupplierProfile() {
               <th>User</th>
               <th>Date Created</th>
               <th>NOTES</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -762,6 +778,7 @@ export function SupplierProfile() {
                 >
                   {s.notes?.trim() ? s.notes : '—'}
                 </td>
+                <td>{shipmentInspectionStatusLabel(s.status)}</td>
               </tr>
             ))}
           </tbody>

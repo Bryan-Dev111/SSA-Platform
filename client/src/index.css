@@ -1763,6 +1763,10 @@ body.sidebar-open {
   margin-bottom: 1rem;
   width: 100%;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Keep shipment alert tooltips above .dashboard-split (later in DOM would otherwise cover them). */
+  position: relative;
+  z-index: 10;
+  overflow: visible;
 }
 
 @media (max-width: 900px) {
@@ -1787,6 +1791,8 @@ body.sidebar-open {
   gap: 1rem;
   align-items: start;
   grid-template-columns: minmax(0, 1fr);
+  position: relative;
+  z-index: 1;
 }
 
 @media (min-width: 1308px) {
