@@ -31,6 +31,7 @@ const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
   { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
   { path: '/global-vendors/purchase-orders', label: 'Purchase Orders' },
   { path: '/global-vendors/samples', label: 'Samples' },
+  { path: '/global-vendors/expenses', label: 'Expenses' },
   { path: '/global-vendors/admin', label: 'Permissions' },
 ];
 

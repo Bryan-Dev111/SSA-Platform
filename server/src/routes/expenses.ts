@@ -7,7 +7,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 const router = Router();
 
 router.use(authMiddleware);
-router.use(requirePageAccess('Admin'));
+router.use(requirePageAccess('GlobalSupplyExpenses'));
 
 router.get(
   '/',

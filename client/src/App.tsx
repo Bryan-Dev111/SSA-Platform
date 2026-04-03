@@ -33,6 +33,7 @@ import { GlobalVendorsIndex } from './pages/globalVendors/GlobalVendorsIndex';
 import { FarmersInformationPage } from './pages/globalVendors/FarmersInformationPage';
 import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
 import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
+import { ExpensesPage } from './pages/globalVendors/ExpensesPage';
 import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
 import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
 import { PurchaseOrdersPage } from './pages/globalVendors/PurchaseOrdersPage';
@@ -144,6 +145,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/samples">
                     <SamplesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="expenses"
+                element={
+                  <ProtectedRoute path="/global-vendors/expenses">
+                    <ExpensesPage />
                   </ProtectedRoute>
                 }
               />

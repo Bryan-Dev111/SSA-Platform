@@ -48,6 +48,11 @@ export interface FarmRow {
   farmerEmail: string | null;
   farmerMobile: string | null;
   notes: string | null;
+  // Relationship fields (used by Relationship & Trust page as well)
+  firstContactDate?: string | null;
+  lastVisitDate?: string | null;
+  visitCount?: number | null;
+  relationshipStatus?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -260,6 +265,30 @@ export function FarmersInformationPage() {
                 <th>Elevation (m)</th>
                 <th>Production style</th>
                 <th>City</th>
+                <th>Total farm size (ha)</th>
+                <th>Main crop area (ha)</th>
+                <th>Main crop annual output (kg)</th>
+                <th>Secondary crop</th>
+                <th>Secondary area (ha)</th>
+                <th>Secondary annual output (kg)</th>
+                <th>Main varieties</th>
+                <th>Secondary varieties</th>
+                <th>Main harvest window</th>
+                <th>Secondary harvest window</th>
+                <th>Main processing</th>
+                <th>Main fermentation (days)</th>
+                <th>Main drying</th>
+                <th>Main bean size</th>
+                <th>Main quality score</th>
+                <th>Secondary processing</th>
+                <th>Secondary fermentation (days)</th>
+                <th>Secondary drying</th>
+                <th>Secondary bean size</th>
+                <th>Secondary quality score</th>
+                <th>Language</th>
+                <th>Samples OK</th>
+                <th>Farmer email</th>
+                <th>Farmer mobile</th>
                 <th>Latitude</th>
                 <th>Longitude</th>
                 <th>Created</th>
@@ -269,7 +298,7 @@ export function FarmersInformationPage() {
             <tbody>
               {farms.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="table-empty">
+                  <td colSpan={38} className="table-empty">
                     No farms yet. Use <strong>Add farmer</strong> to create one.
                   </td>
                 </tr>
@@ -288,6 +317,66 @@ export function FarmersInformationPage() {
                     <td>{typeof f.elevationMeters === 'number' ? f.elevationMeters : '—'}</td>
                     <td>{f.productionStyle ?? '—'}</td>
                     <td>{f.city ?? '—'}</td>
+                    <td>{typeof f.totalFarmSizeHa === 'number' ? f.totalFarmSizeHa : '—'}</td>
+                    <td>{typeof f.mainCropAreaHa === 'number' ? f.mainCropAreaHa : '—'}</td>
+                    <td>
+                      {typeof f.mainCropAnnualOutputKg === 'number'
+                        ? f.mainCropAnnualOutputKg.toLocaleString()
+                        : '—'}
+                    </td>
+                    <td>{f.secondaryCrop ?? '—'}</td>
+                    <td>
+                      {typeof f.secondaryCropAreaHa === 'number'
+                        ? f.secondaryCropAreaHa
+                        : '—'}
+                    </td>
+                    <td>
+                      {typeof f.secondaryCropAnnualOutputKg === 'number'
+                        ? f.secondaryCropAnnualOutputKg.toLocaleString()
+                        : '—'}
+                    </td>
+                    <td>{f.mainVarieties ?? '—'}</td>
+                    <td>{f.secondaryVarieties ?? '—'}</td>
+                    <td>
+                      {f.harvestStartMonth && f.harvestEndMonth
+                        ? `${f.harvestStartMonth}–${f.harvestEndMonth}`
+                        : '—'}
+                    </td>
+                    <td>
+                      {f.secondaryHarvestStartMonth && f.secondaryHarvestEndMonth
+                        ? `${f.secondaryHarvestStartMonth}–${f.secondaryHarvestEndMonth}`
+                        : '—'}
+                    </td>
+                    <td>{f.mainProcessingMethods ?? '—'}</td>
+                    <td>
+                      {typeof f.mainFermentationDays === 'number'
+                        ? f.mainFermentationDays
+                        : '—'}
+                    </td>
+                    <td>{f.mainDryingMethod ?? '—'}</td>
+                    <td>{f.mainBeanSize ?? '—'}</td>
+                    <td>
+                      {typeof f.mainQualityScore === 'number'
+                        ? f.mainQualityScore.toFixed(1)
+                        : '—'}
+                    </td>
+                    <td>{f.secondaryProcessingMethods ?? '—'}</td>
+                    <td>
+                      {typeof f.secondaryFermentationDays === 'number'
+                        ? f.secondaryFermentationDays
+                        : '—'}
+                    </td>
+                    <td>{f.secondaryDryingMethod ?? '—'}</td>
+                    <td>{f.secondaryBeanSize ?? '—'}</td>
+                    <td>
+                      {typeof f.secondaryQualityScore === 'number'
+                        ? f.secondaryQualityScore.toFixed(1)
+                        : '—'}
+                    </td>
+                    <td>{f.language ?? '—'}</td>
+                    <td>{f.samplesOk == null ? '—' : f.samplesOk ? 'Yes' : 'No'}</td>
+                    <td>{f.farmerEmail ?? '—'}</td>
+                    <td>{f.farmerMobile ?? '—'}</td>
                     <td>{typeof f.latitude === 'number' ? f.latitude : '—'}</td>
                     <td>{typeof f.longitude === 'number' ? f.longitude : '—'}</td>
                     <td>
@@ -420,7 +509,7 @@ export function FarmersInformationPage() {
                 void saveEdit();
               }}
               className="stack"
-              style={{ gap: 12, marginTop: 16 }}
+              style={{ gap: 12, marginTop: 16, maxHeight: '70vh', overflow: 'auto', paddingRight: 4 }}
             >
               <label className="field">
                 <span className="field-label">Farm name</span>
@@ -501,6 +590,329 @@ export function FarmersInformationPage() {
                   value={edit.productionStyle ?? ''}
                   onChange={(e) => updateEditField('productionStyle', e.target.value)}
                   placeholder="e.g. Organic, Conventional"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Total farm size (ha)</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  value={
+                    typeof edit.totalFarmSizeHa === 'number'
+                      ? String(edit.totalFarmSizeHa)
+                      : ''
+                  }
+                  onChange={(e) => updateEditField('totalFarmSizeHa', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main crop area (ha)</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  value={
+                    typeof edit.mainCropAreaHa === 'number'
+                      ? String(edit.mainCropAreaHa)
+                      : ''
+                  }
+                  onChange={(e) => updateEditField('mainCropAreaHa', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main crop annual output (kg)</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="1"
+                  value={
+                    typeof edit.mainCropAnnualOutputKg === 'number'
+                      ? String(edit.mainCropAnnualOutputKg)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('mainCropAnnualOutputKg', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary crop</span>
+                <input
+                  className="input"
+                  value={edit.secondaryCrop ?? ''}
+                  onChange={(e) => updateEditField('secondaryCrop', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary crop area (ha)</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  value={
+                    typeof edit.secondaryCropAreaHa === 'number'
+                      ? String(edit.secondaryCropAreaHa)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('secondaryCropAreaHa', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary crop annual output (kg)</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="1"
+                  value={
+                    typeof edit.secondaryCropAnnualOutputKg === 'number'
+                      ? String(edit.secondaryCropAnnualOutputKg)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('secondaryCropAnnualOutputKg', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main varieties</span>
+                <input
+                  className="input"
+                  value={edit.mainVarieties ?? ''}
+                  onChange={(e) => updateEditField('mainVarieties', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary varieties</span>
+                <input
+                  className="input"
+                  value={edit.secondaryVarieties ?? ''}
+                  onChange={(e) =>
+                    updateEditField('secondaryVarieties', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main harvest start month</span>
+                <input
+                  className="input"
+                  value={edit.harvestStartMonth ?? ''}
+                  onChange={(e) =>
+                    updateEditField('harvestStartMonth', e.target.value)
+                  }
+                  placeholder="e.g. January"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main harvest end month</span>
+                <input
+                  className="input"
+                  value={edit.harvestEndMonth ?? ''}
+                  onChange={(e) => updateEditField('harvestEndMonth', e.target.value)}
+                  placeholder="e.g. March"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary harvest start month</span>
+                <input
+                  className="input"
+                  value={edit.secondaryHarvestStartMonth ?? ''}
+                  onChange={(e) =>
+                    updateEditField('secondaryHarvestStartMonth', e.target.value)
+                  }
+                  placeholder="e.g. June"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary harvest end month</span>
+                <input
+                  className="input"
+                  value={edit.secondaryHarvestEndMonth ?? ''}
+                  onChange={(e) =>
+                    updateEditField('secondaryHarvestEndMonth', e.target.value)
+                  }
+                  placeholder="e.g. August"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main processing methods</span>
+                <input
+                  className="input"
+                  value={edit.mainProcessingMethods ?? ''}
+                  onChange={(e) =>
+                    updateEditField('mainProcessingMethods', e.target.value)
+                  }
+                  placeholder="e.g. Washed, Natural"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main fermentation days</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="1"
+                  value={
+                    typeof edit.mainFermentationDays === 'number'
+                      ? String(edit.mainFermentationDays)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('mainFermentationDays', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main drying method</span>
+                <input
+                  className="input"
+                  value={edit.mainDryingMethod ?? ''}
+                  onChange={(e) =>
+                    updateEditField('mainDryingMethod', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main bean size</span>
+                <input
+                  className="input"
+                  value={edit.mainBeanSize ?? ''}
+                  onChange={(e) => updateEditField('mainBeanSize', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Main quality score</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.1"
+                  value={
+                    typeof edit.mainQualityScore === 'number'
+                      ? String(edit.mainQualityScore)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('mainQualityScore', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary processing methods</span>
+                <input
+                  className="input"
+                  value={edit.secondaryProcessingMethods ?? ''}
+                  onChange={(e) =>
+                    updateEditField('secondaryProcessingMethods', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary fermentation days</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="1"
+                  value={
+                    typeof edit.secondaryFermentationDays === 'number'
+                      ? String(edit.secondaryFermentationDays)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('secondaryFermentationDays', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary drying method</span>
+                <input
+                  className="input"
+                  value={edit.secondaryDryingMethod ?? ''}
+                  onChange={(e) =>
+                    updateEditField('secondaryDryingMethod', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary bean size</span>
+                <input
+                  className="input"
+                  value={edit.secondaryBeanSize ?? ''}
+                  onChange={(e) =>
+                    updateEditField('secondaryBeanSize', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Secondary quality score</span>
+                <input
+                  className="input"
+                  type="number"
+                  step="0.1"
+                  value={
+                    typeof edit.secondaryQualityScore === 'number'
+                      ? String(edit.secondaryQualityScore)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    updateEditField('secondaryQualityScore', e.target.value)
+                  }
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Language</span>
+                <input
+                  className="input"
+                  value={edit.language ?? ''}
+                  onChange={(e) => updateEditField('language', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Samples OK</span>
+                <select
+                  className="input"
+                  value={
+                    edit.samplesOk == null ? '' : edit.samplesOk ? 'yes' : 'no'
+                  }
+                  onChange={(e) =>
+                    setEdit((prev) => ({
+                      ...prev,
+                      samplesOk:
+                        e.target.value === ''
+                          ? null
+                          : e.target.value === 'yes',
+                    }))
+                  }
+                >
+                  <option value="">Not set</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Farmer email</span>
+                <input
+                  className="input"
+                  value={edit.farmerEmail ?? ''}
+                  onChange={(e) => updateEditField('farmerEmail', e.target.value)}
+                  type="email"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Farmer mobile</span>
+                <input
+                  className="input"
+                  value={edit.farmerMobile ?? ''}
+                  onChange={(e) => updateEditField('farmerMobile', e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Notes</span>
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={edit.notes ?? ''}
+                  onChange={(e) => updateEditField('notes', e.target.value)}
                 />
               </label>
               <label className="field">
