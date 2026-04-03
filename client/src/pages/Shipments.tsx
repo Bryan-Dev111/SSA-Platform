@@ -60,10 +60,16 @@ interface Metrics {
   scheduleRowCount?: number;
 }
 
-function openShipmentRequestsSubtitle(_m: Metrics): string {
-  // Client requested: remove "late / overdue" breakdown from this card;
-  // we keep a simple status label instead.
-  return 'Waiting inspection';
+function openShipmentRequestsSubtitle(m: Metrics): string {
+  const overdue = m.overdueWaiting ?? 0;
+  const waiting = m.waitingInspection ?? 0;
+  if (waiting === 0) return 'No open requests';
+  if (overdue === 0) return 'Waiting inspection';
+  const notOverdue = waiting - overdue;
+  // Align with Dashboard: same overdue count as `shipmentOverdue` (inspection past requested date).
+  const waitingLabel =
+    notOverdue === 1 ? '1 waiting inspection' : `${notOverdue} waiting inspections`;
+  return `${waitingLabel} · ${overdue} overdue`;
 }
 
 function onTimeDeliverySubtitle(m: Metrics): string {
