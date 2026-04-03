@@ -171,7 +171,7 @@ export function Layout() {
           >
             <MenuIcon />
           </button>
-          <span className="app-header-title">Supplier Assurance Platform</span>
+          <span className="app-header-title">Sentinel Supplier Assurance</span>
           <div className="app-header-actions">
             {roleNames.includes('Admin') && (
               <button
