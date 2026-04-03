@@ -184,6 +184,16 @@ export function Risk() {
     return items
       .filter((r) => r.type === 'risk')
       .map((r) => {
+        // Mitigated risks: matrix + KPIs follow the risk table (likelihood/severity/level), which users edit when reassessing.
+        // Closed actions still hold historical residual; those values can be stale after a table-only update.
+        if (r.status === 'Mitigated') {
+          return {
+            ...r,
+            effectiveLikelihood: r.likelihood as OpportunityRow['likelihood'],
+            effectiveSeverity: r.severity as OpportunityRow['severity'],
+            effectiveRiskLevel: r.riskLevel,
+          };
+        }
         const action = latestActionByRisk.get(r.id);
         const useResidual =
           action?.status === 'Closed' && !!action.residualLikelihood && !!action.residualSeverity && !!action.residualRiskLevel;

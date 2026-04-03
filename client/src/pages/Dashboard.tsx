@@ -95,6 +95,7 @@ interface DashboardOpportunityRow {
   likelihood: DashboardLikelihood;
   severity: DashboardSeverity;
   riskLevel: 'Low' | 'Medium' | 'High' | null;
+  status?: 'Open' | 'Mitigated' | 'Closed' | 'Realized';
   createdAt: string;
 }
 

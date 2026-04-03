@@ -1,6 +1,6 @@
 /**
  * Risk-register distribution (Low / Medium / High), matching the Risk page:
- * latest action per risk; closed actions with full residual fields override displayed level.
+ * Mitigated risks use the opportunity row; otherwise latest closed action residual overrides when present.
  */
 
 export type RiskDistribution = { low: number; medium: number; high: number };
@@ -14,6 +14,8 @@ export interface RiskRegisterItem {
   likelihood: RiskLikelihood | null;
   severity: RiskSeverity | null;
   riskLevel: 'Low' | 'Medium' | 'High' | null;
+  /** When Mitigated, use risk row level (matches Risk page matrix after table edits). */
+  status?: 'Open' | 'Mitigated' | 'Closed' | 'Realized';
 }
 
 export interface RiskRegisterAction {
@@ -35,6 +37,9 @@ export function computeRiskRegisterDistribution(items: RiskRegisterItem[], actio
   const effectiveRisks = items
     .filter((r) => r.type === 'risk')
     .map((r) => {
+      if (r.status === 'Mitigated') {
+        return { effectiveRiskLevel: r.riskLevel };
+      }
       const action = latestActionByRisk.get(r.id);
       const useResidual =
         action?.status === 'Closed' &&
