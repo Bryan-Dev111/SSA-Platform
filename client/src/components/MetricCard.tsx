@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
+
 /**
  * Dashboard-style summary card: label, primary value, optional muted subtitle.
- * Supports an optional alert glyph in the top-right.
+ * Supports an optional alert glyph in the top-right, or a custom alert (e.g. hover tooltip).
  */
 export function MetricCard({
   title,
@@ -8,17 +10,33 @@ export function MetricCard({
   subtitle,
   showAlert,
   alertLabel,
+  customAlert,
 }: {
   title: string;
   value: number | string;
   subtitle?: string;
   showAlert?: boolean;
   alertLabel?: string;
+  /** When set, replaces the default static triangle (use for rich tooltips). */
+  customAlert?: ReactNode;
 }) {
+  const hasCustom = customAlert != null;
+  const hasDefault = Boolean(showAlert) && !hasCustom;
+  const hasAlert = hasCustom || hasDefault;
+
   return (
-    <div className="card">
-      <div className="card-body" style={{ padding: '0.9rem', position: 'relative' }}>
-        {showAlert ? (
+    <div className={hasCustom ? 'card shipments-metric-card--overflow-visible' : 'card'}>
+      <div
+        className="card-body"
+        style={{
+          padding: '0.9rem',
+          position: 'relative',
+          ...(hasAlert ? { minHeight: 88, zIndex: hasCustom ? 1 : undefined } : {}),
+        }}
+      >
+        {hasCustom ? (
+          customAlert
+        ) : hasDefault ? (
           <div
             aria-label={alertLabel ?? 'There are late or overdue items'}
             title={alertLabel}
@@ -48,7 +66,15 @@ export function MetricCard({
             </svg>
           </div>
         ) : null}
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{title}</div>
+        <div
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-text-muted)',
+            paddingRight: hasAlert ? 36 : 0,
+          }}
+        >
+          {title}
+        </div>
         <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>{value}</div>
         {subtitle ? (
           <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>

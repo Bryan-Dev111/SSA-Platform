@@ -41,6 +41,8 @@ router.get(
           openFindingsTotal: 0,
           shipmentLate: 0,
           shipmentOverdue: 0,
+          shipmentShortDeliveryDetails: [],
+          shipmentOverdueInspectionDetails: [],
         },
         charts: { topRiskSuppliers: [], upcomingEvents: [], recentUpdates: [], monthlyTrends: [] },
       });
@@ -306,6 +308,8 @@ router.get(
         openCarsOverdue: overdueCars,
         shipmentLate: shipmentMetrics.shortDeliveries,
         shipmentOverdue: shipmentMetrics.overdueWaiting,
+        shipmentShortDeliveryDetails: shipmentMetrics.shortDeliveryDetails,
+        shipmentOverdueInspectionDetails: shipmentMetrics.overdueDetails,
       },
       charts: {
         topRiskSuppliers,

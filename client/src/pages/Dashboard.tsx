@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { MetricCard } from '../components/MetricCard';
+import { ShipmentMetricAlertIcon } from '../components/ShipmentMetricAlertIcon';
 import { MonthlyTrendsLineChart, type MonthlyTrendRow } from '../components/MonthlyTrendsLineChart';
 import { apiJson } from '../api/client';
 import { computeRiskRegisterDistribution } from '../utils/riskDistribution';
@@ -29,6 +30,12 @@ interface DashboardResponse {
     rejectedDocuments: number;
     shipmentLate?: number;
     shipmentOverdue?: number;
+    shipmentShortDeliveryDetails?: Array<{
+      purchaseOrder: string | null;
+      partNumber: string | null;
+      missingQty: number;
+    }>;
+    shipmentOverdueInspectionDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
   };
   charts: {
     upcomingEvents: Array<{
@@ -166,6 +173,8 @@ export function Dashboard() {
     rejectedDocuments: 0,
     shipmentLate: 0,
     shipmentOverdue: 0,
+    shipmentShortDeliveryDetails: [],
+    shipmentOverdueInspectionDetails: [],
   };
   const upcoming = data?.charts.upcomingEvents ?? [];
   const recentUpdates = data?.charts.recentUpdates ?? [];
@@ -228,8 +237,16 @@ export function Dashboard() {
           title="Shipments"
           value={metrics.shipmentRequests}
           subtitle={`${metrics.shipmentLate ?? 0} Late PO · ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
-          showAlert={(metrics.shipmentLate ?? 0) > 0 || (metrics.shipmentOverdue ?? 0) > 0}
-          alertLabel={`Shipments: ${metrics.shipmentLate ?? 0} Late PO, ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
+          customAlert={
+            (metrics.shipmentLate ?? 0) > 0 || (metrics.shipmentOverdue ?? 0) > 0 ? (
+              <ShipmentMetricAlertIcon
+                shortDeliveries={metrics.shipmentLate ?? 0}
+                shortDetails={metrics.shipmentShortDeliveryDetails ?? []}
+                overdueInspectionCount={metrics.shipmentOverdue ?? 0}
+                overdueInspectionDetails={metrics.shipmentOverdueInspectionDetails ?? []}
+              />
+            ) : undefined
+          }
         />
       </div>
 
