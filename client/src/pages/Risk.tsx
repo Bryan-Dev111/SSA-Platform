@@ -254,7 +254,8 @@ export function Risk() {
     const openActions = actions.filter((x) => x.status === 'Open').length;
     const overdueActions = actions.filter((x) => x.status === 'Open' && x.dueDate && new Date(x.dueDate) < now).length;
     const opportunities = items.filter((x) => x.type === 'opportunity').length;
-    return { avgScore, openRisks, mitigatedRisks, openActions, overdueActions, opportunities };
+    const realizedOpportunities = items.filter((x) => x.type === 'opportunity' && x.status === 'Realized').length;
+    return { avgScore, openRisks, mitigatedRisks, openActions, overdueActions, opportunities, realizedOpportunities };
   }, [effectiveRisks, actions, items]);
 
   const topRiskSuppliers = useMemo(() => {
@@ -518,7 +519,15 @@ export function Risk() {
           value={String(stats.openActions)}
           subtitle={`${stats.overdueActions} overdue action${stats.overdueActions === 1 ? '' : 's'}`}
         />
-        <MetricCard title="Open opportunities" value={String(stats.opportunities)} />
+        <MetricCard
+          title="Open opportunities"
+          value={String(stats.opportunities)}
+          subtitle={
+            stats.realizedOpportunities === 1
+              ? '1 realized opportunity'
+              : `${stats.realizedOpportunities} realized opportunities`
+          }
+        />
       </div>
 
       <div className="risk-overview-two-col">
