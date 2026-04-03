@@ -54,7 +54,11 @@ interface Metrics {
   overdueDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
   /** Schedules where shipped quantity is less than planned after scheduled date. */
   shortDeliveries?: number;
-  shortDeliveryDetails?: Array<{ purchaseOrder: string | null; missingQty: number }>;
+  shortDeliveryDetails?: Array<{
+    purchaseOrder: string | null;
+    partNumber: string | null;
+    missingQty: number;
+  }>;
   otdPercent: number | null;
   fpyPercent: number | null;
   scheduleRowCount?: number;
@@ -81,7 +85,11 @@ function onTimeDeliverySubtitle(m: Metrics): string {
 function openShipmentRequestsAlertProps(m: Metrics):
   | {
       shortDeliveries: number;
-      shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
+      shortDetails: Array<{
+        purchaseOrder: string | null;
+        partNumber: string | null;
+        missingQty: number;
+      }>;
     }
   | undefined {
   const late = m.shortDeliveries ?? 0;
@@ -589,9 +597,9 @@ export function Shipments() {
                       Supplier {sortIndicator('supplier')}
                     </th>
                     <th>P.O.</th>
-                    <th>Lot</th>
                     <th>Part Number</th>
                     <th>Quantity</th>
+                    <th>Lot</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('scheduled')}>
                       Requested Inspection Date {sortIndicator('scheduled')}
                     </th>
@@ -617,9 +625,9 @@ export function Shipments() {
                         </span>
                       </td>
                       <td>{r.purchaseOrder ?? '—'}</td>
-                      <td>{r.lot ?? '—'}</td>
                       <td>{r.partNumber ?? '—'}</td>
                       <td>{r.qty ?? '—'}</td>
+                      <td>{r.lot ?? '—'}</td>
                       <td>{r.inspectionDate?.slice(0, 10) ?? '—'}</td>
 
                       <td>
@@ -836,7 +844,11 @@ function OpenShipmentRequestsAlertIcon({
   shortDetails,
 }: {
   shortDeliveries: number;
-  shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
+  shortDetails: Array<{
+    purchaseOrder: string | null;
+    partNumber: string | null;
+    missingQty: number;
+  }>;
 }) {
   const [hover, setHover] = useState(false);
 
@@ -846,8 +858,9 @@ function OpenShipmentRequestsAlertIcon({
       shortDetails.length > 0
         ? shortDetails.map((d) => {
             const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
+            const part = d.partNumber?.trim() ? d.partNumber.trim() : '—';
             const missing = d.missingQty;
-            return `PO: ${po} · Quantity missing: ${missing}`;
+            return `PO: ${po} · Part: ${part} · Quantity missing: ${missing}`;
           })
         : [`${shortDeliveries} late (quantity short vs planned; details unavailable)`];
     tooltipBlocks.push({ heading: 'Late (quantity short vs planned)', lines });
@@ -952,7 +965,11 @@ function Metric({
   subtitle?: string;
   openShipmentRequestsAlert?: {
     shortDeliveries: number;
-    shortDetails: Array<{ purchaseOrder: string | null; missingQty: number }>;
+    shortDetails: Array<{
+      purchaseOrder: string | null;
+      partNumber: string | null;
+      missingQty: number;
+    }>;
   };
 }) {
   const cardClass =

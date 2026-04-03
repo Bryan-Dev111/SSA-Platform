@@ -727,9 +727,9 @@ export function SupplierProfile() {
               <th>Shipment ID</th>
               <th>Supplier</th>
               <th>P.O.</th>
-              <th>Lot</th>
               <th>Part Number</th>
               <th>Quantity</th>
+              <th>Lot</th>
               <th>Requested Inspection Date</th>
               <th>User</th>
               <th>Date Created</th>
@@ -744,9 +744,9 @@ export function SupplierProfile() {
                   {supplier?.code ?? '—'} — {supplier?.name ?? ''}
                 </td>
                 <td>{s.purchaseOrder ?? '—'}</td>
-                <td>{s.lot ?? '—'}</td>
                 <td>{s.partNumber ?? '—'}</td>
                 <td>{s.qty ?? '—'}</td>
+                <td>{s.lot ?? '—'}</td>
                 <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
                 <td>{s.createdBy ?? '—'}</td>
                 <td>

@@ -43,6 +43,7 @@ export interface LateShipmentDetail {
 
 export interface ShortDeliveryDetail {
   purchaseOrder: string | null;
+  partNumber: string | null;
   missingQty: number;
 }
 
@@ -189,6 +190,7 @@ export async function computeShipmentMetrics(
       shortDeliveries++;
       shortDeliveryDetails.push({
         purchaseOrder: sch.purchaseOrder,
+        partNumber: sch.partNumber,
         missingQty: plannedQty - shippedTotal,
       });
     }
