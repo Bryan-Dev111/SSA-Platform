@@ -24,12 +24,9 @@ CREATE TABLE "EmployeeSupplierAssignment" (
     CONSTRAINT "EmployeeSupplierAssignment_pkey" PRIMARY KEY ("employeeId","supplierId")
 );
 
--- AlterTable
-ALTER TABLE "WorkLog" ADD COLUMN "projectHistoryId" TEXT;
-ALTER TABLE "LaborCost" ADD COLUMN "projectHistoryId" TEXT;
+-- WorkLog / LaborCost projectHistoryId: applied in a later migration (20260412140000)
+-- after those tables are created (shadow DB replay failed when this ran before WorkLog existed).
 
 -- AddForeignKey
 ALTER TABLE "EmployeeSupplierAssignment" ADD CONSTRAINT "EmployeeSupplierAssignment_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "EmployeeSupplierAssignment" ADD CONSTRAINT "EmployeeSupplierAssignment_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "Supplier"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "WorkLog" ADD CONSTRAINT "WorkLog_projectHistoryId_fkey" FOREIGN KEY ("projectHistoryId") REFERENCES "ClientHistory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "LaborCost" ADD CONSTRAINT "LaborCost_projectHistoryId_fkey" FOREIGN KEY ("projectHistoryId") REFERENCES "ClientHistory"("id") ON DELETE SET NULL ON UPDATE CASCADE;

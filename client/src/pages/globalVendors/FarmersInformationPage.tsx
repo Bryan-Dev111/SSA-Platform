@@ -21,6 +21,33 @@ export interface FarmRow {
   mainCrop: string | null;
   elevationMeters: number | null;
   productionStyle: string | null;
+  totalFarmSizeHa: number | null;
+  mainCropAreaHa: number | null;
+  mainCropAnnualOutputKg: number | null;
+  secondaryCrop: string | null;
+  secondaryCropAreaHa: number | null;
+  secondaryCropAnnualOutputKg: number | null;
+  mainVarieties: string | null;
+  secondaryVarieties: string | null;
+  harvestStartMonth: string | null;
+  harvestEndMonth: string | null;
+  secondaryHarvestStartMonth: string | null;
+  secondaryHarvestEndMonth: string | null;
+  mainProcessingMethods: string | null;
+  mainFermentationDays: number | null;
+  mainDryingMethod: string | null;
+  mainBeanSize: string | null;
+  mainQualityScore: number | null;
+  secondaryProcessingMethods: string | null;
+  secondaryFermentationDays: number | null;
+  secondaryDryingMethod: string | null;
+  secondaryBeanSize: string | null;
+  secondaryQualityScore: number | null;
+  language: string | null;
+  samplesOk: boolean | null;
+  farmerEmail: string | null;
+  farmerMobile: string | null;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +156,33 @@ export function FarmersInformationPage() {
         mainCrop: edit.mainCrop,
         elevationMeters: edit.elevationMeters,
         productionStyle: edit.productionStyle,
+        totalFarmSizeHa: edit.totalFarmSizeHa,
+        mainCropAreaHa: edit.mainCropAreaHa,
+        mainCropAnnualOutputKg: edit.mainCropAnnualOutputKg,
+        secondaryCrop: edit.secondaryCrop,
+        secondaryCropAreaHa: edit.secondaryCropAreaHa,
+        secondaryCropAnnualOutputKg: edit.secondaryCropAnnualOutputKg,
+        mainVarieties: edit.mainVarieties,
+        secondaryVarieties: edit.secondaryVarieties,
+        harvestStartMonth: edit.harvestStartMonth,
+        harvestEndMonth: edit.harvestEndMonth,
+        secondaryHarvestStartMonth: edit.secondaryHarvestStartMonth,
+        secondaryHarvestEndMonth: edit.secondaryHarvestEndMonth,
+        mainProcessingMethods: edit.mainProcessingMethods,
+        mainFermentationDays: edit.mainFermentationDays,
+        mainDryingMethod: edit.mainDryingMethod,
+        mainBeanSize: edit.mainBeanSize,
+        mainQualityScore: edit.mainQualityScore,
+        secondaryProcessingMethods: edit.secondaryProcessingMethods,
+        secondaryFermentationDays: edit.secondaryFermentationDays,
+        secondaryDryingMethod: edit.secondaryDryingMethod,
+        secondaryBeanSize: edit.secondaryBeanSize,
+        secondaryQualityScore: edit.secondaryQualityScore,
+        language: edit.language,
+        samplesOk: edit.samplesOk,
+        farmerEmail: edit.farmerEmail,
+        farmerMobile: edit.farmerMobile,
+        notes: edit.notes,
       };
       await apiJson<FarmRow>(`/farms/${editId}`, {
         token,

@@ -10,10 +10,11 @@ The app uses **Supabase** as the database. See **docs/SUPABASE_SETUP.md** for fu
    npm install
    npx prisma generate
    ```
-3. Apply the database schema on Supabase:
+3. Apply the database schema on Supabase (**never use `migrate dev` against production** — it may prompt to reset and drop all data):
    ```bash
-   npx prisma migrate deploy
+   npm run db:migrate
    ```
+   If Prisma reports migrations were **modified after they were applied**, your live schema may already match; sync checksum metadata only (no data loss) by running `npm run db:migrate:sync-checksums`, then executing the printed `UPDATE "_prisma_migrations"...` statements in the Supabase SQL Editor, then run `npm run db:migrate` again.
 4. Seed roles and test users (if the DB is empty):
    ```bash
    npm run db:seed
@@ -24,5 +25,7 @@ The app uses **Supabase** as the database. See **docs/SUPABASE_SETUP.md** for fu
 - `npm run dev` — Start API with tsx watch
 - `npm run build` — Compile TypeScript to `dist/`
 - `npm run start` — Run `dist/index.js`
-- `npm run db:migrate` — Run migrations (dev)
+- `npm run db:migrate` — Apply pending migrations (`migrate deploy`, safe for Supabase)
+- `npm run db:migrate:dev` — Create/apply migrations in dev (`migrate dev`; uses shadow DB, not for shared prod)
+- `npm run db:migrate:sync-checksums` — Print SQL to fix `_prisma_migrations.checksum` after intentional migration edits
 - `npm run db:studio` — Open Prisma Studio

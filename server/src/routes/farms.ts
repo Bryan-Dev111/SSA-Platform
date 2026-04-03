@@ -26,6 +26,35 @@ const farmSelect = {
   mainCrop: true,
   elevationMeters: true,
   productionStyle: true,
+
+  totalFarmSizeHa: true,
+  mainCropAreaHa: true,
+  mainCropAnnualOutputKg: true,
+  secondaryCrop: true,
+  secondaryCropAreaHa: true,
+  secondaryCropAnnualOutputKg: true,
+  mainVarieties: true,
+  secondaryVarieties: true,
+  harvestStartMonth: true,
+  harvestEndMonth: true,
+  secondaryHarvestStartMonth: true,
+  secondaryHarvestEndMonth: true,
+  mainProcessingMethods: true,
+  mainFermentationDays: true,
+  mainDryingMethod: true,
+  mainBeanSize: true,
+  mainQualityScore: true,
+  secondaryProcessingMethods: true,
+  secondaryFermentationDays: true,
+  secondaryDryingMethod: true,
+  secondaryBeanSize: true,
+  secondaryQualityScore: true,
+  language: true,
+  samplesOk: true,
+  farmerEmail: true,
+  farmerMobile: true,
+  notes: true,
+
   firstContactDate: true,
   lastVisitDate: true,
   visitCount: true,
@@ -118,6 +147,33 @@ router.patch(
       mainCrop,
       elevationMeters,
       productionStyle,
+      totalFarmSizeHa,
+      mainCropAreaHa,
+      mainCropAnnualOutputKg,
+      secondaryCrop,
+      secondaryCropAreaHa,
+      secondaryCropAnnualOutputKg,
+      mainVarieties,
+      secondaryVarieties,
+      harvestStartMonth,
+      harvestEndMonth,
+      secondaryHarvestStartMonth,
+      secondaryHarvestEndMonth,
+      mainProcessingMethods,
+      mainFermentationDays,
+      mainDryingMethod,
+      mainBeanSize,
+      mainQualityScore,
+      secondaryProcessingMethods,
+      secondaryFermentationDays,
+      secondaryDryingMethod,
+      secondaryBeanSize,
+      secondaryQualityScore,
+      language,
+      samplesOk,
+      farmerEmail,
+      farmerMobile,
+      notes,
       firstContactDate,
       lastVisitDate,
       visitCount,
@@ -184,6 +240,74 @@ router.patch(
     }
     if (typeof productionStyle === 'string') {
       data.productionStyle = productionStyle.trim() || null;
+    }
+
+    // Agronomy / production metrics (simple nullable numerics/strings)
+    const toNullableFloat = (val: unknown) => {
+      if (val === undefined) return undefined;
+      if (val === null || val === '') return null;
+      const num = Number(val);
+      return Number.isFinite(num) ? num : undefined;
+    };
+    const toNullableInt = (val: unknown) => {
+      if (val === undefined) return undefined;
+      if (val === null || val === '') return null;
+      const num = Number(val);
+      return Number.isFinite(num) ? Math.trunc(num) : undefined;
+    };
+
+    const floatFields: [keyof typeof data, unknown][] = [
+      ['totalFarmSizeHa', totalFarmSizeHa],
+      ['mainCropAreaHa', mainCropAreaHa],
+      ['mainCropAnnualOutputKg', mainCropAnnualOutputKg],
+      ['secondaryCropAreaHa', secondaryCropAreaHa],
+      ['secondaryCropAnnualOutputKg', secondaryCropAnnualOutputKg],
+      ['mainQualityScore', mainQualityScore],
+      ['secondaryQualityScore', secondaryQualityScore],
+    ];
+    for (const [key, raw] of floatFields) {
+      const v = toNullableFloat(raw);
+      if (v !== undefined) (data as any)[key] = v;
+    }
+
+    const intFields: [keyof typeof data, unknown][] = [
+      ['mainFermentationDays', mainFermentationDays],
+      ['secondaryFermentationDays', secondaryFermentationDays],
+    ];
+    for (const [key, raw] of intFields) {
+      const v = toNullableInt(raw);
+      if (v !== undefined) (data as any)[key] = v;
+    }
+
+    const stringFields: [keyof typeof data, unknown][] = [
+      ['secondaryCrop', secondaryCrop],
+      ['mainVarieties', mainVarieties],
+      ['secondaryVarieties', secondaryVarieties],
+      ['harvestStartMonth', harvestStartMonth],
+      ['harvestEndMonth', harvestEndMonth],
+      ['secondaryHarvestStartMonth', secondaryHarvestStartMonth],
+      ['secondaryHarvestEndMonth', secondaryHarvestEndMonth],
+      ['mainProcessingMethods', mainProcessingMethods],
+      ['mainDryingMethod', mainDryingMethod],
+      ['mainBeanSize', mainBeanSize],
+      ['secondaryProcessingMethods', secondaryProcessingMethods],
+      ['secondaryDryingMethod', secondaryDryingMethod],
+      ['secondaryBeanSize', secondaryBeanSize],
+      ['language', language],
+      ['farmerEmail', farmerEmail],
+      ['farmerMobile', farmerMobile],
+      ['notes', notes],
+    ];
+    for (const [key, raw] of stringFields) {
+      if (typeof raw === 'string') {
+        (data as any)[key] = raw.trim() || null;
+      } else if (raw === null) {
+        (data as any)[key] = null;
+      }
+    }
+
+    if (samplesOk !== undefined) {
+      (data as any).samplesOk = samplesOk === null ? null : Boolean(samplesOk);
     }
 
     if (typeof firstContactDate === 'string' && firstContactDate.trim()) {

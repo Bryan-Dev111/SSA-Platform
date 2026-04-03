@@ -664,6 +664,41 @@ model Farm {
   elevationMeters Float?
   productionStyle String?
 
+  // Agronomy / production metrics
+  totalFarmSizeHa              Float?
+  mainCropAreaHa               Float?
+  mainCropAnnualOutputKg       Float?
+  secondaryCrop                String?
+  secondaryCropAreaHa          Float?
+  secondaryCropAnnualOutputKg  Float?
+  mainVarieties                String?
+  secondaryVarieties           String?
+
+  // Seasonality
+  harvestStartMonth            String?
+  harvestEndMonth              String?
+  secondaryHarvestStartMonth   String?
+  secondaryHarvestEndMonth     String?
+
+  // Processing & quality
+  mainProcessingMethods        String?
+  mainFermentationDays         Int?
+  mainDryingMethod             String?
+  mainBeanSize                 String?
+  mainQualityScore             Float?
+  secondaryProcessingMethods   String?
+  secondaryFermentationDays    Int?
+  secondaryDryingMethod        String?
+  secondaryBeanSize            String?
+  secondaryQualityScore        Float?
+
+  // Contact / misc
+  language       String?
+  samplesOk      Boolean?
+  farmerEmail    String?
+  farmerMobile   String?
+  notes          String?
+
   /// Relationship & trust fields (Day 2)
   firstContactDate DateTime? @db.Date
   lastVisitDate    DateTime? @db.Date
