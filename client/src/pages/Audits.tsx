@@ -2,13 +2,14 @@
  * Audits page: table (schedule, results, notes); only assigned Auditor/Admin/QE set result;
  * column with finding #s (clickable → Findings Record). Only Admin can delete.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { downloadWithAuthProgress, parseApiError } from '../utils/apiHelpers';
+import { MAX_RECORD_UPLOAD_BYTES, postRecordWithProgress } from '../utils/recordUpload';
 
 interface Supplier {
   id: string;
@@ -72,6 +73,14 @@ export function Audits() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [summaryModal, setSummaryModal] = useState<{ code: string; summary: string } | null>(null);
   const [downloadingRecord, setDownloadingRecord] = useState<Record<string, boolean>>({});
+  /** Inline add record / attachment from the audits table */
+  const [recordUploadAudit, setRecordUploadAudit] = useState<Audit | null>(null);
+  const [recordName, setRecordName] = useState('');
+  const [recordNotes, setRecordNotes] = useState('');
+  const [recordFile, setRecordFile] = useState<File | null>(null);
+  const [recordUploadProgress, setRecordUploadProgress] = useState<number | null>(null);
+  const [submittingRecord, setSubmittingRecord] = useState(false);
+  const recordFileInputRef = useRef<HTMLInputElement | null>(null);
   /** Pending audit result change — API runs only after Confirm in modal */
   const [resultConfirm, setResultConfirm] = useState<{
     auditId: string;
@@ -239,6 +248,69 @@ export function Audits() {
     const { auditId, result } = resultConfirm;
     setResultConfirm(null);
     void applyAuditResult(auditId, result);
+  };
+
+  const openRecordUploadModal = (a: Audit) => {
+    setRecordUploadAudit(a);
+    setRecordName(`${a.code} attachment`);
+    setRecordNotes('');
+    setRecordFile(null);
+    setRecordUploadProgress(null);
+  };
+
+  const closeRecordUploadModal = () => {
+    if (submittingRecord) return;
+    setRecordUploadAudit(null);
+    setRecordName('');
+    setRecordNotes('');
+    setRecordFile(null);
+    setRecordUploadProgress(null);
+  };
+
+  const submitRecordFromAuditRow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !recordUploadAudit) return;
+    if (!recordName.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!recordFile) {
+      toast.error('File is required');
+      return;
+    }
+    if (recordFile.size > MAX_RECORD_UPLOAD_BYTES) {
+      toast.error('File exceeds current upload limit (75MB)');
+      return;
+    }
+    setSubmittingRecord(true);
+    setRecordUploadProgress(0);
+    try {
+      await postRecordWithProgress(
+        {
+          name: recordName.trim(),
+          supplierId: recordUploadAudit.supplierId,
+          auditId: recordUploadAudit.id,
+          shipmentId: null,
+          carId: null,
+          internalOrSupplier: 'internal',
+          file: recordFile,
+          notes: recordNotes.trim(),
+        },
+        token,
+        (p) => setRecordUploadProgress(p)
+      );
+      toast.success('Record added');
+      setRecordUploadAudit(null);
+      setRecordName('');
+      setRecordNotes('');
+      setRecordFile(null);
+      refetchAudits();
+    } catch (err) {
+      toast.error(parseApiError(err));
+    } finally {
+      setSubmittingRecord(false);
+      setRecordUploadProgress(null);
+    }
   };
 
   const downloadRecord = async (recordId: string, recordName: string) => {
@@ -545,15 +617,25 @@ export function Audits() {
                           ))
                         )}
                         {canAttachRecord && (
-                          <Link
-                            to={`/records?auditId=${encodeURIComponent(a.id)}&supplierId=${encodeURIComponent(a.supplierId)}`}
-                            className="btn btn-ghost"
-                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            + Add record
-                          </Link>
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                              onClick={() => openRecordUploadModal(a)}
+                            >
+                              + Add record
+                            </button>
+                            <Link
+                              to={`/records?auditId=${encodeURIComponent(a.id)}&supplierId=${encodeURIComponent(a.supplierId)}`}
+                              className="btn btn-ghost"
+                              style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Records page
+                            </Link>
+                          </>
                         )}
                       </div>
                     </td>
@@ -666,6 +748,108 @@ export function Audits() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {recordUploadAudit && (
+        <div
+          className="confirm-dialog-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="audit-add-record-title"
+          onClick={closeRecordUploadModal}
+        >
+          <div className="confirm-dialog" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="audit-add-record-title" className="confirm-dialog-title">
+              Add record — {recordUploadAudit.code}
+            </h3>
+            <p style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              {recordUploadAudit.supplier.code} — {recordUploadAudit.supplier.name}
+            </p>
+            <form onSubmit={submitRecordFromAuditRow}>
+              <div className="input-group">
+                <label className="input-label">Name *</label>
+                <input
+                  className="input"
+                  value={recordName}
+                  onChange={(e) => setRecordName(e.target.value)}
+                  required
+                  disabled={submittingRecord}
+                />
+              </div>
+              <div className="input-group" style={{ position: 'relative' }}>
+                <label className="input-label">File *</label>
+                <input
+                  ref={recordFileInputRef}
+                  className="input"
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (!f) {
+                      setRecordFile(null);
+                      setRecordUploadProgress(null);
+                      return;
+                    }
+                    if (f.size > MAX_RECORD_UPLOAD_BYTES) {
+                      setRecordFile(null);
+                      toast.error('Selected file is too large. Maximum is 75MB.');
+                      return;
+                    }
+                    setRecordFile(f);
+                    setRecordUploadProgress(null);
+                  }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn file-picker-btn"
+                    disabled={submittingRecord}
+                    onClick={() => recordFileInputRef.current?.click()}
+                  >
+                    Choose file
+                  </button>
+                  <span
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 260,
+                    }}
+                    title={recordFile?.name || 'No file chosen'}
+                  >
+                    {recordFile?.name || 'No file chosen'}
+                  </span>
+                </div>
+                {recordUploadProgress !== null && recordFile ? (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-xs)' }}>
+                    <progress value={recordUploadProgress} max={100} style={{ width: 120, height: 8 }} />
+                    <span>{recordUploadProgress}%</span>
+                  </div>
+                ) : null}
+              </div>
+              <div className="input-group">
+                <label className="input-label">Notes (optional)</label>
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={recordNotes}
+                  onChange={(e) => setRecordNotes(e.target.value)}
+                  disabled={submittingRecord}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                <button type="button" className="btn btn-ghost" onClick={closeRecordUploadModal} disabled={submittingRecord}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingRecord}>
+                  {submittingRecord ? 'Uploading…' : 'Upload'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

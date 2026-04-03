@@ -133,6 +133,18 @@ router.get(
         supplier: { select: { id: true, code: true, name: true, city: true, country: true } },
         auditType: { select: { id: true, code: true, name: true } },
         findings: { select: { id: true, code: true, status: true, severity: true } },
+        records: {
+          select: {
+            id: true,
+            name: true,
+            filePath: true,
+            fileName: true,
+            status: true,
+            internalOrSupplier: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!audit) {
@@ -147,10 +159,19 @@ router.get(
       res.status(404).json({ error: 'Audit not found' });
       return;
     }
+    const { records: recordsRaw, ...auditRest } = audit;
     res.json({
-      ...audit,
+      ...auditRest,
       derivedStatus: getDerivedStatus(audit.result, audit.auditDate),
       findingCodes: audit.findings.map((f) => f.code),
+      records: recordsRaw.map((r) => ({
+        id: r.id,
+        name: r.name,
+        hasFile: Boolean(r.filePath),
+        status: r.status,
+        internalOrSupplier: r.internalOrSupplier,
+        createdAt: r.createdAt,
+      })),
     });
   })
 );

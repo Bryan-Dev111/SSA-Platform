@@ -8,9 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-
-const MAX_UPLOAD_BYTES = 75 * 1024 * 1024;
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { MAX_RECORD_UPLOAD_BYTES, postRecordWithProgress } from '../utils/recordUpload';
 
 interface Supplier {
   id: string;
@@ -76,58 +74,6 @@ function getRecordRowSlug(status: string): 'pending' | 'approved' | 'rejected' {
   if (label === 'Approved') return 'approved';
   if (label === 'Rejected') return 'rejected';
   return 'pending';
-}
-
-function postRecordWithProgress(
-  payload: {
-    name: string;
-    supplierId: string | null;
-    auditId: string | null;
-    shipmentId: string | null;
-    carId: string | null;
-    internalOrSupplier: 'supplier' | 'internal';
-    file: File | null;
-    notes: string;
-  },
-  token: string,
-  onProgress: (percent: number) => void
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    console.log('[Records Upload] Request started');
-    xhr.open('POST', `${API_BASE}/records`);
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.upload.onprogress = (evt) => {
-      if (!evt.lengthComputable) return;
-      const percent = Math.max(0, Math.min(100, Math.round((evt.loaded / evt.total) * 100)));
-      console.log(`[Records Upload] Progress: ${percent}% (${evt.loaded}/${evt.total} bytes)`);
-      onProgress(percent);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        console.log('[Records Upload] Completed successfully');
-        onProgress(100);
-        resolve();
-      } else {
-        console.log(`[Records Upload] Failed: HTTP ${xhr.status}`, xhr.responseText);
-        reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
-      }
-    };
-    xhr.onerror = () => {
-      console.log('[Records Upload] Network error');
-      reject(new Error('Network error while uploading file'));
-    };
-    const form = new FormData();
-    form.append('name', payload.name);
-    form.append('internalOrSupplier', payload.internalOrSupplier);
-    form.append('supplierId', payload.supplierId ?? '');
-    form.append('auditId', payload.auditId ?? '');
-    form.append('shipmentId', payload.shipmentId ?? '');
-    form.append('carId', payload.carId ?? '');
-    form.append('notes', payload.notes);
-    if (payload.file) form.append('file', payload.file);
-    xhr.send(form);
-  });
 }
 
 export function Records() {
@@ -351,7 +297,7 @@ export function Records() {
       toast.error('File is required');
       return;
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
+    if (file.size > MAX_RECORD_UPLOAD_BYTES) {
       toast.error('File exceeds current upload limit (75MB)');
       return;
     }
@@ -394,14 +340,11 @@ export function Records() {
   };
   const onFileChange = (f: File | null) => {
     if (!f) {
-      console.log('[Records Upload] File cleared');
       setFile(null);
       setUploadProgress(null);
       return;
     }
-    console.log(`[Records Upload] File selected: ${f.name} (${f.size} bytes)`);
-    if (f.size > MAX_UPLOAD_BYTES) {
-      console.log(`[Records Upload] File rejected: exceeds ${MAX_UPLOAD_BYTES} bytes`);
+    if (f.size > MAX_RECORD_UPLOAD_BYTES) {
       setFile(null);
       setUploadProgress(null);
       toast.error('Selected file is too large. Maximum is 75MB.');

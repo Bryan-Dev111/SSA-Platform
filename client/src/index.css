@@ -802,12 +802,20 @@ a.btn:focus {
 }
 
 .login-brand-kicker {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-2);
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: var(--font-semibold);
   color: rgba(226, 232, 240, 0.85);
+}
+
+.login-brand-tagline {
+  margin: 0 0 var(--space-6);
+  font-size: clamp(0.9rem, 1.6vw, 1rem);
+  line-height: 1.45;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .login-brand-title {
