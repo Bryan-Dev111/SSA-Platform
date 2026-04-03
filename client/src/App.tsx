@@ -11,6 +11,7 @@ import { getDefaultPath } from './config/rolePageAccess';
 import { Login } from './pages/Login';
 import { RequestAccess } from './pages/RequestAccess';
 import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Risk } from './pages/Risk';
 import { CorrectiveActions } from './pages/CorrectiveActions';
@@ -56,6 +57,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/request-access" element={<RequestAccess />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/product-hub"
             element={

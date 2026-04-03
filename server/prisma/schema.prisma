@@ -70,6 +70,19 @@ model User {
   qeBuyerBuyers QeBuyer[] @relation("QeBuyerBuyerAssignments")
   qmQes QualityManagerQe[] @relation("QmQeManagerAssignments")
   qmQeEngineers QualityManagerQe[] @relation("QmQeEngineerAssignments")
+  passwordResetTokens PasswordResetToken[]
+}
+
+/// One-time token for self-service password reset (raw token is emailed; only SHA-256 hash is stored).
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model UserRole {
