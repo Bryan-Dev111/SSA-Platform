@@ -56,6 +56,29 @@ interface RiskActionRow {
 type RiskLikelihood = NonNullable<OpportunityRow['likelihood']>;
 type RiskSeverity = NonNullable<OpportunityRow['severity']>;
 
+/** Matches server risk-actions / opportunities matrix for residual preview. */
+function deriveResidualRiskLevel(likelihood: RiskLikelihood, severity: RiskSeverity): 'Low' | 'Medium' | 'High' {
+  const l = ['VeryUnlikely', 'Unlikely', 'Possible', 'Likely', 'VeryLikely'].indexOf(likelihood);
+  const s = ['Negligible', 'Minor', 'Moderate', 'Significant', 'Severe'].indexOf(severity);
+  const matrix: Array<Array<'Low' | 'Medium' | 'High'>> = [
+    ['Low', 'Low', 'Medium', 'Medium', 'Medium'],
+    ['Low', 'Medium', 'Medium', 'Medium', 'High'],
+    ['Low', 'Medium', 'Medium', 'High', 'High'],
+    ['Medium', 'Medium', 'High', 'High', 'High'],
+    ['Medium', 'High', 'High', 'High', 'High'],
+  ];
+  return matrix[l]?.[s] ?? 'Medium';
+}
+
+type ActionDraft = {
+  status: 'Open' | 'Closed';
+  residualLikelihood: RiskLikelihood;
+  residualSeverity: RiskSeverity;
+  description: string;
+  owner: string;
+  dueDate: string;
+};
+
 function levelWeight(level: string | null): number {
   if (level === 'High') return 90;
   if (level === 'Medium') return 60;
@@ -95,6 +118,9 @@ export function Risk() {
   const [newResidualLikelihood, setNewResidualLikelihood] = useState<RiskLikelihood>('Possible');
   const [newResidualSeverity, setNewResidualSeverity] = useState<RiskSeverity>('Moderate');
 
+  const [actionDrafts, setActionDrafts] = useState<Record<string, ActionDraft>>({});
+  const [savingActionId, setSavingActionId] = useState<string | null>(null);
+
   const roleNames = user?.roleNames ?? [];
   const canEditRiskItems =
     roleNames.includes('Admin') ||
@@ -130,6 +156,21 @@ export function Risk() {
     void load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, filterSupplierId]);
+
+  useEffect(() => {
+    const next: Record<string, ActionDraft> = {};
+    for (const row of actions) {
+      next[row.id] = {
+        status: row.status,
+        residualLikelihood: row.residualLikelihood ?? 'Possible',
+        residualSeverity: row.residualSeverity ?? 'Moderate',
+        description: row.description,
+        owner: row.owner ?? '',
+        dueDate: row.dueDate ? row.dueDate.slice(0, 10) : '',
+      };
+    }
+    setActionDrafts(next);
+  }, [actions]);
 
   const latestActionByRisk = useMemo(() => {
     const m = new Map<string, RiskActionRow>();
@@ -341,6 +382,43 @@ export function Risk() {
       toast.error(err instanceof Error ? err.message : 'Failed to create action');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveActionRow = async (row: RiskActionRow) => {
+    const d = actionDrafts[row.id];
+    if (!token || !d) return;
+    if (d.status === 'Closed' && (!d.residualLikelihood || !d.residualSeverity)) {
+      toast.error('Residual likelihood and severity are required to close an action');
+      return;
+    }
+    if (!d.description.trim()) {
+      toast.error('Action description cannot be empty');
+      return;
+    }
+    setSavingActionId(row.id);
+    try {
+      const payload: Record<string, unknown> = {
+        status: d.status,
+        description: d.description.trim(),
+        owner: d.owner.trim() || null,
+        dueDate: d.dueDate || null,
+      };
+      if (d.status === 'Closed') {
+        payload.residualLikelihood = d.residualLikelihood;
+        payload.residualSeverity = d.residualSeverity;
+      }
+      await apiJson<RiskActionRow>(`/risk-actions/${row.id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      toast.success('Action updated');
+      await load(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update action');
+    } finally {
+      setSavingActionId(null);
     }
   };
 
@@ -720,32 +798,175 @@ export function Risk() {
                     <th>Residual Likelihood</th>
                     <th>Residual Severity</th>
                     <th>Residual Risk Level</th>
+                    {canEditRiskItems ? <th>Save</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {actions.map((row) => (
-                    <tr key={row.id} style={getRiskLevelRowStyle(row.residualRiskLevel ?? row.risk.riskLevel)}>
-                      <td>{row.supplier.code} - {row.supplier.name}</td>
-                      <td>{row.risk.code}</td>
-                      <td>{row.risk.description}</td>
-                      <td>{row.risk.riskLevel ?? 'TBD'}</td>
-                      <td>{row.description}</td>
-                      <td>{row.owner || row.createdBy?.name || row.createdBy?.email || 'Unassigned'}</td>
-                      <td>
-                        {row.dueDate
-                          ? new Date(row.dueDate).toLocaleDateString(undefined, {
+                  {actions.map((row) => {
+                    const draft = actionDrafts[row.id];
+                    const editable = canEditRiskItems && row.status === 'Open' && draft;
+                    const previewResidualLevel =
+                      draft?.status === 'Closed'
+                        ? deriveResidualRiskLevel(draft.residualLikelihood, draft.residualSeverity)
+                        : null;
+                    return (
+                      <tr key={row.id} style={getRiskLevelRowStyle(row.residualRiskLevel ?? row.risk.riskLevel)}>
+                        <td>{row.supplier.code} - {row.supplier.name}</td>
+                        <td>{row.risk.code}</td>
+                        <td>{row.risk.description}</td>
+                        <td>{row.risk.riskLevel ?? 'TBD'}</td>
+                        <td>
+                          {editable ? (
+                            <input
+                              className="input"
+                              style={{ minWidth: 160 }}
+                              value={draft.description}
+                              onChange={(e) =>
+                                setActionDrafts((prev) => ({
+                                  ...prev,
+                                  [row.id]: { ...draft, description: e.target.value },
+                                }))
+                              }
+                            />
+                          ) : (
+                            row.description
+                          )}
+                        </td>
+                        <td>
+                          {editable ? (
+                            <input
+                              className="input"
+                              style={{ minWidth: 100 }}
+                              placeholder="Owner"
+                              value={draft.owner}
+                              onChange={(e) =>
+                                setActionDrafts((prev) => ({
+                                  ...prev,
+                                  [row.id]: { ...draft, owner: e.target.value },
+                                }))
+                              }
+                            />
+                          ) : (
+                            row.owner || row.createdBy?.name || row.createdBy?.email || 'Unassigned'
+                          )}
+                        </td>
+                        <td>
+                          {editable ? (
+                            <input
+                              className="input"
+                              type="date"
+                              value={draft.dueDate}
+                              onChange={(e) =>
+                                setActionDrafts((prev) => ({
+                                  ...prev,
+                                  [row.id]: { ...draft, dueDate: e.target.value },
+                                }))
+                              }
+                            />
+                          ) : row.dueDate ? (
+                            new Date(row.dueDate).toLocaleDateString(undefined, {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
                             })
-                          : '—'}
-                      </td>
-                      <td>{row.status}</td>
-                      <td>{row.residualLikelihood ?? '—'}</td>
-                      <td>{row.residualSeverity ?? '—'}</td>
-                      <td>{row.residualRiskLevel ?? '—'}</td>
-                    </tr>
-                  ))}
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>
+                          {editable ? (
+                            <select
+                              className="input"
+                              style={{ minWidth: 100 }}
+                              value={draft.status}
+                              onChange={(e) =>
+                                setActionDrafts((prev) => ({
+                                  ...prev,
+                                  [row.id]: { ...draft, status: e.target.value as 'Open' | 'Closed' },
+                                }))
+                              }
+                            >
+                              <option value="Open">Open</option>
+                              <option value="Closed">Closed</option>
+                            </select>
+                          ) : (
+                            row.status
+                          )}
+                        </td>
+                        <td>
+                          {editable && draft.status === 'Closed' ? (
+                            <select
+                              className="input"
+                              style={{ minWidth: 120 }}
+                              value={draft.residualLikelihood}
+                              onChange={(e) =>
+                                setActionDrafts((prev) => ({
+                                  ...prev,
+                                  [row.id]: {
+                                    ...draft,
+                                    residualLikelihood: e.target.value as RiskLikelihood,
+                                  },
+                                }))
+                              }
+                            >
+                              <option value="VeryUnlikely">Very Unlikely</option>
+                              <option value="Unlikely">Unlikely</option>
+                              <option value="Possible">Possible</option>
+                              <option value="Likely">Likely</option>
+                              <option value="VeryLikely">Very Likely</option>
+                            </select>
+                          ) : (
+                            row.residualLikelihood ?? '—'
+                          )}
+                        </td>
+                        <td>
+                          {editable && draft.status === 'Closed' ? (
+                            <select
+                              className="input"
+                              style={{ minWidth: 120 }}
+                              value={draft.residualSeverity}
+                              onChange={(e) =>
+                                setActionDrafts((prev) => ({
+                                  ...prev,
+                                  [row.id]: {
+                                    ...draft,
+                                    residualSeverity: e.target.value as RiskSeverity,
+                                  },
+                                }))
+                              }
+                            >
+                              <option value="Negligible">Negligible</option>
+                              <option value="Minor">Minor</option>
+                              <option value="Moderate">Moderate</option>
+                              <option value="Significant">Significant</option>
+                              <option value="Severe">Severe</option>
+                            </select>
+                          ) : (
+                            row.residualSeverity ?? '—'
+                          )}
+                        </td>
+                        <td>
+                          {editable && draft.status === 'Closed'
+                            ? previewResidualLevel
+                            : row.residualRiskLevel ?? '—'}
+                        </td>
+                        {canEditRiskItems ? (
+                          <td>
+                            {editable ? (
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                disabled={savingActionId === row.id || saving}
+                                onClick={() => void saveActionRow(row)}
+                              >
+                                {savingActionId === row.id ? 'Saving...' : 'Save'}
+                              </button>
+                            ) : null}
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

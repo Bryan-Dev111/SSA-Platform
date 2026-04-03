@@ -59,6 +59,7 @@ interface RecordRow {
   carId?: string | null;
   car?: { id: string; code: string } | null;
   uploadedBy: { id: string; email: string; name: string | null } | null;
+  approvedBy: { id: string; email: string; name: string | null } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -722,6 +723,7 @@ export function Records() {
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
                     <th>File</th>
                     <th>Uploaded by</th>
+                    <th>Approved by</th>
                     <th>Reviewed At</th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>Created {sortIndicator('created')}</th>
                     {canReview ? <th>Review</th> : null}
@@ -762,6 +764,13 @@ export function Records() {
                         )}
                       </td>
                       <td>{r.uploadedBy?.name?.trim() || '—'}</td>
+                      <td>
+                        {getRecordReviewLabel(r.status) === 'Approved'
+                          ? r.approvedBy?.name?.trim() ||
+                            r.approvedBy?.email ||
+                            '—'
+                          : '—'}
+                      </td>
                       <td>
                         {getRecordReviewLabel(r.status) === 'Pending'
                           ? '—'

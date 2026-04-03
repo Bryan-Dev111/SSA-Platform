@@ -1157,7 +1157,7 @@ body:has(.product-hub-page) {
   font-size: clamp(1.25rem, 3vw, 1.75rem);
   font-weight: var(--font-semibold);
   line-height: 1.25;
-  max-width: 24ch;
+  max-width: min(34ch, 100%);
 }
 
 .product-hub-panel-hint {

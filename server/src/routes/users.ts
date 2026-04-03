@@ -5,7 +5,7 @@ import { Router, Request, Response } from 'express';
 import { AlertCategory } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaBase } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { API_PAGE_ROLES, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
@@ -282,7 +282,7 @@ router.put(
         if (!(cat in row)) continue;
         const enabled = Boolean(row[cat]);
         ops.push(
-          prisma.userAlertPreference.upsert({
+          prismaBase.userAlertPreference.upsert({
             where: { userId_alertCategory: { userId, alertCategory: cat } },
             create: { userId, alertCategory: cat, enabled },
             update: { enabled },
@@ -291,7 +291,7 @@ router.put(
       }
     }
     if (ops.length > 0) {
-      await prisma.$transaction(ops);
+      await prismaBase.$transaction(ops);
     }
     res.json({ ok: true });
   })
@@ -307,7 +307,7 @@ router.put(
     }
     const roles = await prisma.role.findMany({ select: { id: true, name: true } });
     const roleIdByName = new Map(roles.map((r) => [r.name, r.id]));
-    const ops: ReturnType<typeof prisma.rolePagePermission.upsert>[] = [];
+    const ops: ReturnType<typeof prismaBase.rolePagePermission.upsert>[] = [];
     for (const roleName of Object.keys(matrixRaw)) {
       const roleId = roleIdByName.get(roleName);
       if (!roleId) continue;
@@ -315,7 +315,7 @@ router.put(
       for (const page of PAGE_DEFINITIONS) {
         const canAccess = Boolean(row[page.key]);
         ops.push(
-          prisma.rolePagePermission.upsert({
+          prismaBase.rolePagePermission.upsert({
             where: { roleId_pageKey: { roleId, pageKey: page.key } },
             create: { roleId, pageKey: page.key, canAccess },
             update: { canAccess },
@@ -324,7 +324,7 @@ router.put(
       }
     }
     if (ops.length) {
-      await prisma.$transaction(ops);
+      await prismaBase.$transaction(ops);
     }
     res.json({ ok: true });
   })
@@ -582,7 +582,7 @@ router.patch(
       return;
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prismaBase.$transaction(async (tx) => {
       if (roleNames && roleRows) {
         await tx.userRole.deleteMany({ where: { userId: id } });
         await tx.userRole.createMany({ data: roleRows.map((r) => ({ userId: id, roleId: r.id })) });

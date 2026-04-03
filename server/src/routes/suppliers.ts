@@ -3,7 +3,7 @@
  * Scope: Admin all; Buyer assigned; Supplier own.
  */
 import { Router, Request, Response } from 'express';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaBase } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
@@ -291,7 +291,7 @@ router.post(
     }
 
     // Relink in one flow: no manual unlink step required by admin users.
-    await prisma.$transaction(async (tx) => {
+    await prismaBase.$transaction(async (tx) => {
       await tx.supplier.updateMany({
         where: { OR: [{ userId }, { id: supplierId }] },
         data: { userId: null },
@@ -461,7 +461,10 @@ router.get(
         where: { supplierId },
         orderBy: { createdAt: 'desc' },
         take: 100,
-        include: { uploadedBy: { select: { id: true, email: true, name: true } } },
+        include: {
+          uploadedBy: { select: { id: true, email: true, name: true } },
+          approvedBy: { select: { id: true, email: true, name: true } },
+        },
       }),
       prisma.shipment.findMany({
         where: { supplierId },

@@ -811,11 +811,13 @@ export function FindingsRecord() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Status</label>
-                  <select className="input" value={finding.status} disabled>
-                    {(['New', 'DRAFT', 'WaitingDisposition', 'WaitingApproval', 'Closed'] as const).map((s) => (
-                      <option key={s} value={s}>{formatFindingStatus(s)}</option>
-                    ))}
-                  </select>
+                  <input
+                    className="input"
+                    value={formatFindingStatus(finding.status)}
+                    readOnly
+                    disabled
+                    aria-readonly="true"
+                  />
                 </div>
                 <div className="input-group">
                   <label className="input-label">Supplier</label>

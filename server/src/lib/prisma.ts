@@ -61,6 +61,14 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.__ssa_prismaBase = basePrisma;
 }
 
+/**
+ * Unextended Prisma client (no `$allModels.$allOperations` retry wrapper).
+ * Use for `$transaction` (interactive or array): the extended client's middleware
+ * may call `$disconnect()` / `$connect()` on transient errors, which invalidates
+ * interactive transaction IDs and surfaces as P2028.
+ */
+export const prismaBase = basePrisma;
+
 export const prisma: PrismaExtended =
   globalForPrisma.__ssa_prisma ?? extendPrisma(basePrisma);
 

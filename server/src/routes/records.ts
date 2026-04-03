@@ -54,6 +54,7 @@ router.get(
           shipment: { select: { id: true, code: true } },
           car: { select: { id: true, code: true } },
           uploadedBy: { select: { id: true, email: true, name: true } },
+          approvedBy: { select: { id: true, email: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -90,6 +91,7 @@ router.get(
         shipment: { select: { id: true, code: true } },
         car: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
+        approvedBy: { select: { id: true, email: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -198,10 +200,19 @@ router.patch(
     const status = statusRaw as RecordStatus;
     const updated = await prisma.record.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status === RecordStatus.Approved
+          ? { approvedById: req.user.id }
+          : { approvedById: null }),
+      },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
+        audit: { select: { id: true, code: true } },
+        shipment: { select: { id: true, code: true } },
+        car: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
+        approvedBy: { select: { id: true, email: true, name: true } },
       },
     });
     if (updated.status === 'Rejected') {
@@ -430,6 +441,7 @@ router.post(
         shipment: { select: { id: true, code: true } },
         car: { select: { id: true, code: true } },
         uploadedBy: { select: { id: true, email: true, name: true } },
+        approvedBy: { select: { id: true, email: true, name: true } },
       },
     });
     res.status(201).json(record);

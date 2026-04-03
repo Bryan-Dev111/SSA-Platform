@@ -1,5 +1,5 @@
 /**
- * Post-login product chooser: Sentinel Vendor Warranty vs Global Vendors.
+ * Post-login product chooser: Sentinel Supplier Assurance vs Sentinel Global Supply.
  */
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -26,20 +26,18 @@ export function ProductHub() {
           type="button"
           className="product-hub-panel product-hub-panel--current"
           onClick={goCurrent}
-          aria-label="Sentinel Vendor Warranty — Current Products. Open supplier assurance and related tools."
+          aria-label="Sentinel Supplier Assurance. Open supplier assurance, audits, risk, and related tools."
         >
-          <span className="product-hub-panel-kicker">Sentinel Vendor Warranty</span>
-          <span className="product-hub-panel-title">Current Products</span>
+          <span className="product-hub-panel-title">Sentinel Supplier Assurance</span>
           <span className="product-hub-panel-hint">Open supplier assurance, audits, risk, and related tools.</span>
         </button>
         <button
           type="button"
           className="product-hub-panel product-hub-panel--global"
           onClick={goGlobal}
-          aria-label="Global Vendors — Additional Products. Open global vendor workflows."
+          aria-label="Sentinel Global Supply. Open global supply workflows."
         >
-          <span className="product-hub-panel-kicker">Global Vendors</span>
-          <span className="product-hub-panel-title">Additional Products</span>
+          <span className="product-hub-panel-title">Sentinel Global Supply</span>
           <span className="product-hub-panel-hint">Farmer information, approved farmers, and related supply workflows.</span>
         </button>
       </div>

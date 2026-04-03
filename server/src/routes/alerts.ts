@@ -1,6 +1,6 @@
 import { AlertCategory } from '@prisma/client';
 import { Router, Request, Response } from 'express';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaBase } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { requirePageAccess } from '../middleware/rbac';
@@ -68,13 +68,13 @@ router.put(
       return;
     }
     const ops = ALERT_CATEGORIES.map((category) =>
-      prisma.userAlertPreference.upsert({
+      prismaBase.userAlertPreference.upsert({
         where: { userId_alertCategory: { userId: req.user!.id, alertCategory: category } },
         create: { userId: req.user!.id, alertCategory: category, enabled: Boolean(prefsRaw[category]) },
         update: { enabled: Boolean(prefsRaw[category]) },
       })
     );
-    await prisma.$transaction(ops);
+    await prismaBase.$transaction(ops);
     res.json({ ok: true });
   })
 );

@@ -1,5 +1,5 @@
 import { Request, Response, Router } from 'express';
-import { prisma } from '../lib/prisma';
+import { prisma, prismaBase } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { requirePageAccess, requireRole } from '../middleware/rbac';
@@ -152,6 +152,171 @@ router.post(
     // Translate DB status to UI status for the frontend.
     const statusForUi = created.status === 'Mitigated' ? 'Closed' : 'Open';
     res.status(201).json({ ...created, status: statusForUi });
+  })
+);
+
+router.patch(
+  '/:id',
+  requireRole(['Admin', 'QualityEngineer', 'QualityManager', 'Buyer']),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const id = req.params.id;
+    const existing = await prisma.riskAction.findUnique({
+      where: { id },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        risk: { select: { id: true, code: true, description: true, riskLevel: true, type: true, supplierId: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+    if (!existing) {
+      res.status(404).json({ error: 'Risk action not found' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && !allowedIds.includes(existing.supplierId)) {
+      res.status(404).json({ error: 'Risk action not found' });
+      return;
+    }
+
+    const incomingStatus =
+      req.body?.status !== undefined && typeof req.body.status === 'string' ? req.body.status.trim() : undefined;
+    if (incomingStatus !== undefined && !['Open', 'Closed'].includes(incomingStatus)) {
+      res.status(400).json({ error: 'status must be Open or Closed' });
+      return;
+    }
+
+    const currentUi: 'Open' | 'Closed' = existing.status === 'Mitigated' ? 'Closed' : 'Open';
+    const targetUi: 'Open' | 'Closed' = incomingStatus === 'Closed' ? 'Closed' : incomingStatus === 'Open' ? 'Open' : currentUi;
+
+    let description = existing.description;
+    if (req.body?.description !== undefined) {
+      const d = typeof req.body.description === 'string' ? req.body.description.trim() : '';
+      if (!d) {
+        res.status(400).json({ error: 'description cannot be empty' });
+        return;
+      }
+      description = d;
+    }
+
+    let owner = existing.owner;
+    if (req.body?.owner !== undefined) {
+      owner = typeof req.body.owner === 'string' ? req.body.owner.trim() || null : null;
+    }
+
+    let dueDate: Date | null = existing.dueDate;
+    if (req.body?.dueDate !== undefined) {
+      const raw = typeof req.body.dueDate === 'string' ? req.body.dueDate.trim() : '';
+      dueDate = raw ? new Date(`${raw.slice(0, 10)}T12:00:00.000Z`) : null;
+    }
+
+    let residualLikelihood: RiskLikelihood | null = existing.residualLikelihood as RiskLikelihood | null;
+    let residualSeverity: RiskSeverity | null = existing.residualSeverity as RiskSeverity | null;
+
+    if (req.body?.residualLikelihood !== undefined) {
+      const l = typeof req.body.residualLikelihood === 'string' ? req.body.residualLikelihood.trim() : '';
+      if (!['VeryUnlikely', 'Unlikely', 'Possible', 'Likely', 'VeryLikely'].includes(l)) {
+        res.status(400).json({ error: 'invalid residualLikelihood' });
+        return;
+      }
+      residualLikelihood = l as RiskLikelihood;
+    }
+    if (req.body?.residualSeverity !== undefined) {
+      const s = typeof req.body.residualSeverity === 'string' ? req.body.residualSeverity.trim() : '';
+      if (!['Negligible', 'Minor', 'Moderate', 'Significant', 'Severe'].includes(s)) {
+        res.status(400).json({ error: 'invalid residualSeverity' });
+        return;
+      }
+      residualSeverity = s as RiskSeverity;
+    }
+
+    if (targetUi === 'Open') {
+      residualLikelihood = null;
+      residualSeverity = null;
+    }
+
+    let residualRiskLevel: 'Low' | 'Medium' | 'High' | null = null;
+    const dbStatus: RiskActionStatus = targetUi === 'Closed' ? 'Mitigated' : 'Open';
+
+    if (targetUi === 'Closed') {
+      if (!residualLikelihood || !residualSeverity) {
+        res.status(400).json({
+          error: 'residualLikelihood and residualSeverity are required when status is Closed',
+        });
+        return;
+      }
+      residualRiskLevel = deriveRiskLevel(residualLikelihood, residualSeverity);
+    }
+
+    const hasAnyChange =
+      description !== existing.description ||
+      owner !== existing.owner ||
+      (dueDate?.getTime() ?? null) !== (existing.dueDate?.getTime() ?? null) ||
+      dbStatus !== existing.status ||
+      residualLikelihood !== (existing.residualLikelihood as RiskLikelihood | null) ||
+      residualSeverity !== (existing.residualSeverity as RiskSeverity | null);
+
+    if (!hasAnyChange) {
+      res.status(400).json({ error: 'Provide at least one field to update' });
+      return;
+    }
+
+    const riskType = existing.risk.type;
+    const riskId = existing.riskId;
+
+    const syncOpportunity =
+      dbStatus === 'Mitigated' &&
+      riskType === 'risk' &&
+      residualLikelihood &&
+      residualSeverity &&
+      residualRiskLevel;
+
+    const actionData = {
+      description,
+      owner,
+      dueDate,
+      status: dbStatus,
+      residualLikelihood,
+      residualSeverity,
+      residualRiskLevel,
+    };
+    const actionInclude = {
+      supplier: { select: { id: true, code: true, name: true } },
+      risk: { select: { id: true, code: true, description: true, riskLevel: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+    };
+
+    // Use `prismaBase` so the interactive tx is not wrapped by extended-client query
+    // middleware (disconnect/reconnect retry invalidates transaction id → P2028).
+    const updated = await prismaBase.$transaction(
+      async (tx) => {
+        const row = await tx.riskAction.update({
+          where: { id },
+          data: actionData,
+          include: actionInclude,
+        });
+        if (syncOpportunity && residualLikelihood && residualSeverity && residualRiskLevel) {
+          await tx.opportunity.update({
+            where: { id: riskId },
+            data: {
+              likelihood: residualLikelihood,
+              severity: residualSeverity,
+              riskLevel: residualRiskLevel,
+              status: 'Mitigated',
+            },
+          });
+          return { ...row, risk: { ...row.risk, riskLevel: residualRiskLevel } };
+        }
+        return row;
+      },
+      { timeout: 20_000, maxWait: 10_000 },
+    );
+
+    const statusForUi = updated.status === 'Mitigated' ? 'Closed' : 'Open';
+    res.json({ ...updated, status: statusForUi });
   })
 );
 

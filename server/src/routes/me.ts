@@ -100,7 +100,10 @@ router.get(
         where: { supplierId: sid },
         orderBy: { createdAt: 'desc' },
         take: 100,
-        include: { uploadedBy: { select: { id: true, email: true, name: true } } },
+        include: {
+          uploadedBy: { select: { id: true, email: true, name: true } },
+          approvedBy: { select: { id: true, email: true, name: true } },
+        },
       }),
       prisma.shipment.findMany({
         where: { supplierId: sid },
