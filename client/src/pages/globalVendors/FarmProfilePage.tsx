@@ -383,7 +383,7 @@ export function FarmProfilePage() {
                   <img
                     src={`${IMAGE_BASE}/farm-profile/images/${img.id}/download`}
                     alt={img.fileName ?? 'Farm image'}
-                    style={{ width: '100%', display: 'block', objectFit: 'cover' }}
+                    style={{ width: '100%', height: 120, display: 'block', objectFit: 'cover' }}
                   />
                   <figcaption
                     style={{

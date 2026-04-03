@@ -193,7 +193,7 @@ export function FarmersInformationPage() {
 
       <div className="card">
         <div className="table-wrap">
-          <table className="table table--sticky-header">
+          <table className="table table--sticky-header table--prevent-shrink">
             <thead>
               <tr>
                 <th>Farm ID</th>

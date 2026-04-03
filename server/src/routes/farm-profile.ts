@@ -12,8 +12,6 @@ import { uploadRecordToStorage, createRecordDownloadSignedUrl } from '../lib/sup
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.use(authMiddleware);
-
 // Defensive helper so routes degrade gracefully when the Prisma client
 // has not been regenerated for the FarmProfile models yet.
 function getFarmProfileClient() {
@@ -24,11 +22,47 @@ function getFarmProfileClient() {
   return anyPrisma;
 }
 
-function normalizeSection(raw: unknown): 'Profile' | 'Processing' {
+// Historically this route supported only 'Profile' and 'Processing'.
+// For the processing page we now allow multiple step sections like:
+//   ProcessingStep1, ProcessingStep2, ...
+// Prisma stores `section` as a plain String, so we keep it flexible.
+function normalizeSection(raw: unknown): string {
   const v = typeof raw === 'string' ? raw.trim() : '';
-  if (v.toLowerCase() === 'processing') return 'Processing';
-  return 'Profile';
+  return v || 'Profile';
 }
+
+/**
+ * Public image download: returns a short-lived signed URL redirected from Supabase.
+ * Kept outside of auth so <img> tags can load without Authorization headers.
+ */
+router.get(
+  '/images/:imageId/download',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const imageId = String(req.params.imageId ?? '').trim();
+    if (!imageId) {
+      res.status(400).json({ error: 'imageId is required' });
+      return;
+    }
+    const client = getFarmProfileClient();
+    if (!client) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+    const img = await client.farmProfileImage.findUnique({
+      where: { id: imageId },
+      select: { filePath: true },
+    });
+    if (!img || !img.filePath) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+    const signedUrl = await createRecordDownloadSignedUrl(img.filePath);
+    res.redirect(signedUrl);
+  })
+);
+
+// All routes below this line require authentication.
+router.use(authMiddleware);
 
 router.get(
   '/:farmId/content',
@@ -259,36 +293,6 @@ router.post(
     }
 
     res.status(201).json(created);
-  })
-);
-
-/**
- * Public image download: returns a short-lived signed URL redirected from Supabase.
- * Kept outside of auth so <img> tags can load without Authorization headers.
- */
-router.get(
-  '/images/:imageId/download',
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const imageId = String(req.params.imageId ?? '').trim();
-    if (!imageId) {
-      res.status(400).json({ error: 'imageId is required' });
-      return;
-    }
-    const client = getFarmProfileClient();
-    if (!client) {
-      res.status(404).json({ error: 'Image not found' });
-      return;
-    }
-    const img = await client.farmProfileImage.findUnique({
-      where: { id: imageId },
-      select: { filePath: true },
-    });
-    if (!img || !img.filePath) {
-      res.status(404).json({ error: 'Image not found' });
-      return;
-    }
-    const signedUrl = await createRecordDownloadSignedUrl(img.filePath);
-    res.redirect(signedUrl);
   })
 );
 

@@ -57,7 +57,7 @@ export function ApprovedFarmersPage() {
       </header>
       <div className="card">
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table--prevent-shrink">
             <thead>
               <tr>
                 <th>Farm ID</th>

@@ -413,6 +413,19 @@ a.btn:focus {
   font-size: var(--text-sm);
 }
 
+/* Wide tables: keep columns at their natural widths so they don't get squished away
+   on smaller/zoomed client laptops. The surrounding `.table-wrap` provides horizontal
+   scrolling when the table is wider than the viewport. */
+.table--prevent-shrink {
+  width: max-content;
+  min-width: 100%;
+}
+
+.table--prevent-shrink th,
+.table--prevent-shrink td {
+  white-space: nowrap;
+}
+
 /* Optional sticky header for wide master tables (e.g. Farmer Information) */
 .table--sticky-header thead th {
   position: sticky;
