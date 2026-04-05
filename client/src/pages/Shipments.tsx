@@ -83,6 +83,12 @@ function onTimeDeliverySubtitle(m: Metrics): string {
   return `${late} Late PO`;
 }
 
+const SHIPMENT_TABLE_STATUS_RANK: Record<string, number> = {
+  WaitingInspection: 0,
+  Passed: 1,
+  Failed: 2,
+};
+
 function openShipmentRequestsAlertProps(m: Metrics):
   | {
       shortDeliveries: number;
@@ -114,7 +120,21 @@ export function Shipments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'supplier' | 'scheduled' | 'status' | 'records'>('scheduled');
+  const [sortBy, setSortBy] = useState<
+    | 'code'
+    | 'supplier'
+    | 'purchaseOrder'
+    | 'partNumber'
+    | 'qty'
+    | 'lot'
+    | 'scheduled'
+    | 'inspector'
+    | 'status'
+    | 'notes'
+    | 'approvalDate'
+    | 'records'
+    | 'created'
+  >('scheduled');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [downloadingRecord, setDownloadingRecord] = useState<Record<string, boolean>>({});
 
@@ -166,14 +186,32 @@ export function Shipments() {
     const dir = sortDir === 'asc' ? 1 : -1;
     const getValue = (r: ShipmentRow): string | number => {
       switch (sortBy) {
+        case 'code':
+          return r.code ?? '';
         case 'supplier':
           return `${r.supplier.code} ${r.supplier.name}`;
+        case 'purchaseOrder':
+          return r.purchaseOrder ?? '';
+        case 'partNumber':
+          return r.partNumber ?? '';
+        case 'qty':
+          return typeof r.qty === 'number' ? r.qty : -1;
+        case 'lot':
+          return r.lot ?? '';
         case 'scheduled':
           return r.inspectionDate ? new Date(r.inspectionDate).getTime() : 0;
+        case 'inspector':
+          return r.inspector ?? '';
         case 'status':
-          return r.status;
+          return SHIPMENT_TABLE_STATUS_RANK[r.status] ?? 99;
+        case 'notes':
+          return r.notes?.trim() ?? '';
+        case 'approvalDate':
+          return r.status === 'WaitingInspection' ? 0 : r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
         case 'records':
           return r.records?.length ?? 0;
+        case 'created':
+          return r.createdAt ? new Date(r.createdAt).getTime() : 0;
       }
     };
     return [...shipments].sort((a, b) => {
@@ -593,25 +631,45 @@ export function Shipments() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Shipment ID</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>
+                      Shipment ID {sortIndicator('code')}
+                    </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
                       Supplier {sortIndicator('supplier')}
                     </th>
-                    <th>P.O.</th>
-                    <th>Part Number</th>
-                    <th>Quantity</th>
-                    <th>Lot</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('purchaseOrder')}>
+                      P.O. {sortIndicator('purchaseOrder')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('partNumber')}>
+                      Part Number {sortIndicator('partNumber')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('qty')}>
+                      Quantity {sortIndicator('qty')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('lot')}>
+                      Lot {sortIndicator('lot')}
+                    </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('scheduled')}>
                       Requested Inspection Date {sortIndicator('scheduled')}
                     </th>
-                    <th>Inspector</th>
-                    <th>Approval</th>
-                    <th>Notes</th>
-                    <th>Approval Date</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('inspector')}>
+                      Inspector {sortIndicator('inspector')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>
+                      Approval {sortIndicator('status')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('notes')}>
+                      Notes {sortIndicator('notes')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('approvalDate')}>
+                      Approval Date {sortIndicator('approvalDate')}
+                    </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>
                       Records {sortIndicator('records')}
                     </th>
-                    <th>Created</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>
+                      Created {sortIndicator('created')}
+                    </th>
                     <th>Approve/Reject Button</th>
                     <th>Create Finding</th>
                   </tr>

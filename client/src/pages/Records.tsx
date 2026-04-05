@@ -76,6 +76,12 @@ function getRecordRowSlug(status: string): 'pending' | 'approved' | 'rejected' {
   return 'pending';
 }
 
+const RECORD_REVIEW_SORT_RANK: Record<'Pending' | 'Approved' | 'Rejected', number> = {
+  Pending: 0,
+  Approved: 1,
+  Rejected: 2,
+};
+
 export function Records() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -106,7 +112,20 @@ export function Records() {
   const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<'name' | 'supplier' | 'status' | 'created'>('created');
+  const [sortBy, setSortBy] = useState<
+    | 'name'
+    | 'notes'
+    | 'supplier'
+    | 'audit'
+    | 'shipment'
+    | 'car'
+    | 'status'
+    | 'file'
+    | 'uploadedBy'
+    | 'approvedBy'
+    | 'reviewedAt'
+    | 'created'
+  >('created');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -128,10 +147,28 @@ export function Records() {
       switch (sortBy) {
         case 'name':
           return r.name;
+        case 'notes':
+          return r.notes?.trim() ?? '';
         case 'supplier':
-          return r.supplier?.code ?? '';
+          return r.supplier ? `${r.supplier.code} ${r.supplier.name}` : '';
+        case 'audit':
+          return r.audit?.code ?? '';
+        case 'shipment':
+          return r.shipment?.code ?? '';
+        case 'car':
+          return r.car?.code ?? '';
         case 'status':
-          return getRecordReviewLabel(r.status);
+          return RECORD_REVIEW_SORT_RANK[getRecordReviewLabel(r.status)];
+        case 'file':
+          return r.filePath ? 1 : 0;
+        case 'uploadedBy':
+          return r.uploadedBy?.name?.trim() || r.uploadedBy?.email || '';
+        case 'approvedBy':
+          return getRecordReviewLabel(r.status) === 'Approved'
+            ? r.approvedBy?.name?.trim() || r.approvedBy?.email || ''
+            : '';
+        case 'reviewedAt':
+          return getRecordReviewLabel(r.status) === 'Pending' ? 0 : new Date(r.updatedAt).getTime();
         case 'created':
           return new Date(r.createdAt).getTime();
       }
@@ -657,18 +694,42 @@ export function Records() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('name')}>Name {sortIndicator('name')}</th>
-                    <th>Notes</th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
-                    <th>Audit</th>
-                    <th>Shipment</th>
-                    <th>CAR</th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Review {sortIndicator('status')}</th>
-                    <th>File</th>
-                    <th>Uploaded by</th>
-                    <th>Approved by</th>
-                    <th>Reviewed At</th>
-                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>Created {sortIndicator('created')}</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('name')}>
+                      Name {sortIndicator('name')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('notes')}>
+                      Notes {sortIndicator('notes')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
+                      Supplier {sortIndicator('supplier')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>
+                      Audit {sortIndicator('audit')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('shipment')}>
+                      Shipment {sortIndicator('shipment')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('car')}>
+                      CAR {sortIndicator('car')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>
+                      Review {sortIndicator('status')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('file')}>
+                      File {sortIndicator('file')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('uploadedBy')}>
+                      Uploaded by {sortIndicator('uploadedBy')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('approvedBy')}>
+                      Approved by {sortIndicator('approvedBy')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('reviewedAt')}>
+                      Reviewed At {sortIndicator('reviewedAt')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>
+                      Created {sortIndicator('created')}
+                    </th>
                     {canReview ? <th>Review</th> : null}
                   </tr>
                 </thead>

@@ -86,6 +86,43 @@ function levelWeight(level: string | null): number {
   return 0;
 }
 
+const LIKELIHOOD_ORDER = ['VeryUnlikely', 'Unlikely', 'Possible', 'Likely', 'VeryLikely'] as const;
+const SEVERITY_ORDER = ['Negligible', 'Minor', 'Moderate', 'Significant', 'Severe'] as const;
+function likelihoodRank(v: OpportunityRow['likelihood']): number {
+  if (!v) return -1;
+  return LIKELIHOOD_ORDER.indexOf(v);
+}
+function severityRank(v: OpportunityRow['severity']): number {
+  if (!v) return -1;
+  return SEVERITY_ORDER.indexOf(v);
+}
+const RISK_LEVEL_SORT: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+const OPPORTUNITY_STATUS_SORT: Record<string, number> = { Open: 1, Mitigated: 2, Closed: 3, Realized: 4 };
+const ACTION_STATUS_SORT: Record<string, number> = { Open: 1, Closed: 2 };
+
+type RiskItemSortKey =
+  | 'code'
+  | 'supplier'
+  | 'type'
+  | 'description'
+  | 'likelihood'
+  | 'severity'
+  | 'riskLevel'
+  | 'status'
+  | 'created';
+type RiskActionSortKey =
+  | 'supplier'
+  | 'riskCode'
+  | 'riskDescription'
+  | 'riskLevel'
+  | 'description'
+  | 'owner'
+  | 'dueDate'
+  | 'status'
+  | 'residualLikelihood'
+  | 'residualSeverity'
+  | 'residualRiskLevel';
+
 export function Risk() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -120,6 +157,11 @@ export function Risk() {
 
   const [actionDrafts, setActionDrafts] = useState<Record<string, ActionDraft>>({});
   const [savingActionId, setSavingActionId] = useState<string | null>(null);
+
+  const [sortByItems, setSortByItems] = useState<RiskItemSortKey>('created');
+  const [sortDirItems, setSortDirItems] = useState<'asc' | 'desc'>('desc');
+  const [sortByActions, setSortByActions] = useState<RiskActionSortKey>('dueDate');
+  const [sortDirActions, setSortDirActions] = useState<'asc' | 'desc'>('asc');
 
   const roleNames = user?.roleNames ?? [];
   const canEditRiskItems =
@@ -207,6 +249,93 @@ export function Risk() {
   }, [items, latestActionByRisk]);
 
   const distribution = useMemo(() => computeRiskRegisterDistribution(items, actions), [items, actions]);
+
+  const sortedRiskItems = useMemo(() => {
+    const dir = sortDirItems === 'asc' ? 1 : -1;
+    const getValue = (row: OpportunityRow): string | number => {
+      switch (sortByItems) {
+        case 'code':
+          return row.code;
+        case 'supplier':
+          return `${row.supplier.code} ${row.supplier.name}`;
+        case 'type':
+          return row.type;
+        case 'description':
+          return row.description;
+        case 'likelihood':
+          return likelihoodRank(row.likelihood);
+        case 'severity':
+          return severityRank(row.severity);
+        case 'riskLevel':
+          return row.riskLevel ? RISK_LEVEL_SORT[row.riskLevel] ?? 0 : 0;
+        case 'status':
+          return OPPORTUNITY_STATUS_SORT[row.status] ?? 0;
+        case 'created':
+          return new Date(row.createdAt).getTime();
+      }
+    };
+    return [...items].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [items, sortByItems, sortDirItems]);
+
+  const sortedRiskActions = useMemo(() => {
+    const dir = sortDirActions === 'asc' ? 1 : -1;
+    const getValue = (row: RiskActionRow): string | number => {
+      switch (sortByActions) {
+        case 'supplier':
+          return `${row.supplier.code} ${row.supplier.name}`;
+        case 'riskCode':
+          return row.risk.code;
+        case 'riskDescription':
+          return row.risk.description;
+        case 'riskLevel':
+          return row.risk.riskLevel ? RISK_LEVEL_SORT[row.risk.riskLevel] ?? 0 : 0;
+        case 'description':
+          return row.description;
+        case 'owner':
+          return row.owner ?? '';
+        case 'dueDate':
+          return row.dueDate ? new Date(row.dueDate).getTime() : 0;
+        case 'status':
+          return ACTION_STATUS_SORT[row.status] ?? 0;
+        case 'residualLikelihood':
+          return likelihoodRank(row.residualLikelihood as OpportunityRow['likelihood']);
+        case 'residualSeverity':
+          return severityRank(row.residualSeverity as OpportunityRow['severity']);
+        case 'residualRiskLevel':
+          return row.residualRiskLevel ? RISK_LEVEL_SORT[row.residualRiskLevel] ?? 0 : 0;
+      }
+    };
+    return [...actions].sort((a, b) => {
+      const av = getValue(a);
+      const bv = getValue(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+  }, [actions, sortByActions, sortDirActions]);
+
+  const onSortItems = (key: RiskItemSortKey) => {
+    if (sortByItems === key) setSortDirItems((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortByItems(key);
+      setSortDirItems('asc');
+    }
+  };
+  const onSortActions = (key: RiskActionSortKey) => {
+    if (sortByActions === key) setSortDirActions((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortByActions(key);
+      setSortDirActions('asc');
+    }
+  };
+  const sortIndicatorItems = (key: RiskItemSortKey) =>
+    sortByItems !== key ? '▲▼' : sortDirItems === 'asc' ? '↑' : '↓';
+  const sortIndicatorActions = (key: RiskActionSortKey) =>
+    sortByActions !== key ? '▲▼' : sortDirActions === 'asc' ? '↑' : '↓';
 
   const trendBySupplier = useMemo(() => {
     const grouped = new Map<string, RiskSnapshotRow[]>();
@@ -308,7 +437,7 @@ export function Risk() {
 
   const handleExportRiskTable = () => {
     try {
-      const rows: ExportRow[] = items.map((row) => ({
+      const rows: ExportRow[] = sortedRiskItems.map((row) => ({
         ID: row.code,
         Supplier: `${row.supplier.code} - ${row.supplier.name}`,
         Type: row.type,
@@ -688,20 +817,38 @@ export function Risk() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Supplier</th>
-                    <th>Type</th>
-                    <th>Description</th>
-                    <th>Likelihood</th>
-                    <th>Severity</th>
-                    <th>Risk level</th>
-                    <th>Status</th>
-                    <th>Created</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('code')}>
+                      ID {sortIndicatorItems('code')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('supplier')}>
+                      Supplier {sortIndicatorItems('supplier')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('type')}>
+                      Type {sortIndicatorItems('type')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('description')}>
+                      Description {sortIndicatorItems('description')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('likelihood')}>
+                      Likelihood {sortIndicatorItems('likelihood')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('severity')}>
+                      Severity {sortIndicatorItems('severity')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('riskLevel')}>
+                      Risk level {sortIndicatorItems('riskLevel')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('status')}>
+                      Status {sortIndicatorItems('status')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('created')}>
+                      Created {sortIndicatorItems('created')}
+                    </th>
                     {canEditRiskItems ? <th>Action</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((row) => (
+                  {sortedRiskItems.map((row) => (
                     <tr key={row.id} style={getRiskLevelRowStyle(row.riskLevel)}>
                       <td>{row.code}</td>
                       <td>{row.supplier.code} - {row.supplier.name}</td>
@@ -807,22 +954,44 @@ export function Risk() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Supplier</th>
-                    <th>Risk</th>
-                    <th>Description</th>
-                    <th>Risk Level</th>
-                    <th>Action</th>
-                    <th>Owner</th>
-                    <th>Due Date</th>
-                    <th>Status</th>
-                    <th>Residual Likelihood</th>
-                    <th>Residual Severity</th>
-                    <th>Residual Risk Level</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('supplier')}>
+                      Supplier {sortIndicatorActions('supplier')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('riskCode')}>
+                      Risk {sortIndicatorActions('riskCode')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('riskDescription')}>
+                      Description {sortIndicatorActions('riskDescription')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('riskLevel')}>
+                      Risk Level {sortIndicatorActions('riskLevel')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('description')}>
+                      Action {sortIndicatorActions('description')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('owner')}>
+                      Owner {sortIndicatorActions('owner')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('dueDate')}>
+                      Due Date {sortIndicatorActions('dueDate')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('status')}>
+                      Status {sortIndicatorActions('status')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('residualLikelihood')}>
+                      Residual Likelihood {sortIndicatorActions('residualLikelihood')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('residualSeverity')}>
+                      Residual Severity {sortIndicatorActions('residualSeverity')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('residualRiskLevel')}>
+                      Residual Risk Level {sortIndicatorActions('residualRiskLevel')}
+                    </th>
                     {canEditRiskItems ? <th>Save</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {actions.map((row) => {
+                  {sortedRiskActions.map((row) => {
                     const draft = actionDrafts[row.id];
                     const editable = canEditRiskItems && row.status === 'Open' && draft;
                     const previewResidualLevel =

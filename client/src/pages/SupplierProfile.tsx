@@ -16,6 +16,11 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const MAX_RECORD_UPLOAD_BYTES = 75 * 1024 * 1024;
 
 /** Shipment row status for supplier-facing table (matches Records-style labels). */
+/** Replace demo seed names like "Buyer User" in UI labels. */
+function normalizeUserDisplayText(s: string): string {
+  return s.replace(/\bBuyer User\b/g, 'Buyer').trim();
+}
+
 function shipmentInspectionStatusLabel(status: string | undefined | null): string {
   switch (status) {
     case 'Passed':
@@ -102,6 +107,8 @@ interface PortalData {
 interface ShipmentKpis {
   otdPercent: number | null;
   fpyPercent: number | null;
+  /** Inspections later than schedule (OTD late count). */
+  lateVsSchedule?: number;
 }
 
 interface WeeklyRiskPoint {
@@ -126,6 +133,8 @@ export function SupplierProfile() {
   const [recordFile, setRecordFile] = useState<File | null>(null);
   const [shipPo, setShipPo] = useState('');
   const [shipPart, setShipPart] = useState('');
+  const [shipPartOptions, setShipPartOptions] = useState<string[]>([]);
+  const [shipPartLoading, setShipPartLoading] = useState(false);
   const [shipLot, setShipLot] = useState('');
   const [shipQty, setShipQty] = useState('');
   const [shipDate, setShipDate] = useState('');
@@ -198,6 +207,32 @@ export function SupplierProfile() {
       .catch(() => setShipmentKpis(null));
   }, [token, data?.supplier?.id]);
 
+  useEffect(() => {
+    if (!isSupplier || !data?.supplier?.id || !token) return;
+    const po = shipPo.trim();
+    if (!po) {
+      setShipPartOptions([]);
+      setShipPart('');
+      return;
+    }
+    const supplierId = data.supplier.id;
+    const t = window.setTimeout(() => {
+      setShipPartLoading(true);
+      const q = new URLSearchParams({ supplierId, purchaseOrder: po });
+      apiJson<string[]>(`/shipments/schedule-parts?${q.toString()}`, { token })
+        .then((parts) => {
+          setShipPartOptions(parts);
+          setShipPart((prev) => (prev && parts.includes(prev) ? prev : ''));
+        })
+        .catch(() => {
+          setShipPartOptions([]);
+          setShipPart('');
+        })
+        .finally(() => setShipPartLoading(false));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [isSupplier, data?.supplier?.id, shipPo, token]);
+
   const refresh = () => {
     if (!token) return;
     const url = isSupplier
@@ -232,13 +267,6 @@ export function SupplierProfile() {
     () => Math.max(1, ...monthlyTrends.map((r) => Math.max(r.findings, r.cars, r.audits, r.shipments))),
     [monthlyTrends]
   );
-
-  const assignedBuyersSubtitle = useMemo(() => {
-    if (!data?.assignedBuyers?.length) return 'None assigned';
-    const b = data.assignedBuyers;
-    if (b.length <= 2) return b.map((x) => x.name?.trim() || x.email).join(' · ');
-    return `${b.length} contacts`;
-  }, [data?.assignedBuyers]);
 
   const passPercent = useMemo(() => {
     const audits = data?.audits ?? [];
@@ -327,6 +355,7 @@ export function SupplierProfile() {
       });
       setShipPo('');
       setShipPart('');
+      setShipPartOptions([]);
       setShipLot('');
       setShipQty('');
       setShipDate('');
@@ -399,7 +428,7 @@ export function SupplierProfile() {
 
   const supplier = data?.supplier;
   const metrics = data?.metrics;
-  const waitingInspection = metrics?.waitingInspectionCount ?? 0;
+  const latePoCount = shipmentKpis?.lateVsSchedule ?? 0;
 
   return (
     <div className="page">
@@ -447,11 +476,7 @@ export function SupplierProfile() {
           gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
         }}
       >
-        <MetricCard
-          title="Assigned Buyers"
-          value={metrics.assignedBuyerCount}
-          subtitle={assignedBuyersSubtitle}
-        />
+        <MetricCard title="Assigned Buyers" value={metrics.assignedBuyerCount} />
         <MetricCard
           title="Total CARs"
           value={data.cars.length}
@@ -475,7 +500,9 @@ export function SupplierProfile() {
         <MetricCard
           title="OTD%"
           value={shipmentKpis?.otdPercent != null ? `${shipmentKpis.otdPercent}%` : '—'}
-          subtitle={`${waitingInspection} waiting inspection`}
+          subtitle={`${latePoCount} late PO${latePoCount === 1 ? '' : 's'}`}
+          showAlert={latePoCount > 0}
+          alertLabel={`${latePoCount} late PO${latePoCount === 1 ? '' : 's'}`}
         />
       </div>
 
@@ -541,7 +568,28 @@ export function SupplierProfile() {
               </div>
               <div className="input-group">
                 <label className="input-label">Part number *</label>
-                <input className="input" value={shipPart} onChange={(e) => setShipPart(e.target.value)} required />
+                <select
+                  className="input"
+                  value={shipPart}
+                  onChange={(e) => setShipPart(e.target.value)}
+                  required
+                  disabled={!shipPo.trim() || shipPartLoading || shipPartOptions.length === 0}
+                >
+                  <option value="">
+                    {!shipPo.trim()
+                      ? 'Enter purchase order first'
+                      : shipPartLoading
+                        ? 'Loading parts…'
+                        : shipPartOptions.length === 0
+                          ? 'No parts on schedule for this PO'
+                          : 'Select part number'}
+                  </option>
+                  {shipPartOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="input-group">
                 <label className="input-label">Quantity *</label>
@@ -738,14 +786,14 @@ export function SupplierProfile() {
       <SectionTable title="Shipment inspection requests" empty="No requests." rowCount={data.shipments.length}>
         <table className="table">
           <thead>
-            <tr>
+            <tr style={{ verticalAlign: 'bottom' }}>
               <th>Shipment ID</th>
               <th>Supplier</th>
               <th>P.O.</th>
               <th>Part Number</th>
               <th>Quantity</th>
               <th>Lot</th>
-              <th>Requested Inspection Date</th>
+              <th style={{ whiteSpace: 'nowrap' }}>Requested inspection date</th>
               <th>User</th>
               <th>Date Created</th>
               <th>NOTES</th>
@@ -764,7 +812,7 @@ export function SupplierProfile() {
                 <td>{s.qty ?? '—'}</td>
                 <td>{s.lot ?? '—'}</td>
                 <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
-                <td>{s.createdBy ?? '—'}</td>
+                <td>{formatShipmentCreatedByLabel(s.createdBy)}</td>
                 <td>
                   {new Date(s.createdAt).toLocaleDateString(undefined, {
                     year: 'numeric',
@@ -814,6 +862,12 @@ export function SupplierProfile() {
 
 function safeExportFilePart(s: string): string {
   return s.replace(/[/\\?*:[\]"<>|]/g, '_').trim() || 'supplier';
+}
+
+/** Strip demo-style role suffix from shipment requester label. */
+function formatShipmentCreatedByLabel(raw: string | null | undefined): string {
+  if (raw == null || !String(raw).trim()) return '—';
+  return normalizeUserDisplayText(String(raw));
 }
 
 function buildWeeklyRiskSeries(

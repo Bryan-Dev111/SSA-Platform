@@ -61,6 +61,49 @@ router.get(
   })
 );
 
+/** Part numbers on the shipment schedule for a supplier + PO (for supplier upload form dropdown). */
+router.get(
+  '/schedule-parts',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId.trim() : '';
+    const purchaseOrder = typeof req.query.purchaseOrder === 'string' ? req.query.purchaseOrder.trim() : '';
+    if (!supplierId || !purchaseOrder) {
+      res.status(400).json({ error: 'supplierId and purchaseOrder are required' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && !allowedIds.includes(supplierId)) {
+      res.status(403).json({ error: 'Supplier not in scope' });
+      return;
+    }
+    if (req.user.roleNames.includes('Supplier')) {
+      const own = await prisma.supplier.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+      if (!own || own.id !== supplierId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+    }
+    const rows = await prisma.shipmentSchedule.findMany({
+      where: {
+        supplierId,
+        purchaseOrder: { not: null, mode: 'insensitive', equals: purchaseOrder },
+      },
+      select: { partNumber: true },
+    });
+    const unique = new Set<string>();
+    for (const r of rows) {
+      const p = r.partNumber?.trim();
+      if (p) unique.add(p);
+    }
+    const list = [...unique].sort((a, b) => a.localeCompare(b));
+    res.json(list);
+  })
+);
+
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
