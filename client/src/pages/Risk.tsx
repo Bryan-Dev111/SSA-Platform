@@ -258,21 +258,22 @@ export function Risk() {
     return { avgScore, openRisks, mitigatedRisks, openActions, overdueActions, opportunities, realizedOpportunities };
   }, [effectiveRisks, actions, items]);
 
+  /** Per-supplier average register risk weight (same 30/60/90 scale as Risk score avg), not a raw sum. */
   const topRiskSuppliers = useMemo(() => {
-    const bySupplier = new Map<string, { supplier: Supplier; score: number }>();
+    const bySupplier = new Map<string, { supplier: Supplier; sum: number; count: number }>();
     for (const risk of effectiveRisks) {
-      const existing = bySupplier.get(risk.supplierId) ?? { supplier: risk.supplier, score: 0 };
-      existing.score += levelWeight(risk.effectiveRiskLevel);
+      const existing = bySupplier.get(risk.supplierId) ?? { supplier: risk.supplier, sum: 0, count: 0 };
+      existing.sum += levelWeight(risk.effectiveRiskLevel);
+      existing.count += 1;
       bySupplier.set(risk.supplierId, existing);
     }
-    return [...bySupplier.values()].sort((a, b) => b.score - a.score).slice(0, 5);
+    const rows = [...bySupplier.values()].map(({ supplier, sum, count }) => ({
+      supplier,
+      score: count === 0 ? 0 : Math.round((sum / count) * 100) / 100,
+    }));
+    return rows.sort((a, b) => b.score - a.score).slice(0, 5);
   }, [effectiveRisks]);
   const maxTopRiskScore = Math.max(1, ...topRiskSuppliers.map((r) => r.score));
-  const topRiskTotalScore = topRiskSuppliers.reduce((sum, r) => sum + r.score, 0);
-  const topRiskPareto = topRiskSuppliers.map((row, idx) => {
-    const cumulative = topRiskSuppliers.slice(0, idx + 1).reduce((sum, r) => sum + r.score, 0);
-    return { ...row, cumulativePercent: topRiskTotalScore > 0 ? Math.round((cumulative / topRiskTotalScore) * 100) : 0 };
-  });
 
   const matrixLikelihoodOrder: Array<OpportunityRow['likelihood']> = ['VeryLikely', 'Likely', 'Possible', 'Unlikely', 'VeryUnlikely'];
   const matrixSeverityOrder: Array<OpportunityRow['severity']> = ['Negligible', 'Minor', 'Moderate', 'Significant', 'Severe'];
@@ -539,7 +540,7 @@ export function Risk() {
               <p className="table-empty">No data.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {topRiskPareto.map((r) => (
+                {topRiskSuppliers.map((r) => (
                   <div key={r.supplier.id}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.supplier.code} - {r.supplier.name}</span>
