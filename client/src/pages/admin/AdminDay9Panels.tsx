@@ -196,8 +196,22 @@ interface ExpenseRow {
   description: string;
   project: string;
   amount: number;
+  expenseDate: string;
   createdAt: string;
   updatedAt: string;
+}
+
+function expenseDateInputValue(iso: string | undefined): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+function todayDateInputValue(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export function AdminExpensesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
@@ -207,12 +221,20 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
   const [description, setDescription] = useState('');
   const [project, setProject] = useState('');
   const [amount, setAmount] = useState('');
+  const [expenseDate, setExpenseDate] = useState(todayDateInputValue);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<{ type: string; description: string; project: string; amount: string }>({
+  const [editDraft, setEditDraft] = useState<{
+    type: string;
+    description: string;
+    project: string;
+    amount: string;
+    expenseDate: string;
+  }>({
     type: '',
     description: '',
     project: '',
     amount: '',
+    expenseDate: '',
   });
   const totalExpenses = useMemo(() => list.reduce((sum, item) => sum + item.amount, 0), [list]);
 
@@ -234,8 +256,14 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
   const add = async () => {
     if (!token) return;
     const amountNum = Number(amount);
-    if (!type.trim() || !description.trim() || !project.trim() || !Number.isFinite(amountNum)) {
-      toast.error('Type, description, project, and amount are required');
+    if (
+      !type.trim() ||
+      !description.trim() ||
+      !project.trim() ||
+      !Number.isFinite(amountNum) ||
+      !expenseDate.trim()
+    ) {
+      toast.error('Type, description, project, expense date, and amount are required');
       return;
     }
     setBusy(true);
@@ -248,12 +276,14 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           description: description.trim(),
           project: project.trim(),
           amount: amountNum,
+          expenseDate,
         }),
       });
       setType('');
       setDescription('');
       setProject('');
       setAmount('');
+      setExpenseDate(todayDateInputValue());
       toast.success('Expense added');
       await load();
     } catch (e) {
@@ -270,6 +300,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
       description: row.description,
       project: row.project,
       amount: String(row.amount),
+      expenseDate: expenseDateInputValue(row.expenseDate),
     });
   };
 
@@ -280,9 +311,10 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
       !editDraft.type.trim() ||
       !editDraft.description.trim() ||
       !editDraft.project.trim() ||
-      !Number.isFinite(amountNum)
+      !Number.isFinite(amountNum) ||
+      !editDraft.expenseDate.trim()
     ) {
-      toast.error('Type, description, project, and amount are required');
+      toast.error('Type, description, project, expense date, and amount are required');
       return;
     }
     setBusy(true);
@@ -295,6 +327,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           description: editDraft.description.trim(),
           project: editDraft.project.trim(),
           amount: amountNum,
+          expenseDate: editDraft.expenseDate,
         }),
       });
       setEditId(null);
@@ -317,7 +350,8 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
       Description: r.description,
       Project: r.project,
       Amount: r.amount,
-      Created: new Date(r.createdAt).toLocaleString(),
+      'Expense date': r.expenseDate ? new Date(r.expenseDate).toLocaleDateString() : '',
+      Recorded: new Date(r.createdAt).toLocaleString(),
     }));
     downloadTableXlsx('expenses', 'Expenses', rows);
     toast.success('Exported expenses');
@@ -360,6 +394,15 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
             <label className="input-label">Amount</label>
             <input className="input" type="number" step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Expense date</label>
+            <input
+              className="input"
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
             <button type="button" className="btn btn-primary" onClick={add} disabled={busy}>
               Add
@@ -378,7 +421,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
                 <th>Description</th>
                 <th>Project</th>
                 <th>Amount</th>
-                <th>Created</th>
+                <th>Expense date</th>
                 <th style={{ width: 170 }}>Actions</th>
               </tr>
             </thead>
@@ -438,7 +481,24 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
                         row.amount.toFixed(2)
                       )}
                     </td>
-                    <td>{new Date(row.createdAt).toLocaleString()}</td>
+                    <td>
+                      {editId === row.id ? (
+                        <input
+                          className="input"
+                          type="date"
+                          value={editDraft.expenseDate}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, expenseDate: e.target.value }))}
+                        />
+                      ) : row.expenseDate ? (
+                        new Date(row.expenseDate).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td>
                       {editId === row.id ? (
                         <>

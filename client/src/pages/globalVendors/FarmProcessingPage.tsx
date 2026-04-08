@@ -246,12 +246,6 @@ export function FarmProcessingPage() {
     );
   }
 
-  const hasSecondary = Boolean(
-    selectedFarm.secondaryCrop ||
-      selectedFarm.secondaryProcessingMethods ||
-      selectedFarm.secondaryQualityScore != null
-  );
-
   return (
     <div className="page">
       <header
@@ -308,18 +302,6 @@ export function FarmProcessingPage() {
               <div>{selectedFarm.productionStyle ?? '—'}</div>
             </div>
           </div>
-          {/* {hasSecondary && (
-            <p
-              style={{
-                marginTop: '0.75rem',
-                marginBottom: 0,
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              Step 2 is intended for secondary processing details.
-            </p>
-          )} */}
         </div>
       </div>
 

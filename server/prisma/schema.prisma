@@ -846,12 +846,15 @@ model Expense {
   description String
   project     String
   amount      Float
+  /// Calendar date when the expense occurred (may differ from createdAt).
+  expenseDate DateTime @db.Date
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([project])
   @@index([type])
   @@index([createdAt])
+  @@index([expenseDate])
 }
 
 // For application-level code generation (SUP-00001, AUD-00001, etc.)

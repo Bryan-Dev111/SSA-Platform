@@ -14,11 +14,20 @@ type ExpenseRow = {
   description: string;
   project: string;
   amount: number;
+  expenseDate: string;
   createdAt: string;
   updatedAt: string;
 };
 
 const GLOBAL_VENDORS_PROJECT = 'Global Vendors';
+
+function todayDateInputValue(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 /** Shared body for Global Supply expenses (standalone page + Admin tab). */
 export function GlobalSupplyExpensesSection() {
@@ -28,6 +37,7 @@ export function GlobalSupplyExpensesSection() {
   const [busy, setBusy] = useState(false);
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [expenseDate, setExpenseDate] = useState(todayDateInputValue);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -62,8 +72,8 @@ export function GlobalSupplyExpensesSection() {
   const add = async () => {
     if (!token) return;
     const amountNum = Number(price);
-    if (!description.trim() || !Number.isFinite(amountNum)) {
-      toast.error('Description and numeric price are required');
+    if (!description.trim() || !Number.isFinite(amountNum) || !expenseDate.trim()) {
+      toast.error('Description, expense date, and numeric price are required');
       return;
     }
     setBusy(true);
@@ -76,10 +86,12 @@ export function GlobalSupplyExpensesSection() {
           description: description.trim(),
           project: GLOBAL_VENDORS_PROJECT,
           amount: amountNum,
+          expenseDate,
         }),
       });
       setDescription('');
       setPrice('');
+      setExpenseDate(todayDateInputValue());
       toast.success('Expense added');
       await load();
     } catch (e) {
@@ -137,6 +149,15 @@ export function GlobalSupplyExpensesSection() {
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Expense date</label>
+            <input
+              className="input"
+              type="date"
+              value={expenseDate}
+              onChange={(e) => setExpenseDate(e.target.value)}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Price</label>
             <input
               className="input"
@@ -172,7 +193,7 @@ export function GlobalSupplyExpensesSection() {
                 <th>EXP ID</th>
                 <th>Description</th>
                 <th>Price</th>
-                <th>Date</th>
+                <th>Expense date</th>
               </tr>
             </thead>
             <tbody>
@@ -189,11 +210,13 @@ export function GlobalSupplyExpensesSection() {
                     <td>{r.description}</td>
                     <td>${r.amount.toFixed(2)}</td>
                     <td>
-                      {new Date(r.createdAt).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {r.expenseDate
+                        ? new Date(r.expenseDate).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : '—'}
                     </td>
                   </tr>
                 ))
