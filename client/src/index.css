@@ -1084,20 +1084,23 @@ body:has(.product-hub-page) {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: row;
+  /* Two shared rows (title / hint) so both halves stay vertically even across the split. */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
   align-items: stretch;
 }
 
 .product-hub-panel {
-  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / -1;
+  grid-column: auto;
+  justify-items: center;
+  align-items: start;
+  row-gap: var(--space-2);
   padding: clamp(var(--space-4), 4vw, var(--space-10)) clamp(var(--space-3), 3vw, var(--space-6));
   border: 0;
   cursor: pointer;
@@ -1179,13 +1182,43 @@ body:has(.product-hub-page) {
   color: var(--color-text-muted);
 }
 
-@media (max-width: 640px) {
+/* Browsers without subgrid: match legacy side-by-side flex (content centered per panel). */
+@supports not (grid-template-rows: subgrid) {
   .product-hub-row {
-    flex-direction: column;
+    display: flex;
+    flex-direction: row;
+    grid-template-columns: unset;
+    grid-template-rows: unset;
   }
 
   .product-hub-panel {
     flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    grid-row: unset;
+    grid-template-rows: unset;
+    row-gap: var(--space-2);
+  }
+}
+
+@media (max-width: 640px) {
+  .product-hub-row {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: unset;
+    grid-template-rows: unset;
+  }
+
+  .product-hub-panel {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    grid-row: auto;
+    grid-template-rows: unset;
     min-height: 0;
     box-shadow: inset 0 -1px 0 var(--color-border);
   }
