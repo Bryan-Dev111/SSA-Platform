@@ -848,6 +848,10 @@ model Expense {
   amount      Float
   /// Calendar date when the expense occurred (may differ from createdAt).
   expenseDate DateTime @db.Date
+  paymentMethod       String   @default("")
+  attachmentFilePath  String?
+  attachmentFileName  String?
+  attachmentFileMime  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

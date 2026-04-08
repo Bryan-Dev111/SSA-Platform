@@ -1,0 +1,4 @@
+ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "attachmentFilePath" TEXT;
+ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "attachmentFileName" TEXT;
+ALTER TABLE "Expense" ADD COLUMN IF NOT EXISTS "attachmentFileMime" TEXT;

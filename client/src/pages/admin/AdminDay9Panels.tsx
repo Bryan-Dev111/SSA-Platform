@@ -2,7 +2,7 @@
  * Day 9 Admin: Audit types, Risk weights, Buyers & suppliers; Permissions matrix is Admin → Permissions tab only.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiJson } from '../../api/client';
+import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MetricCard } from '../../components/MetricCard';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
@@ -197,6 +197,10 @@ interface ExpenseRow {
   project: string;
   amount: number;
   expenseDate: string;
+  paymentMethod: string;
+  attachmentFilePath: string | null;
+  attachmentFileName: string | null;
+  attachmentFileMime: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -222,6 +226,9 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
   const [project, setProject] = useState('');
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(todayDateInputValue);
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [addAttachmentFile, setAddAttachmentFile] = useState<File | null>(null);
+  const [attachmentBusyId, setAttachmentBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     type: string;
@@ -229,12 +236,14 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
     project: string;
     amount: string;
     expenseDate: string;
+    paymentMethod: string;
   }>({
     type: '',
     description: '',
     project: '',
     amount: '',
     expenseDate: '',
+    paymentMethod: '',
   });
   const totalExpenses = useMemo(() => list.reduce((sum, item) => sum + item.amount, 0), [list]);
 
@@ -253,6 +262,61 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
     load();
   }, [load]);
 
+  const downloadAttachment = async (id: string) => {
+    if (!token) return;
+    try {
+      const r = await apiJson<{ url: string }>(`/expenses/${id}/attachment-url`, { token });
+      window.open(r.url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not download');
+    }
+  };
+
+  const uploadRowAttachment = async (id: string, file: File) => {
+    if (!token) return;
+    setAttachmentBusyId(id);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiFetch(`/expenses/${id}/attachment`, {
+        token,
+        method: 'POST',
+        body: form,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = 'Upload failed';
+        try {
+          const j = JSON.parse(text) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          if (text) msg = text;
+        }
+        throw new Error(msg);
+      }
+      toast.success('Attachment uploaded');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setAttachmentBusyId(null);
+    }
+  };
+
+  const removeAttachment = async (id: string) => {
+    if (!token) return;
+    setAttachmentBusyId(id);
+    try {
+      await apiJson(`/expenses/${id}/attachment`, { token, method: 'DELETE' });
+      toast.success('Attachment removed');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not remove attachment');
+    } finally {
+      setAttachmentBusyId(null);
+    }
+  };
+
   const add = async () => {
     if (!token) return;
     const amountNum = Number(amount);
@@ -268,7 +332,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
     }
     setBusy(true);
     try {
-      await apiJson('/expenses', {
+      const created = await apiJson<ExpenseRow>('/expenses', {
         token,
         method: 'POST',
         body: JSON.stringify({
@@ -277,13 +341,45 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           project: project.trim(),
           amount: amountNum,
           expenseDate,
+          paymentMethod: paymentMethod.trim(),
         }),
       });
+      if (addAttachmentFile) {
+        const form = new FormData();
+        form.append('file', addAttachmentFile);
+        const res = await apiFetch(`/expenses/${created.id}/attachment`, {
+          token,
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = 'Expense saved but attachment upload failed';
+          try {
+            const j = JSON.parse(text) as { error?: string };
+            if (j.error) msg = j.error;
+          } catch {
+            if (text) msg = text;
+          }
+          toast.error(msg);
+          await load();
+          setType('');
+          setDescription('');
+          setProject('');
+          setAmount('');
+          setExpenseDate(todayDateInputValue());
+          setPaymentMethod('');
+          setAddAttachmentFile(null);
+          return;
+        }
+      }
       setType('');
       setDescription('');
       setProject('');
       setAmount('');
       setExpenseDate(todayDateInputValue());
+      setPaymentMethod('');
+      setAddAttachmentFile(null);
       toast.success('Expense added');
       await load();
     } catch (e) {
@@ -301,6 +397,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
       project: row.project,
       amount: String(row.amount),
       expenseDate: expenseDateInputValue(row.expenseDate),
+      paymentMethod: row.paymentMethod ?? '',
     });
   };
 
@@ -328,6 +425,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           project: editDraft.project.trim(),
           amount: amountNum,
           expenseDate: editDraft.expenseDate,
+          paymentMethod: editDraft.paymentMethod.trim(),
         }),
       });
       setEditId(null);
@@ -351,6 +449,8 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
       Project: r.project,
       Amount: r.amount,
       'Expense date': r.expenseDate ? new Date(r.expenseDate).toLocaleDateString() : '',
+      'Payment method': r.paymentMethod ?? '',
+      Attachment: r.attachmentFileName ?? '',
       Recorded: new Date(r.createdAt).toLocaleString(),
     }));
     downloadTableXlsx('expenses', 'Expenses', rows);
@@ -403,6 +503,38 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
               onChange={(e) => setExpenseDate(e.target.value)}
             />
           </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Payment method</label>
+            <input
+              className="input"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              placeholder="e.g. Card, Wire transfer"
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Attachment</label>
+            <input
+              className="input"
+              type="file"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setAddAttachmentFile(f);
+              }}
+            />
+            {addAttachmentFile ? (
+              <span
+                style={{
+                  display: 'block',
+                  marginTop: 4,
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                {addAttachmentFile.name}
+              </span>
+            ) : null}
+          </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
             <button type="button" className="btn btn-primary" onClick={add} disabled={busy}>
               Add
@@ -422,13 +554,15 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
                 <th>Project</th>
                 <th>Amount</th>
                 <th>Expense date</th>
+                <th>Payment method</th>
+                <th style={{ minWidth: 200 }}>Attachment</th>
                 <th style={{ width: 170 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="table-empty">
+                  <td colSpan={8} className="table-empty">
                     No expenses yet.
                   </td>
                 </tr>
@@ -498,6 +632,58 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
                       ) : (
                         '—'
                       )}
+                    </td>
+                    <td>
+                      {editId === row.id ? (
+                        <input
+                          className="input"
+                          value={editDraft.paymentMethod}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, paymentMethod: e.target.value }))}
+                          placeholder="Payment method"
+                        />
+                      ) : (
+                        row.paymentMethod || '—'
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                        {row.attachmentFileName && row.attachmentFilePath ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              style={{ paddingLeft: 0, textAlign: 'left' }}
+                              onClick={() => void downloadAttachment(row.id)}
+                              disabled={attachmentBusyId === row.id}
+                            >
+                              {row.attachmentFileName}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              onClick={() => void removeAttachment(row.id)}
+                              disabled={attachmentBusyId === row.id || editId === row.id}
+                            >
+                              Remove file
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
+                        )}
+                        <label className="btn btn-xs">
+                          {row.attachmentFileName ? 'Replace file' : 'Upload file'}
+                          <input
+                            type="file"
+                            style={{ display: 'none' }}
+                            disabled={attachmentBusyId === row.id || editId === row.id}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) void uploadRowAttachment(row.id, file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      </div>
                     </td>
                     <td>
                       {editId === row.id ? (

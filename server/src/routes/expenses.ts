@@ -1,11 +1,21 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
+import {
+  MAX_RECORD_FILE_BYTES,
+  createRecordDownloadSignedUrl,
+  uploadRecordToStorage,
+} from '../lib/supabaseStorage';
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_RECORD_FILE_BYTES },
+});
 
 router.use(authMiddleware);
 router.use(requirePageAccess('GlobalSupplyExpenses'));
@@ -26,6 +36,103 @@ router.get(
   })
 );
 
+router.get(
+  '/:id/attachment-url',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+      select: { attachmentFilePath: true },
+    });
+    if (!expense?.attachmentFilePath) {
+      res.status(404).json({ error: 'No attachment' });
+      return;
+    }
+    try {
+      const url = await createRecordDownloadSignedUrl(expense.attachmentFilePath);
+      res.json({ url });
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : 'Could not create download link',
+      });
+    }
+  })
+);
+
+router.post(
+  '/:id/attachment',
+  upload.single('file'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'file is required' });
+      return;
+    }
+
+    const expense = await prisma.expense.findUnique({ where: { id }, select: { id: true } });
+    if (!expense) {
+      res.status(404).json({ error: 'Expense not found' });
+      return;
+    }
+
+    try {
+      const uploaded = await uploadRecordToStorage({
+        supplierId: null,
+        recordId: expense.id,
+        fileName: req.file.originalname || 'attachment',
+        fileMime: req.file.mimetype || null,
+        fileBuffer: req.file.buffer,
+      });
+      const updated = await prisma.expense.update({
+        where: { id },
+        data: {
+          attachmentFilePath: uploaded.storagePath,
+          attachmentFileName: (req.file.originalname || '').slice(0, 255) || null,
+          attachmentFileMime: (req.file.mimetype || '').slice(0, 255) || null,
+        },
+      });
+      res.status(201).json(updated);
+    } catch (error) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Could not save attachment',
+      });
+    }
+  })
+);
+
+router.delete(
+  '/:id/attachment',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    const existing = await prisma.expense.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Expense not found' });
+      return;
+    }
+    const updated = await prisma.expense.update({
+      where: { id },
+      data: {
+        attachmentFilePath: null,
+        attachmentFileName: null,
+        attachmentFileMime: null,
+      },
+    });
+    res.json(updated);
+  })
+);
+
 router.post(
   '/',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -35,6 +142,8 @@ router.post(
     const amountRaw = req.body?.amount;
     const amount = Number(amountRaw);
     const expenseDate = parseExpenseDate(req.body?.expenseDate);
+    const paymentMethod =
+      typeof req.body?.paymentMethod === 'string' ? req.body.paymentMethod.trim() : '';
 
     if (!type || !description || !project || !Number.isFinite(amount) || !expenseDate || Number.isNaN(expenseDate.getTime())) {
       res
@@ -46,7 +155,7 @@ router.post(
     const code = await getNextCode('EXP');
 
     const created = await prisma.expense.create({
-      data: { code, type, description, project, amount, expenseDate },
+      data: { code, type, description, project, amount, expenseDate, paymentMethod },
     });
     res.status(201).json(created);
   })
@@ -72,6 +181,7 @@ router.patch(
       project?: string;
       amount?: number;
       expenseDate?: Date;
+      paymentMethod?: string;
     } = {};
     if (typeof req.body?.type === 'string') data.type = req.body.type.trim();
     if (typeof req.body?.description === 'string') data.description = req.body.description.trim();
@@ -91,6 +201,10 @@ router.patch(
         return;
       }
       data.expenseDate = expenseDate;
+    }
+    if (req.body?.paymentMethod !== undefined) {
+      data.paymentMethod =
+        typeof req.body.paymentMethod === 'string' ? req.body.paymentMethod.trim() : '';
     }
 
     const updated = await prisma.expense.update({ where: { id }, data });

@@ -15,6 +15,8 @@ type ExpenseRow = {
   project: string;
   amount: number;
   expenseDate: string;
+  paymentMethod?: string;
+  attachmentFileName?: string | null;
   createdAt: string;
   updatedAt: string;
 };
