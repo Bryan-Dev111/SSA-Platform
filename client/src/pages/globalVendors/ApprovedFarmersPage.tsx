@@ -2,6 +2,7 @@
  * Global Vendors — Approved Farmers list (same data as Farmer Information; columns per spec where fields exist).
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
@@ -68,12 +69,13 @@ export function ApprovedFarmersPage() {
                 <th>Main crop</th>
                 <th>Elevation (m)</th>
                 <th>Production style</th>
+                <th>Farmer Profile</th>
               </tr>
             </thead>
             <tbody>
               {farms.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={9} className="table-empty">
                     No farms yet. Add farmers from <strong>Farmer Information</strong>.
                   </td>
                 </tr>
@@ -81,15 +83,30 @@ export function ApprovedFarmersPage() {
                 farms.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <strong>{f.code}</strong>
+                      <Link
+                        to={`/global-vendors/farmers/${f.id}/profile`}
+                        style={{ fontWeight: 600, color: 'var(--color-primary)' }}
+                      >
+                        {f.code}
+                      </Link>
                     </td>
-                    <td>{f.farmName}</td>
+                    <td>
+                      <Link to={`/global-vendors/farmers/${f.id}/profile`}>{f.farmName}</Link>
+                    </td>
                     <td>{dash(f.farmCategory)}</td>
                     <td>{f.country}</td>
                     <td>{dash(f.region)}</td>
                     <td>{dash(f.mainCrop)}</td>
                     <td>{f.elevationMeters != null ? f.elevationMeters : '—'}</td>
                     <td>{dash(f.productionStyle)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <Link
+                        to={`/global-vendors/farmers/${f.id}/profile`}
+                        className="btn btn-sm"
+                      >
+                        Farmer Profile
+                      </Link>
+                    </td>
                   </tr>
                 ))
               )}

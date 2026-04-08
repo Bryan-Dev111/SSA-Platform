@@ -406,6 +406,14 @@ a.btn:focus {
   border: 1px solid var(--color-border);
 }
 
+/* Global Supply — Farmer Information: scroll inside the table area (wide + tall lists). */
+.farmers-information-table-scroll {
+  max-height: min(75vh, calc(100dvh - 12rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .table {
   width: 100%;
   min-width: 320px;

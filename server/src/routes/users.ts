@@ -88,6 +88,35 @@ function parseIsContractor(value: unknown): boolean {
 router.use(authMiddleware);
 router.use(requireRole(['Admin']));
 
+/** Global Supply admin dashboard: user / role counts (Admin only). */
+router.get(
+  '/global-supply-stats',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const [employees, roles, registeredFarms] = await Promise.all([
+      prisma.user.count({
+        where: { isEmployee: true, employmentStatus: 'Active' },
+      }),
+      prisma.role.findMany({ select: { id: true, name: true } }),
+      prisma.farm.count(),
+    ]);
+    const idByName = new Map(roles.map((r) => [r.name, r.id] as const));
+    const commodityBuyerId = idByName.get('CommodityBuyer');
+    const farmerRoleId = idByName.get('Farmer');
+    const [commodityBuyers, farmerAccounts] = await Promise.all([
+      commodityBuyerId
+        ? prisma.userRole.count({ where: { roleId: commodityBuyerId } })
+        : 0,
+      farmerRoleId ? prisma.userRole.count({ where: { roleId: farmerRoleId } }) : 0,
+    ]);
+    res.json({
+      employees,
+      commodityBuyers,
+      farmerAccounts,
+      registeredFarms,
+    });
+  })
+);
+
 /** Canonical server permission matrix (for Admin UI; Day 9.4) */
 router.get(
   '/permission-matrix',

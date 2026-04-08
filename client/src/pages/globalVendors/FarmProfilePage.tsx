@@ -133,8 +133,22 @@ export function FarmProfilePage() {
   if (loading && !selectedFarm) {
     return (
       <div className="page">
-        <header className="page-header">
+        <header
+          className="page-header"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
           <h1 className="page-title">Farmer Profile</h1>
+          {farmId ? (
+            <Link to={`/global-vendors/farmers/${farmId}/processing`} className="btn btn-primary">
+              Processing &amp; Quality
+            </Link>
+          ) : null}
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -147,8 +161,22 @@ export function FarmProfilePage() {
   if (!selectedFarm) {
     return (
       <div className="page">
-        <header className="page-header">
+        <header
+          className="page-header"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
           <h1 className="page-title">Farmer Profile</h1>
+          {farmId ? (
+            <Link to={`/global-vendors/farmers/${farmId}/processing`} className="btn btn-primary">
+              Processing &amp; Quality
+            </Link>
+          ) : null}
         </header>
         <div className="alert-error" style={{ marginBottom: 12 }}>
           Farm not found. It may have been removed.
@@ -162,8 +190,20 @@ export function FarmProfilePage() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header
+        className="page-header"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
         <h1 className="page-title">Farmer Profile</h1>
+        <Link to={`/global-vendors/farmers/${farmId}/processing`} className="btn btn-primary">
+          Processing &amp; Quality
+        </Link>
       </header>
 
       {error && (

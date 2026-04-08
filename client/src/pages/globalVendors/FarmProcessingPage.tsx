@@ -24,8 +24,6 @@ type ProcessingImage = {
 const PROCESSING_STEPS = [
   { key: 'ProcessingStep1', title: 'Primary processing' },
   { key: 'ProcessingStep2', title: 'Secondary processing' },
-  { key: 'ProcessingStep3', title: 'Quality checks' },
-  { key: 'ProcessingStep4', title: 'Final packaging / storage' },
 ] as const;
 
 type ProcessingStepKey = (typeof PROCESSING_STEPS)[number]['key'];
@@ -193,8 +191,22 @@ export function FarmProcessingPage() {
   if (loading && !selectedFarm) {
     return (
       <div className="page">
-        <header className="page-header">
+        <header
+          className="page-header"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
           <h1 className="page-title">Processing &amp; Quality</h1>
+          {farmId ? (
+            <Link to={`/global-vendors/farmers/${farmId}/profile`} className="btn btn-ghost">
+              Return to Farmer profile
+            </Link>
+          ) : null}
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -207,8 +219,22 @@ export function FarmProcessingPage() {
   if (!selectedFarm) {
     return (
       <div className="page">
-        <header className="page-header">
+        <header
+          className="page-header"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
           <h1 className="page-title">Processing &amp; Quality</h1>
+          {farmId ? (
+            <Link to={`/global-vendors/farmers/${farmId}/profile`} className="btn btn-ghost">
+              Return to Farmer profile
+            </Link>
+          ) : null}
         </header>
         <div className="alert-error" style={{ marginBottom: 12 }}>
           Farm not found. It may have been removed.
@@ -228,8 +254,20 @@ export function FarmProcessingPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header
+        className="page-header"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
         <h1 className="page-title">Processing &amp; Quality</h1>
+        <Link to={`/global-vendors/farmers/${farmId}/profile`} className="btn btn-ghost">
+          Return to Farmer profile
+        </Link>
       </header>
 
       {error && (
@@ -270,7 +308,7 @@ export function FarmProcessingPage() {
               <div>{selectedFarm.productionStyle ?? '—'}</div>
             </div>
           </div>
-          {hasSecondary && (
+          {/* {hasSecondary && (
             <p
               style={{
                 marginTop: '0.75rem',
@@ -281,7 +319,7 @@ export function FarmProcessingPage() {
             >
               Step 2 is intended for secondary processing details.
             </p>
-          )}
+          )} */}
         </div>
       </div>
 

@@ -20,7 +20,8 @@ type ExpenseRow = {
 
 const GLOBAL_VENDORS_PROJECT = 'Global Vendors';
 
-export function ExpensesPage() {
+/** Shared body for Global Supply expenses (standalone page + Admin tab). */
+export function GlobalSupplyExpensesSection() {
   const { token } = useAuth();
   const toast = useToast();
   const [allExpenses, setAllExpenses] = useState<ExpenseRow[]>([]);
@@ -89,124 +90,129 @@ export function ExpensesPage() {
   };
 
   return (
+    <div className="card">
+      <div className="card-body">
+        <p
+          style={{
+            marginTop: 0,
+            marginBottom: '0.75rem',
+            color: 'var(--color-text-muted)',
+            fontSize: 'var(--text-sm)',
+          }}
+        >
+          Track Sentinel Global Supply expenses. Total reflects only rows whose project is{' '}
+          <strong>{GLOBAL_VENDORS_PROJECT}</strong>.
+        </p>
+
+        <div
+          className="dashboard-metric-grid"
+          style={{
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            marginBottom: '0.75rem',
+          }}
+        >
+          <div className="card metric-card">
+            <div className="metric-card-label">Total spent</div>
+            <div className="metric-card-value">
+              ${total.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '0.6rem',
+            marginBottom: '1rem',
+          }}
+        >
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Description</label>
+            <input
+              className="input"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Sample shipping, QC lab fee"
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Price</label>
+            <input
+              className="input"
+              type="number"
+              step={0.01}
+              min={0}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 8,
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={add}
+              disabled={busy}
+            >
+              Add expense
+            </button>
+          </div>
+        </div>
+
+        <div className="table-wrap">
+          <table className="table table--sticky-header">
+            <thead>
+              <tr>
+                <th>EXP ID</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="table-empty">
+                    No expenses for this project yet.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.code}</td>
+                    <td>{r.description}</td>
+                    <td>${r.amount.toFixed(2)}</td>
+                    <td>
+                      {new Date(r.createdAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ExpensesPage() {
+  return (
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Expenses</h1>
       </header>
-
-      <div className="card">
-        <div className="card-body">
-          <p
-            style={{
-              marginTop: 0,
-              marginBottom: '0.75rem',
-              color: 'var(--color-text-muted)',
-              fontSize: 'var(--text-sm)',
-            }}
-          >
-            Track Global Vendors-related expenses. Total reflects only rows whose
-            project is <strong>{GLOBAL_VENDORS_PROJECT}</strong>.
-          </p>
-
-          <div
-            className="dashboard-metric-grid"
-            style={{
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              marginBottom: '0.75rem',
-            }}
-          >
-            <div className="card metric-card">
-              <div className="metric-card-label">Total spent</div>
-              <div className="metric-card-value">
-                ${total.toFixed(2)}
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: '0.6rem',
-              marginBottom: '1rem',
-            }}
-          >
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Description</label>
-              <input
-                className="input"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. Sample shipping, QC lab fee"
-              />
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Price</label>
-              <input
-                className="input"
-                type="number"
-                step={0.01}
-                min={0}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                gap: 8,
-              }}
-            >
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={add}
-                disabled={busy}
-              >
-                Add expense
-              </button>
-            </div>
-          </div>
-
-          <div className="table-wrap">
-            <table className="table table--sticky-header">
-              <thead>
-                <tr>
-                <th>EXP ID</th>
-                  <th>Description</th>
-                  <th>Price</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="table-empty">
-                      No Global Vendors expenses yet.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.code}</td>
-                      <td>{r.description}</td>
-                      <td>${r.amount.toFixed(2)}</td>
-                      <td>
-                        {new Date(r.createdAt).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <GlobalSupplyExpensesSection />
     </div>
   );
 }
