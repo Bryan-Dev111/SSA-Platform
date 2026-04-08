@@ -2,6 +2,7 @@
  * Global Vendors — Farmer Information: list farms, add via modal.
  */
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
@@ -291,13 +292,15 @@ export function FarmersInformationPage() {
                 <th>Latitude</th>
                 <th>Longitude</th>
                 <th>Created</th>
-                <th />
+                <th>Profile</th>
+                <th>Processing</th>
+                <th>Edit</th>
               </tr>
             </thead>
             <tbody>
               {farms.length === 0 ? (
                 <tr>
-                  <td colSpan={38} className="table-empty">
+                  <td colSpan={40} className="table-empty">
                     No farms yet. Use <strong>Add farmer</strong> to create one.
                   </td>
                 </tr>
@@ -384,6 +387,22 @@ export function FarmersInformationPage() {
                         month: 'short',
                         day: 'numeric',
                       })}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <Link
+                        to={`/global-vendors/farmers/${f.id}/profile`}
+                        className="btn btn-sm"
+                      >
+                        Profile
+                      </Link>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <Link
+                        to={`/global-vendors/farmers/${f.id}/processing`}
+                        className="btn btn-sm btn-ghost"
+                      >
+                        Processing
+                      </Link>
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button type="button" className="btn btn-sm" onClick={() => openEdit(f)}>
