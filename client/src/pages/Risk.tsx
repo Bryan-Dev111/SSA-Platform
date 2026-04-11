@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { RiskDistributionCard } from '../components/RiskDistributionCard';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { apiJson } from '../api/client';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 import { computeRiskRegisterDistribution } from '../utils/riskDistribution';
@@ -162,6 +163,9 @@ export function Risk() {
   const [sortDirItems, setSortDirItems] = useState<'asc' | 'desc'>('desc');
   const [sortByActions, setSortByActions] = useState<RiskActionSortKey>('dueDate');
   const [sortDirActions, setSortDirActions] = useState<'asc' | 'desc'>('asc');
+
+  const [deleteTarget, setDeleteTarget] = useState<OpportunityRow | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
 
   const roleNames = user?.roleNames ?? [];
   const canEditRiskItems =
@@ -593,6 +597,22 @@ export function Risk() {
     setEditingId(null);
   };
 
+  const deleteItem = async () => {
+    if (!token || !deleteTarget || deletingItem) return;
+    setDeletingItem(true);
+    try {
+      await apiJson(`/opportunities/${deleteTarget.id}`, { token, method: 'DELETE' });
+      toast.success('Risk/opportunity deleted');
+      if (editingId === deleteTarget.id) setEditingId(null);
+      setDeleteTarget(null);
+      await load(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete item');
+    } finally {
+      setDeletingItem(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -860,7 +880,7 @@ export function Risk() {
                       <td>{row.status}</td>
                       <td>{new Date(row.createdAt).toLocaleString()}</td>
                       {canEditRiskItems ? (
-                        <td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
                           <button
                             type="button"
                             className="btn btn-ghost"
@@ -874,6 +894,9 @@ export function Risk() {
                             }}
                           >
                             Edit
+                          </button>
+                          <button type="button" className="btn btn-ghost" onClick={() => setDeleteTarget(row)}>
+                            Delete
                           </button>
                         </td>
                       ) : null}
@@ -1162,6 +1185,27 @@ export function Risk() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete risk/opportunity?"
+        message={
+          deleteTarget ? (
+            <p style={{ margin: 0 }}>
+              Permanently delete <strong>{deleteTarget.code}</strong> ({deleteTarget.type})? Any linked risk actions are
+              removed as well.
+            </p>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel={deletingItem ? 'Deleting…' : 'Delete'}
+        variant="danger"
+        onConfirm={() => void deleteItem()}
+        onCancel={() => {
+          if (!deletingItem) setDeleteTarget(null);
+        }}
+      />
 
       {editingId && (
         <div className="confirm-dialog-overlay" onClick={closeEditModal} role="dialog" aria-modal="true" aria-labelledby="risk-edit-title">

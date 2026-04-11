@@ -278,7 +278,7 @@ router.patch(
 
 router.delete(
   '/:id',
-  requireRole(['Admin']),
+  requireRole(['Admin', 'QualityEngineer', 'QualityManager', 'Buyer']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const allowedIds = await getAllowedSupplierIds(req.user!);
     const row = await prisma.opportunity.findUnique({ where: { id: req.params.id } });
