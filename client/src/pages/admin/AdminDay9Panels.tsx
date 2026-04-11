@@ -940,6 +940,25 @@ interface SupplierRow {
 
 const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'] as const;
 
+/** Sentinel Supplier Assurance roles only — Global Supply Admin → Users (not Farmer / QE / etc.). */
+const GLOBAL_SUPPLY_USERS_TAB_ROLES = ['Admin', 'Auditor', 'Buyer'] as const;
+type GlobalSupplyUsersTabRole = (typeof GLOBAL_SUPPLY_USERS_TAB_ROLES)[number];
+
+function isGlobalSupplyUsersTabRole(name: string): name is GlobalSupplyUsersTabRole {
+  return (GLOBAL_SUPPLY_USERS_TAB_ROLES as readonly string[]).includes(name);
+}
+
+/** Role rows omitted from Global Supply Admin → Permissions matrix (main SSA roles). */
+const PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES = new Set([
+  'QualityEngineer',
+  'QualityManager',
+  'Supplier',
+  'Viewer',
+]);
+
+/** Role rows omitted from main Admin → Permissions matrix (Global Supply product roles). */
+const PERMISSION_MATRIX_SENTINEL_HIDE_ROLES = new Set(['Farmer', 'CommodityBuyer']);
+
 function formatUserRoleLabel(roleName: string): string {
   if (roleName === 'QualityEngineer') return 'Quality Engineer';
   if (roleName === 'QualityManager') return 'Quality Manager';
@@ -960,6 +979,41 @@ interface PermissionMatrixResponse {
   adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
 }
 
+/** Union of Global Supply routes (/global-vendors/*) plus main Admin portal when any role grants it. */
+function summarizeGlobalSupplyPermissions(
+  roleNames: string[],
+  matrix: Record<string, Record<string, boolean>>,
+  pages: PermissionPageDef[]
+): string {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  const globalPages = pages.filter((p) => p.path.startsWith('/global-vendors'));
+  for (const role of roleNames) {
+    const row = matrix[role];
+    if (!row) continue;
+    for (const page of globalPages) {
+      if (row[page.key] && !seen.has(page.key)) {
+        seen.add(page.key);
+        labels.push(page.label);
+      }
+    }
+  }
+  labels.sort();
+  let hasAdmin = false;
+  for (const role of roleNames) {
+    if (matrix[role]?.Admin) {
+      hasAdmin = true;
+      break;
+    }
+  }
+  const adminLabel = pages.find((p) => p.key === 'Admin')?.label ?? 'Admin';
+  const routePart = labels.join(', ');
+  if (routePart && hasAdmin) return `${routePart}; ${adminLabel}`;
+  if (routePart) return routePart;
+  if (hasAdmin) return adminLabel;
+  return '—';
+}
+
 export function AdminBuyersSuppliersPanel({
   token,
   toast,
@@ -968,6 +1022,7 @@ export function AdminBuyersSuppliersPanel({
   showBuyerSupplierSections = true,
   usersOnlyEmployees = false,
   usersTableTitle = 'Users',
+  globalSupplyUsersMode = false,
 }: {
   token: string | null;
   toast: ToastApi;
@@ -976,6 +1031,8 @@ export function AdminBuyersSuppliersPanel({
   showBuyerSupplierSections?: boolean;
   usersOnlyEmployees?: boolean;
   usersTableTitle?: string;
+  /** Lighter Users tab for Global Supply admin: slim create form, no status/rate/currency columns, permissions column. */
+  globalSupplyUsersMode?: boolean;
 }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -995,6 +1052,8 @@ export function AdminBuyersSuppliersPanel({
   const [newUserCountry, setNewUserCountry] = useState('');
   /** Role names from server (includes custom roles); matrix UI lives only on Permissions tab. */
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [permissionMatrix, setPermissionMatrix] = useState<Record<string, Record<string, boolean>>>({});
+  const [permissionPages, setPermissionPages] = useState<PermissionPageDef[]>([]);
   const [newSupName, setNewSupName] = useState('');
   const [newSupCity, setNewSupCity] = useState('');
   const [newSupCountry, setNewSupCountry] = useState('');
@@ -1013,24 +1072,35 @@ export function AdminBuyersSuppliersPanel({
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const [u, s, ct] = await Promise.all([
+      const [u, pm] = await Promise.all([
         apiJson<UserRow[]>('/users', { token }),
-        apiJson<SupplierRow[]>('/suppliers', { token }),
-        apiJson<{ list: CommodityTypeRow[] }>('/commodity-types', { token }).catch(() => ({ list: [] as CommodityTypeRow[] })),
+        apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token }).catch(() => null),
       ]);
       setUsers(u);
-      setSuppliers(s);
-      setCommodityTypes(ct.list);
-      try {
-        const p = await apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token });
-        setAvailableRoles(p.roles ?? []);
-      } catch {
+      if (pm) {
+        setAvailableRoles(pm.roles ?? []);
+        setPermissionMatrix(pm.matrix ?? {});
+        setPermissionPages([...(pm.pages ?? [])]);
+      } else {
         setAvailableRoles([...USER_ROLE_OPTIONS]);
+        setPermissionMatrix({});
+        setPermissionPages([]);
+      }
+      if (showBuyerSupplierSections) {
+        const [s, ct] = await Promise.all([
+          apiJson<SupplierRow[]>('/suppliers', { token }),
+          apiJson<{ list: CommodityTypeRow[] }>('/commodity-types', { token }).catch(() => ({ list: [] as CommodityTypeRow[] })),
+        ]);
+        setSuppliers(s);
+        setCommodityTypes(ct.list);
+      } else {
+        setSuppliers([]);
+        setCommodityTypes([]);
       }
     } catch {
       toast.error('Failed to load users/suppliers');
     }
-  }, [token, toast]);
+  }, [token, toast, showBuyerSupplierSections]);
 
   useEffect(() => {
     load();
@@ -1042,6 +1112,38 @@ export function AdminBuyersSuppliersPanel({
     ? users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
     : users;
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
+
+  const serverRoleSet = useMemo(
+    () => new Set(availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS]),
+    [availableRoles]
+  );
+
+  /** Create-user dropdown on Global Supply Admin → Users: SSA roles only. */
+  const globalSupplyCreateRoleOptions = useMemo(() => {
+    if (!globalSupplyUsersMode) return availableRoleOptions;
+    const ordered = GLOBAL_SUPPLY_USERS_TAB_ROLES.filter((r) => serverRoleSet.has(r));
+    return ordered.length > 0 ? ordered : [...GLOBAL_SUPPLY_USERS_TAB_ROLES];
+  }, [globalSupplyUsersMode, availableRoleOptions, serverRoleSet]);
+
+  /** Table role edit: SSA defaults plus current user’s roles if outside that set (so the select stays valid). */
+  const roleOptionsForUserTable = useMemo(() => {
+    if (!globalSupplyUsersMode) return availableRoleOptions;
+    const extras =
+      editUser?.roleNames.filter((r) => !isGlobalSupplyUsersTabRole(r)) ?? [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const r of [...globalSupplyCreateRoleOptions, ...extras]) {
+      if (seen.has(r)) continue;
+      seen.add(r);
+      out.push(r);
+    }
+    return out.length > 0 ? out : [...GLOBAL_SUPPLY_USERS_TAB_ROLES];
+  }, [globalSupplyUsersMode, availableRoleOptions, globalSupplyCreateRoleOptions, editUser?.roleNames, editUser?.id]);
+
+  useEffect(() => {
+    if (!globalSupplyUsersMode) return;
+    setNewUserRole((prev) => (globalSupplyCreateRoleOptions.includes(prev) ? prev : globalSupplyCreateRoleOptions[0] ?? 'Buyer'));
+  }, [globalSupplyUsersMode, globalSupplyCreateRoleOptions]);
 
   const employeeContractorStats = useMemo(() => {
     if (!usersOnlyEmployees) return null;
@@ -1058,6 +1160,12 @@ export function AdminBuyersSuppliersPanel({
       activeContractors,
     };
   }, [users, usersOnlyEmployees]);
+
+  const userTableColSpan = useMemo(() => {
+    if (globalSupplyUsersMode) return 8;
+    if (usersOnlyEmployees) return 10;
+    return 6;
+  }, [globalSupplyUsersMode, usersOnlyEmployees]);
 
   const assign = async () => {
     if (!token || !buyerId || !supplierId) return;
@@ -1142,11 +1250,19 @@ export function AdminBuyersSuppliersPanel({
           lastName: newUserLastName.trim(),
           email: newUserEmail.trim(),
           password: newUserPassword,
-            isEmployee: newUserIsEmployee === 'Yes',
-            isContractor: newUserIsEmployee === 'Contractor',
-          employmentStatus: newUserEmploymentStatus,
-          hourlyRate: newUserHourlyRate.trim() === '' ? null : Number(newUserHourlyRate),
-          currency: newUserCurrency.trim() || null,
+          isEmployee: newUserIsEmployee === 'Yes',
+          isContractor: newUserIsEmployee === 'Contractor',
+          ...(globalSupplyUsersMode
+            ? {
+                employmentStatus: 'Active',
+                hourlyRate: null,
+                currency: null,
+              }
+            : {
+                employmentStatus: newUserEmploymentStatus,
+                hourlyRate: newUserHourlyRate.trim() === '' ? null : Number(newUserHourlyRate),
+                currency: newUserCurrency.trim() || null,
+              }),
           country: newUserCountry.trim() || null,
           roleNames,
         }),
@@ -1316,7 +1432,7 @@ export function AdminBuyersSuppliersPanel({
               <div className="input-group">
                 <label className="input-label">Role</label>
                 <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
-                  {availableRoleOptions.map((r) => (
+                  {(globalSupplyUsersMode ? globalSupplyCreateRoleOptions : availableRoleOptions).map((r) => (
                     <option key={r} value={r}>
                       {formatUserRoleLabel(r)}
                     </option>
@@ -1335,28 +1451,36 @@ export function AdminBuyersSuppliersPanel({
                   <option value="Contractor">Contractor</option>
                 </select>
               </div>
-              <div className="input-group">
-                <label className="input-label">Status</label>
-                <select className="input" value={newUserEmploymentStatus} onChange={(e) => setNewUserEmploymentStatus(e.target.value as 'Active' | 'Inactive')}>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-              <div className="input-group">
-                <label className="input-label">Hourly Rate</label>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={newUserHourlyRate}
-                  onChange={(e) => setNewUserHourlyRate(e.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Currency</label>
-                <input className="input" value={newUserCurrency} onChange={(e) => setNewUserCurrency(e.target.value)} />
-              </div>
+              {!globalSupplyUsersMode && (
+                <>
+                  <div className="input-group">
+                    <label className="input-label">Status</label>
+                    <select
+                      className="input"
+                      value={newUserEmploymentStatus}
+                      onChange={(e) => setNewUserEmploymentStatus(e.target.value as 'Active' | 'Inactive')}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Hourly Rate</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={newUserHourlyRate}
+                      onChange={(e) => setNewUserHourlyRate(e.target.value)}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Currency</label>
+                    <input className="input" value={newUserCurrency} onChange={(e) => setNewUserCurrency(e.target.value)} />
+                  </div>
+                </>
+              )}
               <div className="input-group">
                 <label className="input-label">Country</label>
                 <input className="input" value={newUserCountry} onChange={(e) => setNewUserCountry(e.target.value)} />
@@ -1657,19 +1781,30 @@ export function AdminBuyersSuppliersPanel({
                   <th>Name</th>
                   <th>Email</th>
                   <th>Employee</th>
-                  {usersOnlyEmployees && <th>Status</th>}
-                  {usersOnlyEmployees && <th>Hourly Rate</th>}
-                  {usersOnlyEmployees && <th>Currency</th>}
-                  {usersOnlyEmployees && <th>Country</th>}
-                  <th>Password</th>
-                  <th>Role</th>
+                  {globalSupplyUsersMode ? (
+                    <>
+                      <th>Country</th>
+                      <th>Role</th>
+                      <th>Permissions</th>
+                      <th>Password</th>
+                    </>
+                  ) : (
+                    <>
+                      {usersOnlyEmployees && <th>Status</th>}
+                      {usersOnlyEmployees && <th>Hourly Rate</th>}
+                      {usersOnlyEmployees && <th>Currency</th>}
+                      {usersOnlyEmployees && <th>Country</th>}
+                      <th>Password</th>
+                      <th>Role</th>
+                    </>
+                  )}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={usersOnlyEmployees ? 10 : 6} className="table-empty">
+                    <td colSpan={userTableColSpan} className="table-empty">
                       No users yet.
                     </td>
                   </tr>
@@ -1716,88 +1851,185 @@ export function AdminBuyersSuppliersPanel({
                           'No'
                         )}
                       </td>
-                      {usersOnlyEmployees && (
-                        <td>
-                          {editUser?.id === u.id ? (
-                            <select
-                              className="input"
-                              value={editUser.employmentStatus ?? 'Active'}
-                              onChange={(e) => setEditUser({ ...editUser, employmentStatus: e.target.value as 'Active' | 'Inactive' })}
-                            >
-                              <option value="Active">Active</option>
-                              <option value="Inactive">Inactive</option>
-                            </select>
-                          ) : (
-                            u.employmentStatus ?? 'Active'
-                          )}
-                        </td>
-                      )}
-                      {usersOnlyEmployees && (
-                        <td>
-                          {editUser?.id === u.id ? (
-                            <input
-                              className="input"
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={editUser.hourlyRate ?? ''}
-                              onChange={(e) => setEditUser({ ...editUser, hourlyRate: e.target.value === '' ? null : Number(e.target.value) })}
-                            />
-                          ) : u.hourlyRate != null ? (
-                            u.hourlyRate
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      )}
-                      {usersOnlyEmployees && (
-                        <td>
-                          {editUser?.id === u.id ? (
-                            <input className="input" value={editUser.currency ?? ''} onChange={(e) => setEditUser({ ...editUser, currency: e.target.value })} />
-                          ) : (
-                            u.currency ?? '—'
-                          )}
-                        </td>
-                      )}
-                      {usersOnlyEmployees && (
-                        <td>
-                          {editUser?.id === u.id ? (
-                            <input className="input" value={editUser.country ?? ''} onChange={(e) => setEditUser({ ...editUser, country: e.target.value })} />
-                          ) : (
-                            u.country ?? '—'
-                          )}
-                        </td>
-                      )}
-                      <td style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 'var(--text-xs)' }}>
-                        {editUser?.id === u.id ? (
-                          <input
-                            className="input"
-                            type="password"
-                            placeholder="Leave blank to keep current"
-                            value={editUserPassword}
-                            onChange={(e) => setEditUserPassword(e.target.value)}
-                          />
-                        ) : (
-                          u.passwordPlain ?? '—'
-                        )}
-                      </td>
-                      <td>
-                        {editUser?.id === u.id ? (
-                          <select
-                            className="input"
-                            value={editUser.roleNames[0] ?? 'Viewer'}
-                            onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
+                      {globalSupplyUsersMode ? (
+                        <>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <input
+                                className="input"
+                                value={editUser.country ?? ''}
+                                onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
+                              />
+                            ) : (
+                              u.country ?? '—'
+                            )}
+                          </td>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <select
+                                className="input"
+                                value={
+                                  editUser.roleNames[0] ??
+                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer')
+                                }
+                                onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
+                              >
+                                {roleOptionsForUserTable.map((r) => (
+                                  <option key={r} value={r}>
+                                    {formatUserRoleLabel(r)}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              u.roleNames.map(formatUserRoleLabel).join(', ')
+                            )}
+                          </td>
+                          <td
+                            style={{
+                              fontSize: 'var(--text-xs)',
+                              color: 'var(--color-text-muted)',
+                              maxWidth: 320,
+                              verticalAlign: 'top',
+                            }}
+                            title={summarizeGlobalSupplyPermissions(
+                              editUser?.id === u.id ? editUser.roleNames : u.roleNames,
+                              permissionMatrix,
+                              permissionPages
+                            )}
                           >
-                            {availableRoleOptions.map((r) => (
-                              <option key={r} value={r}>
-                                {formatUserRoleLabel(r)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          u.roleNames.map(formatUserRoleLabel).join(', ')
-                        )}
-                      </td>
+                            {summarizeGlobalSupplyPermissions(
+                              editUser?.id === u.id ? editUser.roleNames : u.roleNames,
+                              permissionMatrix,
+                              permissionPages
+                            )}
+                          </td>
+                          <td
+                            style={{
+                              fontFamily:
+                                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                              fontSize: 'var(--text-xs)',
+                            }}
+                          >
+                            {editUser?.id === u.id ? (
+                              <input
+                                className="input"
+                                type="password"
+                                placeholder="Leave blank to keep current"
+                                value={editUserPassword}
+                                onChange={(e) => setEditUserPassword(e.target.value)}
+                              />
+                            ) : (
+                              u.passwordPlain ?? '—'
+                            )}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {usersOnlyEmployees && (
+                            <td>
+                              {editUser?.id === u.id ? (
+                                <select
+                                  className="input"
+                                  value={editUser.employmentStatus ?? 'Active'}
+                                  onChange={(e) =>
+                                    setEditUser({ ...editUser, employmentStatus: e.target.value as 'Active' | 'Inactive' })
+                                  }
+                                >
+                                  <option value="Active">Active</option>
+                                  <option value="Inactive">Inactive</option>
+                                </select>
+                              ) : (
+                                u.employmentStatus ?? 'Active'
+                              )}
+                            </td>
+                          )}
+                          {usersOnlyEmployees && (
+                            <td>
+                              {editUser?.id === u.id ? (
+                                <input
+                                  className="input"
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={editUser.hourlyRate ?? ''}
+                                  onChange={(e) =>
+                                    setEditUser({ ...editUser, hourlyRate: e.target.value === '' ? null : Number(e.target.value) })
+                                  }
+                                />
+                              ) : u.hourlyRate != null ? (
+                                u.hourlyRate
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          )}
+                          {usersOnlyEmployees && (
+                            <td>
+                              {editUser?.id === u.id ? (
+                                <input
+                                  className="input"
+                                  value={editUser.currency ?? ''}
+                                  onChange={(e) => setEditUser({ ...editUser, currency: e.target.value })}
+                                />
+                              ) : (
+                                u.currency ?? '—'
+                              )}
+                            </td>
+                          )}
+                          {usersOnlyEmployees && (
+                            <td>
+                              {editUser?.id === u.id ? (
+                                <input
+                                  className="input"
+                                  value={editUser.country ?? ''}
+                                  onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
+                                />
+                              ) : (
+                                u.country ?? '—'
+                              )}
+                            </td>
+                          )}
+                          <td
+                            style={{
+                              fontFamily:
+                                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                              fontSize: 'var(--text-xs)',
+                            }}
+                          >
+                            {editUser?.id === u.id ? (
+                              <input
+                                className="input"
+                                type="password"
+                                placeholder="Leave blank to keep current"
+                                value={editUserPassword}
+                                onChange={(e) => setEditUserPassword(e.target.value)}
+                              />
+                            ) : (
+                              u.passwordPlain ?? '—'
+                            )}
+                          </td>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <select
+                                className="input"
+                                value={
+                                  editUser.roleNames[0] ??
+                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer')
+                                }
+                                onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
+                              >
+                                {roleOptionsForUserTable.map((r) => (
+                                  <option key={r} value={r}>
+                                    {formatUserRoleLabel(r)}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              u.roleNames.map(formatUserRoleLabel).join(', ')
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td>
                         {editUser?.id === u.id ? (
                           <>
@@ -1821,7 +2053,12 @@ export function AdminBuyersSuppliersPanel({
                             type="button"
                             className="btn btn-ghost"
                             onClick={() => {
-                              setEditUser({ ...u, roleNames: u.roleNames.length ? [...u.roleNames] : ['Viewer'] });
+                              setEditUser({
+                                ...u,
+                                roleNames: u.roleNames.length
+                                  ? [...u.roleNames]
+                                  : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer'],
+                              });
                               setEditUserPassword('');
                             }}
                             disabled={busy}
@@ -2128,6 +2365,17 @@ export function AdminPermissionsPanel({
     return serverData.pages;
   }, [serverData, scope]);
 
+  const filteredRoles = useMemo(() => {
+    if (!serverData) return [];
+    if (scope === 'globalVendors') {
+      return serverData.roles.filter((r) => !PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES.has(r));
+    }
+    if (scope === 'sentinel') {
+      return serverData.roles.filter((r) => !PERMISSION_MATRIX_SENTINEL_HIDE_ROLES.has(r));
+    }
+    return serverData.roles;
+  }, [serverData, scope]);
+
   return (
     <div className="card">
       <div className="card-body">
@@ -2162,7 +2410,7 @@ export function AdminPermissionsPanel({
                 </tr>
               </thead>
               <tbody>
-                {serverData.roles.map((roleName) => (
+                {filteredRoles.map((roleName) => (
                   <tr key={roleName}>
                     <td>{formatUserRoleLabel(roleName)}</td>
                     {filteredPages.map((p) => (

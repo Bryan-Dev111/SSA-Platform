@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
-import { AdminPermissionsPanel } from '../admin/AdminDay9Panels';
+import { AdminBuyersSuppliersPanel, AdminPermissionsPanel } from '../admin/AdminDay9Panels';
 
 type Tab = 'users' | 'permissions' | 'roles';
 
@@ -74,71 +74,79 @@ export function GlobalVendorsAdmin() {
       </div>
 
       {tab === 'users' && (
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Users</h2>
-            {statsError && (
-              <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
-                {statsError}
-              </div>
-            )}
-            {!stats && !statsError && token && <p className="table-empty">Loading…</p>}
-            {stats && (
-              <div
-                className="dashboard-metric-grid"
-                style={{
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                  marginBottom: '0.75rem',
-                }}
-              >
-                <div className="card metric-card">
-                  <div className="metric-card-label">Employees</div>
-                  <div className="metric-card-value">{stats.employees}</div>
-                  <div
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-muted)',
-                      marginTop: '0.35rem',
-                    }}
-                  >
-                    Active users flagged as employees
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Overview</h2>
+              {statsError && (
+                <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
+                  {statsError}
+                </div>
+              )}
+              {!stats && !statsError && token && <p className="table-empty">Loading…</p>}
+              {stats && (
+                <div
+                  className="dashboard-metric-grid"
+                  style={{
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  <div className="card metric-card">
+                    <div className="metric-card-label">Employees</div>
+                    <div className="metric-card-value">{stats.employees}</div>
+                    <div
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        marginTop: '0.35rem',
+                      }}
+                    >
+                      Active users flagged as employees
+                    </div>
+                  </div>
+                  <div className="card metric-card">
+                    <div className="metric-card-label">Commodity buyers</div>
+                    <div className="metric-card-value">{stats.commodityBuyers}</div>
+                    <div
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        marginTop: '0.35rem',
+                      }}
+                    >
+                      Accounts with role <strong>CommodityBuyer</strong>
+                    </div>
+                  </div>
+                  <div className="card metric-card">
+                    <div className="metric-card-label">Farmers</div>
+                    <div className="metric-card-value">{stats.farmerAccounts}</div>
+                    <div
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        marginTop: '0.35rem',
+                      }}
+                    >
+                      Accounts with role <strong>Farmer</strong> ·{' '}
+                      <strong>{stats.registeredFarms}</strong> registered farm profiles
+                    </div>
                   </div>
                 </div>
-                <div className="card metric-card">
-                  <div className="metric-card-label">Commodity buyers</div>
-                  <div className="metric-card-value">{stats.commodityBuyers}</div>
-                  <div
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-muted)',
-                      marginTop: '0.35rem',
-                    }}
-                  >
-                    Accounts with role <strong>CommodityBuyer</strong>
-                  </div>
-                </div>
-                <div className="card metric-card">
-                  <div className="metric-card-label">Farmers</div>
-                  <div className="metric-card-value">{stats.farmerAccounts}</div>
-                  <div
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-muted)',
-                      marginTop: '0.35rem',
-                    }}
-                  >
-                    Accounts with role <strong>Farmer</strong> ·{' '}
-                    <strong>{stats.registeredFarms}</strong> registered farm profiles
-                  </div>
-                </div>
-              </div>
-            )}
-            <p style={{ marginBottom: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-              Add roles such as <strong>CommodityBuyer</strong> and <strong>Farmer</strong> under main app{' '}
-              <strong>Admin</strong> if they do not exist yet, then assign them to users.
-            </p>
+              )}
+              <p style={{ marginBottom: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Add roles such as <strong>CommodityBuyer</strong> and <strong>Farmer</strong> under main app{' '}
+                <strong>Admin</strong> if they do not exist yet, then assign them to users.
+              </p>
+            </div>
           </div>
-        </div>
+          <AdminBuyersSuppliersPanel
+            token={token}
+            toast={toast}
+            showBuyerSupplierSections={false}
+            globalSupplyUsersMode
+          />
+        </>
       )}
 
       {tab === 'permissions' && (
