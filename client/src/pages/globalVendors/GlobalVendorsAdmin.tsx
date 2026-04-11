@@ -3,9 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { AdminPermissionsPanel } from '../admin/AdminDay9Panels';
-import { GlobalSupplyExpensesSection } from './ExpensesPage';
 
-type Tab = 'users' | 'permissions' | 'expenses' | 'roles';
+type Tab = 'users' | 'permissions' | 'roles';
 
 interface GlobalSupplyStats {
   employees: number;
@@ -42,7 +41,7 @@ export function GlobalVendorsAdmin() {
       <header className="page-header">
         <h1 className="page-title">Admin</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          Sentinel Global Supply — users, permissions, and expenses.
+          Sentinel Global Supply — users and permissions.
         </p>
       </header>
 
@@ -60,7 +59,6 @@ export function GlobalVendorsAdmin() {
           [
             ['users', 'Users'],
             ['permissions', 'Permissions'],
-            ['expenses', 'Expenses'],
             ['roles', 'Roles'],
           ] as const
         ).map(([id, label]) => (
@@ -146,8 +144,6 @@ export function GlobalVendorsAdmin() {
       {tab === 'permissions' && (
         <AdminPermissionsPanel token={token} toast={toast} scope="globalVendors" />
       )}
-
-      {tab === 'expenses' && <GlobalSupplyExpensesSection />}
 
       {tab === 'roles' && (
         <div className="card">
