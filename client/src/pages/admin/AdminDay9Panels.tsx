@@ -218,12 +218,24 @@ function todayDateInputValue(): string {
   return `${y}-${m}-${day}`;
 }
 
-export function AdminExpensesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+export function AdminExpensesPanel({
+  token,
+  toast,
+  projectFilter = null,
+  fixedTypeProject = null,
+}: {
+  token: string | null;
+  toast: ToastApi;
+  /** When set, table and export only include rows with this `project` value (e.g. Global Supply). */
+  projectFilter?: string | null;
+  /** When set, add form locks Type and Project to these values. */
+  fixedTypeProject?: { type: string; project: string } | null;
+}) {
   const [list, setList] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState(false);
-  const [type, setType] = useState('');
+  const [type, setType] = useState(() => fixedTypeProject?.type ?? '');
   const [description, setDescription] = useState('');
-  const [project, setProject] = useState('');
+  const [project, setProject] = useState(() => fixedTypeProject?.project ?? '');
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(todayDateInputValue);
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -245,7 +257,18 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
     expenseDate: '',
     paymentMethod: '',
   });
-  const totalExpenses = useMemo(() => list.reduce((sum, item) => sum + item.amount, 0), [list]);
+  const displayedList = useMemo(
+    () => (projectFilter ? list.filter((r) => r.project === projectFilter) : list),
+    [list, projectFilter]
+  );
+  const totalExpenses = useMemo(() => displayedList.reduce((sum, item) => sum + item.amount, 0), [displayedList]);
+
+  useEffect(() => {
+    if (fixedTypeProject) {
+      setType(fixedTypeProject.type);
+      setProject(fixedTypeProject.project);
+    }
+  }, [fixedTypeProject?.type, fixedTypeProject?.project]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -320,13 +343,9 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
   const add = async () => {
     if (!token) return;
     const amountNum = Number(amount);
-    if (
-      !type.trim() ||
-      !description.trim() ||
-      !project.trim() ||
-      !Number.isFinite(amountNum) ||
-      !expenseDate.trim()
-    ) {
+    const typeVal = (fixedTypeProject ? fixedTypeProject.type : type).trim();
+    const projectVal = (fixedTypeProject ? fixedTypeProject.project : project).trim();
+    if (!typeVal || !description.trim() || !projectVal || !Number.isFinite(amountNum) || !expenseDate.trim()) {
       toast.error('Type, description, project, expense date, and amount are required');
       return;
     }
@@ -336,9 +355,9 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
         token,
         method: 'POST',
         body: JSON.stringify({
-          type: type.trim(),
+          type: typeVal,
           description: description.trim(),
-          project: project.trim(),
+          project: projectVal,
           amount: amountNum,
           expenseDate,
           paymentMethod: paymentMethod.trim(),
@@ -363,9 +382,14 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           }
           toast.error(msg);
           await load();
-          setType('');
+          if (fixedTypeProject) {
+            setType(fixedTypeProject.type);
+            setProject(fixedTypeProject.project);
+          } else {
+            setType('');
+            setProject('');
+          }
           setDescription('');
-          setProject('');
           setAmount('');
           setExpenseDate(todayDateInputValue());
           setPaymentMethod('');
@@ -373,9 +397,14 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           return;
         }
       }
-      setType('');
+      if (fixedTypeProject) {
+        setType(fixedTypeProject.type);
+        setProject(fixedTypeProject.project);
+      } else {
+        setType('');
+        setProject('');
+      }
       setDescription('');
-      setProject('');
       setAmount('');
       setExpenseDate(todayDateInputValue());
       setPaymentMethod('');
@@ -439,11 +468,11 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
   };
 
   const exportExcel = () => {
-    if (list.length === 0) {
+    if (displayedList.length === 0) {
       toast.info('No expenses to export');
       return;
     }
-    const rows: ExportRow[] = list.map((r) => ({
+    const rows: ExportRow[] = displayedList.map((r) => ({
       Type: r.type,
       Description: r.description,
       Project: r.project,
@@ -480,7 +509,12 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
         >
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Type</label>
-            <input className="input" value={type} onChange={(e) => setType(e.target.value)} />
+            <input
+              className="input"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              disabled={!!fixedTypeProject}
+            />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Description</label>
@@ -488,7 +522,12 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Project</label>
-            <input className="input" value={project} onChange={(e) => setProject(e.target.value)} />
+            <input
+              className="input"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              disabled={!!fixedTypeProject}
+            />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Amount</label>
@@ -560,14 +599,14 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
               </tr>
             </thead>
             <tbody>
-              {list.length === 0 ? (
+              {displayedList.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="table-empty">
-                    No expenses yet.
+                    {projectFilter ? 'No expenses for this project yet.' : 'No expenses yet.'}
                   </td>
                 </tr>
               ) : (
-                list.map((row) => (
+                displayedList.map((row) => (
                   <tr key={row.id}>
                     <td>
                       {editId === row.id ? (
@@ -575,6 +614,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
                           className="input"
                           value={editDraft.type}
                           onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
+                          disabled={!!fixedTypeProject}
                         />
                       ) : (
                         row.type
@@ -597,6 +637,7 @@ export function AdminExpensesPanel({ token, toast }: { token: string | null; toa
                           className="input"
                           value={editDraft.project}
                           onChange={(e) => setEditDraft((d) => ({ ...d, project: e.target.value }))}
+                          disabled={!!fixedTypeProject}
                         />
                       ) : (
                         row.project
