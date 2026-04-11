@@ -29,7 +29,6 @@ export function ProductHub() {
           aria-label="Sentinel Supplier Assurance. Open supplier assurance, audits, risk, and related tools."
         >
           <span className="product-hub-panel-title">Sentinel Supplier Assurance</span>
-          <span className="product-hub-panel-hint">Open supplier assurance, audits, risk, and related tools.</span>
         </button>
         <button
           type="button"
@@ -38,7 +37,6 @@ export function ProductHub() {
           aria-label="Sentinel Global Supply. Open global supply workflows."
         >
           <span className="product-hub-panel-title">Sentinel Global Supply</span>
-          <span className="product-hub-panel-hint">Farmer information, approved farmers, and related supply workflows.</span>
         </button>
       </div>
     </div>
