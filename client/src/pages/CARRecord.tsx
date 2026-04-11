@@ -1,6 +1,6 @@
 /**
  * CAR Record: form (Supplier, Audit #, Finding #, Severity, CAR Owner, Target Completion Date,
- * Summary, Defect Code, Discrepancy, Containment, Occurrence/Escape Root Cause, Corrective Action,
+ * Summary, Defect Code, Discrepancy, Containment, Root Cause Code, Occurrence/Escape Root Cause, Corrective Action,
  * VOE, Closing Comments); status history; workflow Save (DRAFT → RCCA), Process, Reverse, Approve, Reject.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -48,6 +48,7 @@ interface CAR {
   discrepancy: string;
   defectCode: string | null;
   containment: string | null;
+  rootCauseCode: string | null;
   occurrenceRootCause: string | null;
   escapeRootCause: string | null;
   correctiveAction: string | null;
@@ -227,6 +228,7 @@ export function CARRecord() {
     discrepancy: '',
     defectCode: '',
     containment: '',
+    rootCauseCode: '',
     occurrenceRootCause: '',
     escapeRootCause: '',
     correctiveAction: '',
@@ -238,6 +240,7 @@ export function CARRecord() {
   const [editMode, setEditMode] = useState(false);
   const [approvalComment, setApprovalComment] = useState('');
   const [defectCodeOptions, setDefectCodeOptions] = useState<ReferenceCodeOption[]>([]);
+  const [rootCauseCodeOptions, setRootCauseCodeOptions] = useState<ReferenceCodeOption[]>([]);
   const [carQuery, setCarQuery] = useState(codeParam ?? '');
   const [createFindingChoice, setCreateFindingChoice] = useState('');
   const [searching, setSearching] = useState(false);
@@ -287,6 +290,7 @@ export function CARRecord() {
       discrepancy: '',
       defectCode: '',
       containment: '',
+      rootCauseCode: '',
       occurrenceRootCause: '',
       escapeRootCause: '',
       correctiveAction: '',
@@ -312,6 +316,7 @@ export function CARRecord() {
       discrepancy: c.discrepancy,
       defectCode: c.defectCode ?? '',
       containment: c.containment ?? '',
+      rootCauseCode: c.rootCauseCode ?? '',
       occurrenceRootCause: c.occurrenceRootCause ?? '',
       escapeRootCause: c.escapeRootCause ?? '',
       correctiveAction: c.correctiveAction ?? '',
@@ -391,6 +396,7 @@ export function CARRecord() {
           discrepancy: c.discrepancy,
           defectCode: c.defectCode ?? '',
           containment: c.containment ?? '',
+          rootCauseCode: c.rootCauseCode ?? '',
           occurrenceRootCause: c.occurrenceRootCause ?? '',
           escapeRootCause: c.escapeRootCause ?? '',
           correctiveAction: c.correctiveAction ?? '',
@@ -419,6 +425,9 @@ export function CARRecord() {
     apiJson<{ list: ReferenceCodeOption[] }>('/defect-codes', { token })
       .then((r) => setDefectCodeOptions(r.list))
       .catch(() => setDefectCodeOptions([]));
+    apiJson<{ list: ReferenceCodeOption[] }>('/car-root-cause-codes', { token })
+      .then((r) => setRootCauseCodeOptions(r.list))
+      .catch(() => setRootCauseCodeOptions([]));
   }, [token]);
 
   useEffect(() => {
@@ -472,6 +481,7 @@ export function CARRecord() {
           discrepancy: form.discrepancy,
           defectCode: form.defectCode || null,
           containment: form.containment || null,
+          rootCauseCode: form.rootCauseCode.trim() || null,
           occurrenceRootCause: form.occurrenceRootCause || null,
           escapeRootCause: form.escapeRootCause || null,
           correctiveAction: form.correctiveAction || null,
@@ -624,6 +634,7 @@ export function CARRecord() {
           discrepancy: form.discrepancy.trim(),
           defectCode: form.defectCode.trim() || null,
           containment: form.containment.trim() || null,
+          rootCauseCode: form.rootCauseCode.trim() || null,
           occurrenceRootCause: form.occurrenceRootCause.trim() || null,
           escapeRootCause: form.escapeRootCause.trim() || null,
           correctiveAction: form.correctiveAction.trim() || null,
@@ -887,6 +898,13 @@ export function CARRecord() {
                 options={defectCodeOptions}
                 disabled={createLocked}
               />
+              <ReferenceCodeSelect
+                label="Root Cause Code"
+                value={form.rootCauseCode}
+                onChange={(v) => setForm((p) => ({ ...p, rootCauseCode: v }))}
+                options={rootCauseCodeOptions}
+                disabled={createLocked}
+              />
               <button type="submit" className="btn btn-primary" disabled={saving || createLocked}>
                 {saving ? 'Saving…' : 'Save'}
               </button>
@@ -1020,6 +1038,13 @@ export function CARRecord() {
                 <label className="input-label">Containment</label>
                 <textarea className="input" rows={2} value={form.containment} onChange={(e) => setForm((p) => ({ ...p, containment: e.target.value }))} disabled={!canEdit} />
               </div>
+              <ReferenceCodeSelect
+                label="Root Cause Code"
+                value={form.rootCauseCode}
+                onChange={(v) => setForm((p) => ({ ...p, rootCauseCode: v }))}
+                options={rootCauseCodeOptions}
+                disabled={!canEdit}
+              />
               <div className="input-group">
                 <label className="input-label">Occurrence Root Cause</label>
                 <textarea className="input" rows={2} value={form.occurrenceRootCause} onChange={(e) => setForm((p) => ({ ...p, occurrenceRootCause: e.target.value }))} disabled={!canEdit} />

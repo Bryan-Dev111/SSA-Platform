@@ -20,6 +20,7 @@ import { LegalAdminEditor } from './admin/LegalAdminEditor';
 type Tab =
   | 'commodity'
   | 'defect'
+  | 'carRootCause'
   | 'disposition'
   | 'auditTypes'
   | 'riskWeights'
@@ -56,6 +57,10 @@ export function Admin() {
   const [newDefect, setNewDefect] = useState({ code: '', name: '' });
   const [editDefect, setEditDefect] = useState<CodeRow | null>(null);
 
+  const [carRootCauses, setCarRootCauses] = useState<CodeRow[]>([]);
+  const [newCarRootCause, setNewCarRootCause] = useState({ code: '', name: '' });
+  const [editCarRootCause, setEditCarRootCause] = useState<CodeRow | null>(null);
+
   const [dispositions, setDispositions] = useState<CodeRow[]>([]);
   const [newDisposition, setNewDisposition] = useState({ code: '', name: '' });
   const [editDisposition, setEditDisposition] = useState<CodeRow | null>(null);
@@ -85,6 +90,17 @@ export function Admin() {
     }
   }, [token, toast]);
 
+  const loadCarRootCauses = useCallback(async () => {
+    if (!token) return;
+    try {
+      const r = await apiJson<{ list: CodeRow[] }>('/car-root-cause-codes?all=1', { token });
+      setCarRootCauses(r.list);
+    } catch {
+      setCarRootCauses([]);
+      toast.error('Failed to load CAR root cause codes');
+    }
+  }, [token, toast]);
+
   const loadDispositions = useCallback(async () => {
     if (!token) return;
     try {
@@ -100,8 +116,9 @@ export function Admin() {
     if (!token) return;
     if (tab === 'commodity') loadCommodities();
     if (tab === 'defect') loadDefects();
+    if (tab === 'carRootCause') loadCarRootCauses();
     if (tab === 'disposition') loadDispositions();
-  }, [token, tab, loadCommodities, loadDefects, loadDispositions]);
+  }, [token, tab, loadCommodities, loadDefects, loadCarRootCauses, loadDispositions]);
 
   const addCommodity = async () => {
     if (!token || !newCommodityName.trim()) return;
@@ -151,12 +168,15 @@ export function Admin() {
           ? `/commodity-types/${target.id}`
           : target.kind === 'defect'
             ? `/defect-codes/${target.id}`
-            : `/disposition-codes/${target.id}`;
+            : target.kind === 'carRootCause'
+              ? `/car-root-cause-codes/${target.id}`
+              : `/disposition-codes/${target.id}`;
       await apiJson(path, { token, method: 'DELETE' });
       toast.success('Deleted');
       setDeleteTarget(null);
       if (target.kind === 'commodity') await loadCommodities();
       if (target.kind === 'defect') await loadDefects();
+      if (target.kind === 'carRootCause') await loadCarRootCauses();
       if (target.kind === 'disposition') await loadDispositions();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Delete failed');
@@ -275,6 +295,70 @@ export function Admin() {
     }
   };
 
+  const addCarRootCause = async () => {
+    if (!token || !newCarRootCause.code.trim()) return;
+    setBusy(true);
+    try {
+      await apiJson('/car-root-cause-codes', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          code: newCarRootCause.code.trim(),
+          name: newCarRootCause.name.trim() || null,
+          active: true,
+        }),
+      });
+      setNewCarRootCause({ code: '', name: '' });
+      toast.success('Root cause code added');
+      await loadCarRootCauses();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Add failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveCarRootCauseEdit = async () => {
+    if (!token || !editCarRootCause || !editCarRootCause.code.trim()) return;
+    setBusy(true);
+    try {
+      await apiJson(`/car-root-cause-codes/${editCarRootCause.id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          code: editCarRootCause.code.trim(),
+          name: editCarRootCause.name?.trim() || null,
+          active: editCarRootCause.active,
+        }),
+      });
+      setEditCarRootCause(null);
+      toast.success('Updated');
+      await loadCarRootCauses();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleCarRootCauseActive = async (row: CodeRow) => {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await apiJson(`/car-root-cause-codes/${row.id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ active: !row.active }),
+      });
+      toast.info(!row.active ? 'Activated' : 'Deactivated');
+      await loadCarRootCauses();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleDispositionActive = async (row: CodeRow) => {
     if (!token) return;
     setBusy(true);
@@ -307,6 +391,7 @@ export function Admin() {
             ['buyersSuppliers', 'Buyers & Suppliers'],
             ['commodity', 'Commodity types'],
             ['defect', 'Defect codes'],
+            ['carRootCause', 'CAR root cause codes'],
             ['disposition', 'Disposition codes'],
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
@@ -557,6 +642,123 @@ export function Admin() {
                                 type="button"
                                 className="btn btn-ghost"
                                 onClick={() => setDeleteTarget({ kind: 'defect', id: row.id, label: row.code })}
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'carRootCause' && (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>CAR root cause codes</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Code</label>
+                <input
+                  className="input"
+                  value={newCarRootCause.code}
+                  onChange={(e) => setNewCarRootCause((p) => ({ ...p, code: e.target.value }))}
+                  placeholder="RCC-001"
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Description</label>
+                <input
+                  className="input"
+                  value={newCarRootCause.name}
+                  onChange={(e) => setNewCarRootCause((p) => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button type="button" className="btn btn-primary" onClick={addCarRootCause} disabled={busy || !newCarRootCause.code.trim()}>
+                  Add
+                </button>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Description</th>
+                    <th>Active</th>
+                    <th style={{ width: 220 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {carRootCauses.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="table-empty">
+                        No CAR root cause codes yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    carRootCauses.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          {editCarRootCause?.id === row.id ? (
+                            <input
+                              className="input"
+                              value={editCarRootCause.code}
+                              onChange={(e) => setEditCarRootCause({ ...editCarRootCause, code: e.target.value })}
+                            />
+                          ) : (
+                            row.code
+                          )}
+                        </td>
+                        <td>
+                          {editCarRootCause?.id === row.id ? (
+                            <input
+                              className="input"
+                              value={editCarRootCause.name ?? ''}
+                              onChange={(e) => setEditCarRootCause({ ...editCarRootCause, name: e.target.value })}
+                            />
+                          ) : (
+                            row.name ?? '—'
+                          )}
+                        </td>
+                        <td>{row.active ? 'Yes' : 'No'}</td>
+                        <td>
+                          {editCarRootCause?.id === row.id ? (
+                            <>
+                              <label style={{ marginRight: 8 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={editCarRootCause.active}
+                                  onChange={(e) => setEditCarRootCause({ ...editCarRootCause, active: e.target.checked })}
+                                />{' '}
+                                Active
+                              </label>
+                              <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveCarRootCauseEdit} disabled={busy}>
+                                Save
+                              </button>
+                              <button type="button" className="btn btn-ghost" onClick={() => setEditCarRootCause(null)}>
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => setEditCarRootCause({ ...row })}>
+                                Edit
+                              </button>
+                              <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => toggleCarRootCauseActive(row)} disabled={busy}>
+                                {row.active ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={() => setDeleteTarget({ kind: 'carRootCause', id: row.id, label: row.code })}
                               >
                                 Delete
                               </button>

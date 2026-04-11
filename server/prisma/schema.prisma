@@ -133,6 +133,16 @@ model DispositionCode {
   updatedAt DateTime @updatedAt
 }
 
+// Admin-managed list; CorrectiveAction.rootCauseCode stores the chosen code string.
+model CarRootCauseCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Supplier {
   id              String    @id @default(cuid())
   code            String    @unique // SUP-00001
@@ -323,6 +333,7 @@ model CorrectiveAction {
   discrepancy                 String
   defectCode                  String?
   containment                 String?
+  rootCauseCode               String?
   occurrenceRootCause         String?
   escapeRootCause             String?
   correctiveAction            String?

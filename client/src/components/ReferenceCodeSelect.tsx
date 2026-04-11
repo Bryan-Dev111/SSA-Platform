@@ -1,5 +1,5 @@
 /**
- * Dropdown for admin-configured reference codes (defect, disposition).
+ * Dropdown for admin-configured reference codes (defect, disposition, CAR root cause).
  * Preserves a value not present in the current list (legacy / inactive codes).
  */
 export interface ReferenceCodeOption {
