@@ -41,6 +41,10 @@ import { PurchaseOrdersPage } from './pages/globalVendors/PurchaseOrdersPage';
 import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { FarmProfilePage } from './pages/globalVendors/FarmProfilePage';
 import { FarmProcessingPage } from './pages/globalVendors/FarmProcessingPage';
+import {
+  GlobalFarmProfilePickerPage,
+  GlobalFarmProcessingPickerPage,
+} from './pages/globalVendors/GlobalFarmSectionPickerPages';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -107,6 +111,22 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/farmers">
                     <FarmersInformationPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farm-profile"
+                element={
+                  <ProtectedRoute path="/global-vendors/farm-profile">
+                    <GlobalFarmProfilePickerPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farm-processing"
+                element={
+                  <ProtectedRoute path="/global-vendors/farm-processing">
+                    <GlobalFarmProcessingPickerPage />
                   </ProtectedRoute>
                 }
               />
