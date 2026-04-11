@@ -21,9 +21,12 @@ type ProcessingImage = {
   fileName: string | null;
 };
 
+/** Four CMS blocks (content + images per section key). No card titles — client request. */
 const PROCESSING_STEPS = [
-  { key: 'ProcessingStep1', title: 'Primary processing' },
-  { key: 'ProcessingStep2', title: 'Secondary processing' },
+  { key: 'ProcessingStep1' },
+  { key: 'ProcessingStep2' },
+  { key: 'ProcessingStep3' },
+  { key: 'ProcessingStep4' },
 ] as const;
 
 type ProcessingStepKey = (typeof PROCESSING_STEPS)[number]['key'];
@@ -274,8 +277,8 @@ export function FarmProcessingPage() {
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Processing overview</h2>
           <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Use the steps below to capture photos and the related description for each processing stage
-            for <strong>{selectedFarm.code}</strong>.
+            Use the sections below to capture photos and a short description for each processing block for{' '}
+            <strong>{selectedFarm.code}</strong>.
           </p>
           <div
             style={{
@@ -365,15 +368,21 @@ export function FarmProcessingPage() {
         </div>
       </div>
 
-      {PROCESSING_STEPS.map((step) => {
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '1rem',
+          alignItems: 'stretch',
+        }}
+      >
+        {PROCESSING_STEPS.map((step) => {
         const stepContent = contentByStep[step.key];
         const stepImages = imagesByStep[step.key];
 
         return (
-          <div className="card" style={{ marginBottom: '1rem' }} key={step.key}>
+          <div className="card" style={{ marginBottom: 0 }} key={step.key}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>{step.title}</h2>
-
               {isAdmin && (
                 <div style={{ marginBottom: '0.75rem' }}>
                   <label className="btn">
@@ -512,6 +521,7 @@ export function FarmProcessingPage() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

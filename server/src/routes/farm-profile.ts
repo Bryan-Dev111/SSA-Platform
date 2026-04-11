@@ -23,8 +23,8 @@ function getFarmProfileClient() {
 }
 
 // Historically this route supported only 'Profile' and 'Processing'.
-// For the processing page we now allow multiple step sections like:
-//   ProcessingStep1, ProcessingStep2, ...
+// For the processing page we allow multiple step sections like:
+//   ProcessingStep1 … ProcessingStep4 (arbitrary string; add keys in client as needed).
 // Prisma stores `section` as a plain String, so we keep it flexible.
 function normalizeSection(raw: unknown): string {
   const v = typeof raw === 'string' ? raw.trim() : '';

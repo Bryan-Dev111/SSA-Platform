@@ -339,22 +339,6 @@ export function FarmProfilePage() {
                       : '—'}
                   </td>
                 </tr>
-                <tr>
-                  <th>Latitude</th>
-                  <td>
-                    {typeof selectedFarm.latitude === 'number'
-                      ? selectedFarm.latitude
-                      : '—'}
-                  </td>
-                </tr>
-                <tr>
-                  <th>Longitude</th>
-                  <td>
-                    {typeof selectedFarm.longitude === 'number'
-                      ? selectedFarm.longitude
-                      : '—'}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
@@ -377,7 +361,7 @@ export function FarmProfilePage() {
               style={{ gap: 12, marginBottom: '1rem' }}
             >
               <label className="field">
-                <span className="field-label">Admin notes / story</span>
+                <span className="field-label">Profile content</span>
                 <textarea
                   className="input"
                   rows={6}
