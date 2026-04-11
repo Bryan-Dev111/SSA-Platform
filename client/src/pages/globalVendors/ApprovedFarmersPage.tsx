@@ -1,5 +1,5 @@
 /**
- * Global Vendors — Approved Farmers list (same data as Farmer Information; columns per spec where fields exist).
+ * Global Vendors — Approved Farmers List (same data as Farmer Information; columns per spec where fields exist).
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -30,7 +30,7 @@ export function ApprovedFarmersPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Farmers</h1>
+          <h1 className="page-title">Approved Farmers List</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -44,7 +44,7 @@ export function ApprovedFarmersPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Farmers</h1>
+          <h1 className="page-title">Approved Farmers List</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -54,7 +54,7 @@ export function ApprovedFarmersPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Approved Farmers</h1>
+        <h1 className="page-title">Approved Farmers List</h1>
       </header>
       <div className="card">
         <div className="table-wrap">

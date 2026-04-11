@@ -28,7 +28,7 @@ const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
   { path: '/global-vendors/farmers', label: 'Farmer Information' },
   { path: '/global-vendors/farm-profile', label: 'Farm profile' },
   { path: '/global-vendors/farm-processing', label: 'Processing & quality' },
-  { path: '/global-vendors/approved', label: 'Approved Farm List' },
+  { path: '/global-vendors/approved', label: 'Approved Farmers List' },
   { path: '/global-vendors/map', label: 'Farms Map' },
   { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
   { path: '/global-vendors/purchase-orders', label: 'Purchase Orders' },
