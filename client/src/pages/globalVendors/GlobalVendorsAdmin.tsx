@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { AdminBuyersSuppliersPanel, AdminPermissionsPanel } from '../admin/AdminDay9Panels';
 
-type Tab = 'users' | 'permissions' | 'roles';
+type Tab = 'users' | 'permissions';
 
 interface GlobalSupplyStats {
   employees: number;
@@ -59,7 +59,6 @@ export function GlobalVendorsAdmin() {
           [
             ['users', 'Users'],
             ['permissions', 'Permissions'],
-            ['roles', 'Roles'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -151,33 +150,6 @@ export function GlobalVendorsAdmin() {
 
       {tab === 'permissions' && (
         <AdminPermissionsPanel token={token} toast={toast} scope="globalVendors" />
-      )}
-
-      {tab === 'roles' && (
-        <div className="card">
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Roles</h2>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-              Global Supply typically uses these role names (create them in main <strong>Admin → Permissions</strong>{' '}
-              if needed):
-            </p>
-            <ul style={{ lineHeight: 1.6, marginBottom: 0 }}>
-              <li>
-                <strong>Admin</strong> — full access including this page
-              </li>
-              <li>
-                <strong>CommodityBuyer</strong> — commodity buyer workflows
-              </li>
-              <li>
-                <strong>Farmer</strong> — farmer-facing access
-              </li>
-              <li>
-                <strong>Employee</strong> — internal employee role (counts toward Employees when combined with the
-                employee flag on user records)
-              </li>
-            </ul>
-          </div>
-        </div>
       )}
     </div>
   );
