@@ -2,6 +2,7 @@
  * Corrective Actions page: stats (Open, Overdue, Waiting Approval, AVG Closure Time),
  * table of CARs, supplier filter. Click CAR code → CAR Record.
  * Pagination, Admin-only delete, status-based row colors.
+ * CAR age distribution counts only open CARs (excludes Closed), matching stats.open.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -186,9 +187,10 @@ export function CorrectiveActions() {
     { label: '90+ days', min: 91, max: Number.POSITIVE_INFINITY },
   ] as const;
   const nowMs = Date.now();
+  const openCarsForAge = useMemo(() => list.filter((c) => c.status !== 'Closed'), [list]);
   const ageBuckets = ageBucketDefs.map((bucket) => ({
     label: bucket.label,
-    count: list.filter((c) => {
+    count: openCarsForAge.filter((c) => {
       const createdMs = new Date(c.createdAt).getTime();
       if (Number.isNaN(createdMs)) return false;
       const ageDays = Math.floor((nowMs - createdMs) / (1000 * 60 * 60 * 24));
@@ -567,9 +569,9 @@ export function CorrectiveActions() {
           {list.length > 0 && (
             <div className="card">
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
                 <div
-                  aria-label="CAR age distribution bar chart"
+                  aria-label="CAR age distribution for open CARs only bar chart"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '40px 1fr',
@@ -588,7 +590,7 @@ export function CorrectiveActions() {
                       transform: 'rotate(180deg)',
                     }}
                   >
-                    Number of CARs
+                    Number of open CARs
                   </div>
                   <div>
                     <div

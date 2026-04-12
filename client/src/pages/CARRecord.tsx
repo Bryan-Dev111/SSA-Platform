@@ -1,5 +1,5 @@
 /**
- * CAR Record: form (Supplier, Audit #, Finding #, Severity, CAR Owner, Target Completion Date,
+ * CAR Record: form (CAR #, Supplier, Audit #, Finding #, Status; then Severity, CAR Owner, Target Completion Date,
  * Summary, Defect Code, Discrepancy, Containment, Root Cause Code, Occurrence/Escape Root Cause, Corrective Action,
  * VOE, Closing Comments); status history; workflow Save (DRAFT → RCCA), Process, Reverse, Approve, Reject.
  */
@@ -943,11 +943,20 @@ export function CARRecord() {
                     <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
                   )}
                 </div>
+                <div className="input-group">
+                  <label className="input-label">Status</label>
+                  <input
+                    className="input"
+                    value={formatCarStatusForDisplay(car.status)}
+                    readOnly
+                    disabled
+                  />
+                </div>
                 <div
                   style={{
                     gridColumn: '1 / -1',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(4, minmax(170px, 1fr)) auto',
+                    gridTemplateColumns: 'repeat(3, minmax(170px, 1fr)) auto',
                     gap: '1rem',
                     alignItems: 'end',
                   }}
@@ -964,15 +973,6 @@ export function CARRecord() {
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Status</label>
-                    <input
-                      className="input"
-                      value={formatCarStatusForDisplay(car.status)}
-                      readOnly
-                      disabled
-                    />
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">CAR Owner</label>
