@@ -30,7 +30,7 @@ export const PATH_ROLES: Record<string, string[]> = {
   '/supplier-list': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/suppliers-map': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   '/records': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
-  '/shipments': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier'],
+  '/shipments': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor'],
   '/documents': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
   '/internal-management': ['Admin', 'QualityManager'],
   '/admin': ['Admin'],

@@ -1,6 +1,7 @@
 /**
  * Supplier scope helpers for data access.
- * Buyer/QE/Auditor: assigned suppliers only; QualityManager/Admin: all suppliers; Supplier: only own data.
+ * Buyer/QE/Auditor: assigned suppliers only; employees/contractors also use EmployeeSupplierAssignment;
+ * QualityManager/Admin: all suppliers; Supplier: only own data.
  */
 import { prisma } from '../lib/prisma';
 
@@ -29,6 +30,15 @@ export async function getAuditorAssignedSupplierIds(userId: string): Promise<str
     select: { supplierId: true },
   });
   return assignments.map((a) => a.supplierId);
+}
+
+/** Employee / contractor → supplier (Internal Management → Employee Assignments). */
+export async function getEmployeeAssignedSupplierIds(userId: string): Promise<string[]> {
+  const rows = await prisma.employeeSupplierAssignment.findMany({
+    where: { employeeId: userId },
+    select: { supplierId: true },
+  });
+  return rows.map((r) => r.supplierId);
 }
 
 /**
@@ -68,17 +78,27 @@ export async function getAllowedSupplierIds(user: {
   id: string;
   supplierId?: string | null;
 }): Promise<string[] | null> {
+  const employeeSupplierIds = await getEmployeeAssignedSupplierIds(user.id);
+  const hasEmployeeAssignments = employeeSupplierIds.length > 0;
+
   if (user.roleNames.includes('Supplier')) {
-    if (user.supplierId) return [user.supplierId];
-    // Supplier role but no Supplier row linked to user — must not see all suppliers (Day 9.5 / security)
+    const own: string[] = user.supplierId ? [user.supplierId] : [];
+    const merged = [...new Set([...own, ...employeeSupplierIds])];
+    if (merged.length > 0) return merged;
     return [];
   }
+
   // Quality Managers oversee all suppliers (e.g. cover for QE); do not restrict to QE buyer/supplier assignments.
   if (user.roleNames.includes('QualityManager')) {
     return null;
   }
+
   const restrictToAssignments =
-    user.roleNames.includes('Buyer') || user.roleNames.includes('QualityEngineer') || user.roleNames.includes('Auditor');
+    user.roleNames.includes('Buyer') ||
+    user.roleNames.includes('QualityEngineer') ||
+    user.roleNames.includes('Auditor');
+
+  let roleSupplierIds: string[] = [];
   if (restrictToAssignments) {
     const [buyerSupplierIds, qeSupplierIdsViaBuyers, auditorSupplierIds] = await Promise.all([
       user.roleNames.includes('Buyer') ? getAssignedSupplierIds(user.id) : Promise.resolve<string[]>([]),
@@ -87,13 +107,16 @@ export async function getAllowedSupplierIds(user: {
         : Promise.resolve<string[]>([]),
       user.roleNames.includes('Auditor') ? getAuditorAssignedSupplierIds(user.id) : Promise.resolve<string[]>([]),
     ]);
-    // Backward compatibility: if QE has not been assigned via qeBuyers yet,
-    // fall back to legacy direct qeSuppliers assignments.
     let qeSupplierIds = qeSupplierIdsViaBuyers;
     if (qeSupplierIdsViaBuyers.length === 0 && user.roleNames.includes('QualityEngineer')) {
       qeSupplierIds = await getQeAssignedSupplierIds(user.id);
     }
-    return [...new Set([...buyerSupplierIds, ...qeSupplierIds, ...auditorSupplierIds])]; // can be [] if no assignments
+    roleSupplierIds = [...new Set([...buyerSupplierIds, ...qeSupplierIds, ...auditorSupplierIds])];
   }
-  return null; // Admin, Viewer, Auditor: no restriction
+
+  if (restrictToAssignments || hasEmployeeAssignments) {
+    return [...new Set([...roleSupplierIds, ...employeeSupplierIds])];
+  }
+
+  return null; // Admin, Viewer (no employee supplier rows): unrestricted supplier list
 }

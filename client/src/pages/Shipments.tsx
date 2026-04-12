@@ -275,6 +275,7 @@ export function Shipments() {
       .then((list) => {
         setSuppliers(list);
         if (isSupplier && list.length === 1) setFilterSupplierId(list[0].id);
+        else if (!isSupplier && list.length === 1) setFilterSupplierId((cur) => cur || list[0].id);
       })
       .catch(() => setSuppliers([]));
   }, [token, isSupplier]);
@@ -403,23 +404,31 @@ export function Shipments() {
         <h1 className="page-title">Shipments</h1>
       </header>
 
-      {!isSupplier && suppliers.length > 0 && (
+      {!isSupplier && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <div className="input-group" style={{ maxWidth: 360, marginBottom: 0 }}>
               <label className="input-label">Filter by supplier</label>
-              <select
-                className="input"
-                value={filterSupplierId}
-                onChange={(e) => setFilterSupplierId(e.target.value)}
-              >
-                <option value="">All in scope</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
-                  </option>
-                ))}
-              </select>
+              {suppliers.length > 0 ? (
+                <select
+                  className="input"
+                  value={filterSupplierId}
+                  onChange={(e) => setFilterSupplierId(e.target.value)}
+                >
+                  <option value="">All in scope</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.code} — {s.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                  No suppliers are linked to your account for shipments. An administrator can assign you to suppliers
+                  in Internal Management → Employee Assignments (employee/contractor → supplier), then sign out and
+                  back in if needed.
+                </p>
+              )}
             </div>
           </div>
         </div>
