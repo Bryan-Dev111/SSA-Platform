@@ -98,7 +98,7 @@ function getMissingRccaProcessLabels(f: {
   const missing: string[] = [];
   if (!f.discrepancy.trim()) missing.push('Discrepancy');
   if (!(f.containment ?? '').trim()) missing.push('Containment');
-  if (!(f.occurrenceRootCause ?? '').trim()) missing.push('Occurrence Root Cause');
+  if (!(f.occurrenceRootCause ?? '').trim()) missing.push('Occurrence details (narrative)');
   if (!(f.escapeRootCause ?? '').trim()) missing.push('Escape Root Cause');
   if (!(f.correctiveAction ?? '').trim()) missing.push('Corrective Action');
   return missing;
@@ -1046,8 +1046,15 @@ export function CARRecord() {
                 disabled={!canEdit}
               />
               <div className="input-group">
-                <label className="input-label">Occurrence Root Cause</label>
-                <textarea className="input" rows={2} value={form.occurrenceRootCause} onChange={(e) => setForm((p) => ({ ...p, occurrenceRootCause: e.target.value }))} disabled={!canEdit} />
+                <label className="input-label">Occurrence details (narrative)</label>
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={form.occurrenceRootCause}
+                  onChange={(e) => setForm((p) => ({ ...p, occurrenceRootCause: e.target.value }))}
+                  disabled={!canEdit}
+                  placeholder="Why it occurred — free text; use Root cause code above for trending."
+                />
               </div>
               <div className="input-group">
                 <label className="input-label">Escape Root Cause</label>

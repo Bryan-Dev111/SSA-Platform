@@ -63,6 +63,7 @@ router.get(
           list: [],
           stats: { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 },
           defectCodeCounts: [],
+          rootCauseCodeCounts: [],
           severityCounts: [
             { severity: 'Critical', count: 0 },
             { severity: 'Major', count: 0 },
@@ -78,6 +79,7 @@ router.get(
           list: [],
           stats: { open: 0, overdue: 0, waitingApproval: 0, avgClosureDays: 0 },
           defectCodeCounts: [],
+          rootCauseCodeCounts: [],
           severityCounts: [
             { severity: 'Critical', count: 0 },
             { severity: 'Major', count: 0 },
@@ -126,6 +128,17 @@ router.get(
       .map(([code, count]) => ({ code, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
+    const rootCauseCodeMap = list
+      .filter((c) => c.rootCauseCode?.trim())
+      .reduce((acc: Record<string, number>, c) => {
+        const code = (c.rootCauseCode as string).trim();
+        if (code) acc[code] = (acc[code] || 0) + 1;
+        return acc;
+      }, {});
+    const rootCauseCodeCounts = Object.entries(rootCauseCodeMap)
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
     const severityCounts = (['Critical', 'Major', 'Minor'] as const).map((severity) => ({
       severity,
       count: list.filter((c) => c.severity === severity).length,
@@ -134,6 +147,7 @@ router.get(
       list,
       stats: { open, overdue, waitingApproval, avgClosureDays },
       defectCodeCounts,
+      rootCauseCodeCounts,
       severityCounts,
     });
   })

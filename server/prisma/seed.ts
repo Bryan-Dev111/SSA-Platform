@@ -162,6 +162,20 @@ async function main() {
   }
   console.log('Disposition codes seeded (3).');
 
+  for (const row of [
+    { code: 'RC-TRN', name: 'Training gap', id: 'seed-car-rc-trn' },
+    { code: 'RC-PRC', name: 'Process not followed', id: 'seed-car-rc-prc' },
+    { code: 'RC-DOC', name: 'Procedure / document unclear', id: 'seed-car-rc-doc' },
+    { code: 'RC-SUP', name: 'Supplier / subcontractor issue', id: 'seed-car-rc-sup' },
+  ]) {
+    await prisma.carRootCauseCode.upsert({
+      where: { code: row.code },
+      update: { name: row.name, active: true },
+      create: { id: row.id, code: row.code, name: row.name, active: true },
+    });
+  }
+  console.log('CAR root cause codes seeded (4).');
+
   // Day 9: default risk weight row (single config)
   const rwCount = await prisma.riskWeightConfig.count();
   if (rwCount === 0) {

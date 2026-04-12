@@ -27,6 +27,8 @@ interface CAR {
   status: string;
   severity: string;
   summary: string;
+  defectCode?: string | null;
+  rootCauseCode?: string | null;
   carOwner: string | null;
   targetCompletionDate: string | null;
   createdAt: string;
@@ -37,6 +39,7 @@ interface CARsResponse {
   list: CAR[];
   stats: { open: number; overdue: number; waitingApproval: number; avgClosureDays: number };
   defectCodeCounts: { code: string; count: number }[];
+  rootCauseCodeCounts: { code: string; count: number }[];
   severityCounts: { severity: string; count: number }[];
 }
 
@@ -74,6 +77,16 @@ export function CorrectiveActions() {
   const defectPareto = defectCodeCounts.map((row, idx) => {
     const cumulative = defectCodeCounts.slice(0, idx + 1).reduce((sum, d) => sum + d.count, 0);
     return { ...row, cumulativePercent: defectTotal > 0 ? Math.round((cumulative / defectTotal) * 100) : 0 };
+  });
+  const rootCauseCodeCounts = useMemo(
+    () => [...(data?.rootCauseCodeCounts ?? [])].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
+    [data?.rootCauseCodeCounts]
+  );
+  const maxRootCauseCount = Math.max(1, ...rootCauseCodeCounts.map((d) => d.count));
+  const rootCauseTotal = rootCauseCodeCounts.reduce((sum, d) => sum + d.count, 0);
+  const rootCausePareto = rootCauseCodeCounts.map((row, idx) => {
+    const cumulative = rootCauseCodeCounts.slice(0, idx + 1).reduce((sum, d) => sum + d.count, 0);
+    return { ...row, cumulativePercent: rootCauseTotal > 0 ? Math.round((cumulative / rootCauseTotal) * 100) : 0 };
   });
   const severityCounts = data?.severityCounts ?? [
     { severity: 'Critical', count: 0 },
@@ -235,6 +248,8 @@ export function CorrectiveActions() {
         Supplier: `${c.supplier.code} — ${c.supplier.name}`,
         Audit: c.audit.code,
         Finding: c.finding?.code ?? 'None',
+        'Defect code': c.defectCode?.trim() ? c.defectCode : '—',
+        'Root cause code': c.rootCauseCode?.trim() ? c.rootCauseCode : '—',
         Severity: c.severity,
         Status: formatCarStatusLabel(c.status),
         Summary: c.summary,
@@ -373,7 +388,7 @@ export function CorrectiveActions() {
         </div>
       </div>
 
-      {(defectCodeCounts.length > 0 || list.length > 0) && (
+      {(defectCodeCounts.length > 0 || rootCauseCodeCounts.length > 0 || list.length > 0) && (
         <div
           style={{
             display: 'grid',
@@ -399,6 +414,34 @@ export function CorrectiveActions() {
                             width: `${(count / maxDefectCount) * 100}%`,
                             height: '100%',
                             background: '#4f46e5',
+                            borderRadius: 4,
+                            minWidth: count > 0 ? 4 : 0,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {rootCauseCodeCounts.length > 0 && (
+            <div className="card">
+              <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Root cause codes Pareto (CARs)</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {rootCausePareto.map(({ code, count, cumulativePercent }) => (
+                    <div key={code}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.5rem' }}>
+                        <span>{code}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{count} ({cumulativePercent}% cumulative)</span>
+                      </div>
+                      <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${(count / maxRootCauseCount) * 100}%`,
+                            height: '100%',
+                            background: '#0d9488',
                             borderRadius: 4,
                             minWidth: count > 0 ? 4 : 0,
                           }}
@@ -618,6 +661,8 @@ export function CorrectiveActions() {
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('finding')}>Finding {sortIndicator('finding')}</th>
+                <th>Defect code</th>
+                <th>Root cause code</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
                 <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
                 <th>Summary</th>
@@ -630,7 +675,7 @@ export function CorrectiveActions() {
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={10 + (isAdmin ? 1 : 0)} className="table-empty">
+                  <td colSpan={12 + (isAdmin ? 1 : 0)} className="table-empty">
                     No CARs in scope (or none past DRAFT yet).
                   </td>
                 </tr>
@@ -668,6 +713,8 @@ export function CorrectiveActions() {
                         <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>None</span>
                       )}
                     </td>
+                    <td style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{c.defectCode?.trim() ? c.defectCode : '—'}</td>
+                    <td style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{c.rootCauseCode?.trim() ? c.rootCauseCode : '—'}</td>
                     <td>{c.severity}</td>
                     <td>
                       <span
