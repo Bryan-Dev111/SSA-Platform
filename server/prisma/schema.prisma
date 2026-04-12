@@ -71,6 +71,7 @@ model User {
   qmQes QualityManagerQe[] @relation("QmQeManagerAssignments")
   qmQeEngineers QualityManagerQe[] @relation("QmQeEngineerAssignments")
   passwordResetTokens PasswordResetToken[]
+  clientHistoriesAsBuyer ClientHistory[] @relation("ClientHistoryBuyer")
 }
 
 /// One-time token for self-service password reset (raw token is emailed; only SHA-256 hash is stored).
@@ -173,6 +174,7 @@ model Supplier {
   riskActions     RiskAction[]
   shipmentSchedules ShipmentSchedule[]
   workLogs        WorkLog[]
+  clientHistories ClientHistory[]
 }
 
 model BuyerSupplier {
@@ -548,10 +550,17 @@ model ClientHistory {
   revenueAmount        Float?
   /// Active or Inactive
   status               String   @default("Active")
+  buyerId              String?
+  buyer                User?     @relation("ClientHistoryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  supplierId           String?
+  supplier             Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   workLogs             WorkLog[]
   laborCosts           LaborCost[]
+
+  @@index([buyerId])
+  @@index([supplierId])
 }
 
 // ============== Risk ==============

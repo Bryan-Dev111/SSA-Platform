@@ -10,6 +10,16 @@ import { getNextCode } from '../services/idGenerator';
 
 const router = Router();
 
+async function userHasBuyerRole(userId: string): Promise<boolean> {
+  const buyerRole = await prisma.role.findFirst({ where: { name: 'Buyer' } });
+  if (!buyerRole) return false;
+  const link = await prisma.userRole.findFirst({
+    where: { userId, roleId: buyerRole.id },
+    select: { userId: true },
+  });
+  return !!link;
+}
+
 function parseRevenueAmount(value: unknown): number | null {
   if (typeof value !== 'string') return null;
   const cleaned = value.replace(/[^0-9.-]/g, '');
@@ -23,9 +33,32 @@ router.use(requirePageAccess('InternalManagement'));
 router.use(requireRole(['Admin', 'QualityManager']));
 
 router.get(
+  '/buyers',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const buyerRole = await prisma.role.findFirst({ where: { name: 'Buyer' } });
+    if (!buyerRole) {
+      res.json([]);
+      return;
+    }
+    const buyers = await prisma.user.findMany({
+      where: { userRoles: { some: { roleId: buyerRole.id } } },
+      select: { id: true, name: true, email: true },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    });
+    res.json(buyers);
+  })
+);
+
+router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-    const list = await prisma.clientHistory.findMany({ orderBy: { updatedAt: 'desc' } });
+    const list = await prisma.clientHistory.findMany({
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        buyer: { select: { id: true, name: true, email: true } },
+        supplier: { select: { id: true, code: true, name: true } },
+      },
+    });
     res.json(list);
   })
 );
@@ -89,6 +122,21 @@ router.post(
     const status = statusRaw.toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
     const projectCode = await getNextCode('PROJ');
     const revenueRaw = typeof body.revenue === 'string' ? body.revenue.trim() : '';
+    const buyerIdRaw = typeof body.buyerId === 'string' ? body.buyerId.trim() : '';
+    const buyerId = buyerIdRaw || null;
+    const supplierIdRaw = typeof body.supplierId === 'string' ? body.supplierId.trim() : '';
+    const supplierId = supplierIdRaw || null;
+    if (buyerId && !(await userHasBuyerRole(buyerId))) {
+      res.status(400).json({ error: 'buyerId must be a user with the Buyer role' });
+      return;
+    }
+    if (supplierId) {
+      const sup = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true } });
+      if (!sup) {
+        res.status(400).json({ error: 'supplierId is invalid' });
+        return;
+      }
+    }
     const row = await prisma.clientHistory.create({
       data: {
         projectCode,
@@ -105,6 +153,12 @@ router.post(
         revenue: revenueRaw || null,
         revenueAmount: parseRevenueAmount(revenueRaw),
         status,
+        buyerId,
+        supplierId,
+      },
+      include: {
+        buyer: { select: { id: true, name: true, email: true } },
+        supplier: { select: { id: true, code: true, name: true } },
       },
     });
     res.status(201).json(row);
@@ -133,6 +187,8 @@ router.patch(
       revenue?: string | null;
       status?: string;
       revenueAmount?: number | null;
+      buyerId?: string | null;
+      supplierId?: string | null;
     } = {};
     if (typeof body.clientName === 'string') data.clientName = body.clientName.trim();
     if (typeof body.companyName === 'string') data.companyName = body.companyName.trim();
@@ -162,6 +218,27 @@ router.patch(
     if (typeof body.status === 'string') {
       data.status = body.status.trim().toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
     }
+    if (body.buyerId !== undefined) {
+      const raw = typeof body.buyerId === 'string' ? body.buyerId.trim() : '';
+      const next = raw || null;
+      if (next && !(await userHasBuyerRole(next))) {
+        res.status(400).json({ error: 'buyerId must be a user with the Buyer role' });
+        return;
+      }
+      data.buyerId = next;
+    }
+    if (body.supplierId !== undefined) {
+      const raw = typeof body.supplierId === 'string' ? body.supplierId.trim() : '';
+      const next = raw || null;
+      if (next) {
+        const sup = await prisma.supplier.findUnique({ where: { id: next }, select: { id: true } });
+        if (!sup) {
+          res.status(400).json({ error: 'supplierId is invalid' });
+          return;
+        }
+      }
+      data.supplierId = next;
+    }
     if (data.clientName !== undefined && !data.clientName) {
       res.status(400).json({ error: 'clientName cannot be empty' });
       return;
@@ -173,6 +250,10 @@ router.patch(
     const row = await prisma.clientHistory.update({
       where: { id },
       data,
+      include: {
+        buyer: { select: { id: true, name: true, email: true } },
+        supplier: { select: { id: true, code: true, name: true } },
+      },
     });
     res.json(row);
   })

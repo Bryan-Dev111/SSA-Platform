@@ -70,6 +70,18 @@ interface ScheduleRow {
   supplier: { id: string; code: string; name: string } | null;
 }
 
+interface ProjectHistoryBuyer {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+interface ProjectHistorySupplier {
+  id: string;
+  code: string;
+  name: string;
+}
+
 interface ProjectHistoryRow {
   id: string;
   projectCode: string;
@@ -84,6 +96,10 @@ interface ProjectHistoryRow {
   revenue: string | null;
   revenueAmount: number | null;
   status: string;
+  buyerId?: string | null;
+  supplierId?: string | null;
+  buyer?: ProjectHistoryBuyer | null;
+  supplier?: ProjectHistorySupplier | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -182,6 +198,9 @@ export function InternalManagement() {
   const [commandMediaDeletingId, setCommandMediaDeletingId] = useState<string | null>(null);
 
   const [projectHistories, setProjectHistories] = useState<ProjectHistoryRow[]>([]);
+  const [buyerOptions, setBuyerOptions] = useState<ProjectHistoryBuyer[]>([]);
+  const [projectHistoryBuyerFilter, setProjectHistoryBuyerFilter] = useState('');
+  const [projectHistorySupplierFilter, setProjectHistorySupplierFilter] = useState('');
   const [clientForm, setClientForm] = useState({
     clientName: '',
     companyName: '',
@@ -193,23 +212,34 @@ export function InternalManagement() {
     periodOfPerformance: '',
     revenue: '',
     status: 'Active' as 'Active' | 'Inactive',
+    buyerId: '',
+    supplierId: '',
   });
   const [projectEditingId, setProjectEditingId] = useState<string | null>(null);
   const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
 
+  const filteredProjectHistories = useMemo(() => {
+    return projectHistories.filter((r) => {
+      if (projectHistoryBuyerFilter && (r.buyerId ?? '') !== projectHistoryBuyerFilter) return false;
+      if (projectHistorySupplierFilter && (r.supplierId ?? '') !== projectHistorySupplierFilter) return false;
+      return true;
+    });
+  }, [projectHistories, projectHistoryBuyerFilter, projectHistorySupplierFilter]);
+
   const projectHistoryRevenueTotal = useMemo(() => {
-    return projectHistories.reduce((sum, r) => {
+    return filteredProjectHistories.reduce((sum, r) => {
       const n = r.revenueAmount;
       return sum + (typeof n === 'number' && Number.isFinite(n) ? n : 0);
     }, 0);
-  }, [projectHistories]);
+  }, [filteredProjectHistories]);
 
   const projectHistoryRevenueNumericCount = useMemo(
     () =>
-      projectHistories.filter((r) => typeof r.revenueAmount === 'number' && Number.isFinite(r.revenueAmount)).length,
-    [projectHistories]
+      filteredProjectHistories.filter((r) => typeof r.revenueAmount === 'number' && Number.isFinite(r.revenueAmount))
+        .length,
+    [filteredProjectHistories]
   );
 
   const profitRowsActive = useMemo(
@@ -232,6 +262,13 @@ export function InternalManagement() {
     apiJson<ProjectHistoryRow[]>('/project-history', { token })
       .then(setProjectHistories)
       .catch(() => setProjectHistories([]));
+  };
+
+  const loadProjectHistoryBuyers = () => {
+    if (!token) return;
+    apiJson<ProjectHistoryBuyer[]>('/project-history/buyers', { token })
+      .then(setBuyerOptions)
+      .catch(() => setBuyerOptions([]));
   };
 
   const loadProfit = () => {
@@ -294,7 +331,10 @@ export function InternalManagement() {
 
   useEffect(() => {
     if (!token || !isAdmin || (tab !== 'projectHistory' && tab !== 'profit')) return;
-    if (tab === 'projectHistory') loadProjectHistories();
+    if (tab === 'projectHistory') {
+      loadProjectHistories();
+      loadProjectHistoryBuyers();
+    }
     if (tab === 'profit') loadProfit();
   }, [token, isAdmin, tab]);
 
@@ -597,6 +637,8 @@ export function InternalManagement() {
       periodOfPerformance: '',
       revenue: '',
       status: 'Active',
+      buyerId: '',
+      supplierId: '',
     });
   };
 
@@ -623,6 +665,8 @@ export function InternalManagement() {
             periodOfPerformance: clientForm.periodOfPerformance.trim() || null,
             revenue: clientForm.revenue.trim() || null,
             status: clientForm.status,
+            buyerId: clientForm.buyerId.trim() || null,
+            supplierId: clientForm.supplierId.trim() || null,
           }),
         });
         toast.success('Project history updated');
@@ -641,6 +685,8 @@ export function InternalManagement() {
             periodOfPerformance: clientForm.periodOfPerformance.trim() || null,
             revenue: clientForm.revenue.trim() || null,
             status: clientForm.status,
+            buyerId: clientForm.buyerId.trim() || null,
+            supplierId: clientForm.supplierId.trim() || null,
           }),
         });
         toast.success('Project history added');
@@ -668,6 +714,8 @@ export function InternalManagement() {
       periodOfPerformance: row.periodOfPerformance ?? '',
       revenue: row.revenue ?? '',
       status: row.status === 'Inactive' ? 'Inactive' : 'Active',
+      buyerId: row.buyerId ?? '',
+      supplierId: row.supplierId ?? '',
     });
   };
 
@@ -1377,6 +1425,36 @@ export function InternalManagement() {
                     </select>
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Buyer</label>
+                    <select
+                      className="input"
+                      value={clientForm.buyerId}
+                      onChange={(e) => setClientForm((p) => ({ ...p, buyerId: e.target.value }))}
+                    >
+                      <option value="">None</option>
+                      {buyerOptions.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {(b.name?.trim() || b.email) ?? b.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Supplier</label>
+                    <select
+                      className="input"
+                      value={clientForm.supplierId}
+                      onChange={(e) => setClientForm((p) => ({ ...p, supplierId: e.target.value }))}
+                    >
+                      <option value="">None</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.code} — {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Period of performance</label>
                     <input
                       className="input"
@@ -1426,9 +1504,16 @@ export function InternalManagement() {
               subtitle={
                 projectHistories.length === 0
                   ? 'No projects yet'
-                  : `${projectHistoryRevenueNumericCount} of ${projectHistories.length} project${
-                      projectHistories.length === 1 ? '' : 's'
-                    } with numeric revenue`
+                  : (() => {
+                      const filteredCount = filteredProjectHistories.length;
+                      const base = `${projectHistoryRevenueNumericCount} of ${filteredCount} visible project${
+                        filteredCount === 1 ? '' : 's'
+                      } with numeric revenue`;
+                      if (projectHistoryBuyerFilter || projectHistorySupplierFilter) {
+                        return `${base} (${projectHistories.length} total in list)`;
+                      }
+                      return base;
+                    })()
               }
             />
           </div>
@@ -1436,9 +1521,51 @@ export function InternalManagement() {
           <div className="card">
             <div className="card-body">
               <h2 style={{ marginTop: 0 }}>Project history</h2>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '0.75rem',
+                  marginBottom: '1rem',
+                  alignItems: 'end',
+                }}
+              >
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Filter by buyer</label>
+                  <select
+                    className="input"
+                    value={projectHistoryBuyerFilter}
+                    onChange={(e) => setProjectHistoryBuyerFilter(e.target.value)}
+                  >
+                    <option value="">All buyers</option>
+                    {buyerOptions.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {(b.name?.trim() || b.email) ?? b.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Filter by supplier</label>
+                  <select
+                    className="input"
+                    value={projectHistorySupplierFilter}
+                    onChange={(e) => setProjectHistorySupplierFilter(e.target.value)}
+                  >
+                    <option value="">All suppliers</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.code} — {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="table-wrap" style={{ overflowX: 'auto' }}>
                 {projectHistories.length === 0 ? (
                   <p className="table-empty">No project records yet.</p>
+                ) : filteredProjectHistories.length === 0 ? (
+                  <p className="table-empty">No projects match the selected filters.</p>
                 ) : (
                   <table className="table">
                     <thead>
@@ -1446,6 +1573,8 @@ export function InternalManagement() {
                         <th>Project</th>
                         <th>Client name</th>
                         <th>Company</th>
+                        <th>Buyer</th>
+                        <th>Supplier</th>
                         <th>Email</th>
                         <th>Mobile</th>
                         <th>Industry</th>
@@ -1458,11 +1587,13 @@ export function InternalManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {projectHistories.map((r) => (
+                      {filteredProjectHistories.map((r) => (
                         <tr key={r.id}>
                           <td>{r.projectCode}</td>
                           <td>{r.clientName}</td>
                           <td>{r.companyName}</td>
+                          <td>{r.buyer ? (r.buyer.name?.trim() || r.buyer.email) : '—'}</td>
+                          <td>{r.supplier ? `${r.supplier.code} — ${r.supplier.name}` : '—'}</td>
                           <td>{r.clientEmail ?? '—'}</td>
                           <td>{r.clientMobile ?? '—'}</td>
                           <td>{r.industry ?? '—'}</td>
