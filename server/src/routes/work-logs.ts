@@ -71,26 +71,19 @@ router.post(
       return;
     }
     const userId = req.user.id;
-    const allowNameForOther = canViewAllWorkLogs(req.user);
     const workDateRaw = typeof req.body?.workDate === 'string' ? req.body.workDate.trim() : '';
     const hoursWorkedRaw = req.body?.hoursWorked;
     const workTypeRaw = typeof req.body?.workType === 'string' ? req.body.workType.trim() : '';
     const supplierId = typeof req.body?.supplierId === 'string' && req.body.supplierId.trim() ? req.body.supplierId.trim() : null;
     const auditId = typeof req.body?.auditId === 'string' && req.body.auditId.trim() ? req.body.auditId.trim() : null;
     const shipmentId = typeof req.body?.shipmentId === 'string' && req.body.shipmentId.trim() ? req.body.shipmentId.trim() : null;
-    const projectHistoryId =
-      typeof req.body?.projectHistoryId === 'string' && req.body.projectHistoryId.trim()
-        ? req.body.projectHistoryId.trim()
-        : null;
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() || null : null;
-    const bodyName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim() : '';
 
     const me = await prisma.user.findUnique({
       where: { id: userId },
       select: { name: true, email: true },
     });
-    const selfLabel = (me?.name?.trim() || me?.email || '').trim();
-    const fullName = allowNameForOther && bodyName ? bodyName : selfLabel;
+    const fullName = (me?.name?.trim() || me?.email || '').trim();
     if (!fullName) {
       res.status(400).json({ error: 'Could not resolve name for this user' });
       return;
@@ -107,14 +100,6 @@ router.post(
     if (!['Audit', 'Inspection', 'Travel', 'Admin', 'Other'].includes(workTypeRaw)) {
       res.status(400).json({ error: 'workType must be one of: Audit, Inspection, Travel, Admin, Other' });
       return;
-    }
-
-    if (projectHistoryId) {
-      const exists = await prisma.clientHistory.findUnique({ where: { id: projectHistoryId }, select: { id: true } });
-      if (!exists) {
-        res.status(400).json({ error: 'projectHistoryId is invalid' });
-        return;
-      }
     }
 
     const workDate = new Date(workDateRaw.slice(0, 10) + 'T12:00:00.000Z');
@@ -134,7 +119,7 @@ router.post(
           supplierId,
           auditId,
           shipmentId,
-          projectHistoryId,
+          projectHistoryId: null,
           description,
           createdById: userId,
         },
@@ -143,7 +128,7 @@ router.post(
         data: {
           code: costCode,
           workLogId: wl.id,
-          projectHistoryId,
+          projectHistoryId: null,
           fullName,
           hours: hoursWorked,
           rate,

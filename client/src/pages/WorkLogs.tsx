@@ -1,6 +1,6 @@
 /**
- * Work Logs — own entries by default; Admin/QM can switch to all entries.
- * Submitting creates a matching Labor Cost row (rate from employee profile when matched by name/email).
+ * Work Logs — own entries by default; Admin/QM can switch to all entries in the tables.
+ * Full name is always taken from the account. Submitting creates a matching Labor Cost row.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -58,29 +58,14 @@ interface ShipmentOption {
   code: string | null;
 }
 
-interface ProjectOption {
-  id: string;
-  projectCode: string;
-  companyName: string;
-}
-
-interface UserOption {
-  id: string;
-  name: string | null;
-  email: string;
-  isEmployee?: boolean;
-}
-
 export function WorkLogs() {
   const { token, user } = useAuth();
   const toast = useToast();
   const [workLogs, setWorkLogs] = useState<WorkLogRow[]>([]);
   const [laborCosts, setLaborCosts] = useState<LaborCostRow[]>([]);
-  const [employees, setEmployees] = useState<Array<{ id: string; label: string }>>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
   const [shipments, setShipments] = useState<ShipmentOption[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -98,22 +83,14 @@ export function WorkLogs() {
   }, [user?.email, user?.name]);
 
   const [form, setForm] = useState({
-    fullName: '',
     workDate: '',
     hoursWorked: '',
     workType: 'Audit' as WorkLogRow['workType'],
     supplierId: '',
     auditId: '',
     shipmentId: '',
-    projectHistoryId: '',
     description: '',
   });
-
-  useEffect(() => {
-    if (!scopeAll || !canViewAll) {
-      setForm((p) => ({ ...p, fullName: selfLabel }));
-    }
-  }, [selfLabel, scopeAll, canViewAll]);
 
   const load = useCallback(() => {
     if (!token) return;
@@ -122,28 +99,16 @@ export function WorkLogs() {
     Promise.all([
       apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
       apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
-      apiJson<UserOption[]>('/users', { token }).catch(() => []),
       apiJson<SupplierOption[]>('/suppliers', { token }).catch(() => []),
       apiJson<AuditOption[]>('/audits', { token }).catch(() => []),
       apiJson<ShipmentOption[]>('/shipments', { token }).catch(() => []),
-      apiJson<ProjectOption[]>('/project-history', { token }).catch(() => []),
     ])
-      .then(([logs, costs, users, supplierRows, auditRows, shipmentRows, projectRows]) => {
+      .then(([logs, costs, supplierRows, auditRows, shipmentRows]) => {
         setWorkLogs(logs);
         setLaborCosts(costs);
-        setEmployees(
-          users
-            .filter((u) => u.isEmployee)
-            .map((u) => ({
-              id: u.id,
-              label: u.name?.trim() || u.email,
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label))
-        );
         setSuppliers(supplierRows);
         setAudits(auditRows);
         setShipments(shipmentRows);
-        setProjects(projectRows);
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
@@ -156,9 +121,8 @@ export function WorkLogs() {
   const createWorkLog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !form.workDate.trim() || !form.hoursWorked.trim()) return;
-    const nameRequired = scopeAll && canViewAll ? form.fullName.trim() : selfLabel;
-    if (!nameRequired) {
-      toast.error('Name is required');
+    if (!selfLabel.trim()) {
+      toast.error('Your account has no name or email; add a name in your profile.');
       return;
     }
     setSubmitting(true);
@@ -168,14 +132,12 @@ export function WorkLogs() {
         token,
         method: 'POST',
         body: JSON.stringify({
-          fullName: scopeAll && canViewAll ? form.fullName.trim() : undefined,
           workDate: form.workDate,
           hoursWorked: Number(form.hoursWorked),
           workType: form.workType,
           supplierId: form.supplierId || null,
           auditId: form.auditId || null,
           shipmentId: form.shipmentId || null,
-          projectHistoryId: form.projectHistoryId || null,
           description: form.description.trim() || null,
         }),
       });
@@ -183,14 +145,12 @@ export function WorkLogs() {
       const costs = await apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []);
       setLaborCosts(costs);
       setForm({
-        fullName: scopeAll && canViewAll ? '' : selfLabel,
         workDate: '',
         hoursWorked: '',
         workType: 'Audit',
         supplierId: '',
         auditId: '',
         shipmentId: '',
-        projectHistoryId: '',
         description: '',
       });
       toast.success('Work log saved — a labor cost line was added automatically.');
@@ -211,8 +171,8 @@ export function WorkLogs() {
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Log time</h2>
           <p style={{ marginTop: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-            Each entry creates a matching row under Labor Costs (Internal Management) using your profile hourly rate when your
-            name matches an employee user.
+            Full name is taken from your account. Each entry creates a matching row under Labor Costs (Internal Management)
+            using your profile hourly rate when your name matches an employee user.
           </p>
           {canViewAll && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: 'var(--text-sm)' }}>
@@ -225,23 +185,7 @@ export function WorkLogs() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Full name</label>
-                {scopeAll && canViewAll ? (
-                  <select
-                    className="input"
-                    value={form.fullName}
-                    onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select employee</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.label}>
-                        {emp.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input className="input" value={selfLabel} readOnly title="Taken from your account" />
-                )}
+                <input className="input" value={selfLabel || '—'} readOnly title="Taken from your account" />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Date</label>
@@ -312,26 +256,11 @@ export function WorkLogs() {
                   ))}
                 </select>
               </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Project</label>
-                <select
-                  className="input"
-                  value={form.projectHistoryId}
-                  onChange={(e) => setForm((p) => ({ ...p, projectHistoryId: e.target.value }))}
-                >
-                  <option value="">None</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.projectCode} — {p.companyName}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="input-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
                 <label className="input-label">Description</label>
                 <input className="input" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
+              <button type="submit" className="btn btn-primary" disabled={submitting || !selfLabel.trim()}>
                 {submitting ? 'Saving…' : 'Save work log'}
               </button>
             </div>
@@ -356,7 +285,6 @@ export function WorkLogs() {
                     <th>Date</th>
                     <th>Hours</th>
                     <th>Type</th>
-                    <th>Project</th>
                     <th>Description</th>
                     <th>Created</th>
                   </tr>
@@ -369,7 +297,6 @@ export function WorkLogs() {
                       <td>{r.workDate?.slice(0, 10) ?? '—'}</td>
                       <td>{r.hoursWorked}</td>
                       <td>{r.workType}</td>
-                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
                       <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description ?? ''}>
                         {r.description?.trim() ? r.description : '—'}
                       </td>
@@ -400,7 +327,6 @@ export function WorkLogs() {
                   <tr>
                     <th>Cost ID</th>
                     <th>Log ID</th>
-                    <th>Project</th>
                     <th>Full name</th>
                     <th>Hours</th>
                     <th>Rate</th>
@@ -413,7 +339,6 @@ export function WorkLogs() {
                     <tr key={r.id}>
                       <td>{r.code}</td>
                       <td>{r.workLog?.code ?? '—'}</td>
-                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
                       <td>{r.fullName}</td>
                       <td>{r.hours}</td>
                       <td>{r.rate}</td>
