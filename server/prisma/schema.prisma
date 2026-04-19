@@ -525,13 +525,17 @@ enum DocumentType {
 }
 
 model InternalDoc {
-  id        String   @id @default(cuid())
-  name      String
-  category  String?
-  note      String?
-  filePath  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String         @id @default(cuid())
+  name             String
+  category         String?
+  note             String?
+  filePath         String?
+  projectHistoryId String?
+  projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([projectHistoryId])
 }
 
 /// Client / engagement records for Internal Management — Client History tab.
@@ -560,6 +564,7 @@ model ClientHistory {
   updatedAt            DateTime @updatedAt
   workLogs             WorkLog[]
   laborCosts           LaborCost[]
+  internalDocs         InternalDoc[]
 
   @@index([buyerId])
   @@index([supplierId])

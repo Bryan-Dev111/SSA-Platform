@@ -35,6 +35,8 @@ interface InternalRow {
   filePath: string | null;
   createdAt: string;
   updatedAt: string;
+  projectHistoryId?: string | null;
+  projectHistory?: { id: string; projectCode: string; companyName: string } | null;
 }
 
 interface SupplierOption {
@@ -131,6 +133,13 @@ function formatProjectPopCell(popStart: string | null, popEnd: string | null): s
   return `${popStart.slice(0, 10)} – ${popEnd.slice(0, 10)}`;
 }
 
+function formatContractProjectCell(r: InternalRow): string {
+  if (r.projectHistory) {
+    return `${r.projectHistory.projectCode} — ${r.projectHistory.companyName}`;
+  }
+  return '—';
+}
+
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -145,6 +154,7 @@ export function InternalManagement() {
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
+  const [contractsProjectId, setContractsProjectId] = useState('');
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -305,7 +315,10 @@ export function InternalManagement() {
     if (
       !token ||
       !isAdmin ||
-      (tab !== 'projectHistory' && tab !== 'profit' && tab !== 'managementAssignments')
+      (tab !== 'projectHistory' &&
+        tab !== 'profit' &&
+        tab !== 'managementAssignments' &&
+        tab !== 'contracts')
     )
       return;
     if (tab === 'projectHistory') {
@@ -314,13 +327,17 @@ export function InternalManagement() {
     }
     if (tab === 'profit') loadProfit();
     if (tab === 'managementAssignments') loadManagementAssignments();
+    if (tab === 'contracts') loadProjectHistories();
   }, [token, isAdmin, tab]);
 
   if (user && !isAdmin) {
     return <Navigate to={getDefaultPath(user.roleNames)} replace />;
   }
 
-  const submit = async (e: React.FormEvent, options?: { categoryOverride?: string | null }) => {
+  const submit = async (
+    e: React.FormEvent,
+    options?: { categoryOverride?: string | null; projectHistoryId?: string | null }
+  ) => {
     e.preventDefault();
     if (!token || !name.trim()) return;
     if (file && file.size > 8 * 1024 * 1024) {
@@ -350,23 +367,28 @@ export function InternalManagement() {
         });
         fileName = file.name;
       }
+      const payload: Record<string, unknown> = {
+        name: name.trim(),
+        category:
+          options?.categoryOverride !== undefined ? options.categoryOverride : category.trim() || null,
+        note: note.trim() || null,
+        ...(fileBase64 ? { fileBase64, fileName } : {}),
+      };
+      if (options && 'projectHistoryId' in options) {
+        payload.projectHistoryId = options.projectHistoryId;
+      }
       await apiJson('/internal-docs', {
         token,
         method: 'POST',
-        body: JSON.stringify({
-          name: name.trim(),
-          category:
-            options?.categoryOverride !== undefined
-              ? options.categoryOverride
-              : category.trim() || null,
-          note: note.trim() || null,
-          ...(fileBase64 ? { fileBase64, fileName } : {}),
-        }),
+        body: JSON.stringify(payload),
       });
       setName('');
       setCategory('');
       setNote('');
       setFile(null);
+      if (options && 'projectHistoryId' in options) {
+        setContractsProjectId('');
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadProgress(null);
       toast.success('Saved');
@@ -891,17 +913,38 @@ export function InternalManagement() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
               <h2 style={{ marginTop: 0 }}>Upload</h2>
-              <form onSubmit={(e) => void submit(e)}>
+              <form
+                onSubmit={(e) =>
+                  void submit(e, { projectHistoryId: contractsProjectId.trim() ? contractsProjectId.trim() : null })
+                }
+              >
                 <div
                   style={{
                     display: 'grid',
                     gridTemplateColumns:
-                      'minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
+                      'minmax(220px, 1.1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
                     gap: '0.75rem',
                     alignItems: 'flex-end',
                     paddingBottom: 22,
                   }}
                 >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Project</label>
+                    <select
+                      className="input"
+                      value={contractsProjectId}
+                      onChange={(e) => setContractsProjectId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {[...projectHistories]
+                        .sort((a, b) => a.projectCode.localeCompare(b.projectCode))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.projectCode} — {p.companyName}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Name *</label>
                     <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -1003,6 +1046,7 @@ export function InternalManagement() {
                   <table className="table">
                     <thead>
                       <tr>
+                        <th>Project</th>
                         <th>Name</th>
                         <th>Type</th>
                         <th>Note</th>
@@ -1014,6 +1058,7 @@ export function InternalManagement() {
                     <tbody>
                       {rows.map((r) => (
                         <tr key={r.id}>
+                          <td>{formatContractProjectCell(r)}</td>
                           <td>{r.name}</td>
                           <td>{r.category ?? '—'}</td>
                           <td>{r.note ?? '—'}</td>
