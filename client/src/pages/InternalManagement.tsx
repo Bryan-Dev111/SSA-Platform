@@ -19,6 +19,12 @@ import { InternalManagementOrgChart } from './InternalManagementOrgChart';
 import { InternalManagementCalendarView } from './InternalManagementCalendar';
 import type { InternalManagementTab as ImTab } from './internalManagementTabs';
 
+interface ProjectHistoryBuyer {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
 interface InternalRow {
   id: string;
   name: string;
@@ -29,6 +35,10 @@ interface InternalRow {
   updatedAt: string;
   projectHistoryId?: string | null;
   projectHistory?: { id: string; projectCode: string; companyName: string } | null;
+  buyerId?: string | null;
+  employeeUserId?: string | null;
+  buyer?: ProjectHistoryBuyer | null;
+  employee?: ProjectHistoryBuyer | null;
 }
 
 interface SupplierOption {
@@ -52,12 +62,6 @@ interface ScheduleRow {
   scheduledDate: string | null;
   notes: string | null;
   supplier: { id: string; code: string; name: string } | null;
-}
-
-interface ProjectHistoryBuyer {
-  id: string;
-  name: string | null;
-  email: string;
 }
 
 interface ProjectHistorySupplier {
@@ -134,6 +138,12 @@ function formatContractProjectCell(r: InternalRow): string {
   return '—';
 }
 
+function formatStaffFullName(u: Pick<ProjectHistoryBuyer, 'name' | 'email'> | null | undefined): string {
+  if (!u) return '—';
+  const n = u.name?.trim();
+  return n || u.email;
+}
+
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
@@ -149,6 +159,9 @@ export function InternalManagement() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [contractsProjectId, setContractsProjectId] = useState('');
+  const [contractsBuyerId, setContractsBuyerId] = useState('');
+  const [contractsEmployeeId, setContractsEmployeeId] = useState('');
+  const [contractEmployeeOptions, setContractEmployeeOptions] = useState<ProjectHistoryBuyer[]>([]);
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -259,6 +272,10 @@ export function InternalManagement() {
       switch (k) {
         case 'project':
           return cmpStr(formatContractProjectCell(a), formatContractProjectCell(b), dir);
+        case 'buyer':
+          return cmpStr(formatStaffFullName(a.buyer), formatStaffFullName(b.buyer), dir);
+        case 'employee':
+          return cmpStr(formatStaffFullName(a.employee), formatStaffFullName(b.employee), dir);
         case 'name':
           return cmpStr(a.name, b.name, dir);
         case 'type':
@@ -399,6 +416,13 @@ export function InternalManagement() {
       .catch(() => setBuyerOptions([]));
   };
 
+  const loadContractEmployees = () => {
+    if (!token) return;
+    apiJson<ProjectHistoryBuyer[]>('/project-history/employees-contractors', { token })
+      .then(setContractEmployeeOptions)
+      .catch(() => setContractEmployeeOptions([]));
+  };
+
   const loadProfit = () => {
     if (!token) return;
     apiJson<ProfitRow[]>('/project-history/profit-summary', { token })
@@ -471,7 +495,11 @@ export function InternalManagement() {
     }
     if (tab === 'profit') loadProfit();
     if (tab === 'managementAssignments') loadManagementAssignments();
-    if (tab === 'contracts') loadProjectHistories();
+    if (tab === 'contracts') {
+      loadProjectHistories();
+      loadProjectHistoryBuyers();
+      loadContractEmployees();
+    }
   }, [token, isAdmin, tab]);
 
   if (user && !isAdmin) {
@@ -480,7 +508,12 @@ export function InternalManagement() {
 
   const submit = async (
     e: React.FormEvent,
-    options?: { categoryOverride?: string | null; projectHistoryId?: string | null }
+    options?: {
+      categoryOverride?: string | null;
+      projectHistoryId?: string | null;
+      buyerId?: string | null;
+      employeeUserId?: string | null;
+    }
   ) => {
     e.preventDefault();
     if (!token || !name.trim()) return;
@@ -521,6 +554,12 @@ export function InternalManagement() {
       if (options && 'projectHistoryId' in options) {
         payload.projectHistoryId = options.projectHistoryId;
       }
+      if (options && 'buyerId' in options) {
+        payload.buyerId = options.buyerId;
+      }
+      if (options && 'employeeUserId' in options) {
+        payload.employeeUserId = options.employeeUserId;
+      }
       await apiJson('/internal-docs', {
         token,
         method: 'POST',
@@ -532,6 +571,8 @@ export function InternalManagement() {
       setFile(null);
       if (options && 'projectHistoryId' in options) {
         setContractsProjectId('');
+        setContractsBuyerId('');
+        setContractsEmployeeId('');
       }
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadProgress(null);
@@ -1131,14 +1172,18 @@ export function InternalManagement() {
               <h2 style={{ marginTop: 0 }}>Upload</h2>
               <form
                 onSubmit={(e) =>
-                  void submit(e, { projectHistoryId: contractsProjectId.trim() ? contractsProjectId.trim() : null })
+                  void submit(e, {
+                    projectHistoryId: contractsProjectId.trim() ? contractsProjectId.trim() : null,
+                    buyerId: contractsBuyerId.trim() ? contractsBuyerId.trim() : null,
+                    employeeUserId: contractsEmployeeId.trim() ? contractsEmployeeId.trim() : null,
+                  })
                 }
               >
                 <div
                   style={{
                     display: 'grid',
                     gridTemplateColumns:
-                      'minmax(220px, 1.1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
+                      'minmax(200px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(160px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
                     gap: '0.75rem',
                     alignItems: 'flex-end',
                     paddingBottom: 22,
@@ -1159,6 +1204,36 @@ export function InternalManagement() {
                             {p.projectCode} — {p.companyName}
                           </option>
                         ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Buyer</label>
+                    <select
+                      className="input"
+                      value={contractsBuyerId}
+                      onChange={(e) => setContractsBuyerId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {buyerOptions.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {formatStaffFullName(b)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Employee</label>
+                    <select
+                      className="input"
+                      value={contractsEmployeeId}
+                      onChange={(e) => setContractsEmployeeId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {contractEmployeeOptions.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {formatStaffFullName(u)}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
@@ -1270,6 +1345,20 @@ export function InternalManagement() {
                           onSort={(col) => setContractSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
+                          label="Buyer"
+                          columnKey="buyer"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Employee"
+                          columnKey="employee"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
                           label="Name"
                           columnKey="name"
                           activeKey={contractSort.key}
@@ -1305,6 +1394,8 @@ export function InternalManagement() {
                       {sortedContractRows.map((r) => (
                         <tr key={r.id}>
                           <td>{formatContractProjectCell(r)}</td>
+                          <td>{formatStaffFullName(r.buyer)}</td>
+                          <td>{formatStaffFullName(r.employee)}</td>
                           <td>{r.name}</td>
                           <td>{r.category ?? '—'}</td>
                           <td>{r.note ?? '—'}</td>

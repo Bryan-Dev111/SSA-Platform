@@ -72,6 +72,8 @@ model User {
   qmQeEngineers QualityManagerQe[] @relation("QmQeEngineerAssignments")
   passwordResetTokens PasswordResetToken[]
   clientHistoriesAsBuyer ClientHistory[] @relation("ClientHistoryBuyer")
+  internalDocsAsBuyer    InternalDoc[]   @relation("InternalDocBuyer")
+  internalDocsAsEmployee InternalDoc[]   @relation("InternalDocEmployee")
   workLogsCreated   WorkLog[]   @relation("WorkLogCreatedBy")
   laborCostsCreated LaborCost[] @relation("LaborCostCreatedBy")
 }
@@ -553,10 +555,16 @@ model InternalDoc {
   filePath         String?
   projectHistoryId String?
   projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
+  buyerId          String?
+  buyer            User?          @relation("InternalDocBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  employeeUserId   String?
+  employee         User?          @relation("InternalDocEmployee", fields: [employeeUserId], references: [id], onDelete: SetNull)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   @@index([projectHistoryId])
+  @@index([buyerId])
+  @@index([employeeUserId])
 }
 
 /// Client / engagement records for Internal Management — Client History tab.

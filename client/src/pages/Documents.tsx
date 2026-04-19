@@ -9,6 +9,7 @@ import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
+import { commandMediaDocumentTypeLabel } from '../constants/commandMedia';
 
 interface DocumentRow {
   id: string;
@@ -28,20 +29,6 @@ interface DocumentApiRow {
   documentType: string;
   filePath: string | null;
   createdAt: string;
-}
-
-const DOC_TYPES: { value: string; label: string }[] = [
-  { value: 'Procedure', label: 'Procedure' },
-  { value: 'Policy', label: 'Policy' },
-  { value: 'QualityManual', label: 'Quality Manual' },
-  { value: 'Standard', label: 'Standard' },
-  { value: 'StandardOperatingProcedure', label: 'SOP' },
-  { value: 'WorkInstruction', label: 'Work Instruction' },
-  { value: 'Form', label: 'Form' },
-];
-
-function typeLabel(t: string): string {
-  return DOC_TYPES.find((d) => d.value === t)?.label ?? t;
 }
 
 export function Documents() {
@@ -65,7 +52,11 @@ export function Documents() {
     list.sort((a, b) => {
       switch (k) {
         case 'type':
-          return cmpStr(typeLabel(a.documentType), typeLabel(b.documentType), dir);
+          return cmpStr(
+            commandMediaDocumentTypeLabel(a.documentType),
+            commandMediaDocumentTypeLabel(b.documentType),
+            dir
+          );
         case 'number':
           return cmpStr(a.documentNumber, b.documentNumber, dir);
         case 'name':
@@ -225,7 +216,7 @@ export function Documents() {
                 <tbody>
                   {paginatedRows.map((r) => (
                     <tr key={r.id}>
-                      <td>{typeLabel(r.documentType)}</td>
+                      <td>{commandMediaDocumentTypeLabel(r.documentType)}</td>
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>

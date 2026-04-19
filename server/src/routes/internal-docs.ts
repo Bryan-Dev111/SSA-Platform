@@ -18,6 +18,60 @@ type ProjectHistoryIdResolved =
   | { skip: true }
   | { skip: false; value: string | null };
 
+const internalDocUserPick = { select: { id: true, name: true, email: true } as const };
+
+async function resolveOptionalBuyerId(
+  body: Record<string, unknown>
+): Promise<{ ok: true; skip: true } | { ok: true; skip: false; value: string | null } | { ok: false; error: string }> {
+  if (!Object.prototype.hasOwnProperty.call(body, 'buyerId')) {
+    return { ok: true, skip: true };
+  }
+  const raw = body.buyerId;
+  if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) {
+    return { ok: true, skip: false, value: null };
+  }
+  if (typeof raw !== 'string') {
+    return { ok: false, error: 'buyerId must be a string or null' };
+  }
+  const id = raw.trim();
+  const buyerRole = await prisma.role.findFirst({ where: { name: 'Buyer' }, select: { id: true } });
+  if (!buyerRole) {
+    return { ok: false, error: 'Buyer role not configured' };
+  }
+  const u = await prisma.user.findFirst({
+    where: { id, userRoles: { some: { roleId: buyerRole.id } } },
+    select: { id: true },
+  });
+  if (!u) {
+    return { ok: false, error: 'buyerId must reference a user with the Buyer role' };
+  }
+  return { ok: true, skip: false, value: id };
+}
+
+async function resolveOptionalEmployeeUserId(
+  body: Record<string, unknown>
+): Promise<{ ok: true; skip: true } | { ok: true; skip: false; value: string | null } | { ok: false; error: string }> {
+  if (!Object.prototype.hasOwnProperty.call(body, 'employeeUserId')) {
+    return { ok: true, skip: true };
+  }
+  const raw = body.employeeUserId;
+  if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) {
+    return { ok: true, skip: false, value: null };
+  }
+  if (typeof raw !== 'string') {
+    return { ok: false, error: 'employeeUserId must be a string or null' };
+  }
+  const id = raw.trim();
+  const u = await prisma.user.findFirst({
+    where: { id, OR: [{ isEmployee: true }, { isContractor: true }] },
+    select: { id: true },
+  });
+  if (!u) {
+    return { ok: false, error: 'employeeUserId must reference an employee or contractor user' };
+  }
+  return { ok: true, skip: false, value: id };
+}
+
 async function resolveProjectHistoryId(
   body: Record<string, unknown> | null | undefined
 ): Promise<{ ok: true } & ProjectHistoryIdResolved | { ok: false; error: string }> {
@@ -48,6 +102,8 @@ router.get(
       orderBy: { updatedAt: 'desc' },
       include: {
         projectHistory: { select: { id: true, projectCode: true, companyName: true } },
+        buyer: internalDocUserPick,
+        employee: internalDocUserPick,
       },
     });
     res.json(list);
@@ -94,6 +150,16 @@ router.post(
       res.status(400).json({ error: projRes.error });
       return;
     }
+    const buyerRes = await resolveOptionalBuyerId(req.body as Record<string, unknown>);
+    if (!buyerRes.ok) {
+      res.status(400).json({ error: buyerRes.error });
+      return;
+    }
+    const empRes = await resolveOptionalEmployeeUserId(req.body as Record<string, unknown>);
+    if (!empRes.ok) {
+      res.status(400).json({ error: empRes.error });
+      return;
+    }
     let filePath: string | null = null;
     if (fileBase64Raw) {
       try {
@@ -110,14 +176,24 @@ router.post(
       note: string | null;
       filePath: string | null;
       projectHistoryId?: string | null;
+      buyerId?: string | null;
+      employeeUserId?: string | null;
     } = { name, category, note, filePath };
     if (!projRes.skip) {
       createData.projectHistoryId = projRes.value;
+    }
+    if (!buyerRes.skip) {
+      createData.buyerId = buyerRes.value;
+    }
+    if (!empRes.skip) {
+      createData.employeeUserId = empRes.value;
     }
     const created = await prisma.internalDoc.create({
       data: createData,
       include: {
         projectHistory: { select: { id: true, projectCode: true, companyName: true } },
+        buyer: internalDocUserPick,
+        employee: internalDocUserPick,
       },
     });
     res.status(201).json(created);
@@ -139,6 +215,8 @@ router.patch(
       note?: string | null;
       filePath?: string | null;
       projectHistoryId?: string | null;
+      buyerId?: string | null;
+      employeeUserId?: string | null;
     } = {};
     if (typeof req.body?.name === 'string') data.name = req.body.name.trim();
     if (typeof req.body?.category === 'string') data.category = req.body.category.trim() || null;
@@ -151,6 +229,26 @@ router.patch(
       }
       if (!projRes.skip) {
         data.projectHistoryId = projRes.value;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'buyerId')) {
+      const buyerRes = await resolveOptionalBuyerId(req.body as Record<string, unknown>);
+      if (!buyerRes.ok) {
+        res.status(400).json({ error: buyerRes.error });
+        return;
+      }
+      if (!buyerRes.skip) {
+        data.buyerId = buyerRes.value;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'employeeUserId')) {
+      const empRes = await resolveOptionalEmployeeUserId(req.body as Record<string, unknown>);
+      if (!empRes.ok) {
+        res.status(400).json({ error: empRes.error });
+        return;
+      }
+      if (!empRes.skip) {
+        data.employeeUserId = empRes.value;
       }
     }
     const fileBase64Raw =
@@ -176,6 +274,8 @@ router.patch(
       data,
       include: {
         projectHistory: { select: { id: true, projectCode: true, companyName: true } },
+        buyer: internalDocUserPick,
+        employee: internalDocUserPick,
       },
     });
     res.json(updated);

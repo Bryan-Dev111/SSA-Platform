@@ -147,6 +147,22 @@ router.get(
   })
 );
 
+/** Active employees and contractors (for Internal Management — Contracts). */
+router.get(
+  '/employees-contractors',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [{ isEmployee: true }, { isContractor: true }],
+        employmentStatus: 'Active',
+      },
+      select: { id: true, name: true, email: true },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    });
+    res.json(users);
+  })
+);
+
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {

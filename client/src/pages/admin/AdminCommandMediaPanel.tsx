@@ -7,18 +7,12 @@ import { parseApiError, downloadWithAuthProgress } from '../../utils/apiHelpers'
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { SortableTh } from '../../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../../utils/tableSort';
+import {
+  COMMAND_MEDIA_DOCUMENT_TYPES,
+  commandMediaDocumentTypeLabel,
+} from '../../constants/commandMedia';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-const COMMAND_MEDIA_TYPES: { value: string; label: string }[] = [
-  { value: 'Procedure', label: 'Procedure' },
-  { value: 'Policy', label: 'Policy' },
-  { value: 'QualityManual', label: 'Quality Manual' },
-  { value: 'Standard', label: 'Standard' },
-  { value: 'StandardOperatingProcedure', label: 'SOP' },
-  { value: 'WorkInstruction', label: 'Work Instruction' },
-  { value: 'Form', label: 'Form' },
-];
 
 interface CommandMediaApiRow {
   id: string;
@@ -38,10 +32,6 @@ interface CommandMediaRow {
   documentType: string;
   filePath: string | null;
   createdAt: string;
-}
-
-function commandMediaTypeLabel(t: string): string {
-  return COMMAND_MEDIA_TYPES.find((d) => d.value === t)?.label ?? t;
 }
 
 interface ToastApi {
@@ -78,7 +68,11 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
     list.sort((a, b) => {
       switch (k) {
         case 'type':
-          return cmpStr(commandMediaTypeLabel(a.documentType), commandMediaTypeLabel(b.documentType), dir);
+          return cmpStr(
+            commandMediaDocumentTypeLabel(a.documentType),
+            commandMediaDocumentTypeLabel(b.documentType),
+            dir
+          );
         case 'number':
           return cmpStr(a.documentNumber, b.documentNumber, dir);
         case 'name':
@@ -225,7 +219,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                   value={form.documentType}
                   onChange={(e) => setForm((p) => ({ ...p, documentType: e.target.value }))}
                 >
-                  {COMMAND_MEDIA_TYPES.map((t) => (
+                  {COMMAND_MEDIA_DOCUMENT_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
                     </option>
@@ -328,7 +322,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                 <tbody>
                   {displayRows.map((r) => (
                     <tr key={r.id}>
-                      <td>{commandMediaTypeLabel(r.documentType)}</td>
+                      <td>{commandMediaDocumentTypeLabel(r.documentType)}</td>
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>
