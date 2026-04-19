@@ -1909,7 +1909,8 @@ export function InternalManagement() {
             <div className="card-body">
               <h2 style={{ marginTop: 0 }}>Profit by project (Active)</h2>
               <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Active projects only so totals are not mixed with completed or inactive work.
+                Active projects only so totals are not mixed with completed or inactive work. Costs include labor tied to each project with status{' '}
+                <strong>Paid</strong> only (pending or rejected labor lines are not deducted).
               </p>
               <div className="table-wrap" style={{ overflowX: 'auto' }}>
                 {profitRows.length === 0 ? (
@@ -1949,6 +1950,9 @@ export function InternalManagement() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
               <h2 style={{ marginTop: 0 }}>Inactive projects</h2>
+              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Same cost rule as above: only <strong>Paid</strong> labor costs reduce profit.
+              </p>
 
               <div
                 style={{

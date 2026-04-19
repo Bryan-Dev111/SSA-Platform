@@ -181,7 +181,8 @@ router.get(
       prisma.laborCost.groupBy({
         by: ['projectHistoryId'],
         _sum: { totalCost: true },
-        where: { projectHistoryId: { not: null } },
+        /** Profit deducts only labor costs approved in Labor Costs (Paid). Pending/Rejected excluded. */
+        where: { projectHistoryId: { not: null }, paidStatus: 'Paid' },
       }),
     ]);
     const costByProjectId = new Map(
