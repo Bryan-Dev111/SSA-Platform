@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma';
 import { getPathRolesMatrix } from '../lib/permissions';
 import { getNextCode } from '../services/idGenerator';
 import { buildSupplierMonthlyTrends } from '../services/supplierMonthlyTrends';
+import { computeAndStoreRiskSnapshot } from '../services/riskScoring';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.get(
     }
     const sid = supplier.id;
     const now = new Date();
+    await computeAndStoreRiskSnapshot(sid);
     const [
       buyerLinks,
       audits,

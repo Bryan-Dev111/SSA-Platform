@@ -881,6 +881,8 @@ model Sample {
   crop      String?
   shipmentAddress String?
   notes     String?
+  /// Calendar date the sample was sent (user-selected).
+  sentDate  DateTime? @db.Date
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   notesFilePath String?
@@ -889,6 +891,7 @@ model Sample {
 
   @@index([code])
   @@index([farmId])
+  @@index([sentDate])
 }
 
 model Expense {

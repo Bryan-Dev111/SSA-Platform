@@ -63,6 +63,20 @@ router.post(
         ? req.body.notes.trim() || null
         : null;
 
+    const sentDateRaw =
+      typeof req.body?.sentDate === 'string' ? req.body.sentDate.trim() : '';
+    let sentDate: Date | undefined;
+    if (!sentDateRaw || !/^\d{4}-\d{2}-\d{2}$/.test(sentDateRaw)) {
+      res.status(400).json({ error: 'sentDate is required (YYYY-MM-DD)' });
+      return;
+    }
+    const parsed = new Date(`${sentDateRaw}T12:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      res.status(400).json({ error: 'Invalid sentDate' });
+      return;
+    }
+    sentDate = parsed;
+
     if (!buyerName) {
       res.status(400).json({ error: 'buyerName is required' });
       return;
@@ -108,6 +122,7 @@ router.post(
         crop,
         shipmentAddress,
         notes,
+        sentDate,
         notesFilePath,
         notesFileName,
         notesFileMime,

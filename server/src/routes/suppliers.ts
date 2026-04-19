@@ -9,6 +9,7 @@ import { requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
 import { buildSupplierMonthlyTrends } from '../services/supplierMonthlyTrends';
+import { computeAndStoreRiskSnapshot } from '../services/riskScoring';
 import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
@@ -398,6 +399,7 @@ router.get(
       return;
     }
     const now = new Date();
+    await computeAndStoreRiskSnapshot(supplierId);
     const [
       buyerLinks,
       audits,

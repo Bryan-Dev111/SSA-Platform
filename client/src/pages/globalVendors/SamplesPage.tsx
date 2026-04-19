@@ -16,6 +16,7 @@ type SampleRow = {
   crop: string | null;
   shipmentAddress: string | null;
   notes: string | null;
+  sentDate: string | null;
   createdAt: string;
   updatedAt: string;
   farm: {
@@ -45,6 +46,7 @@ export function SamplesPage() {
   const [shipmentAddress, setShipmentAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [notesFile, setNotesFile] = useState<File | null>(null);
+  const [sentDate, setSentDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
@@ -80,6 +82,7 @@ export function SamplesPage() {
     setShipmentAddress('');
     setNotes('');
     setNotesFile(null);
+    setSentDate(new Date().toISOString().slice(0, 10));
   };
 
   const submit = async (e: FormEvent) => {
@@ -94,6 +97,7 @@ export function SamplesPage() {
       if (crop) form.append('crop', crop);
       if (shipmentAddress) form.append('shipmentAddress', shipmentAddress);
       if (notes) form.append('notes', notes);
+      form.append('sentDate', sentDate);
       if (notesFile) form.append('notesFile', notesFile);
 
       await apiFetch('/samples', {
@@ -195,7 +199,7 @@ export function SamplesPage() {
             <tbody>
               {samples.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={11} className="table-empty">
                     No samples yet. Use <strong>Add sample</strong> to create
                     one.
                   </td>
@@ -209,11 +213,13 @@ export function SamplesPage() {
                     <td>{s.buyerName}</td>
                     <td>{s.buyerEmail ?? '—'}</td>
                     <td>
-                      {new Date(s.createdAt).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {s.sentDate
+                        ? new Date(s.sentDate).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : '—'}
                     </td>
                     <td>{s.farm ? s.farm.code : '—'}</td>
                     <td>{s.farm ? s.farm.farmName : '—'}</td>
@@ -229,13 +235,6 @@ export function SamplesPage() {
                           None
                         </span>
                       )}
-                    </td>
-                    <td>
-                      {new Date(s.createdAt).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
                     </td>
                   </tr>
                 ))
@@ -283,6 +282,16 @@ export function SamplesPage() {
                   type="email"
                   value={buyerEmail}
                   onChange={(e) => setBuyerEmail(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Date sample was sent</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={sentDate}
+                  onChange={(e) => setSentDate(e.target.value)}
+                  required
                 />
               </label>
               <label className="field">
