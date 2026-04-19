@@ -13,7 +13,7 @@ interface LaborCostRow {
   hours: number;
   rate: number;
   totalCost: number;
-  paidStatus: 'Pending' | 'Paid';
+  paidStatus: 'Pending' | 'Paid' | 'Rejected';
   createdAt: string;
 }
 
@@ -53,6 +53,7 @@ export function AdminLaborCostsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [patchingId, setPatchingId] = useState<string | null>(null);
   const [employeeRateByName, setEmployeeRateByName] = useState<Record<string, number>>({});
   const [form, setForm] = useState({
     workLogId: '',
@@ -60,7 +61,7 @@ export function AdminLaborCostsPanel({
     fullName: '',
     hours: '',
     rate: '',
-    paidStatus: 'Pending' as 'Pending' | 'Paid',
+    paidStatus: 'Pending' as 'Pending' | 'Paid' | 'Rejected',
   });
 
   const qs = listScope === 'all' ? '?scope=all' : '';
@@ -140,6 +141,24 @@ export function AdminLaborCostsPanel({
     }
   };
 
+  const patchPaidStatus = async (id: string, paidStatus: 'Paid' | 'Rejected') => {
+    if (!token) return;
+    setPatchingId(id);
+    setError(null);
+    try {
+      const updated = await apiJson<LaborCostRow>(`/labor-costs/${encodeURIComponent(id)}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ paidStatus }),
+      });
+      setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setPatchingId(null);
+    }
+  };
+
   return (
     <div className="card">
       <div className="card-body">
@@ -179,9 +198,24 @@ export function AdminLaborCostsPanel({
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">Paid Status</label>
-              <select className="input" value={form.paidStatus} onChange={(e) => setForm((p) => ({ ...p, paidStatus: e.target.value === 'Paid' ? 'Paid' : 'Pending' }))}>
+              <select
+                className="input"
+                value={form.paidStatus}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    paidStatus:
+                      e.target.value === 'Paid'
+                        ? 'Paid'
+                        : e.target.value === 'Rejected'
+                          ? 'Rejected'
+                          : 'Pending',
+                  }))
+                }
+              >
                 <option value="Pending">Pending</option>
                 <option value="Paid">Paid</option>
+                <option value="Rejected">Rejected</option>
               </select>
             </div>
             <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create Cost'}</button>
@@ -204,6 +238,7 @@ export function AdminLaborCostsPanel({
                   <th>Rate</th>
                   <th>Total Cost</th>
                   <th>Paid Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,6 +252,30 @@ export function AdminLaborCostsPanel({
                     <td>{r.rate}</td>
                     <td>{r.totalCost}</td>
                     <td>{r.paidStatus}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {r.paidStatus === 'Pending' ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            disabled={patchingId === r.id}
+                            onClick={() => patchPaidStatus(r.id, 'Paid')}
+                          >
+                            {patchingId === r.id ? '…' : 'Mark paid'}
+                          </button>{' '}
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-ghost"
+                            disabled={patchingId === r.id}
+                            onClick={() => patchPaidStatus(r.id, 'Rejected')}
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -38,7 +38,7 @@ interface LaborCostRow {
   hours: number;
   rate: number;
   totalCost: number;
-  paidStatus: 'Pending' | 'Paid';
+  paidStatus: 'Pending' | 'Paid' | 'Rejected';
   createdAt: string;
 }
 

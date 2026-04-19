@@ -441,6 +441,7 @@ model LaborCost {
 enum PaidStatus {
   Pending
   Paid
+  Rejected
 }
 
 enum WorkType {

@@ -75,7 +75,8 @@ router.post(
       return;
     }
 
-    const paidStatus = paidStatusRaw === 'Paid' ? 'Paid' : 'Pending';
+    const paidStatus: PaidStatus =
+      paidStatusRaw === 'Paid' ? 'Paid' : paidStatusRaw === 'Rejected' ? 'Rejected' : 'Pending';
     let workLogProjectHistoryId: string | null = null;
     if (workLogId) {
       const workLog = await prisma.workLog.findUnique({
@@ -118,6 +119,52 @@ router.post(
       },
     });
     res.status(201).json(created);
+  })
+);
+
+/** Set payment outcome for a pending labor cost (Internal Management only). */
+router.patch(
+  '/:id',
+  requirePageAccess('InternalManagement'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const id = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    const raw = typeof req.body?.paidStatus === 'string' ? req.body.paidStatus.trim() : '';
+    if (raw !== 'Paid' && raw !== 'Rejected') {
+      res.status(400).json({ error: 'paidStatus must be Paid or Rejected' });
+      return;
+    }
+
+    const existing = await prisma.laborCost.findUnique({
+      where: { id },
+      select: { id: true, paidStatus: true },
+    });
+    if (!existing) {
+      res.status(404).json({ error: 'Labor cost not found' });
+      return;
+    }
+    if (existing.paidStatus !== 'Pending') {
+      res.status(400).json({ error: 'Only pending labor costs can be marked paid or rejected' });
+      return;
+    }
+
+    const updated = await prisma.laborCost.update({
+      where: { id },
+      data: { paidStatus: raw as PaidStatus },
+      include: {
+        workLog: { select: { id: true, code: true, projectHistoryId: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+    res.json(updated);
   })
 );
 
