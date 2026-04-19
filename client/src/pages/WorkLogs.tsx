@@ -18,9 +18,19 @@ interface WorkLogRow {
   supplierId: string | null;
   supplier: { id: string; code: string; name: string } | null;
   auditId: string | null;
-  audit: { id: string; code: string } | null;
+  audit: {
+    id: string;
+    code: string;
+    projectHistoryId?: string | null;
+    projectHistory?: { id: string; projectCode: string } | null;
+  } | null;
   shipmentId: string | null;
-  shipment: { id: string; code: string | null } | null;
+  shipment: {
+    id: string;
+    code: string | null;
+    projectHistory?: { id: string; projectCode: string } | null;
+    resolvedProjectHistory?: { id: string; projectCode: string } | null;
+  } | null;
   projectHistoryId: string | null;
   projectHistory: { id: string; projectCode: string } | null;
   description: string | null;
@@ -51,11 +61,20 @@ interface SupplierOption {
 interface AuditOption {
   id: string;
   code: string;
+  projectHistoryId?: string | null;
+  projectHistory?: { id: string; projectCode: string } | null;
 }
 
 interface ShipmentOption {
   id: string;
   code: string | null;
+  projectHistory?: { id: string; projectCode: string } | null;
+  resolvedProjectHistory?: { id: string; projectCode: string } | null;
+}
+
+interface EmployeeRatePreview {
+  hourlyRate: number;
+  currency: string | null;
 }
 
 export function WorkLogs() {
@@ -66,6 +85,7 @@ export function WorkLogs() {
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
   const [shipments, setShipments] = useState<ShipmentOption[]>([]);
+  const [employeeRatePreview, setEmployeeRatePreview] = useState<EmployeeRatePreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -92,6 +112,27 @@ export function WorkLogs() {
     description: '',
   });
 
+  const previewTotalCost = useMemo(() => {
+    const raw = form.hoursWorked.trim();
+    if (!raw || employeeRatePreview === null) return null;
+    const hoursNum = Number(raw);
+    if (!Number.isFinite(hoursNum) || hoursNum < 0) return null;
+    return hoursNum * employeeRatePreview.hourlyRate;
+  }, [form.hoursWorked, employeeRatePreview]);
+
+  const derivedProjectLabel = useMemo(() => {
+    if (form.auditId) {
+      const a = audits.find((x) => x.id === form.auditId);
+      return a?.projectHistory?.projectCode ?? '—';
+    }
+    if (form.shipmentId) {
+      const s = shipments.find((x) => x.id === form.shipmentId);
+      const ph = s?.projectHistory ?? s?.resolvedProjectHistory;
+      return ph?.projectCode ?? '—';
+    }
+    return '—';
+  }, [form.auditId, form.shipmentId, audits, shipments]);
+
   const load = useCallback(() => {
     if (!token) return;
     setLoading(true);
@@ -102,13 +143,18 @@ export function WorkLogs() {
       apiJson<SupplierOption[]>('/suppliers', { token }).catch(() => []),
       apiJson<AuditOption[]>('/audits', { token }).catch(() => []),
       apiJson<ShipmentOption[]>('/shipments', { token }).catch(() => []),
+      apiJson<EmployeeRatePreview>('/work-logs/preview-rate', { token }).catch(() => ({
+        hourlyRate: 0,
+        currency: null,
+      })),
     ])
-      .then(([logs, costs, supplierRows, auditRows, shipmentRows]) => {
+      .then(([logs, costs, supplierRows, auditRows, shipmentRows, ratePreview]) => {
         setWorkLogs(logs);
         setLaborCosts(costs);
         setSuppliers(supplierRows);
         setAudits(auditRows);
         setShipments(shipmentRows);
+        setEmployeeRatePreview(ratePreview);
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
@@ -171,8 +217,9 @@ export function WorkLogs() {
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Log time</h2>
           <p style={{ marginTop: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-            Full name is taken from your account. Each entry creates a matching row under Labor Costs (Internal Management)
-            using your profile hourly rate when your name matches an employee user.
+            Full name is taken from your account. Rate and total cost below use the same employee hourly rate as Admin →
+            Employees (name or email match), consistent with the labor cost line created on save. Project is set from the
+            chosen audit or shipment when applicable.
           </p>
           {canViewAll && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: 'var(--text-sm)' }}>
@@ -210,6 +257,37 @@ export function WorkLogs() {
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Rate (from Employees)</label>
+                <input
+                  className="input"
+                  readOnly
+                  value={
+                    employeeRatePreview === null
+                      ? 'Loading…'
+                      : `${employeeRatePreview.hourlyRate.toFixed(2)}${
+                          employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : ''
+                        }`
+                  }
+                  title="Matched by your account name or email to an employee user’s hourly rate"
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Total cost (estimate)</label>
+                <input
+                  className="input"
+                  readOnly
+                  value={
+                    employeeRatePreview === null
+                      ? 'Loading…'
+                      : previewTotalCost !== null
+                        ? previewTotalCost.toFixed(2) +
+                          (employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : '')
+                        : '—'
+                  }
+                  title="Hours × rate (same calculation as the labor cost row when you save)"
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Work type</label>
                 <select
                   className="input"
@@ -222,6 +300,10 @@ export function WorkLogs() {
                   <option value="Admin">Admin</option>
                   <option value="Other">Other</option>
                 </select>
+              </div>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Project (from audit / shipment)</label>
+                <input className="input" readOnly value={derivedProjectLabel} title="Filled when you select an audit or shipment" />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Supplier</label>
@@ -285,6 +367,7 @@ export function WorkLogs() {
                     <th>Date</th>
                     <th>Hours</th>
                     <th>Type</th>
+                    <th>Project</th>
                     <th>Description</th>
                     <th>Created</th>
                   </tr>
@@ -297,6 +380,7 @@ export function WorkLogs() {
                       <td>{r.workDate?.slice(0, 10) ?? '—'}</td>
                       <td>{r.hoursWorked}</td>
                       <td>{r.workType}</td>
+                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
                       <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description ?? ''}>
                         {r.description?.trim() ? r.description : '—'}
                       </td>
@@ -327,6 +411,7 @@ export function WorkLogs() {
                   <tr>
                     <th>Cost ID</th>
                     <th>Log ID</th>
+                    <th>Project</th>
                     <th>Full name</th>
                     <th>Hours</th>
                     <th>Rate</th>
@@ -339,6 +424,7 @@ export function WorkLogs() {
                     <tr key={r.id}>
                       <td>{r.code}</td>
                       <td>{r.workLog?.code ?? '—'}</td>
+                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
                       <td>{r.fullName}</td>
                       <td>{r.hours}</td>
                       <td>{r.rate}</td>

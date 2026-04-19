@@ -244,6 +244,8 @@ model Audit {
   code         String    @unique // AUD-00001
   supplierId   String
   supplier     Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  projectHistoryId String?
+  projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
   auditTypeId  String?
   auditType    AuditType? @relation(fields: [auditTypeId], references: [id])
   auditDate    DateTime  @db.Date
@@ -258,6 +260,8 @@ model Audit {
   correctiveActions CorrectiveAction[]
   records      Record[]
   workLogs     WorkLog[]
+
+  @@index([projectHistoryId])
 }
 
 enum AuditResult {
@@ -376,6 +380,8 @@ model Shipment {
   code            String?         @unique
   supplierId      String
   supplier        Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  projectHistoryId String?
+  projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
   purchaseOrder   String?
   partNumber      String?
   lot             String?
@@ -391,6 +397,8 @@ model Shipment {
   workLogs        WorkLog[]
   records         Record[]
   findings        Finding[]
+
+  @@index([projectHistoryId])
 }
 
 model WorkLog {
@@ -573,11 +581,16 @@ model ClientHistory {
   buyer                User?     @relation("ClientHistoryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
   supplierId           String?
   supplier             Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  /// When set with supplierId, shipments with the same supplier + PO + part resolve to this project for work logs / labor cost.
+  shipmentMatchPurchaseOrder String?
+  shipmentMatchPartNumber    String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   workLogs             WorkLog[]
   laborCosts           LaborCost[]
   internalDocs         InternalDoc[]
+  audits               Audit[]
+  shipments            Shipment[]
 
   @@index([buyerId])
   @@index([supplierId])

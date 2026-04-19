@@ -82,6 +82,8 @@ interface ProjectHistoryRow {
   status: string;
   buyerId?: string | null;
   supplierId?: string | null;
+  shipmentMatchPurchaseOrder?: string | null;
+  shipmentMatchPartNumber?: string | null;
   buyer?: ProjectHistoryBuyer | null;
   supplier?: ProjectHistorySupplier | null;
   createdAt: string;
@@ -160,6 +162,7 @@ export function InternalManagement() {
     auditor: '',
     summary: '',
     scope: '',
+    projectHistoryId: '',
   });
   const [submittingAudit, setSubmittingAudit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -193,6 +196,8 @@ export function InternalManagement() {
     revenue: '',
     buyerId: '',
     supplierId: '',
+    shipmentMatchPurchaseOrder: '',
+    shipmentMatchPartNumber: '',
   });
   const [projectEditingId, setProjectEditingId] = useState<string | null>(null);
   const [projectSubmitting, setProjectSubmitting] = useState(false);
@@ -267,6 +272,11 @@ export function InternalManagement() {
     });
     return list;
   }, [rows, contractSort]);
+
+  const projectsForNewAudit = useMemo(() => {
+    if (!newAudit.supplierId) return projectHistories;
+    return projectHistories.filter((p) => !p.supplierId || p.supplierId === newAudit.supplierId);
+  }, [projectHistories, newAudit.supplierId]);
 
   const sortedFilteredProjectHistories = useMemo(() => {
     if (!projectTableSort.key) return filteredProjectHistories;
@@ -438,6 +448,11 @@ export function InternalManagement() {
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (!token || !isAdmin || tab !== 'audits') return;
+    loadProjectHistories();
+  }, [token, isAdmin, tab]);
 
   useEffect(() => {
     if (
@@ -642,6 +657,7 @@ export function InternalManagement() {
           auditor: newAudit.auditor || null,
           summary: newAudit.summary || null,
           scope: newAudit.scope || null,
+          projectHistoryId: newAudit.projectHistoryId.trim() || null,
         }),
       });
       toast.success(`Audit ${created.code} created`);
@@ -652,6 +668,7 @@ export function InternalManagement() {
         auditor: '',
         summary: '',
         scope: '',
+        projectHistoryId: '',
       });
     } catch (e) {
       toast.error(parseApiError(e));
@@ -675,6 +692,8 @@ export function InternalManagement() {
       revenue: '',
       buyerId: '',
       supplierId: '',
+      shipmentMatchPurchaseOrder: '',
+      shipmentMatchPartNumber: '',
     });
   };
 
@@ -703,6 +722,8 @@ export function InternalManagement() {
             revenue: clientForm.revenue.trim() || null,
             buyerId: clientForm.buyerId.trim() || null,
             supplierId: clientForm.supplierId.trim() || null,
+            shipmentMatchPurchaseOrder: clientForm.shipmentMatchPurchaseOrder.trim() || null,
+            shipmentMatchPartNumber: clientForm.shipmentMatchPartNumber.trim() || null,
           }),
         });
         toast.success('Project history updated');
@@ -723,6 +744,8 @@ export function InternalManagement() {
             revenue: clientForm.revenue.trim() || null,
             buyerId: clientForm.buyerId.trim() || null,
             supplierId: clientForm.supplierId.trim() || null,
+            shipmentMatchPurchaseOrder: clientForm.shipmentMatchPurchaseOrder.trim() || null,
+            shipmentMatchPartNumber: clientForm.shipmentMatchPartNumber.trim() || null,
           }),
         });
         toast.success('Project history added');
@@ -753,6 +776,8 @@ export function InternalManagement() {
       revenue: row.revenue ?? '',
       buyerId: row.buyerId ?? '',
       supplierId: row.supplierId ?? '',
+      shipmentMatchPurchaseOrder: row.shipmentMatchPurchaseOrder ?? '',
+      shipmentMatchPartNumber: row.shipmentMatchPartNumber ?? '',
     });
   };
 
@@ -827,7 +852,13 @@ export function InternalManagement() {
                   <select
                     className="input"
                     value={newAudit.supplierId}
-                    onChange={(e) => setNewAudit((p) => ({ ...p, supplierId: e.target.value }))}
+                    onChange={(e) =>
+                      setNewAudit((p) => ({
+                        ...p,
+                        supplierId: e.target.value,
+                        projectHistoryId: '',
+                      }))
+                    }
                     required
                   >
                     <option value="">Select</option>
@@ -860,6 +891,21 @@ export function InternalManagement() {
                       <option key={t.id} value={t.id}>
                         {t.code}
                         {t.name ? ` — ${t.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Project</label>
+                  <select
+                    className="input"
+                    value={newAudit.projectHistoryId}
+                    onChange={(e) => setNewAudit((p) => ({ ...p, projectHistoryId: e.target.value }))}
+                  >
+                    <option value="">None</option>
+                    {projectsForNewAudit.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.projectCode} — {p.companyName}
                       </option>
                     ))}
                   </select>
@@ -1569,6 +1615,24 @@ export function InternalManagement() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Shipment match — PO</label>
+                    <input
+                      className="input"
+                      value={clientForm.shipmentMatchPurchaseOrder}
+                      onChange={(e) => setClientForm((p) => ({ ...p, shipmentMatchPurchaseOrder: e.target.value }))}
+                      placeholder="Match inspection requests (optional)"
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Shipment match — part #</label>
+                    <input
+                      className="input"
+                      value={clientForm.shipmentMatchPartNumber}
+                      onChange={(e) => setClientForm((p) => ({ ...p, shipmentMatchPartNumber: e.target.value }))}
+                      placeholder="With supplier, links shipment to this project"
+                    />
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Period of performance — start</label>

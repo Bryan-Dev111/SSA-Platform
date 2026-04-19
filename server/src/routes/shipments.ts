@@ -11,6 +11,10 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { ShipmentResult, ShipmentStatus } from '@prisma/client';
 import { createAlertForRecipients } from '../services/alerts';
 import { getNextCode } from '../services/idGenerator';
+import {
+  batchResolvedProjectHistoryForShipments,
+  resolveProjectHistoryIdFromShipmentFields,
+} from '../lib/shipmentProjectResolve';
 
 const router = Router();
 
@@ -132,6 +136,7 @@ router.get(
       where,
       include: {
         supplier: { select: { id: true, code: true, name: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
         records: { select: { id: true, name: true, filePath: true }, orderBy: { createdAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -148,8 +153,20 @@ router.get(
         s.code = code;
       }
     }
+    const resolvedMap = await batchResolvedProjectHistoryForShipments(
+      list.map((s) => ({
+        id: s.id,
+        supplierId: s.supplierId,
+        purchaseOrder: s.purchaseOrder,
+        partNumber: s.partNumber,
+        projectHistoryId: s.projectHistoryId,
+        projectHistory: s.projectHistory,
+      }))
+    );
+
     const withRecords = list.map((s) => ({
       ...s,
+      resolvedProjectHistory: resolvedMap.get(s.id) ?? null,
       records: (s.records ?? []).map((r) => ({ id: r.id, name: r.name, hasFile: Boolean(r.filePath) })),
     }));
     res.json(withRecords);
@@ -185,6 +202,40 @@ router.get(
       email: u.email,
     }));
     res.json({ list });
+  })
+);
+
+/** Projects linked to a supplier (for optional project on new inspection request / UI). */
+router.get(
+  '/eligible-projects',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const supplierId = typeof req.query.supplierId === 'string' ? req.query.supplierId.trim() : '';
+    if (!supplierId) {
+      res.status(400).json({ error: 'supplierId is required' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && !allowedIds.includes(supplierId)) {
+      res.status(403).json({ error: 'Supplier not in scope' });
+      return;
+    }
+    if (req.user.roleNames.includes('Supplier')) {
+      const own = await prisma.supplier.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+      if (!own || own.id !== supplierId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+    }
+    const rows = await prisma.clientHistory.findMany({
+      where: { supplierId },
+      select: { id: true, projectCode: true, companyName: true },
+      orderBy: { projectCode: 'asc' },
+    });
+    res.json(rows);
   })
 );
 
@@ -250,6 +301,31 @@ router.post(
     }
     const inspectionDate = new Date(inspectionDateStr.slice(0, 10) + 'T12:00:00.000Z');
 
+    const rawPh = typeof req.body?.projectHistoryId === 'string' ? req.body.projectHistoryId.trim() : '';
+    let projectHistoryId: string | null = null;
+    if (rawPh) {
+      const proj = await prisma.clientHistory.findUnique({
+        where: { id: rawPh },
+        select: { supplierId: true },
+      });
+      if (!proj) {
+        res.status(400).json({ error: 'projectHistoryId is invalid' });
+        return;
+      }
+      if (proj.supplierId && proj.supplierId !== supplierId) {
+        res.status(400).json({ error: 'Project must use the same supplier as this shipment' });
+        return;
+      }
+      projectHistoryId = rawPh;
+    } else {
+      projectHistoryId = await resolveProjectHistoryIdFromShipmentFields({
+        supplierId,
+        purchaseOrder: purchaseOrder || null,
+        partNumber: partNumber || null,
+        explicitProjectHistoryId: null,
+      });
+    }
+
     // Validate that there is at least one scheduled row for this supplier + PO,
     // so OTD / short-delivery logic can reliably match on the same pair.
     const normalizedPo = purchaseOrder.toLowerCase();
@@ -275,6 +351,7 @@ router.post(
       data: {
         supplierId,
         code,
+        projectHistoryId,
         purchaseOrder,
         partNumber,
         lot,
@@ -282,7 +359,10 @@ router.post(
         inspectionDate,
         createdBy,
       },
-      include: { supplier: { select: { id: true, code: true, name: true } } },
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
+      },
     });
     await createAlertForRecipients({
       category: 'shipmentInspectionRequest',

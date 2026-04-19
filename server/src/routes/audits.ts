@@ -89,6 +89,7 @@ router.get(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         auditType: { select: { id: true, code: true, name: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
         findings: { select: { id: true, code: true } },
         records: { select: { id: true, name: true, filePath: true }, orderBy: { createdAt: 'desc' } },
       },
@@ -102,6 +103,8 @@ router.get(
       code: a.code,
       supplierId: a.supplierId,
       supplier: a.supplier,
+      projectHistoryId: a.projectHistoryId,
+      projectHistory: a.projectHistory,
       auditTypeId: a.auditTypeId,
       auditType: a.auditType,
       auditDate: a.auditDate,
@@ -132,6 +135,7 @@ router.get(
       include: {
         supplier: { select: { id: true, code: true, name: true, city: true, country: true } },
         auditType: { select: { id: true, code: true, name: true } },
+        projectHistory: { select: { id: true, projectCode: true, companyName: true } },
         findings: { select: { id: true, code: true, status: true, severity: true } },
         records: {
           select: {
@@ -192,7 +196,7 @@ router.post(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const { supplierId, auditTypeId, auditDate, auditor, summary, scope, notes } = req.body as {
+    const { supplierId, auditTypeId, auditDate, auditor, summary, scope, notes, projectHistoryId } = req.body as {
       supplierId?: string;
       auditTypeId?: string | null;
       auditDate?: string;
@@ -200,6 +204,7 @@ router.post(
       summary?: string | null;
       scope?: string | null;
       notes?: string | null;
+      projectHistoryId?: string | null;
     };
     if (!supplierId || !auditDate) {
       res.status(400).json({ error: 'supplierId and auditDate are required' });
@@ -209,6 +214,23 @@ router.post(
       res.status(403).json({ error: 'Supplier not in scope' });
       return;
     }
+    let projectHistoryIdCreate: string | null = null;
+    if (typeof projectHistoryId === 'string' && projectHistoryId.trim()) {
+      const pid = projectHistoryId.trim();
+      const proj = await prisma.clientHistory.findUnique({
+        where: { id: pid },
+        select: { supplierId: true },
+      });
+      if (!proj) {
+        res.status(400).json({ error: 'projectHistoryId is invalid' });
+        return;
+      }
+      if (proj.supplierId && proj.supplierId !== supplierId) {
+        res.status(400).json({ error: 'Project supplier must match audit supplier' });
+        return;
+      }
+      projectHistoryIdCreate = pid;
+    }
     const code = await getNextCode('AUD');
     // Parse as calendar date (YYYY-MM-DD) using UTC noon so timezone does not shift the day
     const dateOnly = new Date(auditDate.trim().slice(0, 10) + 'T12:00:00.000Z');
@@ -216,6 +238,7 @@ router.post(
       data: {
         code,
         supplierId,
+        projectHistoryId: projectHistoryIdCreate,
         auditTypeId: auditTypeId || null,
         auditDate: dateOnly,
         auditor: auditor ? String(auditor).trim() : null,
@@ -226,6 +249,7 @@ router.post(
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         auditType: { select: { id: true, code: true, name: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
         findings: { select: { id: true, code: true } },
       },
     });
@@ -254,7 +278,7 @@ router.patch(
       res.status(404).json({ error: 'Audit not found' });
       return;
     }
-    const { auditDate, notes, result, auditTypeId, auditor, summary, scope } = req.body as {
+    const { auditDate, notes, result, auditTypeId, auditor, summary, scope, projectHistoryId } = req.body as {
       auditDate?: string;
       notes?: string | null;
       result?: AuditResult | null;
@@ -262,6 +286,7 @@ router.patch(
       auditor?: string | null;
       summary?: string | null;
       scope?: string | null;
+      projectHistoryId?: string | null;
     };
 
     const isAdminOrQe =
@@ -276,7 +301,8 @@ router.patch(
         summary !== undefined ||
         scope !== undefined ||
         auditTypeId !== undefined ||
-        auditor !== undefined;
+        auditor !== undefined ||
+        projectHistoryId !== undefined;
       if (triesToEditOtherFields) {
         res.status(403).json({ error: 'Viewer and other roles are read-only for audits' });
         return;
@@ -295,6 +321,7 @@ router.patch(
       result?: AuditResult | null;
       auditTypeId?: string | null;
       auditor?: string | null;
+      projectHistoryId?: string | null;
     } = {};
     if (auditDate !== undefined) {
       update.auditDate = new Date(auditDate.trim().slice(0, 10) + 'T12:00:00.000Z');
@@ -326,12 +353,36 @@ router.patch(
         update.auditTypeId = auditTypeId;
       }
     }
+    if (projectHistoryId !== undefined) {
+      if (!isAdminOrQe) {
+        res.status(403).json({ error: 'Only Admin, QE, or QM can change project link' });
+        return;
+      }
+      if (projectHistoryId === null || projectHistoryId === '') {
+        update.projectHistoryId = null;
+      } else {
+        const proj = await prisma.clientHistory.findUnique({
+          where: { id: projectHistoryId },
+          select: { supplierId: true },
+        });
+        if (!proj) {
+          res.status(400).json({ error: 'projectHistoryId is invalid' });
+          return;
+        }
+        if (proj.supplierId && proj.supplierId !== existing.supplierId) {
+          res.status(400).json({ error: 'Project supplier must match audit supplier' });
+          return;
+        }
+        update.projectHistoryId = projectHistoryId;
+      }
+    }
     const audit = await prisma.audit.update({
       where: { id: req.params.id },
       data: update,
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         auditType: { select: { id: true, code: true, name: true } },
+        projectHistory: { select: { id: true, projectCode: true } },
         findings: { select: { id: true, code: true } },
         records: { select: { id: true, name: true, filePath: true }, orderBy: { createdAt: 'desc' } },
       },

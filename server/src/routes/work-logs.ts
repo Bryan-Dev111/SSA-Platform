@@ -8,8 +8,43 @@ import { requirePageAccess } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import { WorkType } from '@prisma/client';
+import { resolveProjectHistoryIdFromShipmentFields } from '../lib/shipmentProjectResolve';
+import { hourlyRateForFullName } from '../lib/employeeHourlyRate';
 
 const router = Router();
+
+async function resolveWorkLogProjectHistoryId(
+  auditId: string | null,
+  shipmentId: string | null
+): Promise<string | null> {
+  if (auditId) {
+    const a = await prisma.audit.findUnique({
+      where: { id: auditId },
+      select: { projectHistoryId: true },
+    });
+    return a?.projectHistoryId ?? null;
+  }
+  if (shipmentId) {
+    const s = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+      select: {
+        supplierId: true,
+        purchaseOrder: true,
+        partNumber: true,
+        projectHistoryId: true,
+      },
+    });
+    if (!s) return null;
+    if (s.projectHistoryId) return s.projectHistoryId;
+    return resolveProjectHistoryIdFromShipmentFields({
+      supplierId: s.supplierId,
+      purchaseOrder: s.purchaseOrder,
+      partNumber: s.partNumber,
+      explicitProjectHistoryId: null,
+    });
+  }
+  return null;
+}
 
 router.use(authMiddleware);
 
@@ -18,24 +53,26 @@ function canViewAllWorkLogs(user: { roleNames: string[] } | undefined): boolean 
   return user.roleNames.includes('Admin') || user.roleNames.includes('QualityManager');
 }
 
-/** Best-effort hourly rate for the person named on the work log (employee user record). */
-async function hourlyRateForFullName(fullName: string): Promise<number> {
-  const t = fullName.trim();
-  if (!t) return 0;
-  const u = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { email: { equals: t, mode: 'insensitive' } },
-        { name: { equals: t, mode: 'insensitive' } },
-      ],
-    },
-    select: { hourlyRate: true },
-  });
-  if (u && typeof u.hourlyRate === 'number' && Number.isFinite(u.hourlyRate) && u.hourlyRate >= 0) {
-    return u.hourlyRate;
-  }
-  return 0;
-}
+router.get(
+  '/preview-rate',
+  requirePageAccess('WorkLogs'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const me = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { name: true, email: true, currency: true },
+    });
+    const label = (me?.name?.trim() || me?.email || '').trim();
+    const hourlyRate = await hourlyRateForFullName(label);
+    res.json({
+      hourlyRate,
+      currency: me?.currency ?? null,
+    });
+  })
+);
 
 router.get(
   '/',
@@ -50,8 +87,18 @@ router.get(
       where: all ? {} : { createdById: req.user.id },
       include: {
         supplier: { select: { id: true, code: true, name: true } },
-        audit: { select: { id: true, code: true } },
-        shipment: { select: { id: true, code: true } },
+        audit: { select: { id: true, code: true, projectHistoryId: true, projectHistory: { select: { id: true, projectCode: true } } } },
+        shipment: {
+          select: {
+            id: true,
+            code: true,
+            projectHistoryId: true,
+            supplierId: true,
+            purchaseOrder: true,
+            partNumber: true,
+            projectHistory: { select: { id: true, projectCode: true } },
+          },
+        },
         projectHistory: { select: { id: true, projectCode: true } },
         createdBy: { select: { id: true, name: true, email: true } },
       },
@@ -102,6 +149,8 @@ router.post(
       return;
     }
 
+    const projectHistoryId = await resolveWorkLogProjectHistoryId(auditId, shipmentId);
+
     const workDate = new Date(workDateRaw.slice(0, 10) + 'T12:00:00.000Z');
     const logCode = await getNextCode('LOG');
     const rate = await hourlyRateForFullName(fullName);
@@ -119,7 +168,7 @@ router.post(
           supplierId,
           auditId,
           shipmentId,
-          projectHistoryId: null,
+          projectHistoryId,
           description,
           createdById: userId,
         },
@@ -128,7 +177,7 @@ router.post(
         data: {
           code: costCode,
           workLogId: wl.id,
-          projectHistoryId: null,
+          projectHistoryId,
           fullName,
           hours: hoursWorked,
           rate,
@@ -141,8 +190,18 @@ router.post(
         where: { id: wl.id },
         include: {
           supplier: { select: { id: true, code: true, name: true } },
-          audit: { select: { id: true, code: true } },
-          shipment: { select: { id: true, code: true } },
+          audit: { select: { id: true, code: true, projectHistoryId: true, projectHistory: { select: { id: true, projectCode: true } } } },
+          shipment: {
+            select: {
+              id: true,
+              code: true,
+              projectHistoryId: true,
+              supplierId: true,
+              purchaseOrder: true,
+              partNumber: true,
+              projectHistory: { select: { id: true, projectCode: true } },
+            },
+          },
           projectHistory: { select: { id: true, projectCode: true } },
           createdBy: { select: { id: true, name: true, email: true } },
         },

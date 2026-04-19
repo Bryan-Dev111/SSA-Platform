@@ -305,6 +305,11 @@ router.post(
         return;
       }
     }
+    const matchPo =
+      typeof body.shipmentMatchPurchaseOrder === 'string' ? body.shipmentMatchPurchaseOrder.trim() || null : null;
+    const matchPart =
+      typeof body.shipmentMatchPartNumber === 'string' ? body.shipmentMatchPartNumber.trim() || null : null;
+
     const row = await prisma.clientHistory.create({
       data: {
         projectCode,
@@ -323,6 +328,8 @@ router.post(
         status,
         buyerId,
         supplierId,
+        shipmentMatchPurchaseOrder: matchPo,
+        shipmentMatchPartNumber: matchPart,
       },
       include: {
         buyer: { select: { id: true, name: true, email: true } },
@@ -367,6 +374,8 @@ router.patch(
       revenueAmount?: number | null;
       buyerId?: string | null;
       supplierId?: string | null;
+      shipmentMatchPurchaseOrder?: string | null;
+      shipmentMatchPartNumber?: string | null;
     } = {};
     if (typeof body.clientName === 'string') data.clientName = body.clientName.trim();
     if (typeof body.companyName === 'string') data.companyName = body.companyName.trim();
@@ -419,6 +428,16 @@ router.patch(
         }
       }
       data.supplierId = next;
+    }
+    if (body.shipmentMatchPurchaseOrder !== undefined) {
+      data.shipmentMatchPurchaseOrder =
+        typeof body.shipmentMatchPurchaseOrder === 'string'
+          ? body.shipmentMatchPurchaseOrder.trim() || null
+          : null;
+    }
+    if (body.shipmentMatchPartNumber !== undefined) {
+      data.shipmentMatchPartNumber =
+        typeof body.shipmentMatchPartNumber === 'string' ? body.shipmentMatchPartNumber.trim() || null : null;
     }
     if (data.clientName !== undefined && !data.clientName) {
       res.status(400).json({ error: 'clientName cannot be empty' });

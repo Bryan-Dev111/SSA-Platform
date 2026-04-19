@@ -138,6 +138,10 @@ export function SupplierProfile() {
   const [shipLot, setShipLot] = useState('');
   const [shipQty, setShipQty] = useState('');
   const [shipDate, setShipDate] = useState('');
+  const [shipProjectId, setShipProjectId] = useState('');
+  const [eligibleShipmentProjects, setEligibleShipmentProjects] = useState<
+    Array<{ id: string; projectCode: string; companyName: string }>
+  >([]);
   const [submitting, setSubmitting] = useState(false);
   const [carSummaryModal, setCarSummaryModal] = useState<{ code: string; summary: string } | null>(null);
 
@@ -206,6 +210,19 @@ export function SupplierProfile() {
       .then((k) => setShipmentKpis(k))
       .catch(() => setShipmentKpis(null));
   }, [token, data?.supplier?.id]);
+
+  useEffect(() => {
+    if (!token || !data?.supplier?.id || !isSupplier) {
+      setEligibleShipmentProjects([]);
+      return;
+    }
+    apiJson<Array<{ id: string; projectCode: string; companyName: string }>>(
+      `/shipments/eligible-projects?supplierId=${encodeURIComponent(data.supplier.id)}`,
+      { token }
+    )
+      .then(setEligibleShipmentProjects)
+      .catch(() => setEligibleShipmentProjects([]));
+  }, [token, data?.supplier?.id, isSupplier]);
 
   useEffect(() => {
     if (!isSupplier || !data?.supplier?.id || !token) return;
@@ -351,6 +368,7 @@ export function SupplierProfile() {
           lot: shipLot.trim(),
           qty: qtyNum,
           inspectionDate: shipDate.trim(),
+          ...(shipProjectId.trim() ? { projectHistoryId: shipProjectId.trim() } : {}),
         }),
       });
       setShipPo('');
@@ -359,6 +377,7 @@ export function SupplierProfile() {
       setShipLot('');
       setShipQty('');
       setShipDate('');
+      setShipProjectId('');
       toast.success('Inspection request submitted');
       refresh();
     } catch (err) {
@@ -602,6 +621,17 @@ export function SupplierProfile() {
               <div className="input-group">
                 <label className="input-label">Requested inspection date *</label>
                 <input className="input" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} required />
+              </div>
+              <div className="input-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="input-label">Project (optional)</label>
+                <select className="input" value={shipProjectId} onChange={(e) => setShipProjectId(e.target.value)}>
+                  <option value="">Auto from PO / part match if set on Project History</option>
+                  {eligibleShipmentProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.projectCode} — {p.companyName}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <button type="submit" className="btn btn-primary" style={{ marginTop: '0.75rem' }} disabled={submitting}>
