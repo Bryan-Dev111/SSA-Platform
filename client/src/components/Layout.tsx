@@ -138,6 +138,55 @@ function ChevronRightIcon() {
   );
 }
 
+function LayoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <rect x="3" y="3" width="7" height="9" rx="1" />
+      <rect x="14" y="3" width="7" height="5" rx="1" />
+      <rect x="14" y="11" width="7" height="10" rx="1" />
+      <rect x="3" y="15" width="7" height="6" rx="1" />
+    </svg>
+  );
+}
+
+function LogOutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function headerUserDisplayName(user: { name?: string | null; email?: string | null } | null | undefined): string {
+  const n = user?.name?.trim();
+  if (n) return n;
+  const em = user?.email?.trim();
+  if (em) {
+    const local = em.split('@')[0];
+    return local || em;
+  }
+  return 'User';
+}
+
+function headerUserInitials(user: { name?: string | null; email?: string | null } | null | undefined): string {
+  const n = user?.name?.trim();
+  if (n) {
+    const parts = n.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase();
+    return n.slice(0, 2).toUpperCase();
+  }
+  const em = user?.email?.trim();
+  if (em) return em.slice(0, 2).toUpperCase();
+  return 'U';
+}
+
+function formatRoleSummary(roleNames: string[]): string {
+  if (!roleNames.length) return '';
+  if (roleNames.length <= 2) return roleNames.join(' · ');
+  return `${roleNames.slice(0, 2).join(' · ')} +${roleNames.length - 2}`;
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -221,6 +270,16 @@ export function Layout() {
   }, [menuOpen]);
 
   const closeMenu = () => setMenuOpen(false);
+
+  const headerDisplayName = useMemo(() => headerUserDisplayName(user), [user]);
+  const headerInitials = useMemo(() => headerUserInitials(user), [user]);
+  const headerRoleSummary = useMemo(() => formatRoleSummary(roleNames), [roleNames]);
+  const headerUserTitle = useMemo(() => {
+    const parts: string[] = [];
+    if (user?.email) parts.push(user.email);
+    if (roleNames.length) parts.push(`Roles: ${roleNames.join(', ')}`);
+    return parts.join('\n') || undefined;
+  }, [user?.email, roleNames]);
 
   if (user) {
     const allowed = canAccessPath(pathname, roleNames);
@@ -338,38 +397,65 @@ export function Layout() {
       ) : null}
       <div className="app-main-wrap">
         <header className="app-header">
-          <button
-            type="button"
-            className="header-menu-btn"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <MenuIcon />
-          </button>
-          <span className="app-header-title">Sentinel Supplier Assurance</span>
-          <div className="app-header-actions">
+          <div className="app-header-start">
+            <button
+              type="button"
+              className="header-menu-btn"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <MenuIcon />
+            </button>
+            <div className="app-header-brand" aria-label="Sentinel Supplier Assurance">
+              <span className="app-header-brand-mark" aria-hidden />
+              <div className="app-header-brand-text">
+                <span className="app-header-brand-name">Sentinel</span>
+                <span className="app-header-brand-tagline">Supplier Assurance</span>
+              </div>
+              <span
+                className={`app-header-context${globalVendorsShell ? ' app-header-context--supply' : ''}`}
+                title={globalVendorsShell ? 'Global supply workspace' : 'Supplier assurance workspace'}
+              >
+                {globalVendorsShell ? 'Global supply' : 'Supplier assurance'}
+              </span>
+            </div>
+          </div>
+          <div className="app-header-end">
             {roleNames.includes('Admin') && (
               <button
                 type="button"
-                className="btn btn-ghost"
+                className="app-header-btn app-header-btn--hub"
                 onClick={() => navigate('/product-hub')}
               >
+                <LayoutIcon />
                 Product hub
               </button>
             )}
-            <span className="app-header-user">
-              {user?.email}
-              {user?.roleNames?.length ? (
-                <span style={{ marginLeft: 4, color: 'var(--color-text-subtle)' }}>
-                  ({user.roleNames.join(', ')})
-                </span>
-              ) : null}
-            </span>
+            <div
+              className="app-header-user-chip"
+              title={headerUserTitle}
+              aria-label={
+                headerRoleSummary
+                  ? `Signed in as ${headerDisplayName}. ${headerRoleSummary}`
+                  : `Signed in as ${headerDisplayName}`
+              }
+            >
+              <span className="app-header-user-avatar" aria-hidden>
+                {headerInitials}
+              </span>
+              <div className="app-header-user-meta">
+                <span className="app-header-user-name">{headerDisplayName}</span>
+                {headerRoleSummary ? (
+                  <span className="app-header-user-roles">{headerRoleSummary}</span>
+                ) : null}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => setShowLogoutConfirm(true)}
-              className="btn btn-ghost"
+              className="app-header-btn app-header-btn--logout"
             >
+              <LogOutIcon />
               Log out
             </button>
           </div>
