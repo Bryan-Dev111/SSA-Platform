@@ -22,6 +22,7 @@ type ImTab =
   | 'documents'
   | 'commandMedia'
   | 'projectHistory'
+  | 'managementAssignments'
   | 'profit'
   | 'employeeAssignments'
   | 'workLogs'
@@ -114,6 +115,21 @@ interface ProfitRow {
   costs: number;
   profit: number;
   status: string;
+}
+
+interface ManagementAssignmentActiveProject {
+  id: string;
+  projectCode: string;
+  companyName: string;
+  clientName: string;
+  popStart: string | null;
+  popEnd: string | null;
+  status: string;
+}
+
+interface ManagementAssignmentRow {
+  supplier: ProjectHistorySupplier | null;
+  activeProjects: ManagementAssignmentActiveProject[];
 }
 
 interface CommandMediaApiRow {
@@ -230,6 +246,7 @@ export function InternalManagement() {
   const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
+  const [managementAssignments, setManagementAssignments] = useState<ManagementAssignmentRow[]>([]);
 
   const filteredProjectHistories = useMemo(() => {
     return projectHistories.filter((r) => {
@@ -289,6 +306,13 @@ export function InternalManagement() {
       .catch(() => setProfitRows([]));
   };
 
+  const loadManagementAssignments = () => {
+    if (!token) return;
+    apiJson<ManagementAssignmentRow[]>('/project-history/management-assignments', { token })
+      .then(setManagementAssignments)
+      .catch(() => setManagementAssignments([]));
+  };
+
   const load = () => {
     if (!token) return;
     Promise.all([
@@ -341,12 +365,18 @@ export function InternalManagement() {
   }, [token, isAdmin]);
 
   useEffect(() => {
-    if (!token || !isAdmin || (tab !== 'projectHistory' && tab !== 'profit')) return;
+    if (
+      !token ||
+      !isAdmin ||
+      (tab !== 'projectHistory' && tab !== 'profit' && tab !== 'managementAssignments')
+    )
+      return;
     if (tab === 'projectHistory') {
       loadProjectHistories();
       loadProjectHistoryBuyers();
     }
     if (tab === 'profit') loadProfit();
+    if (tab === 'managementAssignments') loadManagementAssignments();
   }, [token, isAdmin, tab]);
 
   if (user && !isAdmin) {
@@ -705,6 +735,7 @@ export function InternalManagement() {
       resetProjectForm();
       loadProjectHistories();
       loadProfit();
+      loadManagementAssignments();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -739,6 +770,7 @@ export function InternalManagement() {
       if (projectEditingId === id) resetProjectForm();
       loadProjectHistories();
       loadProfit();
+      loadManagementAssignments();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -761,6 +793,7 @@ export function InternalManagement() {
             ['documents', 'Documents'],
             ['commandMedia', 'Command Media'],
             ['projectHistory', 'Project History'],
+            ['managementAssignments', 'Management Assignments'],
             ['profit', 'Profit'],
             ['employeeAssignments', 'Employee Assignments'],
             ['workLogs', 'Work Logs'],
@@ -1643,6 +1676,55 @@ export function InternalManagement() {
             </div>
           </div>
         </>
+      )}
+
+      {tab === 'managementAssignments' && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Management Assignments</h2>
+            <p
+              style={{
+                marginTop: 0,
+                marginBottom: '0.75rem',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              Every row is one supplier. Each list entry is an active project (Period of Performance includes today, UTC).
+              Assign a supplier on each record in Project History.
+            </p>
+            <div className="table-wrap" style={{ overflowX: 'auto' }}>
+              {managementAssignments.length === 0 ? (
+                <p className="table-empty">No suppliers with active projects.</p>
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: 200 }}>Supplier</th>
+                      <th>Active projects</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {managementAssignments.map((row) => (
+                      <tr key={row.supplier?.id ?? '__unassigned__'}>
+                        <td>{row.supplier ? `${row.supplier.code} — ${row.supplier.name}` : 'No supplier assigned'}</td>
+                        <td>
+                          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                            {row.activeProjects.map((p) => (
+                              <li key={p.id} style={{ marginBottom: '0.35rem' }}>
+                                {p.projectCode} — {p.companyName} · {p.clientName} · POP {formatProjectPopCell(p.popStart, p.popEnd)}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === 'profit' && (

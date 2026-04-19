@@ -207,6 +207,67 @@ router.get(
   })
 );
 
+/** One row per supplier (or one "unassigned" row) with all POP-active projects for that supplier. */
+router.get(
+  '/management-assignments',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const list = await prisma.clientHistory.findMany({
+      orderBy: [{ supplierId: 'asc' }, { projectCode: 'asc' }],
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+      },
+    });
+    const active = list.filter((p) => computeClientHistoryStatus(p.popStart, p.popEnd) === 'Active');
+    const byKey = new Map<string, typeof active>();
+    for (const p of active) {
+      const key = p.supplierId ?? '__unassigned__';
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key)!.push(p);
+    }
+    const OUT: {
+      supplier: { id: string; code: string; name: string } | null;
+      activeProjects: Array<{
+        id: string;
+        projectCode: string;
+        companyName: string;
+        clientName: string;
+        popStart: string | null;
+        popEnd: string | null;
+        status: 'Active';
+      }>;
+    }[] = [];
+    for (const [, projects] of byKey) {
+      projects.sort((a, b) => a.projectCode.localeCompare(b.projectCode));
+      const first = projects[0];
+      const supplier =
+        first.supplierId && first.supplier
+          ? { id: first.supplier.id, code: first.supplier.code, name: first.supplier.name }
+          : null;
+      OUT.push({
+        supplier,
+        activeProjects: projects.map((p) => ({
+          id: p.id,
+          projectCode: p.projectCode,
+          companyName: p.companyName,
+          clientName: p.clientName,
+          popStart: p.popStart ? p.popStart.toISOString() : null,
+          popEnd: p.popEnd ? p.popEnd.toISOString() : null,
+          status: 'Active' as const,
+        })),
+      });
+    }
+    OUT.sort((a, b) => {
+      if (!a.supplier && !b.supplier) return 0;
+      if (!a.supplier) return 1;
+      if (!b.supplier) return -1;
+      const ca = `${a.supplier.code}\t${a.supplier.name}`;
+      const cb = `${b.supplier.code}\t${b.supplier.name}`;
+      return ca.localeCompare(cb);
+    });
+    res.json(OUT);
+  })
+);
+
 router.post(
   '/',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
