@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
 
 const router = Router();
@@ -26,6 +27,103 @@ function parseRevenueAmount(value: unknown): number | null {
   if (!cleaned) return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
+}
+
+/** YYYY-MM-DD calendar input → UTC noon (stable JSON round-trip). */
+function parsePopDateInput(raw: unknown): Date | null {
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
+  if (Number.isNaN(dt.getTime())) return null;
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return dt;
+}
+
+function startOfUtcDay(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** Active when today (UTC calendar) is within [popStart, popEnd] inclusive; requires both dates. */
+function computeClientHistoryStatus(popStart: Date | null, popEnd: Date | null): 'Active' | 'Inactive' {
+  if (!popStart || !popEnd) return 'Inactive';
+  const s = startOfUtcDay(popStart);
+  const e = startOfUtcDay(popEnd);
+  const t = startOfUtcDay(new Date());
+  if (s > e) return 'Inactive';
+  if (t >= s && t <= e) return 'Active';
+  return 'Inactive';
+}
+
+/**
+ * Parse POP from body: both empty → null,null; both required if either provided.
+ */
+function parsePopPair(body: Record<string, unknown>): { ok: true; popStart: Date | null; popEnd: Date | null } | { ok: false; error: string } {
+  const startRaw = body.popStart;
+  const endRaw = body.popEnd;
+  const startEmpty =
+    startRaw === undefined ||
+    startRaw === null ||
+    (typeof startRaw === 'string' && startRaw.trim() === '');
+  const endEmpty =
+    endRaw === undefined || endRaw === null || (typeof endRaw === 'string' && endRaw.trim() === '');
+  if (startEmpty && endEmpty) {
+    return { ok: true, popStart: null, popEnd: null };
+  }
+  if (startEmpty || endEmpty) {
+    return { ok: false, error: 'Period of performance requires both start and end dates, or leave both empty' };
+  }
+  const popStart = parsePopDateInput(startRaw);
+  const popEnd = parsePopDateInput(endRaw);
+  if (!popStart || !popEnd) {
+    return { ok: false, error: 'Invalid period of performance dates (use YYYY-MM-DD)' };
+  }
+  if (popStart > popEnd) {
+    return { ok: false, error: 'Period of performance end date must be on or after start date' };
+  }
+  return { ok: true, popStart, popEnd };
+}
+
+/** Combine PATCH body with existing row, then validate with parsePopPair. */
+function mergePatchPop(
+  body: Record<string, unknown>,
+  existing: { popStart: Date | null; popEnd: Date | null }
+): { ok: true; popStart: Date | null; popEnd: Date | null } | { ok: false; error: string } {
+  if (body.popStart === undefined && body.popEnd === undefined) {
+    return { ok: true, popStart: existing.popStart, popEnd: existing.popEnd };
+  }
+  const startStr =
+    body.popStart !== undefined
+      ? typeof body.popStart === 'string'
+        ? body.popStart.trim()
+        : ''
+      : existing.popStart
+        ? existing.popStart.toISOString().slice(0, 10)
+        : '';
+  const endStr =
+    body.popEnd !== undefined
+      ? typeof body.popEnd === 'string'
+        ? body.popEnd.trim()
+        : ''
+      : existing.popEnd
+        ? existing.popEnd.toISOString().slice(0, 10)
+        : '';
+  return parsePopPair({ popStart: startStr, popEnd: endStr });
+}
+
+function mapClientHistoryRow<
+  T extends {
+    popStart: Date | null;
+    popEnd: Date | null;
+    status: string;
+    buyer?: unknown;
+    supplier?: unknown;
+    [key: string]: unknown;
+  },
+>(row: T): T {
+  const status = computeClientHistoryStatus(row.popStart, row.popEnd);
+  return { ...row, status };
 }
 
 router.use(authMiddleware);
@@ -59,7 +157,7 @@ router.get(
         supplier: { select: { id: true, code: true, name: true } },
       },
     });
-    res.json(list);
+    res.json(list.map((row) => mapClientHistoryRow(row)));
   })
 );
 
@@ -76,6 +174,8 @@ router.get(
           revenue: true,
           revenueAmount: true,
           status: true,
+          popStart: true,
+          popEnd: true,
         },
       }),
       prisma.laborCost.groupBy({
@@ -85,12 +185,11 @@ router.get(
       }),
     ]);
     const costByProjectId = new Map(
-      laborGrouped
-        .filter((r) => r.projectHistoryId)
-        .map((r) => [r.projectHistoryId as string, r._sum.totalCost ?? 0])
+      laborGrouped.filter((r) => r.projectHistoryId).map((r) => [r.projectHistoryId as string, r._sum.totalCost ?? 0])
     );
-    res.json(
-      projects.map((p) => {
+    const rows = projects
+      .filter((p) => computeClientHistoryStatus(p.popStart, p.popEnd) === 'Active')
+      .map((p) => {
         const costs = costByProjectId.get(p.id) ?? 0;
         const revenue = p.revenueAmount ?? 0;
         return {
@@ -101,10 +200,10 @@ router.get(
           revenueAmount: revenue,
           costs,
           profit: revenue - costs,
-          status: p.status,
+          status: computeClientHistoryStatus(p.popStart, p.popEnd),
         };
-      })
-    );
+      });
+    res.json(rows);
   })
 );
 
@@ -118,8 +217,15 @@ router.post(
       res.status(400).json({ error: 'clientName and companyName are required' });
       return;
     }
-    const statusRaw = typeof body.status === 'string' ? body.status.trim() : 'Active';
-    const status = statusRaw.toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
+
+    const popParsed = parsePopPair(body);
+    if (!popParsed.ok) {
+      res.status(400).json({ error: popParsed.error });
+      return;
+    }
+    const { popStart, popEnd } = popParsed;
+    const status = computeClientHistoryStatus(popStart, popEnd);
+
     const projectCode = await getNextCode('PROJ');
     const revenueRaw = typeof body.revenue === 'string' ? body.revenue.trim() : '';
     const buyerIdRaw = typeof body.buyerId === 'string' ? body.buyerId.trim() : '';
@@ -148,8 +254,8 @@ router.post(
         country: typeof body.country === 'string' ? body.country.trim() || null : null,
         projectDescription:
           typeof body.projectDescription === 'string' ? body.projectDescription.trim() || null : null,
-        periodOfPerformance:
-          typeof body.periodOfPerformance === 'string' ? body.periodOfPerformance.trim() || null : null,
+        popStart,
+        popEnd,
         revenue: revenueRaw || null,
         revenueAmount: parseRevenueAmount(revenueRaw),
         status,
@@ -161,16 +267,25 @@ router.post(
         supplier: { select: { id: true, code: true, name: true } },
       },
     });
-    res.status(201).json(row);
+    res.status(201).json(mapClientHistoryRow(row));
   })
 );
 
 router.patch(
   '/:id',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
     const id = req.params.id;
     const existing = await prisma.clientHistory.findUnique({ where: { id } });
     if (!existing) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    const allowedIds = await getAllowedSupplierIds(req.user);
+    if (allowedIds !== null && existing.supplierId && !allowedIds.includes(existing.supplierId)) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
@@ -183,7 +298,8 @@ router.patch(
       industry?: string | null;
       country?: string | null;
       projectDescription?: string | null;
-      periodOfPerformance?: string | null;
+      popStart?: Date | null;
+      popEnd?: Date | null;
       revenue?: string | null;
       status?: string;
       revenueAmount?: number | null;
@@ -206,17 +322,20 @@ router.patch(
       data.projectDescription =
         typeof body.projectDescription === 'string' ? body.projectDescription.trim() || null : null;
     }
-    if (body.periodOfPerformance !== undefined) {
-      data.periodOfPerformance =
-        typeof body.periodOfPerformance === 'string' ? body.periodOfPerformance.trim() || null : null;
+    if (body.popStart !== undefined || body.popEnd !== undefined) {
+      const popMerged = mergePatchPop(body, existing);
+      if (!popMerged.ok) {
+        res.status(400).json({ error: popMerged.error });
+        return;
+      }
+      data.popStart = popMerged.popStart;
+      data.popEnd = popMerged.popEnd;
     }
+
     if (body.revenue !== undefined) {
       const revenueRaw = typeof body.revenue === 'string' ? body.revenue.trim() : '';
       data.revenue = revenueRaw || null;
       data.revenueAmount = parseRevenueAmount(revenueRaw);
-    }
-    if (typeof body.status === 'string') {
-      data.status = body.status.trim().toLowerCase() === 'inactive' ? 'Inactive' : 'Active';
     }
     if (body.buyerId !== undefined) {
       const raw = typeof body.buyerId === 'string' ? body.buyerId.trim() : '';
@@ -247,6 +366,16 @@ router.patch(
       res.status(400).json({ error: 'companyName cannot be empty' });
       return;
     }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'Provide at least one field to update' });
+      return;
+    }
+
+    const nextPopStart = data.popStart !== undefined ? data.popStart : existing.popStart;
+    const nextPopEnd = data.popEnd !== undefined ? data.popEnd : existing.popEnd;
+    data.status = computeClientHistoryStatus(nextPopStart, nextPopEnd);
+
     const row = await prisma.clientHistory.update({
       where: { id },
       data,
@@ -255,7 +384,7 @@ router.patch(
         supplier: { select: { id: true, code: true, name: true } },
       },
     });
-    res.json(row);
+    res.json(mapClientHistoryRow(row));
   })
 );
 

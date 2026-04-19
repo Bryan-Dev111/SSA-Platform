@@ -545,11 +545,13 @@ model ClientHistory {
   industry             String?
   country              String?
   projectDescription   String?
-  periodOfPerformance  String?
+  /// Period of performance (UTC calendar days). When both set, status is derived from “today” in that range.
+  popStart             DateTime? @db.Date
+  popEnd               DateTime? @db.Date
   revenue              String?
   revenueAmount        Float?
-  /// Active or Inactive
-  status               String   @default("Active")
+  /// Active = today (UTC) within [popStart, popEnd] when both dates set; else Inactive. Set on write; also derived on read.
+  status               String   @default("Inactive")
   buyerId              String?
   buyer                User?     @relation("ClientHistoryBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
   supplierId           String?

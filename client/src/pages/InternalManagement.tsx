@@ -92,7 +92,8 @@ interface ProjectHistoryRow {
   industry: string | null;
   country: string | null;
   projectDescription: string | null;
-  periodOfPerformance: string | null;
+  popStart: string | null;
+  popEnd: string | null;
   revenue: string | null;
   revenueAmount: number | null;
   status: string;
@@ -137,6 +138,16 @@ interface CommandMediaRow {
 
 function commandMediaTypeLabel(t: string): string {
   return COMMAND_MEDIA_TYPES.find((d) => d.value === t)?.label ?? t;
+}
+
+function projectPopToInputDate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+function formatProjectPopCell(popStart: string | null, popEnd: string | null): string {
+  if (!popStart || !popEnd) return '—';
+  return `${popStart.slice(0, 10)} – ${popEnd.slice(0, 10)}`;
 }
 
 export function InternalManagement() {
@@ -209,9 +220,9 @@ export function InternalManagement() {
     industry: '',
     country: '',
     projectDescription: '',
-    periodOfPerformance: '',
+    popStart: '',
+    popEnd: '',
     revenue: '',
-    status: 'Active' as 'Active' | 'Inactive',
     buyerId: '',
     supplierId: '',
   });
@@ -634,9 +645,9 @@ export function InternalManagement() {
       industry: '',
       country: '',
       projectDescription: '',
-      periodOfPerformance: '',
+      popStart: '',
+      popEnd: '',
       revenue: '',
-      status: 'Active',
       buyerId: '',
       supplierId: '',
     });
@@ -662,9 +673,9 @@ export function InternalManagement() {
             industry: clientForm.industry.trim() || null,
             country: clientForm.country.trim() || null,
             projectDescription: clientForm.projectDescription.trim() || null,
-            periodOfPerformance: clientForm.periodOfPerformance.trim() || null,
+            popStart: clientForm.popStart.trim(),
+            popEnd: clientForm.popEnd.trim(),
             revenue: clientForm.revenue.trim() || null,
-            status: clientForm.status,
             buyerId: clientForm.buyerId.trim() || null,
             supplierId: clientForm.supplierId.trim() || null,
           }),
@@ -682,9 +693,9 @@ export function InternalManagement() {
             industry: clientForm.industry.trim() || null,
             country: clientForm.country.trim() || null,
             projectDescription: clientForm.projectDescription.trim() || null,
-            periodOfPerformance: clientForm.periodOfPerformance.trim() || null,
+            popStart: clientForm.popStart.trim(),
+            popEnd: clientForm.popEnd.trim(),
             revenue: clientForm.revenue.trim() || null,
-            status: clientForm.status,
             buyerId: clientForm.buyerId.trim() || null,
             supplierId: clientForm.supplierId.trim() || null,
           }),
@@ -711,9 +722,9 @@ export function InternalManagement() {
       industry: row.industry ?? '',
       country: row.country ?? '',
       projectDescription: row.projectDescription ?? '',
-      periodOfPerformance: row.periodOfPerformance ?? '',
+      popStart: projectPopToInputDate(row.popStart),
+      popEnd: projectPopToInputDate(row.popEnd),
       revenue: row.revenue ?? '',
-      status: row.status === 'Inactive' ? 'Inactive' : 'Active',
       buyerId: row.buyerId ?? '',
       supplierId: row.supplierId ?? '',
     });
@@ -1412,19 +1423,6 @@ export function InternalManagement() {
                     />
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Status</label>
-                    <select
-                      className="input"
-                      value={clientForm.status}
-                      onChange={(e) =>
-                        setClientForm((p) => ({ ...p, status: e.target.value === 'Inactive' ? 'Inactive' : 'Active' }))
-                      }
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Buyer</label>
                     <select
                       className="input"
@@ -1455,13 +1453,34 @@ export function InternalManagement() {
                     </select>
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Period of performance</label>
+                    <label className="input-label">Period of performance — start</label>
                     <input
+                      type="date"
                       className="input"
-                      value={clientForm.periodOfPerformance}
-                      onChange={(e) => setClientForm((p) => ({ ...p, periodOfPerformance: e.target.value }))}
+                      value={clientForm.popStart}
+                      onChange={(e) => setClientForm((p) => ({ ...p, popStart: e.target.value }))}
                     />
                   </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Period of performance — end</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={clientForm.popEnd}
+                      onChange={(e) => setClientForm((p) => ({ ...p, popEnd: e.target.value }))}
+                    />
+                  </div>
+                  <p
+                    style={{
+                      gridColumn: '1 / -1',
+                      margin: 0,
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  >
+                    Status is computed automatically: Active when today (UTC) falls between start and end;
+                    otherwise Inactive. Leave both dates empty if there is no POP yet.
+                  </p>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Revenue</label>
                     <input
@@ -1599,7 +1618,7 @@ export function InternalManagement() {
                           <td>{r.industry ?? '—'}</td>
                           <td>{r.country ?? '—'}</td>
                           <td style={{ maxWidth: 200, whiteSpace: 'pre-wrap' }}>{r.projectDescription ?? '—'}</td>
-                          <td>{r.periodOfPerformance ?? '—'}</td>
+                          <td>{formatProjectPopCell(r.popStart, r.popEnd)}</td>
                           <td>{r.revenue ?? '—'}</td>
                           <td>{r.status}</td>
                           <td>
