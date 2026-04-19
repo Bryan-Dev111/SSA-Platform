@@ -2,6 +2,7 @@
  * Day 9 Admin: Audit types, Risk weights, Buyers & suppliers; Permissions matrix is Admin → Permissions tab only.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MetricCard } from '../../components/MetricCard';
@@ -1041,6 +1042,7 @@ export function AdminBuyersSuppliersPanel({
   /** Lighter Users tab for Global Supply admin: slim create form, no status/rate/currency columns, permissions column. */
   globalSupplyUsersMode?: boolean;
 }) {
+  const { user: authUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [buyerId, setBuyerId] = useState('');
@@ -1074,6 +1076,7 @@ export function AdminBuyersSuppliersPanel({
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [editUserPassword, setEditUserPassword] = useState('');
   const [delSup, setDelSup] = useState<SupplierRow | null>(null);
+  const [delUser, setDelUser] = useState<UserRow | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -1408,6 +1411,37 @@ export function AdminBuyersSuppliersPanel({
     } catch (e) {
       setDelSup(target);
       toast.error(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDeleteUser = async () => {
+    if (!token || !delUser) return;
+    const target = delUser;
+    setBusy(true);
+    setDelUser(null);
+    try {
+      await apiJson(`/users/${target.id}`, { token, method: 'DELETE' });
+      toast.success('User deleted');
+      if (editUser?.id === target.id) {
+        setEditUser(null);
+        setEditUserPassword('');
+      }
+      await load();
+    } catch (e) {
+      setDelUser(target);
+      let msg = 'Delete failed';
+      if (e instanceof Error) {
+        try {
+          const j = JSON.parse(e.message) as { error?: string };
+          if (j.error) msg = j.error;
+          else msg = e.message;
+        } catch {
+          msg = e.message || msg;
+        }
+      }
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -2056,22 +2090,34 @@ export function AdminBuyersSuppliersPanel({
                             </button>
                           </>
                         ) : (
-                          <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() => {
-                              setEditUser({
-                                ...u,
-                                roleNames: u.roleNames.length
-                                  ? [...u.roleNames]
-                                  : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer'],
-                              });
-                              setEditUserPassword('');
-                            }}
-                            disabled={busy}
-                          >
-                            Edit
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ marginRight: 8 }}
+                              onClick={() => {
+                                setEditUser({
+                                  ...u,
+                                  roleNames: u.roleNames.length
+                                    ? [...u.roleNames]
+                                    : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer'],
+                                });
+                                setEditUserPassword('');
+                              }}
+                              disabled={busy}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => setDelUser(u)}
+                              disabled={busy || authUser?.id === u.id}
+                              title={authUser?.id === u.id ? 'You cannot delete your own account' : 'Delete user permanently'}
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -2268,6 +2314,20 @@ export function AdminBuyersSuppliersPanel({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!delUser}
+        title="Delete user?"
+        message={
+          delUser
+            ? `Permanently delete ${delUser.email}${delUser.name?.trim() ? ` (${delUser.name.trim()})` : ''}? This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete user"
+        variant="danger"
+        onCancel={() => setDelUser(null)}
+        onConfirm={doDeleteUser}
+      />
 
       <ConfirmDialog
         open={!!delSup}

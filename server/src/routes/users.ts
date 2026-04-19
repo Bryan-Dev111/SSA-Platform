@@ -150,6 +150,7 @@ router.get(
         { entity: 'Risk snapshot', method: 'DELETE', path: '/risk-snapshots/:id' },
         { entity: 'Opportunity', method: 'DELETE', path: '/opportunities/:id' },
         { entity: 'Supplier', method: 'DELETE', path: '/suppliers/:idOrCode' },
+        { entity: 'User', method: 'DELETE', path: '/users/:id' },
       ],
     });
   })
@@ -453,6 +454,43 @@ router.post(
       assignedSupplierIds: user.buyerSuppliers.map((b) => b.supplierId),
       qeAssignedSupplierIds: user.qeSuppliers.map((q) => q.supplierId),
     });
+  })
+);
+
+router.delete(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    if (!req.user || req.user.id === id) {
+      res.status(400).json({ error: 'Cannot delete your own account' });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    /**
+     * Clear FKs without onDelete behavior so the user row can be removed.
+     * (Buyer on ClientHistory, approvals, etc. use onDelete: SetNull and are handled by Prisma.)
+     */
+    await prismaBase.$transaction(async (tx) => {
+      await tx.supplier.updateMany({ where: { userId: id }, data: { userId: null } });
+      await tx.finding.updateMany({ where: { createdById: id }, data: { createdById: null } });
+      await tx.correctiveAction.updateMany({ where: { createdById: id }, data: { createdById: null } });
+      await tx.record.updateMany({ where: { uploadedById: id }, data: { uploadedById: null } });
+      await tx.opportunity.updateMany({ where: { createdById: id }, data: { createdById: null } });
+      await tx.riskAction.updateMany({ where: { createdById: id }, data: { createdById: null } });
+      await tx.user.delete({ where: { id } });
+    });
+
+    res.status(204).send();
   })
 );
 

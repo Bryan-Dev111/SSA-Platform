@@ -20,6 +20,7 @@ const GROUPS: OrgGroup[] = [
     subtitle: 'Audits and shipment schedule',
     items: [
       { label: 'Audits', tab: 'audits' },
+      { label: 'Calendar', tab: 'calendar' },
       { label: 'Shipments', tab: 'shipments' },
     ],
   },

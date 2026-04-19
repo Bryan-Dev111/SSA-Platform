@@ -16,6 +16,7 @@ import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
 import { InternalManagementOrgChart } from './InternalManagementOrgChart';
+import { InternalManagementCalendarView } from './InternalManagementCalendar';
 import type { InternalManagementTab as ImTab } from './internalManagementTabs';
 
 interface InternalRow {
@@ -808,6 +809,7 @@ export function InternalManagement() {
         {(
           [
             ['audits', 'Audits'],
+            ['calendar', 'Calendar'],
             ['orgChart', 'Org Chart'],
             ['shipments', 'Shipments'],
             ['contracts', 'Contracts'],
@@ -833,6 +835,8 @@ export function InternalManagement() {
       {error && <div className="alert-error">{error}</div>}
 
       {tab === 'orgChart' && <InternalManagementOrgChart onGoToTab={setTab} />}
+
+      {tab === 'calendar' && <InternalManagementCalendarView token={token} />}
 
       {tab === 'audits' && (
         <div className="card" style={{ marginBottom: '1rem' }}>
