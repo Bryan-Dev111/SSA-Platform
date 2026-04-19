@@ -39,7 +39,14 @@ interface UserOption {
   hourlyRate?: number | null;
 }
 
-export function AdminLaborCostsPanel({ token }: { token: string | null }) {
+export function AdminLaborCostsPanel({
+  token,
+  listScope = 'mine',
+}: {
+  token: string | null;
+  /** Internal Management lists all rows; default API returns only the current user’s rows. */
+  listScope?: 'mine' | 'all';
+}) {
   const [rows, setRows] = useState<LaborCostRow[]>([]);
   const [workLogs, setWorkLogs] = useState<WorkLogOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -56,13 +63,15 @@ export function AdminLaborCostsPanel({ token }: { token: string | null }) {
     paidStatus: 'Pending' as 'Pending' | 'Paid',
   });
 
+  const qs = listScope === 'all' ? '?scope=all' : '';
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
     setError(null);
     Promise.all([
-      apiJson<LaborCostRow[]>('/labor-costs', { token }),
-      apiJson<WorkLogOption[]>('/work-logs', { token }).catch(() => []),
+      apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }),
+      apiJson<WorkLogOption[]>(`/work-logs${qs}`, { token }).catch(() => []),
       apiJson<ProjectOption[]>('/project-history', { token }).catch(() => []),
       apiJson<UserOption[]>('/users', { token }).catch(() => []),
     ])
@@ -81,7 +90,7 @@ export function AdminLaborCostsPanel({ token }: { token: string | null }) {
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, qs]);
 
   useEffect(() => {
     if (!form.workLogId) return;

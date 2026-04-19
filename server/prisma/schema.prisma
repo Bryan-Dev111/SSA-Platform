@@ -72,6 +72,8 @@ model User {
   qmQeEngineers QualityManagerQe[] @relation("QmQeEngineerAssignments")
   passwordResetTokens PasswordResetToken[]
   clientHistoriesAsBuyer ClientHistory[] @relation("ClientHistoryBuyer")
+  workLogsCreated   WorkLog[]   @relation("WorkLogCreatedBy")
+  laborCostsCreated LaborCost[] @relation("LaborCostCreatedBy")
 }
 
 /// One-time token for self-service password reset (raw token is emailed; only SHA-256 hash is stored).
@@ -407,8 +409,13 @@ model WorkLog {
   projectHistoryId String?
   projectHistory   ClientHistory? @relation(fields: [projectHistoryId], references: [id], onDelete: SetNull)
   description String?
+  /// User who submitted this row (self-serve Work Logs page or admin acting as user).
+  createdById String?
+  createdBy   User?    @relation("WorkLogCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   laborCosts  LaborCost[]
+
+  @@index([createdById])
 }
 
 model LaborCost {
@@ -423,7 +430,12 @@ model LaborCost {
   rate       Float
   totalCost  Float
   paidStatus PaidStatus @default(Pending)
+  /// Same as the linked work log submitter when auto-created from a work log.
+  createdById String?
+  createdBy   User?     @relation("LaborCostCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt  DateTime   @default(now())
+
+  @@index([createdById])
 }
 
 enum PaidStatus {

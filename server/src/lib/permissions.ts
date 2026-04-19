@@ -28,6 +28,7 @@ export const PAGE_DEFINITIONS = [
   { key: 'GlobalSupplySamples', label: 'Samples', path: '/global-vendors/samples' },
   { key: 'GlobalSupplyExpenses', label: 'Expenses', path: '/global-vendors/expenses' },
   { key: 'Documents', label: 'Command Media', path: '/documents' },
+  { key: 'WorkLogs', label: 'Work Logs', path: '/work-logs' },
   { key: 'InternalManagement', label: 'Internal Management', path: '/internal-management' },
   { key: 'Admin', label: 'Admin', path: '/admin' },
 ] as const;
@@ -53,6 +54,7 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   Records: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor'],
   Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
+  WorkLogs: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
   InternalManagement: ['Admin', 'QualityManager'],
   Admin: ['Admin'],
   Login: [],
@@ -94,6 +96,7 @@ export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/records': DEFAULT_API_PAGE_ROLES.Records,
   '/shipments': DEFAULT_API_PAGE_ROLES.Shipments,
   '/documents': DEFAULT_API_PAGE_ROLES.Documents,
+  '/work-logs': DEFAULT_API_PAGE_ROLES.WorkLogs,
   '/internal-management': DEFAULT_API_PAGE_ROLES.InternalManagement,
   '/admin': DEFAULT_API_PAGE_ROLES.Admin,
 };

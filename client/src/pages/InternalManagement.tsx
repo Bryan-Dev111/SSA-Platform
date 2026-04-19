@@ -12,7 +12,6 @@ import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MetricCard } from '../components/MetricCard';
 import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
-import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
 import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
@@ -792,7 +791,6 @@ export function InternalManagement() {
             ['managementAssignments', 'Management Assignments'],
             ['profit', 'Profit'],
             ['employeeAssignments', 'Employee Assignments'],
-            ['workLogs', 'Work Logs'],
             ['laborCosts', 'Labor Costs'],
           ] as const
         ).map(([t, label]) => (
@@ -2015,15 +2013,9 @@ export function InternalManagement() {
         </div>
       )}
 
-      {tab === 'workLogs' && (
-        <div style={{ marginTop: '1rem' }}>
-          <AdminWorkLogsPanel token={token} />
-        </div>
-      )}
-
       {tab === 'laborCosts' && (
         <div style={{ marginTop: '1rem' }}>
-          <AdminLaborCostsPanel token={token} />
+          <AdminLaborCostsPanel token={token} listScope="all" />
         </div>
       )}
 

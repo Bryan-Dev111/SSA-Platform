@@ -32,6 +32,7 @@ export const PATH_ROLES: Record<string, string[]> = {
   '/records': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   '/shipments': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor'],
   '/documents': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
+  '/work-logs': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
   '/internal-management': ['Admin', 'QualityManager'],
   '/admin': ['Admin'],
 };
@@ -61,6 +62,7 @@ const SIDEBAR_PATH_ORDER = [
   '/global-vendors/samples',
   '/global-vendors/admin',
   '/documents',
+  '/work-logs',
   '/internal-management',
   '/admin',
 ] as const;

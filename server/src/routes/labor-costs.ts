@@ -1,10 +1,10 @@
 /**
- * Labor Costs (Admin): list and create labor cost rows.
+ * Labor Costs: list (own rows, or all for Admin/QM with scope=all); manual POST for Internal Management only.
  */
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePageAccess } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import { PaidStatus } from '@prisma/client';
@@ -12,15 +12,27 @@ import { PaidStatus } from '@prisma/client';
 const router = Router();
 
 router.use(authMiddleware);
-router.use(requireRole(['Admin']));
+
+function canViewAllLaborCosts(user: { roleNames: string[] } | undefined): boolean {
+  if (!user) return false;
+  return user.roleNames.includes('Admin') || user.roleNames.includes('QualityManager');
+}
 
 router.get(
   '/',
-  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+  requirePageAccess('WorkLogs'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const all = req.query.scope === 'all' && canViewAllLaborCosts(req.user);
     const rows = await prisma.laborCost.findMany({
+      where: all ? {} : { createdById: req.user.id },
       include: {
         workLog: { select: { id: true, code: true, projectHistoryId: true } },
         projectHistory: { select: { id: true, projectCode: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -31,6 +43,7 @@ router.get(
 
 router.post(
   '/',
+  requirePageAccess('InternalManagement'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const workLogId = typeof req.body?.workLogId === 'string' && req.body.workLogId.trim() ? req.body.workLogId.trim() : null;
     const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim() : '';
@@ -41,6 +54,11 @@ router.post(
       typeof req.body?.projectHistoryId === 'string' && req.body.projectHistoryId.trim()
         ? req.body.projectHistoryId.trim()
         : null;
+
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     if (!fullName) {
       res.status(400).json({ error: 'fullName is required' });
@@ -91,10 +109,12 @@ router.post(
         rate,
         totalCost: hours * rate,
         paidStatus: paidStatus as PaidStatus,
+        createdById: req.user.id,
       },
       include: {
         workLog: { select: { id: true, code: true, projectHistoryId: true } },
         projectHistory: { select: { id: true, projectCode: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
       },
     });
     res.status(201).json(created);

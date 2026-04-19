@@ -23,6 +23,7 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   Records: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor'],
   Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
+  WorkLogs: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
   InternalManagement: ['Admin', 'QualityManager'],
   Admin: ['Admin'],
   GlobalSupplyFarmers: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],

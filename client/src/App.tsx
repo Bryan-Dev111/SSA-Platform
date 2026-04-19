@@ -27,6 +27,7 @@ import { Records } from './pages/Records';
 import { Shipments } from './pages/Shipments';
 import { Documents } from './pages/Documents';
 import { InternalManagement } from './pages/InternalManagement';
+import { WorkLogs } from './pages/WorkLogs';
 import { Admin } from './pages/Admin';
 import { NoAccess } from './pages/NoAccess';
 import { ProductHub } from './pages/ProductHub';
@@ -94,6 +95,7 @@ function App() {
             <Route path="records" element={<ProtectedRoute path="/records"><Records /></ProtectedRoute>} />
             <Route path="shipments" element={<ProtectedRoute path="/shipments"><Shipments /></ProtectedRoute>} />
             <Route path="documents" element={<ProtectedRoute path="/documents"><Documents /></ProtectedRoute>} />
+            <Route path="work-logs" element={<ProtectedRoute path="/work-logs"><WorkLogs /></ProtectedRoute>} />
             <Route path="internal-management" element={<ProtectedRoute path="/internal-management"><InternalManagement /></ProtectedRoute>} />
             <Route path="admin" element={<ProtectedRoute path="/admin"><Admin /></ProtectedRoute>} />
             <Route path="no-access" element={<ProtectedRoute path="/no-access"><NoAccess /></ProtectedRoute>} />

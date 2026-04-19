@@ -20,6 +20,7 @@ const MENU_ITEMS: { path: string; label: string }[] = [
   { path: '/supplier-list', label: 'Approved Supplier List' },
   { path: '/suppliers-map', label: 'Suppliers Map' },
   { path: '/documents', label: 'Command Media' },
+  { path: '/work-logs', label: 'Work Logs' },
   { path: '/internal-management', label: 'Internal Management' },
   { path: '/admin', label: 'Admin' },
 ];
