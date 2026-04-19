@@ -2515,7 +2515,7 @@ body.sidebar-open {
   margin-bottom: 1rem;
   width: 100%;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  /* Keep shipment alert tooltips above .dashboard-split (later in DOM would otherwise cover them). */
+  /* Keep shipment alert tooltips above the trio grid (later in DOM would otherwise cover them). */
   position: relative;
   z-index: 10;
   overflow: visible;
@@ -2537,31 +2537,60 @@ body.sidebar-open {
   min-width: 0;
 }
 
-/* Dashboard: two columns (lists + recent updates) on wide screens */
-.dashboard-split {
+/* Dashboard: Risk donut + Upcoming + Recent Updates — equal-width columns on large screens */
+.dashboard-trio-grid {
   display: grid;
   gap: 1rem;
-  align-items: start;
+  width: 100%;
   grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   position: relative;
   z-index: 1;
 }
 
-@media (min-width: 1308px) {
-  .dashboard-split {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+@media (min-width: 1024px) {
+  .dashboard-trio-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-.dashboard-split-left-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  align-content: start;
+@media (min-width: 640px) and (max-width: 1023px) {
+  .dashboard-trio-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Recent Updates spans full width below Risk + Upcoming */
+  .dashboard-trio-grid > .dashboard-section-card:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.dashboard-trio-grid > .risk-distribution-card,
+.dashboard-trio-grid > .dashboard-section-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
-.dashboard-split--spaced {
+.dashboard-trio-grid > .dashboard-section-card > .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dashboard-trio-grid .risk-distribution-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-trio-grid .risk-distribution-legend {
+  margin-top: auto;
+}
+
+.dashboard-trio-grid--spaced {
   margin-bottom: 1rem;
 }
 

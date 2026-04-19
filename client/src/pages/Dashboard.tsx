@@ -280,36 +280,34 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="dashboard-split dashboard-split--spaced">
-        <div className="dashboard-split-left-grid">
-          <RiskDistributionCard distribution={riskRegisterDistribution} />
+      <div className="dashboard-trio-grid dashboard-trio-grid--spaced">
+        <RiskDistributionCard distribution={riskRegisterDistribution} />
 
-          <div className="card dashboard-section-card">
-            <div className="card-body">
-              <h2 className="dashboard-section-heading">Upcoming events</h2>
-              {upcoming.length === 0 ? (
-                <p className="table-empty">No upcoming audits or shipment inspections.</p>
-              ) : (
-                <div className="dashboard-event-list">
-                  {upcoming.map((e) => (
-                    <div key={`${e.type}-${e.id}`} className="dashboard-event-row">
-                      <span className="dashboard-event-date">
-                        {e.date
-                          ? new Date(e.date).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : 'N/A'}
-                      </span>
-                      <span>
-                        <strong>{e.type}</strong> {e.code} - {e.supplierCode}: {e.supplierName}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className="card dashboard-section-card">
+          <div className="card-body">
+            <h2 className="dashboard-section-heading">Upcoming events</h2>
+            {upcoming.length === 0 ? (
+              <p className="table-empty">No upcoming audits or shipment inspections.</p>
+            ) : (
+              <div className="dashboard-event-list">
+                {upcoming.map((e) => (
+                  <div key={`${e.type}-${e.id}`} className="dashboard-event-row">
+                    <span className="dashboard-event-date">
+                      {e.date
+                        ? new Date(e.date).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : 'N/A'}
+                    </span>
+                    <span>
+                      <strong>{e.type}</strong> {e.code} - {e.supplierCode}: {e.supplierName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
