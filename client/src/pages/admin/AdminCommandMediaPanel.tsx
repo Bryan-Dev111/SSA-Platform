@@ -1,10 +1,12 @@
 /**
  * Admin — Command Media (document library, same /documents API as the Command Media page).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../../utils/apiHelpers';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { SortableTh } from '../../components/SortableTh';
+import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../../utils/tableSort';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -67,6 +69,30 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
   const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [tableSort, setTableSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+
+  const displayRows = useMemo(() => {
+    if (!tableSort.key) return rows;
+    const { key: k, dir } = tableSort;
+    const list = [...rows];
+    list.sort((a, b) => {
+      switch (k) {
+        case 'type':
+          return cmpStr(commandMediaTypeLabel(a.documentType), commandMediaTypeLabel(b.documentType), dir);
+        case 'number':
+          return cmpStr(a.documentNumber, b.documentNumber, dir);
+        case 'name':
+          return cmpStr(a.name, b.name, dir);
+        case 'revision':
+          return cmpStr(a.revision ?? '', b.revision ?? '', dir);
+        case 'created':
+          return cmpNum(dateMs(a.createdAt), dateMs(b.createdAt), dir);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [rows, tableSort]);
 
   const load = useCallback(() => {
     if (!token) return;
@@ -260,21 +286,53 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Type</th>
-                    <th>Number</th>
-                    <th>Name</th>
-                    <th>Revision</th>
+                    <SortableTh
+                      label="Type"
+                      columnKey="type"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Number"
+                      columnKey="number"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Name"
+                      columnKey="name"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Revision"
+                      columnKey="revision"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Created"
+                      columnKey="created"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
                     <th>View</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {displayRows.map((r) => (
                     <tr key={r.id}>
                       <td>{commandMediaTypeLabel(r.documentType)}</td>
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>
+                      <td>{new Date(r.createdAt).toLocaleString()}</td>
                       <td>
                         {r.filePath ? (
                           <button

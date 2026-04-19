@@ -14,6 +14,8 @@ import { MetricCard } from '../components/MetricCard';
 import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
 import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
 import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
+import { SortableTh } from '../components/SortableTh';
+import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
 
 type ImTab =
   | 'audits'
@@ -208,6 +210,10 @@ export function InternalManagement() {
   const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
   const [managementAssignments, setManagementAssignments] = useState<ManagementAssignmentRow[]>([]);
+  const [shipmentSort, setShipmentSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [contractSort, setContractSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [projectTableSort, setProjectTableSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [mgmtAssignSort, setMgmtAssignSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
 
   const filteredProjectHistories = useMemo(() => {
     return projectHistories.filter((r) => {
@@ -216,6 +222,139 @@ export function InternalManagement() {
       return true;
     });
   }, [projectHistories, projectHistoryBuyerFilter, projectHistorySupplierFilter]);
+
+  const sortedSchedules = useMemo(() => {
+    if (!shipmentSort.key) return schedules;
+    const { key: k, dir } = shipmentSort;
+    const list = [...schedules];
+    const supplierLabel = (r: ScheduleRow) => (r.supplier ? `${r.supplier.code} ${r.supplier.name}` : '');
+    list.sort((a, b) => {
+      switch (k) {
+        case 'supplier':
+          return cmpStr(supplierLabel(a), supplierLabel(b), dir);
+        case 'po':
+          return cmpStr(a.purchaseOrder ?? '', b.purchaseOrder ?? '', dir);
+        case 'part':
+          return cmpStr(a.partNumber ?? '', b.partNumber ?? '', dir);
+        case 'qty': {
+          const na = typeof a.qty === 'number' && Number.isFinite(a.qty) ? a.qty : -Number.MAX_VALUE;
+          const nb = typeof b.qty === 'number' && Number.isFinite(b.qty) ? b.qty : -Number.MAX_VALUE;
+          return cmpNum(na, nb, dir);
+        }
+        case 'scheduled':
+          return cmpStr(
+            a.scheduledDate ? String(a.scheduledDate).slice(0, 10) : '',
+            b.scheduledDate ? String(b.scheduledDate).slice(0, 10) : '',
+            dir
+          );
+        case 'notes':
+          return cmpStr((a.notes ?? '').trim(), (b.notes ?? '').trim(), dir);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [schedules, shipmentSort]);
+
+  const sortedContractRows = useMemo(() => {
+    if (!contractSort.key) return rows;
+    const { key: k, dir } = contractSort;
+    const list = [...rows];
+    list.sort((a, b) => {
+      switch (k) {
+        case 'project':
+          return cmpStr(formatContractProjectCell(a), formatContractProjectCell(b), dir);
+        case 'name':
+          return cmpStr(a.name, b.name, dir);
+        case 'type':
+          return cmpStr(a.category ?? '', b.category ?? '', dir);
+        case 'note':
+          return cmpStr((a.note ?? '').trim(), (b.note ?? '').trim(), dir);
+        case 'updated':
+          return cmpNum(dateMs(a.updatedAt), dateMs(b.updatedAt), dir);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [rows, contractSort]);
+
+  const sortedFilteredProjectHistories = useMemo(() => {
+    if (!projectTableSort.key) return filteredProjectHistories;
+    const { key: k, dir } = projectTableSort;
+    const list = [...filteredProjectHistories];
+    const revenueSortVal = (r: ProjectHistoryRow) => {
+      if (typeof r.revenueAmount === 'number' && Number.isFinite(r.revenueAmount)) return r.revenueAmount;
+      if (r.revenue) {
+        const n = Number(String(r.revenue).replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(n) ? n : 0;
+      }
+      return 0;
+    };
+    list.sort((a, b) => {
+      switch (k) {
+        case 'projectCode':
+          return cmpStr(a.projectCode, b.projectCode, dir);
+        case 'clientName':
+          return cmpStr(a.clientName, b.clientName, dir);
+        case 'companyName':
+          return cmpStr(a.companyName, b.companyName, dir);
+        case 'buyer': {
+          const la = a.buyer ? (a.buyer.name?.trim() || a.buyer.email) : '';
+          const lb = b.buyer ? (b.buyer.name?.trim() || b.buyer.email) : '';
+          return cmpStr(la, lb, dir);
+        }
+        case 'supplier': {
+          const sa = a.supplier ? `${a.supplier.code} ${a.supplier.name}` : '';
+          const sb = b.supplier ? `${b.supplier.code} ${b.supplier.name}` : '';
+          return cmpStr(sa, sb, dir);
+        }
+        case 'email':
+          return cmpStr(a.clientEmail ?? '', b.clientEmail ?? '', dir);
+        case 'mobile':
+          return cmpStr(a.clientMobile ?? '', b.clientMobile ?? '', dir);
+        case 'industry':
+          return cmpStr(a.industry ?? '', b.industry ?? '', dir);
+        case 'country':
+          return cmpStr(a.country ?? '', b.country ?? '', dir);
+        case 'description':
+          return cmpStr((a.projectDescription ?? '').trim(), (b.projectDescription ?? '').trim(), dir);
+        case 'period': {
+          const da = dateMs(a.popStart);
+          const db = dateMs(b.popStart);
+          if (da !== db) return cmpNum(da, db, dir);
+          return cmpStr(
+            formatProjectPopCell(a.popStart, a.popEnd),
+            formatProjectPopCell(b.popStart, b.popEnd),
+            dir
+          );
+        }
+        case 'revenue':
+          return cmpNum(revenueSortVal(a), revenueSortVal(b), dir);
+        case 'status':
+          return cmpStr(a.status, b.status, dir);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [filteredProjectHistories, projectTableSort]);
+
+  const sortedManagementAssignments = useMemo(() => {
+    if (!mgmtAssignSort.key) return managementAssignments;
+    const { key: k, dir } = mgmtAssignSort;
+    const list = [...managementAssignments];
+    const supplierLabel = (row: ManagementAssignmentRow) =>
+      row.supplier ? `${row.supplier.code} ${row.supplier.name}` : 'No supplier assigned';
+    const projectsKey = (row: ManagementAssignmentRow) =>
+      [...row.activeProjects].map((p) => p.projectCode).sort().join('\u0001');
+    list.sort((a, b) => {
+      if (k === 'supplier') return cmpStr(supplierLabel(a), supplierLabel(b), dir);
+      if (k === 'projects') return cmpStr(projectsKey(a), projectsKey(b), dir);
+      return 0;
+    });
+    return list;
+  }, [managementAssignments, mgmtAssignSort]);
 
   const projectHistoryRevenueTotal = useMemo(() => {
     return filteredProjectHistories.reduce((sum, r) => {
@@ -865,17 +1004,53 @@ export function InternalManagement() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Supplier</th>
-                        <th>PO</th>
-                        <th>Part #</th>
-                        <th>Qty</th>
-                        <th>Scheduled</th>
-                        <th>Notes</th>
+                        <SortableTh
+                          label="Supplier"
+                          columnKey="supplier"
+                          activeKey={shipmentSort.key}
+                          dir={shipmentSort.dir}
+                          onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="PO"
+                          columnKey="po"
+                          activeKey={shipmentSort.key}
+                          dir={shipmentSort.dir}
+                          onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Part #"
+                          columnKey="part"
+                          activeKey={shipmentSort.key}
+                          dir={shipmentSort.dir}
+                          onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Qty"
+                          columnKey="qty"
+                          activeKey={shipmentSort.key}
+                          dir={shipmentSort.dir}
+                          onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Scheduled"
+                          columnKey="scheduled"
+                          activeKey={shipmentSort.key}
+                          dir={shipmentSort.dir}
+                          onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Notes"
+                          columnKey="notes"
+                          activeKey={shipmentSort.key}
+                          dir={shipmentSort.dir}
+                          onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
+                        />
                         <th />
                       </tr>
                     </thead>
                     <tbody>
-                      {schedules.map((r) => (
+                      {sortedSchedules.map((r) => (
                         <tr key={r.id}>
                           <td>
                             {r.supplier ? `${r.supplier.code} — ${r.supplier.name}` : '—'}
@@ -1046,17 +1221,47 @@ export function InternalManagement() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Note</th>
+                        <SortableTh
+                          label="Project"
+                          columnKey="project"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Name"
+                          columnKey="name"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Type"
+                          columnKey="type"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Note"
+                          columnKey="note"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
                         <th>View</th>
-                        <th>Updated</th>
+                        <SortableTh
+                          label="Updated"
+                          columnKey="updated"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
                         <th />
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((r) => (
+                      {sortedContractRows.map((r) => (
                         <tr key={r.id}>
                           <td>{formatContractProjectCell(r)}</td>
                           <td>{r.name}</td>
@@ -1511,24 +1716,102 @@ export function InternalManagement() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Project</th>
-                        <th>Client name</th>
-                        <th>Company</th>
-                        <th>Buyer</th>
-                        <th>Supplier</th>
-                        <th>Email</th>
-                        <th>Mobile</th>
-                        <th>Industry</th>
-                        <th>Country</th>
-                        <th>Project</th>
-                        <th>Period</th>
-                        <th>Revenue</th>
-                        <th>Status</th>
+                        <SortableTh
+                          label="Project"
+                          columnKey="projectCode"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Client name"
+                          columnKey="clientName"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Company"
+                          columnKey="companyName"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Buyer"
+                          columnKey="buyer"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Supplier"
+                          columnKey="supplier"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Email"
+                          columnKey="email"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Mobile"
+                          columnKey="mobile"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Industry"
+                          columnKey="industry"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Country"
+                          columnKey="country"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Description"
+                          columnKey="description"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Period"
+                          columnKey="period"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Revenue"
+                          columnKey="revenue"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Status"
+                          columnKey="status"
+                          activeKey={projectTableSort.key}
+                          dir={projectTableSort.dir}
+                          onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
+                        />
                         <th />
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredProjectHistories.map((r) => (
+                      {sortedFilteredProjectHistories.map((r) => (
                         <tr key={r.id}>
                           <td>{r.projectCode}</td>
                           <td>{r.clientName}</td>
@@ -1589,12 +1872,25 @@ export function InternalManagement() {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 200 }}>Supplier</th>
-                      <th>Active projects</th>
+                      <SortableTh
+                        label="Supplier"
+                        columnKey="supplier"
+                        activeKey={mgmtAssignSort.key}
+                        dir={mgmtAssignSort.dir}
+                        onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
+                        style={{ minWidth: 200 }}
+                      />
+                      <SortableTh
+                        label="Active projects"
+                        columnKey="projects"
+                        activeKey={mgmtAssignSort.key}
+                        dir={mgmtAssignSort.dir}
+                        onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
+                      />
                     </tr>
                   </thead>
                   <tbody>
-                    {managementAssignments.map((row) => (
+                    {sortedManagementAssignments.map((row) => (
                       <tr key={row.supplier?.id ?? '__unassigned__'}>
                         <td>{row.supplier ? `${row.supplier.code} — ${row.supplier.name}` : 'No supplier assigned'}</td>
                         <td>

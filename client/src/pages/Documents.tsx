@@ -1,12 +1,14 @@
 /**
  * Day 10: Policies, SOPs, etc. — list & view for authorized roles; Admin/QE manage.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { SortableTh } from '../components/SortableTh';
+import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
 
 interface DocumentRow {
   id: string;
@@ -54,15 +56,39 @@ export function Documents() {
   const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [tableSort, setTableSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+
+  const sortedRows = useMemo(() => {
+    if (!tableSort.key) return rows;
+    const { key: k, dir } = tableSort;
+    const list = [...rows];
+    list.sort((a, b) => {
+      switch (k) {
+        case 'type':
+          return cmpStr(typeLabel(a.documentType), typeLabel(b.documentType), dir);
+        case 'number':
+          return cmpStr(a.documentNumber, b.documentNumber, dir);
+        case 'name':
+          return cmpStr(a.name, b.name, dir);
+        case 'revision':
+          return cmpStr(a.revision ?? '', b.revision ?? '', dir);
+        case 'created':
+          return cmpNum(dateMs(a.createdAt), dateMs(b.createdAt), dir);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [rows, tableSort]);
 
   const canMutate =
     (user?.roleNames?.includes('Admin') ?? false) ||
     (user?.roleNames?.includes('QualityEngineer') ?? false) ||
     (user?.roleNames?.includes('QualityManager') ?? false);
-  const totalCount = rows.length;
+  const totalCount = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const pageSafe = Math.min(page, totalPages) || 1;
-  const paginatedRows = rows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const paginatedRows = sortedRows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
   const load = () => {
     if (!token) return;
@@ -96,9 +122,9 @@ export function Documents() {
   }, [token]);
 
   useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(rows.length / pageSize));
+    const maxPage = Math.max(1, Math.ceil(sortedRows.length / pageSize));
     if (page > maxPage) setPage(maxPage);
-  }, [rows.length, page, pageSize]);
+  }, [sortedRows.length, page, pageSize]);
 
   const remove = async (id: string) => {
     if (!token) return;
@@ -157,10 +183,41 @@ export function Documents() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Type</th>
-                    <th>Number</th>
-                    <th>Name</th>
-                    <th>Revision</th>
+                    <SortableTh
+                      label="Type"
+                      columnKey="type"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Number"
+                      columnKey="number"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Name"
+                      columnKey="name"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Revision"
+                      columnKey="revision"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
+                    <SortableTh
+                      label="Created"
+                      columnKey="created"
+                      activeKey={tableSort.key}
+                      dir={tableSort.dir}
+                      onSort={(col) => setTableSort((p) => toggleSort(p, col))}
+                    />
                     <th>View</th>
                     {canMutate ? <th /> : null}
                   </tr>
@@ -172,6 +229,7 @@ export function Documents() {
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>
+                      <td>{new Date(r.createdAt).toLocaleString()}</td>
                       <td>
                         {r.filePath ? (
                           <button
