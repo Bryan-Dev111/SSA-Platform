@@ -16,6 +16,7 @@ import {
 } from './admin/AdminDay9Panels';
 import { AdminAlertPreferencesPanel } from './admin/AdminAlertPreferencesPanel';
 import { LegalAdminEditor } from './admin/LegalAdminEditor';
+import { AdminCommandMediaPanel } from './admin/AdminCommandMediaPanel';
 
 type Tab =
   | 'commodity'
@@ -25,6 +26,7 @@ type Tab =
   | 'auditTypes'
   | 'riskWeights'
   | 'expenses'
+  | 'commandMedia'
   | 'users'
   | 'employees'
   | 'buyersSuppliers'
@@ -396,6 +398,7 @@ export function Admin() {
             ['auditTypes', 'Audit types'],
             ['riskWeights', 'Risk weights'],
             ['expenses', 'Expenses'],
+            ['commandMedia', 'Command Media'],
             ['alertPreferences', 'Email alerts'],
             ['permissions', 'Permissions'],
             ['legal', 'Legal (Terms & Privacy)'],
@@ -415,6 +418,7 @@ export function Admin() {
       {tab === 'auditTypes' && <AdminAuditTypesPanel token={token} toast={toast} />}
       {tab === 'riskWeights' && <AdminRiskWeightsPanel token={token} toast={toast} />}
       {tab === 'expenses' && <AdminExpensesPanel token={token} toast={toast} />}
+      {tab === 'commandMedia' && <AdminCommandMediaPanel token={token} toast={toast} />}
       {tab === 'users' && (
         <AdminBuyersSuppliersPanel
           token={token}

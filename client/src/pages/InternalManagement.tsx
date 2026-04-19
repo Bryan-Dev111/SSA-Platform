@@ -1,5 +1,6 @@
 /**
- * Internal Management — Admin only: Audits, Shipments (schedule), Contracts (internal docs).
+ * Internal Management — Admin only: Audits, Shipments (schedule), Contracts, internal & project history, etc.
+ * Command Media (shared /documents library) is on the Admin page.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -14,29 +15,17 @@ import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsP
 import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
 import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
 type ImTab =
   | 'audits'
   | 'shipments'
   | 'contracts'
   | 'documents'
-  | 'commandMedia'
   | 'projectHistory'
   | 'managementAssignments'
   | 'profit'
   | 'employeeAssignments'
   | 'workLogs'
   | 'laborCosts';
-
-const COMMAND_MEDIA_TYPES: { value: string; label: string }[] = [
-  { value: 'Procedure', label: 'Procedure' },
-  { value: 'Policy', label: 'Policy' },
-  { value: 'QualityManual', label: 'Quality Manual' },
-  { value: 'Standard', label: 'Standard' },
-  { value: 'StandardOperatingProcedure', label: 'SOP' },
-  { value: 'WorkInstruction', label: 'Work Instruction' },
-  { value: 'Form', label: 'Form' },
-];
 
 interface InternalRow {
   id: string;
@@ -132,30 +121,6 @@ interface ManagementAssignmentRow {
   activeProjects: ManagementAssignmentActiveProject[];
 }
 
-interface CommandMediaApiRow {
-  id: string;
-  documentNumber: string;
-  name: string;
-  category: string | null;
-  documentType: string;
-  filePath: string | null;
-  createdAt: string;
-}
-
-interface CommandMediaRow {
-  id: string;
-  documentNumber: string;
-  name: string;
-  revision: string | null;
-  documentType: string;
-  filePath: string | null;
-  createdAt: string;
-}
-
-function commandMediaTypeLabel(t: string): string {
-  return COMMAND_MEDIA_TYPES.find((d) => d.value === t)?.label ?? t;
-}
-
 function projectPopToInputDate(iso: string | null | undefined): string {
   if (!iso) return '';
   return iso.slice(0, 10);
@@ -209,20 +174,6 @@ export function InternalManagement() {
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
   const [scheduleDeleteId, setScheduleDeleteId] = useState<string | null>(null);
   const [scheduleBusyId, setScheduleBusyId] = useState<string | null>(null);
-  const [commandMedia, setCommandMedia] = useState({
-    documentNumber: '',
-    name: '',
-    documentType: 'Procedure',
-    revision: '',
-    file: null as File | null,
-  });
-  const [commandMediaSubmitting, setCommandMediaSubmitting] = useState(false);
-  const [commandMediaUploadProgress, setCommandMediaUploadProgress] = useState<number | null>(null);
-  const commandMediaFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [commandMediaRows, setCommandMediaRows] = useState<CommandMediaRow[]>([]);
-  const [commandMediaDownloading, setCommandMediaDownloading] = useState<Record<string, number>>({});
-  const [commandMediaDeleteConfirmId, setCommandMediaDeleteConfirmId] = useState<string | null>(null);
-  const [commandMediaDeletingId, setCommandMediaDeletingId] = useState<string | null>(null);
 
   const [projectHistories, setProjectHistories] = useState<ProjectHistoryRow[]>([]);
   const [buyerOptions, setBuyerOptions] = useState<ProjectHistoryBuyer[]>([]);
@@ -320,19 +271,12 @@ export function InternalManagement() {
       apiJson<SupplierOption[]>('/suppliers', { token }),
       apiJson<AuditTypeOption[]>('/audits/types', { token }),
       apiJson<ScheduleRow[]>('/shipment-schedule', { token }),
-      apiJson<CommandMediaApiRow[]>('/documents', { token }),
     ])
-      .then(([docs, supplierList, typeList, sched, commandDocs]) => {
+      .then(([docs, supplierList, typeList, sched]) => {
         setRows(docs);
         setSuppliers(supplierList);
         setAuditTypes(typeList);
         setSchedules(sched);
-        setCommandMediaRows(
-          commandDocs.map((r) => ({
-            ...r,
-            revision: r.category,
-          }))
-        );
       })
       .catch((e) => setError(parseApiError(e)));
   };
@@ -346,19 +290,12 @@ export function InternalManagement() {
       apiJson<SupplierOption[]>('/suppliers', { token }),
       apiJson<AuditTypeOption[]>('/audits/types', { token }),
       apiJson<ScheduleRow[]>('/shipment-schedule', { token }),
-      apiJson<CommandMediaApiRow[]>('/documents', { token }),
     ])
-      .then(([docs, supplierList, typeList, sched, commandDocs]) => {
+      .then(([docs, supplierList, typeList, sched]) => {
         setRows(docs);
         setSuppliers(supplierList);
         setAuditTypes(typeList);
         setSchedules(sched);
-        setCommandMediaRows(
-          commandDocs.map((r) => ({
-            ...r,
-            revision: r.category,
-          }))
-        );
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
@@ -573,98 +510,6 @@ export function InternalManagement() {
     }
   };
 
-  const submitCommandMedia = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token || !commandMedia.documentNumber.trim() || !commandMedia.name.trim()) return;
-    if (commandMedia.file && commandMedia.file.size > 150 * 1024 * 1024) {
-      toast.error('File must be 150MB or smaller');
-      return;
-    }
-    setCommandMediaSubmitting(true);
-    setCommandMediaUploadProgress(commandMedia.file ? 0 : null);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE}/documents`);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.upload.onprogress = (evt) => {
-          if (!evt.lengthComputable) return;
-          setCommandMediaUploadProgress(Math.max(0, Math.min(100, Math.round((evt.loaded / evt.total) * 100))));
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            setCommandMediaUploadProgress(100);
-            resolve();
-          } else {
-            reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error while uploading file'));
-        const form = new FormData();
-        form.append('documentNumber', commandMedia.documentNumber.trim());
-        form.append('name', commandMedia.name.trim());
-        form.append('documentType', commandMedia.documentType);
-        form.append('revision', commandMedia.revision.trim());
-        if (commandMedia.file) form.append('file', commandMedia.file);
-        xhr.send(form);
-      });
-
-      setCommandMedia({
-        documentNumber: '',
-        name: '',
-        documentType: 'Procedure',
-        revision: '',
-        file: null,
-      });
-      if (commandMediaFileInputRef.current) commandMediaFileInputRef.current.value = '';
-      setCommandMediaUploadProgress(null);
-      toast.success('Command media uploaded');
-      load();
-    } catch (e) {
-      toast.error(parseApiError(e));
-    } finally {
-      setCommandMediaSubmitting(false);
-      setCommandMediaUploadProgress(null);
-    }
-  };
-
-  const downloadCommandMedia = async (r: CommandMediaRow) => {
-    if (!token || !r.filePath) {
-      toast.error('No file attached');
-      return;
-    }
-    try {
-      setCommandMediaDownloading((prev) => ({ ...prev, [r.id]: 0 }));
-      await downloadWithAuthProgress(`/documents/${r.id}/download`, token, `${r.documentNumber}-${r.name}`, (p) => {
-        setCommandMediaDownloading((prev) => ({ ...prev, [r.id]: p }));
-      });
-      toast.success('Download completed');
-    } catch (e) {
-      toast.error(parseApiError(e));
-    } finally {
-      setCommandMediaDownloading((prev) => {
-        const next = { ...prev };
-        delete next[r.id];
-        return next;
-      });
-    }
-  };
-
-  const removeCommandMedia = async (id: string) => {
-    if (!token) return;
-    setCommandMediaDeleteConfirmId(null);
-    setCommandMediaDeletingId(id);
-    try {
-      await apiJson(`/documents/${id}`, { token, method: 'DELETE' });
-      toast.success('Deleted');
-      load();
-    } catch (e) {
-      toast.error(parseApiError(e));
-    } finally {
-      setCommandMediaDeletingId(null);
-    }
-  };
-
   const resetProjectForm = () => {
     setProjectEditingId(null);
     setClientForm({
@@ -791,7 +636,6 @@ export function InternalManagement() {
             ['shipments', 'Shipments'],
             ['contracts', 'Contracts'],
             ['documents', 'Documents'],
-            ['commandMedia', 'Command Media'],
             ['projectHistory', 'Project History'],
             ['managementAssignments', 'Management Assignments'],
             ['profit', 'Profit'],
@@ -1849,150 +1693,6 @@ export function InternalManagement() {
         </div>
       )}
 
-      {tab === 'commandMedia' && (
-        <>
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Add document</h2>
-              <form onSubmit={submitCommandMedia}>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    gap: '0.75rem',
-                    alignItems: 'end',
-                  }}
-                >
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Type *</label>
-                    <select
-                      className="input"
-                      value={commandMedia.documentType}
-                      onChange={(e) => setCommandMedia((p) => ({ ...p, documentType: e.target.value }))}
-                    >
-                      {COMMAND_MEDIA_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Document Number *</label>
-                    <input
-                      className="input"
-                      value={commandMedia.documentNumber}
-                      onChange={(e) => setCommandMedia((p) => ({ ...p, documentNumber: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Name *</label>
-                    <input
-                      className="input"
-                      value={commandMedia.name}
-                      onChange={(e) => setCommandMedia((p) => ({ ...p, name: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Revision</label>
-                    <input
-                      className="input"
-                      value={commandMedia.revision}
-                      onChange={(e) => setCommandMedia((p) => ({ ...p, revision: e.target.value }))}
-                    />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">File (optional)</label>
-                    <input
-                      ref={commandMediaFileInputRef}
-                      className="input"
-                      type="file"
-                      onChange={(e) => setCommandMedia((p) => ({ ...p, file: e.target.files?.[0] ?? null }))}
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={commandMediaSubmitting}>
-                    {commandMediaSubmitting ? 'Creating…' : 'Create'}
-                  </button>
-                </div>
-                {commandMediaUploadProgress !== null && (
-                  <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                    Upload progress: {commandMediaUploadProgress}%
-                  </div>
-                )}
-              </form>
-            </div>
-          </div>
-
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Library</h2>
-              <div className="table-wrap">
-                {commandMediaRows.length === 0 ? (
-                  <p className="table-empty">No documents.</p>
-                ) : (
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Number</th>
-                        <th>Name</th>
-                        <th>Revision</th>
-                        <th>View</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commandMediaRows.map((r) => (
-                        <tr key={r.id}>
-                          <td>{commandMediaTypeLabel(r.documentType)}</td>
-                          <td>{r.documentNumber}</td>
-                          <td>{r.name}</td>
-                          <td>{r.revision ?? '—'}</td>
-                          <td>
-                            {r.filePath ? (
-                              <button
-                                type="button"
-                                className="btn"
-                                onClick={() => void downloadCommandMedia(r)}
-                                disabled={commandMediaDownloading[r.id] !== undefined}
-                                style={commandMediaDownloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
-                              >
-                                {commandMediaDownloading[r.id] !== undefined ? (
-                                  <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    <progress value={commandMediaDownloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
-                                    <span>{commandMediaDownloading[r.id]}%</span>
-                                  </span>
-                                ) : (
-                                  'Download'
-                                )}
-                              </button>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              disabled={commandMediaDeletingId === r.id}
-                              onClick={() => setCommandMediaDeleteConfirmId(r.id)}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
       <ConfirmDialog
         open={deleteConfirmId !== null}
         title="Delete internal document"
@@ -2016,18 +1716,6 @@ export function InternalManagement() {
           void removeSchedule(scheduleDeleteId);
         }}
         onCancel={() => setScheduleDeleteId(null)}
-      />
-      <ConfirmDialog
-        open={commandMediaDeleteConfirmId !== null}
-        title="Delete document"
-        message="Delete this document? This cannot be undone."
-        confirmLabel="Delete"
-        variant="danger"
-        onConfirm={() => {
-          if (!commandMediaDeleteConfirmId) return;
-          void removeCommandMedia(commandMediaDeleteConfirmId);
-        }}
-        onCancel={() => setCommandMediaDeleteConfirmId(null)}
       />
     </div>
   );
