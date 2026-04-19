@@ -6,7 +6,7 @@ interface LaborCostRow {
   id: string;
   code: string;
   workLogId: string | null;
-  workLog: { id: string; code: string; projectHistoryId: string | null } | null;
+  workLog: { id: string; code: string; projectHistoryId: string | null; workDate: string } | null;
   projectHistoryId: string | null;
   projectHistory: { id: string; projectCode: string } | null;
   fullName: string;
@@ -37,6 +37,12 @@ interface UserOption {
   email: string;
   isEmployee?: boolean;
   hourlyRate?: number | null;
+}
+
+function formatLaborCostDate(r: LaborCostRow): string {
+  const w = r.workLog?.workDate;
+  if (w) return w.slice(0, 10);
+  return r.createdAt.slice(0, 10);
 }
 
 export function AdminLaborCostsPanel({
@@ -233,6 +239,7 @@ export function AdminLaborCostsPanel({
                   <th>Cost ID</th>
                   <th>Log ID</th>
                   <th>Project</th>
+                  <th>Date</th>
                   <th>Full Name</th>
                   <th>Hours</th>
                   <th>Rate</th>
@@ -247,6 +254,7 @@ export function AdminLaborCostsPanel({
                     <td>{r.code}</td>
                     <td>{r.workLog?.code ?? r.workLogId ?? '—'}</td>
                     <td>{r.projectHistory?.projectCode ?? r.projectHistoryId ?? r.workLog?.projectHistoryId ?? '—'}</td>
+                    <td title={r.workLog?.workDate ? 'Work log date' : 'Created date'}>{formatLaborCostDate(r)}</td>
                     <td>{r.fullName}</td>
                     <td>{r.hours}</td>
                     <td>{r.rate}</td>

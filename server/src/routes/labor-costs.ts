@@ -30,7 +30,7 @@ router.get(
     const rows = await prisma.laborCost.findMany({
       where: all ? {} : { createdById: req.user.id },
       include: {
-        workLog: { select: { id: true, code: true, projectHistoryId: true } },
+        workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
         projectHistory: { select: { id: true, projectCode: true } },
         createdBy: { select: { id: true, name: true, email: true } },
       },
@@ -113,7 +113,7 @@ router.post(
         createdById: req.user.id,
       },
       include: {
-        workLog: { select: { id: true, code: true, projectHistoryId: true } },
+        workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
         projectHistory: { select: { id: true, projectCode: true } },
         createdBy: { select: { id: true, name: true, email: true } },
       },
@@ -159,7 +159,7 @@ router.patch(
       where: { id },
       data: { paidStatus: raw as PaidStatus },
       include: {
-        workLog: { select: { id: true, code: true, projectHistoryId: true } },
+        workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
         projectHistory: { select: { id: true, projectCode: true } },
         createdBy: { select: { id: true, name: true, email: true } },
       },
