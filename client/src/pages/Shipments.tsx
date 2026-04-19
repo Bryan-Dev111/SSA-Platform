@@ -78,9 +78,13 @@ function openShipmentRequestsSubtitle(m: Metrics): string {
 }
 
 function onTimeDeliverySubtitle(m: Metrics): string {
-  const late = m.shortDeliveries ?? 0;
-  if (late <= 0) return 'No Late POs';
-  return `${late} Late PO`;
+  const lateVs = m.lateVsSchedule ?? 0;
+  const qtyShort = m.shortDeliveries ?? 0;
+  if (lateVs <= 0 && qtyShort <= 0) return 'No late vs schedule';
+  const parts: string[] = [];
+  if (lateVs > 0) parts.push(`${lateVs} late vs schedule`);
+  if (qtyShort > 0) parts.push(`${qtyShort} qty short vs plan`);
+  return parts.join(' · ');
 }
 
 const SHIPMENT_TABLE_STATUS_RANK: Record<string, number> = {
@@ -97,15 +101,18 @@ function openShipmentRequestsAlertProps(m: Metrics):
         partNumber: string | null;
         missingQty: number;
       }>;
+      lateVsSchedule: number;
+      lateVsScheduleDetails: Array<{ purchaseOrder: string | null; qty: number | null }>;
     }
   | undefined {
-  const late = m.shortDeliveries ?? 0;
-  // Alert triangle should only reflect "quantity short vs planned" (late),
-  // not overdue inspection dates.
-  if (late <= 0) return undefined;
+  const qtyShort = m.shortDeliveries ?? 0;
+  const lateVs = m.lateVsSchedule ?? 0;
+  if (qtyShort <= 0 && lateVs <= 0) return undefined;
   return {
-    shortDeliveries: late,
+    shortDeliveries: qtyShort,
     shortDetails: m.shortDeliveryDetails ?? [],
+    lateVsSchedule: lateVs,
+    lateVsScheduleDetails: m.lateDetails ?? [],
   };
 }
 
@@ -923,6 +930,8 @@ function Metric({
       partNumber: string | null;
       missingQty: number;
     }>;
+    lateVsSchedule: number;
+    lateVsScheduleDetails: Array<{ purchaseOrder: string | null; qty: number | null }>;
   };
 }) {
   const cardClass =
@@ -943,6 +952,8 @@ function Metric({
           <ShipmentMetricAlertIcon
             shortDeliveries={openShipmentRequestsAlert.shortDeliveries}
             shortDetails={openShipmentRequestsAlert.shortDetails}
+            lateVsSchedule={openShipmentRequestsAlert.lateVsSchedule}
+            lateVsScheduleDetails={openShipmentRequestsAlert.lateVsScheduleDetails}
           />
         ) : null}
         <div

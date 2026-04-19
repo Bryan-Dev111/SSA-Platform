@@ -17,9 +17,16 @@ export type ShipmentOverdueInspectionDetail = {
   qty: number | null;
 };
 
+export type ShipmentLateVsScheduleDetail = {
+  purchaseOrder: string | null;
+  qty: number | null;
+};
+
 export function ShipmentMetricAlertIcon({
   shortDeliveries,
   shortDetails,
+  lateVsSchedule = 0,
+  lateVsScheduleDetails = [],
   overdueInspectionCount = 0,
   overdueInspectionDetails = [],
   includeOverdueInspectionInTooltip = true,
@@ -27,6 +34,9 @@ export function ShipmentMetricAlertIcon({
 }: {
   shortDeliveries: number;
   shortDetails: ShipmentShortDeliveryDetail[];
+  /** Inspection completed after schedule, or still waiting past schedule — matches OTD late count. */
+  lateVsSchedule?: number;
+  lateVsScheduleDetails?: ShipmentLateVsScheduleDetail[];
   overdueInspectionCount?: number;
   overdueInspectionDetails?: ShipmentOverdueInspectionDetail[];
   /** Dashboard: omit "Overdue inspection" from the hover panel; Shipments page keeps both (default true). */
@@ -58,6 +68,17 @@ export function ShipmentMetricAlertIcon({
   }, []);
 
   const tooltipBlocks: { heading: string; lines: string[] }[] = [];
+  if (lateVsSchedule > 0) {
+    const lines =
+      lateVsScheduleDetails.length > 0
+        ? lateVsScheduleDetails.map((d) => {
+            const po = d.purchaseOrder?.trim() ? d.purchaseOrder.trim() : '—';
+            const q = d.qty != null ? String(d.qty) : '—';
+            return `PO: ${po} · Qty: ${q}`;
+          })
+        : [`${lateVsSchedule} late vs planned schedule (details unavailable)`];
+    tooltipBlocks.push({ heading: 'Late vs schedule (OTD)', lines });
+  }
   if (shortDeliveries > 0) {
     const lines =
       shortDetails.length > 0

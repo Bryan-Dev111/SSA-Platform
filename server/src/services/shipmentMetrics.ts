@@ -140,6 +140,14 @@ export async function computeShipmentMetrics(
         overdueWaiting++;
         overdueDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
       }
+      // Past the scheduled ship/inspect window with no Passed/Failed result yet — counts as OTD late.
+      const schWait = findMatchingSchedule(sh, scopedSchedules);
+      const schedWaitDay = schWait?.scheduledDate ? dateOnlyMs(schWait.scheduledDate) : null;
+      if (schedWaitDay !== null && startOfTodayUtc > schedWaitDay) {
+        otdLate++;
+        lateVsSchedule++;
+        lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
+      }
       continue;
     }
 
@@ -170,9 +178,13 @@ export async function computeShipmentMetrics(
             lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
           }
         } else if (sh.status === 'Failed' || sh.result === 'Failed') {
+          // OTD measures timeliness vs schedule (not quality); late failed inspections are OTD misses.
           if (inspDay > schedDay) {
+            otdLate++;
             lateVsSchedule++;
             lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
+          } else {
+            otdOnTime++;
           }
         }
       }
