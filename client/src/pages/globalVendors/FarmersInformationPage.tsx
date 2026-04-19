@@ -1,11 +1,12 @@
 /**
  * Global Vendors — Farmer Information: list farms, add via modal.
  */
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
+import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 
 export interface FarmRow {
   id: string;
@@ -55,6 +56,74 @@ export interface FarmRow {
   relationshipStatus?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+function farmRowToExportRow(f: FarmRow): ExportRow {
+  const mainHarvest =
+    f.harvestStartMonth && f.harvestEndMonth
+      ? `${f.harvestStartMonth}–${f.harvestEndMonth}`
+      : '—';
+  const secondaryHarvest =
+    f.secondaryHarvestStartMonth && f.secondaryHarvestEndMonth
+      ? `${f.secondaryHarvestStartMonth}–${f.secondaryHarvestEndMonth}`
+      : '—';
+  const created = new Date(f.createdAt).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  return {
+    'Farm ID': f.code,
+    'Farm name': f.farmName,
+    'Farmer name': f.farmerName,
+    Country: f.country,
+    Region: f.region ?? '—',
+    'Farm category': f.farmCategory ?? '—',
+    'Main crop': f.mainCrop ?? '—',
+    'Elevation (m)': typeof f.elevationMeters === 'number' ? f.elevationMeters : '—',
+    'Production style': f.productionStyle ?? '—',
+    City: f.city ?? '—',
+    'Total farm size (ha)': typeof f.totalFarmSizeHa === 'number' ? f.totalFarmSizeHa : '—',
+    'Main crop area (ha)': typeof f.mainCropAreaHa === 'number' ? f.mainCropAreaHa : '—',
+    'Main crop annual output (kg)':
+      typeof f.mainCropAnnualOutputKg === 'number' ? f.mainCropAnnualOutputKg : '—',
+    'Secondary crop': f.secondaryCrop ?? '—',
+    'Secondary area (ha)': typeof f.secondaryCropAreaHa === 'number' ? f.secondaryCropAreaHa : '—',
+    'Secondary annual output (kg)':
+      typeof f.secondaryCropAnnualOutputKg === 'number' ? f.secondaryCropAnnualOutputKg : '—',
+    'Main varieties': f.mainVarieties ?? '—',
+    'Secondary varieties': f.secondaryVarieties ?? '—',
+    'Main harvest window': mainHarvest,
+    'Secondary harvest window': secondaryHarvest,
+    'Main processing': f.mainProcessingMethods ?? '—',
+    'Main fermentation (days)':
+      typeof f.mainFermentationDays === 'number' ? f.mainFermentationDays : '—',
+    'Main drying': f.mainDryingMethod ?? '—',
+    'Main bean size': f.mainBeanSize ?? '—',
+    'Main quality score': typeof f.mainQualityScore === 'number' ? f.mainQualityScore : '—',
+    'Secondary processing': f.secondaryProcessingMethods ?? '—',
+    'Secondary fermentation (days)':
+      typeof f.secondaryFermentationDays === 'number' ? f.secondaryFermentationDays : '—',
+    'Secondary drying': f.secondaryDryingMethod ?? '—',
+    'Secondary bean size': f.secondaryBeanSize ?? '—',
+    'Secondary quality score':
+      typeof f.secondaryQualityScore === 'number' ? f.secondaryQualityScore : '—',
+    Language: f.language ?? '—',
+    'Samples OK': f.samplesOk == null ? '—' : f.samplesOk ? 'Yes' : 'No',
+    'Farmer email': f.farmerEmail ?? '—',
+    'Farmer mobile': f.farmerMobile ?? '—',
+    Latitude: typeof f.latitude === 'number' ? f.latitude : '—',
+    Longitude: typeof f.longitude === 'number' ? f.longitude : '—',
+    Created: created,
+    ...(origin
+      ? {
+          'Profile URL': `${origin}/global-vendors/farmers/${f.id}/profile`,
+          'Processing URL': `${origin}/global-vendors/farmers/${f.id}/processing`,
+        }
+      : {}),
+  };
 }
 
 export function FarmersInformationPage() {
@@ -213,6 +282,21 @@ export function FarmersInformationPage() {
     }
   };
 
+  const exportToExcel = useCallback(() => {
+    if (farms.length === 0) {
+      toast.info('No farms to export yet.');
+      return;
+    }
+    try {
+      const rows = farms.map(farmRowToExportRow);
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTableXlsx(`Farmer_Information_${stamp}`, 'Farmer Information', rows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  }, [farms, toast]);
+
   if (loading && farms.length === 0) {
     return (
       <div className="page">
@@ -245,9 +329,20 @@ export function FarmersInformationPage() {
         style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
       >
         <h1 className="page-title">Farmer Information</h1>
-        <button type="button" className="btn btn-primary" onClick={() => setModalOpen(true)}>
-          Add farmer
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={exportToExcel}
+            disabled={loading}
+            title="Download the current table as an Excel file"
+          >
+            Export to Excel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => setModalOpen(true)}>
+            Add farmer
+          </button>
+        </div>
       </header>
 
       <div className="card">
