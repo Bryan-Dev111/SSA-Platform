@@ -965,6 +965,13 @@ function formatUserRoleLabel(roleName: string): string {
   return roleName;
 }
 
+/** Buyer dropdown / tables: show profile name and login email (username). */
+function formatBuyerDisplayLabel(b: Pick<UserRow, 'name' | 'email'>): string {
+  const displayName = b.name?.trim();
+  if (displayName) return `${displayName} — ${b.email}`;
+  return b.email;
+}
+
 interface PermissionPageDef {
   key: string;
   label: string;
@@ -2088,7 +2095,7 @@ export function AdminBuyersSuppliersPanel({
                 <option value="">Select buyer</option>
                 {buyers.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.email}
+                    {formatBuyerDisplayLabel(b)}
                   </option>
                 ))}
               </select>
@@ -2137,7 +2144,10 @@ export function AdminBuyersSuppliersPanel({
                     b.assignedSupplierIds.length === 0
                       ? [
                           <tr key={b.id}>
-                            <td>{b.email}</td>
+                            <td>
+                              <div>{b.name?.trim() || '—'}</div>
+                              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{b.email}</div>
+                            </td>
                             <td colSpan={2} className="table-empty">
                               None
                             </td>
@@ -2147,7 +2157,10 @@ export function AdminBuyersSuppliersPanel({
                           const sup = suppliers.find((x) => x.id === sid);
                           return (
                             <tr key={`${b.id}-${sid}`}>
-                              <td>{b.email}</td>
+                              <td>
+                                <div>{b.name?.trim() || '—'}</div>
+                                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{b.email}</div>
+                              </td>
                               <td>{sup ? `${sup.code} — ${sup.name}` : sid}</td>
                               <td>
                                 <button type="button" className="btn btn-ghost" onClick={() => unassign(b.id, sid)} disabled={busy}>
