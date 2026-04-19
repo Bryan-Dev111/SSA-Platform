@@ -484,7 +484,7 @@ export function SupplierProfile() {
         <>
       <div style={{ marginBottom: '0.75rem' }}>
         <strong>
-          {supplier.code} — {supplier.name}
+          {supplier.code}: {supplier.name}
         </strong>
       </div>
 
@@ -835,7 +835,7 @@ export function SupplierProfile() {
               <tr key={s.id}>
                 <td>{s.code ?? '—'}</td>
                 <td>
-                  {supplier?.code ?? '—'} — {supplier?.name ?? ''}
+                  {supplier?.code ?? '—'}: {supplier?.name ?? ''}
                 </td>
                 <td>{s.purchaseOrder ?? '—'}</td>
                 <td>{s.partNumber ?? '—'}</td>

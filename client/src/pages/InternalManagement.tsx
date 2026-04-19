@@ -864,7 +864,7 @@ export function InternalManagement() {
                     <option value="">Select</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.code} — {s.name}
+                        {s.code}: {s.name}
                       </option>
                     ))}
                   </select>
@@ -973,7 +973,7 @@ export function InternalManagement() {
                       <option value="">Select</option>
                       {suppliers.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.code} — {s.name}
+                          {s.code}: {s.name}
                         </option>
                       ))}
                     </select>
@@ -1090,7 +1090,7 @@ export function InternalManagement() {
                       {sortedSchedules.map((r) => (
                         <tr key={r.id}>
                           <td>
-                            {r.supplier ? `${r.supplier.code} — ${r.supplier.name}` : '—'}
+                            {r.supplier ? `${r.supplier.code}: ${r.supplier.name}` : '—'}
                           </td>
                           <td>{r.purchaseOrder ?? '—'}</td>
                           <td>{r.partNumber ?? '—'}</td>
@@ -1611,7 +1611,7 @@ export function InternalManagement() {
                       <option value="">None</option>
                       {suppliers.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.code} — {s.name}
+                          {s.code}: {s.name}
                         </option>
                       ))}
                     </select>
@@ -1756,7 +1756,7 @@ export function InternalManagement() {
                     <option value="">All suppliers</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.code} — {s.name}
+                        {s.code}: {s.name}
                       </option>
                     ))}
                   </select>
@@ -1872,7 +1872,7 @@ export function InternalManagement() {
                           <td>{r.clientName}</td>
                           <td>{r.companyName}</td>
                           <td>{r.buyer ? (r.buyer.name?.trim() || r.buyer.email) : '—'}</td>
-                          <td>{r.supplier ? `${r.supplier.code} — ${r.supplier.name}` : '—'}</td>
+                          <td>{r.supplier ? `${r.supplier.code}: ${r.supplier.name}` : '—'}</td>
                           <td>{r.clientEmail ?? '—'}</td>
                           <td>{r.clientMobile ?? '—'}</td>
                           <td>{r.industry ?? '—'}</td>
@@ -1947,7 +1947,7 @@ export function InternalManagement() {
                   <tbody>
                     {sortedManagementAssignments.map((row) => (
                       <tr key={row.supplier?.id ?? '__unassigned__'}>
-                        <td>{row.supplier ? `${row.supplier.code} — ${row.supplier.name}` : 'No supplier assigned'}</td>
+                        <td>{row.supplier ? `${row.supplier.code}: ${row.supplier.name}` : 'No supplier assigned'}</td>
                         <td>
                           <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
                             {row.activeProjects.map((p) => (

@@ -220,7 +220,7 @@ router.patch(
         category: 'rejectedShipmentDocument',
         entityType: 'Record',
         entityId: updated.id,
-        message: `Record ${updated.name} was rejected${updated.supplier ? ` for ${updated.supplier.code} — ${updated.supplier.name}` : ''}.`,
+        message: `Record ${updated.name} was rejected${updated.supplier ? ` for ${updated.supplier.code}: ${updated.supplier.name}` : ''}.`,
       });
     }
     res.json(updated);

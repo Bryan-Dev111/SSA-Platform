@@ -160,7 +160,7 @@ export function Audits() {
   const auditsBySupplier = useMemo(() => {
     const map = new Map<string, { label: string; count: number }>();
     for (const a of audits) {
-      const current = map.get(a.supplierId) ?? { label: `${a.supplier.code} — ${a.supplier.name}`, count: 0 };
+      const current = map.get(a.supplierId) ?? { label: `${a.supplier.code}: ${a.supplier.name}`, count: 0 };
       current.count += 1;
       map.set(a.supplierId, current);
     }
@@ -372,7 +372,7 @@ export function Audits() {
             <option value="">All</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
+                {s.code}: {s.name}
               </option>
             ))}
           </select>
@@ -500,7 +500,7 @@ export function Audits() {
                         {a.code}
                       </Link>
                     </td>
-                    <td>{a.supplier.code} — {a.supplier.name}</td>
+                    <td>{a.supplier.code}: {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate)}</td>
                     <td>{a.auditType?.name?.trim() ? a.auditType.name : '—'}</td>
                     <td style={{ maxWidth: 280, whiteSpace: 'normal', verticalAlign: 'top' }}>
@@ -765,7 +765,7 @@ export function Audits() {
               Add record — {recordUploadAudit.code}
             </h3>
             <p style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-              {recordUploadAudit.supplier.code} — {recordUploadAudit.supplier.name}
+              {recordUploadAudit.supplier.code}: {recordUploadAudit.supplier.name}
             </p>
             <form onSubmit={submitRecordFromAuditRow}>
               <div className="input-group">

@@ -251,7 +251,7 @@ export function AdminEmployeeAssignmentsPanel({
                 <option value="">Select Supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
+                    {s.code}: {s.name}
                   </option>
                 ))}
               </select>
@@ -298,7 +298,7 @@ export function AdminEmployeeAssignmentsPanel({
                         <tr key={`${a.id}-${sid}`}>
                           <td>{a.name?.trim() ? a.name : a.email}</td>
                           <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
-                          <td>{sup ? `${sup.code} — ${sup.name}` : sid}</td>
+                          <td>{sup ? `${sup.code}: ${sup.name}` : sid}</td>
                           <td>
                             <button type="button" className="btn btn-ghost" onClick={() => void removeEmployeeSupplier(a.id, sid)} disabled={busy}>
                               Remove
@@ -385,7 +385,7 @@ export function AdminEmployeeAssignmentsPanel({
                           : supplierIds
                               .map((sid) => {
                                 const sup = supplierById[sid];
-                                return sup ? `${sup.code} — ${sup.name}` : sid;
+                                return sup ? `${sup.code}: ${sup.name}` : sid;
                               })
                               .join(', ');
 

@@ -418,7 +418,7 @@ export function Shipments() {
                   <option value="">All in scope</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.code} — {s.name}
+                      {s.code}: {s.name}
                     </option>
                   ))}
                 </select>
@@ -689,7 +689,7 @@ export function Shipments() {
                       <td style={{ fontWeight: 600 }}>{r.code ?? '—'}</td>
                       <td>
                         <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-                          {r.supplier?.code ?? '—'} — {r.supplier?.name ?? ''}
+                          {r.supplier?.code ?? '—'}: {r.supplier?.name ?? ''}
                         </span>
                       </td>
                       <td>{r.purchaseOrder ?? '—'}</td>

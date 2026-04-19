@@ -238,7 +238,7 @@ export function Dashboard() {
             <option value="">All in scope</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
+                {s.code}: {s.name}
               </option>
             ))}
           </select>
@@ -325,7 +325,7 @@ export function Dashboard() {
                             : 'N/A'}
                         </span>
                         <span>
-                          <strong>{e.type}</strong> {e.code} - {e.supplierCode} — {e.supplierName}
+                          <strong>{e.type}</strong> {e.code} - {e.supplierCode}: {e.supplierName}
                         </span>
                       </div>
                     ))}
@@ -365,8 +365,8 @@ export function Dashboard() {
                         <td title={u.code} style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {u.code}
                         </td>
-                        <td title={u.supplierCode ? `${u.supplierCode} — ${u.supplierName}` : u.supplierName} style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {u.supplierCode} — {u.supplierName}
+                        <td title={u.supplierCode ? `${u.supplierCode}: ${u.supplierName}` : u.supplierName} style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {u.supplierCode}: {u.supplierName}
                         </td>
                       </tr>
                     ))}

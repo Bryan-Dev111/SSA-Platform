@@ -818,7 +818,7 @@ export function CARRecord() {
                   >
                     <option value="">Select</option>
                     {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+                      <option key={s.id} value={s.id}>{s.code}: {s.name}</option>
                     ))}
                   </select>
                 </div>

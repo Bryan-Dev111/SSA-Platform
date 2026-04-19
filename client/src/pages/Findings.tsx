@@ -226,7 +226,7 @@ export function Findings() {
     try {
       const rows: ExportRow[] = sortedList.map((f) => ({
         Code: f.code,
-        Supplier: `${f.supplier.code} — ${f.supplier.name}`,
+        Supplier: `${f.supplier.code}: ${f.supplier.name}`,
         Audit: f.audit?.code ?? 'None',
         Shipment: f.shipment?.code?.trim() || f.shipment?.id || '—',
         Severity: f.severity,
@@ -317,7 +317,7 @@ export function Findings() {
           >
             <option value="">All</option>
             {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+              <option key={s.id} value={s.id}>{s.code}: {s.name}</option>
             ))}
           </select>
         </label>
@@ -506,7 +506,7 @@ export function Findings() {
                               {f.code}
                             </Link>
                           </td>
-                          <td>{f.supplier.code} — {f.supplier.name}</td>
+                          <td>{f.supplier.code}: {f.supplier.name}</td>
                           <td>{f.audit?.code ?? '—'}</td>
                           <td>
                             {f.shipment ? (

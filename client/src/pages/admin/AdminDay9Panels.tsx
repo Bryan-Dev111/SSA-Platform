@@ -2106,7 +2106,7 @@ export function AdminBuyersSuppliersPanel({
                 <option value="">Select supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
+                    {s.code}: {s.name}
                   </option>
                 ))}
               </select>
@@ -2161,7 +2161,7 @@ export function AdminBuyersSuppliersPanel({
                                 <div>{b.name?.trim() || '—'}</div>
                                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{b.email}</div>
                               </td>
-                              <td>{sup ? `${sup.code} — ${sup.name}` : sid}</td>
+                              <td>{sup ? `${sup.code}: ${sup.name}` : sid}</td>
                               <td>
                                 <button type="button" className="btn btn-ghost" onClick={() => unassign(b.id, sid)} disabled={busy}>
                                   Remove
@@ -2198,7 +2198,7 @@ export function AdminBuyersSuppliersPanel({
                   <option value="">Select supplier</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.code} — {s.name}
+                      {s.code}: {s.name}
                     </option>
                   ))}
                 </select>
@@ -2248,7 +2248,7 @@ export function AdminBuyersSuppliersPanel({
                   ) : (
                     suppliers.map((s) => (
                       <tr key={`link-${s.id}`}>
-                        <td>{s.code} — {s.name}</td>
+                        <td>{s.code}: {s.name}</td>
                         <td>{s.user ? (s.user.name?.trim() ? `${s.user.name} (${s.user.email})` : s.user.email) : '—'}</td>
                         <td>
                           {s.user ? (

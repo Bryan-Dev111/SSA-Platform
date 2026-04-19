@@ -368,7 +368,7 @@ router.post(
       category: 'shipmentInspectionRequest',
       entityType: 'Shipment',
       entityId: shipment.id,
-      message: `Shipment inspection request for ${shipment.supplier.code} — ${shipment.supplier.name} (${shipment.purchaseOrder || 'PO-N/A'}).`,
+      message: `Shipment inspection request for ${shipment.supplier.code}: ${shipment.supplier.name} (${shipment.purchaseOrder || 'PO-N/A'}).`,
     });
     res.status(201).json(shipment);
   })
@@ -476,7 +476,7 @@ router.patch(
           category: 'rejectedShipmentDocument',
           entityType: 'Shipment',
           entityId: updated.id,
-          message: `Shipment ${updated.purchaseOrder || updated.id} was rejected for ${updated.supplier.code} — ${updated.supplier.name}.`,
+          message: `Shipment ${updated.purchaseOrder || updated.id} was rejected for ${updated.supplier.code}: ${updated.supplier.name}.`,
         });
       }
 

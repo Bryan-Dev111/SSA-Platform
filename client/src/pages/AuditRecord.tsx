@@ -149,7 +149,7 @@ export function AuditRecord() {
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Supplier</label>
                 <div className="input" style={{ userSelect: 'text' }}>
-                  {audit.supplier.code} — {audit.supplier.name}
+                  {audit.supplier.code}: {audit.supplier.name}
                 </div>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>

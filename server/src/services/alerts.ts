@@ -71,7 +71,7 @@ export async function backfillOverdueAuditAlerts(): Promise<void> {
       category: 'overdueAudit',
       entityType: 'Audit',
       entityId: audit.id,
-      message: `Overdue audit ${audit.code} for ${audit.supplier.code} — ${audit.supplier.name}.`,
+      message: `Overdue audit ${audit.code} for ${audit.supplier.code}: ${audit.supplier.name}.`,
     });
   }
 }
@@ -91,7 +91,7 @@ export async function backfillOverdueCarAlerts(): Promise<void> {
       category: 'overdueCAR',
       entityType: 'CAR',
       entityId: car.id,
-      message: `Overdue CAR ${car.code} for ${car.supplier.code} — ${car.supplier.name}.`,
+      message: `Overdue CAR ${car.code} for ${car.supplier.code}: ${car.supplier.name}.`,
     });
   }
 }
@@ -115,7 +115,7 @@ export async function backfillLateShipmentAlerts(): Promise<void> {
       category: 'lateShipment',
       entityType: 'Shipment',
       entityId: shipment.id,
-      message: `Late shipment ${shipment.purchaseOrder || shipment.id} for ${shipment.supplier.code} — ${shipment.supplier.name}.`,
+      message: `Late shipment ${shipment.purchaseOrder || shipment.id} for ${shipment.supplier.code}: ${shipment.supplier.name}.`,
     });
   }
 }

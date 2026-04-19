@@ -448,7 +448,7 @@ export function Records() {
                 <option value="">All in scope</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.code} — {s.name}
+                    {s.code}: {s.name}
                   </option>
                 ))}
               </select>

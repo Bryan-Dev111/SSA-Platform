@@ -262,7 +262,7 @@ router.post(
         category: 'majorCriticalFinding',
         entityType: 'Finding',
         entityId: finding.id,
-        message: `${finding.severity} finding ${finding.code} created for ${finding.supplier.code} — ${finding.supplier.name}.`,
+        message: `${finding.severity} finding ${finding.code} created for ${finding.supplier.code}: ${finding.supplier.name}.`,
       });
     }
     res.status(201).json(finding);

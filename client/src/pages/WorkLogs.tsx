@@ -311,7 +311,7 @@ export function WorkLogs() {
                   <option value="">None</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.code} — {s.name}
+                      {s.code}: {s.name}
                     </option>
                   ))}
                 </select>

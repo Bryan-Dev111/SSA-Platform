@@ -716,7 +716,7 @@ export function FindingsRecord() {
                   >
                     <option value="">Select</option>
                     {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+                      <option key={s.id} value={s.id}>{s.code}: {s.name}</option>
                     ))}
                   </select>
                 </div>
@@ -823,7 +823,7 @@ export function FindingsRecord() {
                   <label className="input-label">Supplier</label>
                   <input
                     className="input"
-                    value={finding.supplier ? `${finding.supplier.code} — ${finding.supplier.name}` : ''}
+                    value={finding.supplier ? `${finding.supplier.code}: ${finding.supplier.name}` : ''}
                     readOnly
                     disabled
                   />

@@ -247,7 +247,7 @@ export function CorrectiveActions() {
     try {
       const rows: ExportRow[] = sortedList.map((c) => ({
         Code: c.code,
-        Supplier: `${c.supplier.code} — ${c.supplier.name}`,
+        Supplier: `${c.supplier.code}: ${c.supplier.name}`,
         Audit: c.audit.code,
         Finding: c.finding?.code ?? 'None',
         'Defect code': c.defectCode?.trim() ? c.defectCode : '—',
@@ -366,7 +366,7 @@ export function CorrectiveActions() {
           >
             <option value="">All</option>
             {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+              <option key={s.id} value={s.id}>{s.code}: {s.name}</option>
             ))}
           </select>
         </label>
@@ -689,7 +689,7 @@ export function CorrectiveActions() {
                         {c.code}
                       </Link>
                     </td>
-                    <td>{c.supplier.code} — {c.supplier.name}</td>
+                    <td>{c.supplier.code}: {c.supplier.name}</td>
                     <td>
                       <Link
                         to={`/audit-record?id=${encodeURIComponent(c.audit.id)}`}

@@ -311,7 +311,7 @@ export function SuppliersMap() {
               ) : (
                 mapPins.map((s) => (
                   <tr key={s.id}>
-                    <td>{s.code} — {s.name}</td>
+                    <td>{s.code}: {s.name}</td>
                     <td>{s.city ?? '—'}</td>
                     <td>{s.country ?? '—'}</td>
                     <td>{s.risk?.level ?? 'N/A'}</td>
