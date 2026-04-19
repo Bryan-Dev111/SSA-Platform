@@ -443,7 +443,7 @@ export function CorrectiveActions() {
                           style={{
                             width: `${(count / maxRootCauseCount) * 100}%`,
                             height: '100%',
-                            background: '#0d9488',
+                            background: '#2563eb',
                             borderRadius: 4,
                             minWidth: count > 0 ? 4 : 0,
                           }}

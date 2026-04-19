@@ -227,7 +227,7 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                 width: 10,
                 height: 10,
                 borderRadius: 2,
-                background: 'var(--color-success-bg, #dcfce7)',
+                background: 'var(--color-success-bg, #dbeafe)',
                 marginRight: 6,
                 verticalAlign: 'middle',
                 border: '1px solid var(--color-border)',
@@ -308,7 +308,7 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                               it.kind === 'audit'
                                 ? 'var(--color-info-bg, #dbeafe)'
                                 : it.kind === 'shipment'
-                                  ? 'var(--color-success-bg, #dcfce7)'
+                                  ? 'var(--color-success-bg, #dbeafe)'
                                   : 'var(--color-warning-bg, #fef3c7)';
                             const inner =
                               it.kind === 'audit' ? (

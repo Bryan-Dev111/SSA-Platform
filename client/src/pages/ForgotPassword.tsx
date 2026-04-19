@@ -60,8 +60,8 @@ export function ForgotPassword() {
               marginBottom: '1rem',
               padding: '0.75rem 1rem',
               borderRadius: 8,
-              background: 'rgba(34, 197, 94, 0.12)',
-              border: '1px solid rgba(34, 197, 94, 0.35)',
+              background: 'rgba(37, 99, 235, 0.1)',
+              border: '1px solid rgba(37, 99, 235, 0.3)',
               color: 'var(--color-text, #111827)',
               fontSize: 'var(--text-sm)',
             }}
@@ -88,7 +88,7 @@ export function ForgotPassword() {
                 disabled={submitting}
               />
             </div>
-            <button type="submit" className="btn login-submit login-submit-teal" disabled={submitting}>
+            <button type="submit" className="btn login-submit login-submit-brand" disabled={submitting}>
               {submitting ? 'Sending…' : 'Send reset link'}
             </button>
           </form>

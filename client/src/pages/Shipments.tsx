@@ -823,7 +823,7 @@ export function Shipments() {
                               style={{
                                 fontSize: 'var(--text-sm)',
                                 padding: '0.35rem 0.65rem',
-                                background: 'var(--color-success)',
+                                background: 'var(--approve-green)',
                                 color: '#fff',
                               }}
                               disabled={savingId === r.id}

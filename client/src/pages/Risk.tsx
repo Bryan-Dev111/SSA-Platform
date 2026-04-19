@@ -1409,6 +1409,6 @@ function TrendFooter({ pct }: { pct: number | null }) {
 function getRiskLevelRowStyle(level: 'Low' | 'Medium' | 'High' | null | undefined): CSSProperties | undefined {
   if (level === 'High') return { backgroundColor: 'rgba(239, 68, 68, 0.12)' };
   if (level === 'Medium') return { backgroundColor: 'rgba(234, 179, 8, 0.16)' };
-  if (level === 'Low') return { backgroundColor: 'rgba(34, 197, 94, 0.12)' };
+  if (level === 'Low') return { backgroundColor: 'var(--risk-row-low-bg)' };
   return undefined;
 }

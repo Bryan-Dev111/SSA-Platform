@@ -142,7 +142,7 @@ export function Login() {
             </div>
           </div>
           {error && <div className="alert-error">{error}</div>}
-          <button type="submit" disabled={submitting} className="btn login-submit login-submit-teal">
+          <button type="submit" disabled={submitting} className="btn login-submit login-submit-brand">
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>

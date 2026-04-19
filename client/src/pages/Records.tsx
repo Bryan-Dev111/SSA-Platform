@@ -797,7 +797,7 @@ export function Records() {
                             <button
                               type="button"
                               className="btn"
-                              style={{ background: 'var(--color-success)', color: '#fff' }}
+                              style={{ background: 'var(--approve-green)', color: '#fff' }}
                               disabled={reviewingId === r.id || r.status === 'Approved'}
                               title={r.status === 'Approved' ? 'Already approved' : 'Approve'}
                               onClick={() => review(r.id, 'Approved')}

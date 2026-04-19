@@ -68,7 +68,7 @@ export function ResetPassword() {
         {success ? (
           <>
             <p style={{ marginBottom: '1rem' }}>Your password has been updated.</p>
-            <Link to="/login" className="btn login-submit login-submit-teal" style={{ textAlign: 'center', textDecoration: 'none' }}>
+            <Link to="/login" className="btn login-submit login-submit-brand" style={{ textAlign: 'center', textDecoration: 'none' }}>
               Sign in
             </Link>
           </>
@@ -121,7 +121,7 @@ export function ResetPassword() {
             </label>
             <button
               type="submit"
-              className="btn login-submit login-submit-teal"
+              className="btn login-submit login-submit-brand"
               disabled={submitting || !tokenFromUrl}
             >
               {submitting ? 'Saving…' : 'Update password'}
