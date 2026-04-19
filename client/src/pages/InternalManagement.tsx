@@ -16,18 +16,8 @@ import { AdminWorkLogsPanel } from './admin/AdminWorkLogsPanel';
 import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
-
-type ImTab =
-  | 'audits'
-  | 'shipments'
-  | 'contracts'
-  | 'documents'
-  | 'projectHistory'
-  | 'managementAssignments'
-  | 'profit'
-  | 'employeeAssignments'
-  | 'workLogs'
-  | 'laborCosts';
+import { InternalManagementOrgChart } from './InternalManagementOrgChart';
+import type { InternalManagementTab as ImTab } from './internalManagementTabs';
 
 interface InternalRow {
   id: string;
@@ -794,6 +784,7 @@ export function InternalManagement() {
         {(
           [
             ['audits', 'Audits'],
+            ['orgChart', 'Org Chart'],
             ['shipments', 'Shipments'],
             ['contracts', 'Contracts'],
             ['documents', 'Documents'],
@@ -817,6 +808,8 @@ export function InternalManagement() {
       </div>
 
       {error && <div className="alert-error">{error}</div>}
+
+      {tab === 'orgChart' && <InternalManagementOrgChart onGoToTab={setTab} />}
 
       {tab === 'audits' && (
         <div className="card" style={{ marginBottom: '1rem' }}>
