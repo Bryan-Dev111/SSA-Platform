@@ -63,7 +63,10 @@ export function requirePageAccess(pageName: string) {
         return;
       }
       const liveMap = await getApiPageRolesMatrix();
-      const allowedRoles = liveMap[pageName] ?? [];
+      let allowedRoles = liveMap[pageName] ?? [];
+      if (allowedRoles.length === 0) {
+        allowedRoles = API_PAGE_ROLES[pageName] ?? [];
+      }
       if (allowedRoles.length === 0) {
         res.status(403).json({ error: 'Insufficient permissions' });
         return;
@@ -96,7 +99,8 @@ export function requirePageAccessAny(pageNames: string[]) {
       }
       const liveMap = await getApiPageRolesMatrix();
       const ok = pageNames.some((pageName) => {
-        const allowedRoles = liveMap[pageName] ?? [];
+        let allowedRoles = liveMap[pageName] ?? [];
+        if (allowedRoles.length === 0) allowedRoles = API_PAGE_ROLES[pageName] ?? [];
         return (
           allowedRoles.length > 0 && req.user!.roleNames.some((r) => allowedRoles.includes(r))
         );

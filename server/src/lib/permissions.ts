@@ -110,35 +110,33 @@ export async function getPathRolesMatrix(): Promise<Record<string, string[]>> {
   for (const page of PAGE_DEFINITIONS) {
     const rowsForPage = permissions.filter((p) => p.pageKey === page.key);
     if (rowsForPage.length === 0) continue; // keep DEFAULT_PATH_ROLES fallback when no rows exist yet
-    pathRoles[page.path] = [];
+    const fromDb: string[] = [];
     for (const p of rowsForPage) {
       if (!p.canAccess) continue;
       const roleName = roleById.get(p.roleId);
       if (!roleName) continue;
-      pathRoles[page.path].push(roleName);
+      fromDb.push(roleName);
     }
+    const baseline = DEFAULT_PATH_ROLES[page.path] ?? [];
+    pathRoles[page.path] = [...new Set([...baseline, ...fromDb])];
   }
   return pathRoles;
 }
 
+/**
+ * Page-key → roles for `requirePageAccess(pageKey)`.
+ * Merges each path’s live matrix with code defaults so a partial DB matrix (e.g. Shipments missing Auditor)
+ * cannot drop roles below product defaults or yield an empty list (which would 403 every user).
+ */
 export async function getApiPageRolesMatrix(): Promise<Record<string, string[]>> {
   const pathRoles = await getPathRolesMatrix();
-  return {
-    ...DEFAULT_API_PAGE_ROLES,
-    Dashboard: pathRoles['/dashboard'] ?? [],
-    Risk: pathRoles['/risk'] ?? [],
-    CorrectiveActions: pathRoles['/corrective-actions'] ?? [],
-    Findings: pathRoles['/findings'] ?? [],
-    Audits: pathRoles['/audits'] ?? [],
-    SupplierList: pathRoles['/supplier-list'] ?? [],
-    Records: pathRoles['/records'] ?? [],
-    Documents: pathRoles['/documents'] ?? [],
-    Admin: pathRoles['/admin'] ?? [],
-    GlobalSupplyFarmers: pathRoles['/global-vendors/farmers'] ?? [],
-    GlobalSupplyApproved: pathRoles['/global-vendors/approved'] ?? [],
-    GlobalSupplyMap: pathRoles['/global-vendors/map'] ?? [],
-    GlobalSupplyRelationship: pathRoles['/global-vendors/relationship'] ?? [],
-    GlobalSupplyPurchaseOrders: pathRoles['/global-vendors/purchase-orders'] ?? [],
-    GlobalSupplySamples: pathRoles['/global-vendors/samples'] ?? [],
-  };
+  const merged: Record<string, string[]> = { ...DEFAULT_API_PAGE_ROLES };
+  for (const page of PAGE_DEFINITIONS) {
+    const key = page.key as keyof typeof DEFAULT_API_PAGE_ROLES;
+    const def = DEFAULT_API_PAGE_ROLES[key];
+    if (!Array.isArray(def) || def.length === 0) continue;
+    const fromPath = pathRoles[page.path] ?? [];
+    (merged as Record<string, string[]>)[page.key] = [...new Set([...def, ...fromPath])];
+  }
+  return merged;
 }
