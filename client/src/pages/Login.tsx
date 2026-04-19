@@ -25,8 +25,8 @@ export function Login() {
     return (
       <LoginBrandedShell>
         <div className="login-card">
-          <div className="loading-message" style={{ textAlign: 'center' }}>
-            <div className="loading-spinner" style={{ marginBottom: 12 }} />
+          <div className="loading-message login-loading">
+            <div className="loading-spinner" />
             Loading…
           </div>
         </div>
@@ -75,10 +75,12 @@ export function Login() {
   return (
     <LoginBrandedShell>
       <div className="login-card">
+        <div className="login-brand-row">
+          <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
+        </div>
         <div className="login-header">
-          <img src="/logo.png" alt="Sentinel" className="login-logo" />
-          <h1 className="login-title">Welcome</h1>
-          <p className="login-subtitle">Sign in to continue to your workspace.</p>
+          <h1 className="login-title">Sign in</h1>
+          <p className="login-subtitle">Continue to Supplier Assurance Platform</p>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">
@@ -92,8 +94,8 @@ export function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="input"
-              placeholder="you@company.com"
+              className="input login-input-soft"
+              placeholder="Enter your email"
             />
           </div>
           <div className="input-group">
@@ -108,8 +110,8 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="input"
-                placeholder="••••••••"
+                className="input login-input-soft"
+                placeholder="Enter your password"
               />
               <button
                 type="button"
@@ -117,13 +119,31 @@ export function Login() {
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M3 3l18 18M10.6 10.6a2 2 0 003.7 1.1M9.9 5.1A10.4 10.4 0 0112 5c4.3 0 8 2.7 9.5 6.5-.6 1.5-1.5 2.8-2.6 3.9M6.3 6.3C4.3 7.7 2.8 9.7 2 12c1.5 3.8 5.2 6.5 9.5 6.5 1.4 0 2.7-.3 3.9-.8"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M12 5c-4.3 0-8 2.7-9.5 6.5 1.5 3.8 5.2 6.5 9.5 6.5s8-2.7 9.5-6.5C20 7.7 16.3 5 12 5z"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                    />
+                    <circle cx="12" cy="11.5" r="2.5" fill="currentColor" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
           {error && <div className="alert-error">{error}</div>}
-          <button type="submit" disabled={submitting} className="btn btn-primary login-submit">
-            {submitting ? 'Signing in...' : 'Sign in'}
+          <button type="submit" disabled={submitting} className="btn login-submit login-submit-teal">
+            {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
         <div className="login-form-footer" aria-label="Account help">

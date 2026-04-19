@@ -57,8 +57,11 @@ export function RequestAccess() {
   return (
     <LoginBrandedShell>
       <div className="login-card">
+        <div className="login-brand-row">
+          <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
+          <span className="login-wordmark">Sentinel</span>
+        </div>
         <div className="login-header">
-          <img src="/logo.png" alt="Sentinel" className="login-logo" />
           <h1 className="login-title">Request access</h1>
           <p className="login-subtitle">
             Tell us who you are. An administrator will review and create your account if approved.
@@ -91,7 +94,7 @@ export function RequestAccess() {
               <input
                 id="req-email"
                 type="email"
-                className="input"
+                className="input login-input-soft"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -108,7 +111,7 @@ export function RequestAccess() {
               <input
                 id="req-name"
                 type="text"
-                className="input"
+                className="input login-input-soft"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -125,7 +128,7 @@ export function RequestAccess() {
               <input
                 id="req-org"
                 type="text"
-                className="input"
+                className="input login-input-soft"
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
                 autoComplete="organization"
@@ -140,7 +143,7 @@ export function RequestAccess() {
               </label>
               <textarea
                 id="req-message"
-                className="input"
+                className="input login-input-soft"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Role needed, supplier name, or other context"
@@ -150,7 +153,7 @@ export function RequestAccess() {
                 style={{ resize: 'vertical', minHeight: '5rem' }}
               />
             </div>
-            <button type="submit" className="btn btn-primary login-submit" disabled={submitting}>
+            <button type="submit" className="btn login-submit login-submit-teal" disabled={submitting}>
               {submitting ? 'Submitting…' : 'Submit request'}
             </button>
           </form>

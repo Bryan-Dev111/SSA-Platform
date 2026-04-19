@@ -44,8 +44,11 @@ export function ForgotPassword() {
   return (
     <LoginBrandedShell>
       <div className="login-card">
+        <div className="login-brand-row">
+          <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
+          <span className="login-wordmark">Sentinel</span>
+        </div>
         <div className="login-header">
-          <img src="/logo.png" alt="Sentinel" className="login-logo" />
           <h1 className="login-title">Forgot password</h1>
           <p className="login-subtitle">Enter your email and we will send you a link to set a new password.</p>
         </div>
@@ -76,7 +79,7 @@ export function ForgotPassword() {
               <input
                 id="forgot-email"
                 type="email"
-                className="input"
+                className="input login-input-soft"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -85,7 +88,7 @@ export function ForgotPassword() {
                 disabled={submitting}
               />
             </div>
-            <button type="submit" className="btn btn-primary login-submit" disabled={submitting}>
+            <button type="submit" className="btn login-submit login-submit-teal" disabled={submitting}>
               {submitting ? 'Sending…' : 'Send reset link'}
             </button>
           </form>

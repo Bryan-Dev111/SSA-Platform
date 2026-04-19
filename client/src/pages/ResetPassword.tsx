@@ -56,8 +56,11 @@ export function ResetPassword() {
   return (
     <LoginBrandedShell>
       <div className="login-card">
+        <div className="login-brand-row">
+          <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
+          <span className="login-wordmark">Sentinel</span>
+        </div>
         <div className="login-header">
-          <img src="/logo.png" alt="Sentinel" className="login-logo" />
           <h1 className="login-title">Set new password</h1>
           <p className="login-subtitle">Choose a strong password for your account.</p>
         </div>
@@ -65,7 +68,7 @@ export function ResetPassword() {
         {success ? (
           <>
             <p style={{ marginBottom: '1rem' }}>Your password has been updated.</p>
-            <Link to="/login" className="btn btn-primary login-submit" style={{ textAlign: 'center', textDecoration: 'none' }}>
+            <Link to="/login" className="btn login-submit login-submit-teal" style={{ textAlign: 'center', textDecoration: 'none' }}>
               Sign in
             </Link>
           </>
@@ -87,7 +90,7 @@ export function ResetPassword() {
               <input
                 id="reset-password"
                 type={showPassword ? 'text' : 'password'}
-                className="input"
+                className="input login-input-soft"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -103,7 +106,7 @@ export function ResetPassword() {
               <input
                 id="reset-confirm"
                 type={showPassword ? 'text' : 'password'}
-                className="input"
+                className="input login-input-soft"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required
@@ -118,7 +121,7 @@ export function ResetPassword() {
             </label>
             <button
               type="submit"
-              className="btn btn-primary login-submit"
+              className="btn login-submit login-submit-teal"
               disabled={submitting || !tokenFromUrl}
             >
               {submitting ? 'Saving…' : 'Update password'}
