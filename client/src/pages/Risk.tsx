@@ -1211,7 +1211,7 @@ export function Risk() {
 
       {editingId && (
         <div className="confirm-dialog-overlay" onClick={closeEditModal} role="dialog" aria-modal="true" aria-labelledby="risk-edit-title">
-          <div className="confirm-dialog" style={{ maxWidth: 920 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--xl" onClick={(e) => e.stopPropagation()}>
             <h3 id="risk-edit-title" className="confirm-dialog-title">Edit risk/opportunity</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <select className="input" value={editType} onChange={(e) => setEditType(e.target.value as 'risk' | 'opportunity')}>

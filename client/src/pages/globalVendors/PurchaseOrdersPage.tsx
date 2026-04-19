@@ -467,11 +467,7 @@ export function PurchaseOrdersPage() {
           onClick={closeModal}
           onKeyDown={(ev) => ev.key === 'Escape' && closeModal()}
         >
-          <div
-            className="confirm-dialog"
-            style={{ maxWidth: 640 }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-po-title" className="confirm-dialog-title">
               New purchase order
             </h3>

@@ -253,11 +253,7 @@ export function SamplesPage() {
           onClick={closeModal}
           onKeyDown={(ev) => ev.key === 'Escape' && closeModal()}
         >
-          <div
-            className="confirm-dialog"
-            style={{ maxWidth: 640 }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-sample-title" className="confirm-dialog-title">
               Add sample
             </h3>

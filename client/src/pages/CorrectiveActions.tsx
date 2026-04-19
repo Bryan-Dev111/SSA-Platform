@@ -852,7 +852,7 @@ export function CorrectiveActions() {
           aria-labelledby="car-summary-title"
           onClick={() => setSummaryModal(null)}
         >
-          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="car-summary-title" className="confirm-dialog-title">
               CAR Summary - {summaryModal.code}
             </h3>

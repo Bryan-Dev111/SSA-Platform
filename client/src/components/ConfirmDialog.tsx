@@ -44,7 +44,7 @@ export function ConfirmDialog({
       aria-labelledby="confirm-dialog-title"
       aria-describedby="confirm-dialog-desc"
     >
-      <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="confirm-dialog confirm-dialog--narrow" onClick={(e) => e.stopPropagation()}>
         <h3 id="confirm-dialog-title" className="confirm-dialog-title">
           {title}
         </h3>

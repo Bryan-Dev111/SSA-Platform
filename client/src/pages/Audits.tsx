@@ -738,7 +738,7 @@ export function Audits() {
           aria-labelledby="audit-summary-title"
           onClick={() => setSummaryModal(null)}
         >
-          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="audit-summary-title" className="confirm-dialog-title">
               Audit Summary - {summaryModal.code}
             </h3>
@@ -760,7 +760,7 @@ export function Audits() {
           aria-labelledby="audit-add-record-title"
           onClick={closeRecordUploadModal}
         >
-          <div className="confirm-dialog" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="audit-add-record-title" className="confirm-dialog-title">
               Add record — {recordUploadAudit.code}
             </h3>

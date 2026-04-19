@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 
 /**
- * Dashboard-style summary card: label, primary value, optional muted subtitle.
- * Supports an optional alert glyph in the top-right, or a custom alert (e.g. hover tooltip).
+ * Compact KPI tile: label, value, optional subtitle; optional shipment-style alert (tooltip-capable).
  */
 export function MetricCard({
   title,
@@ -17,7 +16,6 @@ export function MetricCard({
   subtitle?: string;
   showAlert?: boolean;
   alertLabel?: string;
-  /** When set, replaces the default static triangle (use for rich tooltips). */
   customAlert?: ReactNode;
 }) {
   const hasCustom = customAlert != null;
@@ -27,12 +25,9 @@ export function MetricCard({
   return (
     <div className={hasCustom ? 'card shipments-metric-card--overflow-visible' : 'card'}>
       <div
-        className="card-body"
-        style={{
-          padding: '0.9rem',
-          position: 'relative',
-          ...(hasAlert ? { minHeight: 88, zIndex: hasCustom ? 1 : undefined } : {}),
-        }}
+        className={`card-body summary-kpi-card-body${hasAlert ? ' summary-kpi-card-body--alert' : ''}${
+          hasCustom ? ' summary-kpi-card-body--custom-tooltip' : ''
+        }`}
       >
         {hasCustom ? (
           customAlert
@@ -40,19 +35,7 @@ export function MetricCard({
           <div
             aria-label={alertLabel ?? 'There are late or overdue items'}
             title={alertLabel}
-            style={{
-              position: 'absolute',
-              top: 6,
-              right: 6,
-              width: 26,
-              height: 26,
-              borderRadius: 6,
-              background: 'rgba(254, 226, 226, 0.98)',
-              border: '1px solid rgba(252, 165, 165, 0.95)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="summary-kpi-alert-glyph"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
@@ -66,21 +49,9 @@ export function MetricCard({
             </svg>
           </div>
         ) : null}
-        <div
-          style={{
-            fontSize: 'var(--text-sm)',
-            color: 'var(--color-text-muted)',
-            paddingRight: hasAlert ? 36 : 0,
-          }}
-        >
-          {title}
-        </div>
-        <div style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>{value}</div>
-        {subtitle ? (
-          <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
-            {subtitle}
-          </div>
-        ) : null}
+        <div className="summary-kpi-label">{title}</div>
+        <div className="summary-kpi-value">{value}</div>
+        {subtitle ? <div className="summary-kpi-subtitle">{subtitle}</div> : null}
       </div>
     </div>
   );

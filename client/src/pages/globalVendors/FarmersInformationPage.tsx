@@ -521,7 +521,7 @@ export function FarmersInformationPage() {
           onClick={closeModal}
           onKeyDown={(ev) => ev.key === 'Escape' && closeModal()}
         >
-          <div className="confirm-dialog" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-farm-title" className="confirm-dialog-title">
               Add farmer
             </h3>
@@ -587,7 +587,7 @@ export function FarmersInformationPage() {
           onClick={closeEdit}
           onKeyDown={(ev) => ev.key === 'Escape' && closeEdit()}
         >
-          <div className="confirm-dialog" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="edit-farm-title" className="confirm-dialog-title">
               Edit farmer
             </h3>

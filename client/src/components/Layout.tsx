@@ -1,12 +1,48 @@
 /**
  * App layout: sidebar (role-based menu), header, outlet.
  * Mobile: sidebar becomes overlay drawer; hamburger toggles menu.
+ * Desktop: sidebar width is resizable; can collapse to icon rail (tooltips on hover).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from './ConfirmDialog';
+import { SidebarNavIcon } from './SidebarNavIcons';
 import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
+
+const STORAGE_SIDEBAR_COLLAPSED = 'sentinel.sidebarCollapsed';
+const STORAGE_SIDEBAR_WIDTH = 'sentinel.sidebarWidthPx';
+
+const SIDEBAR_WIDTH_DEFAULT = 268;
+const SIDEBAR_WIDTH_MIN = 220;
+const SIDEBAR_WIDTH_MAX = 420;
+const SIDEBAR_RAIL_WIDTH = 72;
+
+function readCollapsedFromStorage(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function readWidthFromStorage(): number {
+  try {
+    if (typeof localStorage === 'undefined') return SIDEBAR_WIDTH_DEFAULT;
+    const raw = localStorage.getItem(STORAGE_SIDEBAR_WIDTH);
+    if (!raw) return SIDEBAR_WIDTH_DEFAULT;
+    const n = Number.parseInt(raw, 10);
+    if (Number.isNaN(n)) return SIDEBAR_WIDTH_DEFAULT;
+    return Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, n));
+  } catch {
+    return SIDEBAR_WIDTH_DEFAULT;
+  }
+}
+
+function desktopMatches(): boolean {
+  if (typeof window === 'undefined') return true;
+  return window.matchMedia('(min-width: 769px)').matches;
+}
 
 const MENU_ITEMS: { path: string; label: string }[] = [
   { path: '/dashboard', label: 'Dashboard' },
@@ -63,15 +99,117 @@ function CloseIcon() {
   );
 }
 
+function SidebarNavLink({
+  item,
+  railMode,
+}: {
+  item: { path: string; label: string };
+  /** Desktop collapsed sidebar: icon only + native tooltip */
+  railMode?: boolean;
+}) {
+  return (
+    <NavLink
+      to={item.path}
+      title={railMode ? item.label : undefined}
+      aria-label={railMode ? item.label : undefined}
+      className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
+    >
+      <span className="sidebar-nav-link-icon" aria-hidden>
+        <SidebarNavIcon path={item.path} />
+      </span>
+      <span className="sidebar-nav-link-label">{item.label}</span>
+    </NavLink>
+  );
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readCollapsedFromStorage);
+  const [sidebarWidthPx, setSidebarWidthPx] = useState(readWidthFromStorage);
+  const [isDesktop, setIsDesktop] = useState(desktopMatches);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const roleNames = user?.roleNames ?? [];
   const pathname = location.pathname;
   const globalVendorsShell = isGlobalVendorsPath(pathname);
+
+  const sidebarRailMode = isDesktop && sidebarCollapsed;
+
+  const desktopAsideStyle = useMemo(() => {
+    if (!isDesktop) return undefined;
+    const w = sidebarCollapsed ? SIDEBAR_RAIL_WIDTH : sidebarWidthPx;
+    return {
+      width: w,
+      minWidth: w,
+      flexShrink: 0,
+    } as const;
+  }, [isDesktop, sidebarCollapsed, sidebarWidthPx]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 769px)');
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_SIDEBAR_COLLAPSED, sidebarCollapsed ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_SIDEBAR_WIDTH, String(sidebarWidthPx));
+    } catch {
+      /* ignore */
+    }
+  }, [sidebarWidthPx]);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+    const onMove = (e: MouseEvent) => {
+      const next = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, e.clientX));
+      setSidebarWidthPx(next);
+    };
+    const onUp = () => setIsResizingSidebar(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingSidebar]);
+
+  useEffect(() => {
+    if (sidebarCollapsed) setIsResizingSidebar(false);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (menuOpen) {
@@ -92,6 +230,11 @@ export function Layout() {
   const visibleItems = MENU_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
   const visibleGlobalVendor = GLOBAL_VENDOR_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
 
+  const showDualNavSections =
+    !roleNames.includes('Admin') && visibleItems.length > 0 && visibleGlobalVendor.length > 0;
+  const showGlobalSupplySectionAdmin =
+    roleNames.includes('Admin') && globalVendorsShell && visibleGlobalVendor.length > 0;
+
   return (
     <div className="app-layout">
       <div
@@ -102,9 +245,16 @@ export function Layout() {
         tabIndex={-1}
         aria-hidden="true"
       />
-      <aside className={`sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Main navigation">
+      <aside
+        style={desktopAsideStyle}
+        className={`sidebar ${menuOpen ? 'is-open' : ''} ${sidebarRailMode ? 'sidebar--collapsed' : ''} ${isDesktop && isResizingSidebar ? 'sidebar--resizing' : ''}`}
+        aria-label="Main navigation"
+      >
         <div className="sidebar-brand-wrap">
-          <div className="sidebar-brand">Sentinel</div>
+          <div className="sidebar-brand">
+            <span className="sidebar-brand-dot" aria-hidden />
+            <span className="sidebar-brand-label">Sentinel</span>
+          </div>
           <button
             type="button"
             className="sidebar-close-btn"
@@ -118,52 +268,74 @@ export function Layout() {
           {roleNames.includes('Admin') ? (
             // Admin: use Product Hub to switch; sidebar only shows the current area's pages.
             globalVendorsShell ? (
-              visibleGlobalVendor.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-                >
-                  {item.label}
-                </NavLink>
-              ))
+              <>
+                {showGlobalSupplySectionAdmin ? (
+                  <div className="sidebar-nav-section" title={sidebarRailMode ? 'Global supply' : undefined}>
+                    Global supply
+                  </div>
+                ) : null}
+                {visibleGlobalVendor.map((item) => (
+                  <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
+                ))}
+              </>
             ) : (
               visibleItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-                >
-                  {item.label}
-                </NavLink>
+                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
               ))
             )
           ) : (
             // Non-admin: unified sidebar showing Sentinel + Global Vendors together.
             <>
+              {showDualNavSections ? (
+                <div className="sidebar-nav-section" title={sidebarRailMode ? 'Supplier assurance' : undefined}>
+                  Supplier assurance
+                </div>
+              ) : null}
               {visibleItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-                >
-                  {item.label}
-                </NavLink>
+                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
               ))}
-              {visibleGlobalVendor.length > 0 &&
-                visibleGlobalVendor.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
+              {showDualNavSections ? (
+                <div
+                  className="sidebar-nav-section sidebar-nav-section--spaced"
+                  title={sidebarRailMode ? 'Global supply' : undefined}
+                >
+                  Global supply
+                </div>
+              ) : null}
+              {visibleGlobalVendor.map((item) => (
+                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
+              ))}
             </>
           )}
         </nav>
+        {isDesktop ? (
+          <div className="sidebar-footer">
+            <button
+              type="button"
+              className="sidebar-collapse-toggle"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              aria-expanded={!sidebarCollapsed}
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar to icons'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            </button>
+          </div>
+        ) : null}
       </aside>
+      {isDesktop && !sidebarCollapsed ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag to resize sidebar"
+          title="Drag to resize"
+          className={`sidebar-resize-handle${isResizingSidebar ? ' is-active' : ''}`}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizingSidebar(true);
+          }}
+        />
+      ) : null}
       <div className="app-main-wrap">
         <header className="app-header">
           <button

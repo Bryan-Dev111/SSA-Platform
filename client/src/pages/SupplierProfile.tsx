@@ -873,7 +873,7 @@ export function SupplierProfile() {
           aria-labelledby="supplier-profile-car-summary-title"
           onClick={() => setCarSummaryModal(null)}
         >
-          <div className="confirm-dialog" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="supplier-profile-car-summary-title" className="confirm-dialog-title">
               CAR Summary — {carSummaryModal.code}
             </h3>

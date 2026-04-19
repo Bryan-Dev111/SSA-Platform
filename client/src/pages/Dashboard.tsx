@@ -178,7 +178,7 @@ export function Dashboard() {
 
   if (loading && !data) {
     return (
-      <div className="page">
+      <div className="page page-dashboard">
         <header className="page-header">
           <h1 className="page-title">Dashboard</h1>
         </header>
@@ -214,7 +214,7 @@ export function Dashboard() {
   const monthly = data?.charts.monthlyTrends ?? [];
 
   return (
-    <div className="page">
+    <div className="page page-dashboard">
       <header className="page-header">
         <h1 className="page-title">Dashboard</h1>
         <p className="page-description">
@@ -226,15 +226,10 @@ export function Dashboard() {
 
       {error && <div className="alert-error">{error}</div>}
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
-          <select
-            className="input"
-            style={{ minWidth: 220, width: 'auto' }}
-            value={filterSupplierId}
-            onChange={(e) => setFilterSupplierId(e.target.value)}
-          >
+      <div className="dashboard-toolbar">
+        <label className="dashboard-toolbar-label">
+          <span className="dashboard-toolbar-title">Supplier filter</span>
+          <select className="input dashboard-toolbar-select" value={filterSupplierId} onChange={(e) => setFilterSupplierId(e.target.value)}>
             <option value="">All in scope</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
@@ -285,64 +280,47 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="dashboard-split" style={{ marginBottom: '1rem' }}>
-        <div
-          style={{
-            display: 'grid',
-            gap: '1rem',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            height: '100%',
-          }}
-        >
-            <RiskDistributionCard distribution={riskRegisterDistribution} />
+      <div className="dashboard-split dashboard-split--spaced">
+        <div className="dashboard-split-left-grid">
+          <RiskDistributionCard distribution={riskRegisterDistribution} />
 
-            <div className="card">
-              <div className="card-body">
-                <h2 style={{ marginTop: 0 }}>Upcoming events</h2>
-                {upcoming.length === 0 ? (
-                  <p className="table-empty">No upcoming audits or shipment inspections.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {upcoming.map((e) => (
-                      <div
-                        key={`${e.type}-${e.id}`}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '90px 1fr',
-                          gap: '0.5rem',
-                          fontSize: 'var(--text-sm)',
-                          borderBottom: '1px solid var(--color-border-subtle)',
-                          paddingBottom: '0.4rem',
-                        }}
-                      >
-                        <span style={{ color: 'var(--color-text-muted)' }}>
-                          {e.date
-                            ? new Date(e.date).toLocaleDateString(undefined, {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })
-                            : 'N/A'}
-                        </span>
-                        <span>
-                          <strong>{e.type}</strong> {e.code} - {e.supplierCode}: {e.supplierName}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          <div className="card dashboard-section-card">
+            <div className="card-body">
+              <h2 className="dashboard-section-heading">Upcoming events</h2>
+              {upcoming.length === 0 ? (
+                <p className="table-empty">No upcoming audits or shipment inspections.</p>
+              ) : (
+                <div className="dashboard-event-list">
+                  {upcoming.map((e) => (
+                    <div key={`${e.type}-${e.id}`} className="dashboard-event-row">
+                      <span className="dashboard-event-date">
+                        {e.date
+                          ? new Date(e.date).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : 'N/A'}
+                      </span>
+                      <span>
+                        <strong>{e.type}</strong> {e.code} - {e.supplierCode}: {e.supplierName}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
         </div>
 
-        <div className="card">
+        <div className="card dashboard-section-card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Recent Updates</h2>
+            <h2 className="dashboard-section-heading">Recent Updates</h2>
             {recentUpdates.length === 0 ? (
               <p className="table-empty">No updates in last 7 days.</p>
             ) : (
-              <div className="table-wrap" style={{ maxHeight: 265, overflowY: 'auto' }}>
-                <table className="table" style={{ marginBottom: 0 }}>
+              <div className="table-wrap dashboard-recent-table-wrap" style={{ maxHeight: 265, overflowY: 'auto' }}>
+                <table className="table dashboard-recent-table" style={{ marginBottom: 0 }}>
                   <thead>
                     <tr>
                       <th>Date</th>
@@ -378,9 +356,9 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      <div className="card dashboard-section-card dashboard-trends-card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
+          <h2 className="dashboard-section-heading">Monthly trends</h2>
           {monthly.length === 0 ? (
             <p className="table-empty">No trend data yet.</p>
           ) : (

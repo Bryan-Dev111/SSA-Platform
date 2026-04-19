@@ -846,7 +846,7 @@ export function InternalManagement() {
         <h1 className="page-title">Internal Management</h1>
       </header>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      <div className="page-tab-rail">
         {(
           [
             ['audits', 'Audits'],
