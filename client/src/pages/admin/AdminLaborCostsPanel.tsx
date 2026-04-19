@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
+import { formatUsd } from '../../utils/formatUsd';
 
 interface LaborCostRow {
   id: string;
@@ -199,7 +200,7 @@ export function AdminLaborCostsPanel({
               <input className="input" type="number" min={0} step="0.01" value={form.hours} onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} required />
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Rate</label>
+              <label className="input-label">Rate (USD / hr)</label>
               <input className="input" type="number" min={0} step="0.01" value={form.rate} onChange={(e) => setForm((p) => ({ ...p, rate: e.target.value }))} required />
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
@@ -242,8 +243,8 @@ export function AdminLaborCostsPanel({
                   <th>Date</th>
                   <th>Full Name</th>
                   <th>Hours</th>
-                  <th>Rate</th>
-                  <th>Total Cost</th>
+                  <th>Rate (USD)</th>
+                  <th>Total cost (USD)</th>
                   <th>Paid Status</th>
                   <th>Actions</th>
                 </tr>
@@ -257,8 +258,8 @@ export function AdminLaborCostsPanel({
                     <td title={r.workLog?.workDate ? 'Work log date' : 'Created date'}>{formatLaborCostDate(r)}</td>
                     <td>{r.fullName}</td>
                     <td>{r.hours}</td>
-                    <td>{r.rate}</td>
-                    <td>{r.totalCost}</td>
+                    <td>{formatUsd(r.rate)}</td>
+                    <td>{formatUsd(r.totalCost)}</td>
                     <td>{r.paidStatus}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {r.paidStatus === 'Pending' ? (

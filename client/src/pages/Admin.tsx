@@ -1,5 +1,5 @@
 /**
- * Admin: Day 8 reference data + Day 9 audit types, risk weights, buyers/suppliers, permissions.
+ * Admin: Day 8 reference data + Day 9 audit types, buyers/suppliers, permissions.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,6 @@ import {
   AdminExpensesPanel,
   // (Employee assignments lives in separate file)
   AdminPermissionsPanel,
-  AdminRiskWeightsPanel,
 } from './admin/AdminDay9Panels';
 import { AdminAlertPreferencesPanel } from './admin/AdminAlertPreferencesPanel';
 import { LegalAdminEditor } from './admin/LegalAdminEditor';
@@ -24,7 +23,6 @@ type Tab =
   | 'carRootCause'
   | 'disposition'
   | 'auditTypes'
-  | 'riskWeights'
   | 'expenses'
   | 'commandMedia'
   | 'users'
@@ -396,7 +394,6 @@ export function Admin() {
             ['carRootCause', 'CAR root cause codes'],
             ['disposition', 'Disposition codes'],
             ['auditTypes', 'Audit types'],
-            ['riskWeights', 'Risk weights'],
             ['expenses', 'Expenses'],
             ['commandMedia', 'Command Media'],
             ['alertPreferences', 'Email alerts'],
@@ -416,7 +413,6 @@ export function Admin() {
       </div>
 
       {tab === 'auditTypes' && <AdminAuditTypesPanel token={token} toast={toast} />}
-      {tab === 'riskWeights' && <AdminRiskWeightsPanel token={token} toast={toast} />}
       {tab === 'expenses' && <AdminExpensesPanel token={token} toast={toast} />}
       {tab === 'commandMedia' && <AdminCommandMediaPanel token={token} toast={toast} />}
       {tab === 'users' && (

@@ -377,7 +377,11 @@ router.post(
     const hourlyRateRaw = req.body?.hourlyRate;
     const hourlyRate =
       hourlyRateRaw === undefined || hourlyRateRaw === null || hourlyRateRaw === '' ? null : Number(hourlyRateRaw);
-    const currency = typeof req.body?.currency === 'string' ? req.body.currency.trim() || null : null;
+    let currency = typeof req.body?.currency === 'string' ? req.body.currency.trim() || null : null;
+    /* Hourly compensation is USD-only in product UI; default when an hourly rate is set. */
+    if (hourlyRate !== null && !currency) {
+      currency = 'USD';
+    }
     const country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
     const roleNamesRaw = Array.isArray(req.body?.roleNames) ? (req.body.roleNames as unknown[]).map(String) : [];
     const roleNames = normalizeRoleNames(roleNamesRaw);
@@ -563,6 +567,9 @@ router.patch(
         return;
       }
       data.hourlyRate = hourlyRate;
+      if (hourlyRate !== null && !('currency' in req.body)) {
+        data.currency = 'USD';
+      }
     }
 
     if ('currency' in req.body) {
