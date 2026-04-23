@@ -43,10 +43,7 @@ import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
 import { LogisticsProfilePage } from './pages/globalVendors/LogisticsProfilePage';
 import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDashboardPage';
-import {
-  GlobalFarmProcessingQualityPage,
-  GlobalFarmProfilePage,
-} from './pages/globalVendors/FarmSectionMediaPage';
+import { GlobalFarmProfilePage } from './pages/globalVendors/FarmSectionMediaPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -130,14 +127,6 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/farm-profile">
                     <GlobalFarmProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="processing-quality"
-                element={
-                  <ProtectedRoute path="/global-vendors/processing-quality">
-                    <GlobalFarmProcessingQualityPage />
                   </ProtectedRoute>
                 }
               />

@@ -123,9 +123,6 @@ export function GlobalSupplyMasterDataPanel({
     <div className="card">
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>{title}</h2>
-        <p style={{ marginTop: 0, marginBottom: '0.8rem', color: 'var(--color-text-muted)' }}>
-          Add and maintain {noun.toLowerCase()} values used by Global Supply pages.
-        </p>
         <div
           style={{
             display: 'grid',

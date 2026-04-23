@@ -405,7 +405,6 @@ export function PurchaseOrdersPage() {
             <thead>
               <tr>
                 <th>Close PO</th>
-                <th>Edit</th>
                 <th>PO ID</th>
                 <th>Farm</th>
                 <th>Buyer</th>
@@ -421,6 +420,7 @@ export function PurchaseOrdersPage() {
                 <th>Port of discharge</th>
                 <th>Created</th>
                 <th>Attachments</th>
+                <th>Edit</th>
               </tr>
             </thead>
             <tbody>
@@ -449,16 +449,6 @@ export function PurchaseOrdersPage() {
                           : closingId === o.id
                             ? 'Closing…'
                             : 'Close PO'}
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-ghost"
-                        onClick={() => openEditModal(o)}
-                        disabled={closingId === o.id || attachSavingId === o.id}
-                      >
-                        Edit
                       </button>
                     </td>
                     <td>
@@ -632,6 +622,16 @@ export function PurchaseOrdersPage() {
                           </ul>
                         )}
                       </div>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => openEditModal(o)}
+                        disabled={closingId === o.id || attachSavingId === o.id}
+                      >
+                        Edit
+                      </button>
                     </td>
                   </tr>
                 ))

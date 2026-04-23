@@ -17,9 +17,6 @@ export function GlobalVendorsIndex() {
   if (canAccessPath('/global-vendors/farm-profile', roleNames)) {
     return <Navigate to="/global-vendors/farm-profile" replace />;
   }
-  if (canAccessPath('/global-vendors/processing-quality', roleNames)) {
-    return <Navigate to="/global-vendors/processing-quality" replace />;
-  }
   if (canAccessPath('/global-vendors/approved', roleNames)) {
     return <Navigate to="/global-vendors/approved" replace />;
   }

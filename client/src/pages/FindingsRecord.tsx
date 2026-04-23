@@ -804,59 +804,49 @@ export function FindingsRecord() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div className="input-group">
-                  <label className="input-label">Finding #</label>
-                  <input className="input" value={finding.code} readOnly disabled />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Status</label>
-                  <input
-                    className="input"
-                    value={formatFindingStatus(finding.status)}
-                    readOnly
-                    disabled
-                    aria-readonly="true"
-                  />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Supplier</label>
-                  <input
-                    className="input"
-                    value={finding.supplier ? `${finding.supplier.code}: ${finding.supplier.name}` : ''}
-                    readOnly
-                    disabled
-                  />
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Audit #</label>
-                  {finding.audit?.code ? (
-                    <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
-                      {finding.audit.code}
-                    </Link>
-                  ) : (
-                    <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
-                  )}
-                </div>
-                <div className="input-group">
-                  <label className="input-label">Shipment #</label>
-                  {finding.shipment?.code || finding.shipment?.id ? (
-                    <Link to="/shipments" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
-                      {finding.shipment.code?.trim() || finding.shipment.id}
-                    </Link>
-                  ) : (
-                    <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
-                  )}
-                </div>
+              <div style={{ display: 'grid', gap: '1rem' }}>
                 <div
                   style={{
-                    gridColumn: '1 / -1',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(170px, 1fr)) auto',
-                    gap: '1rem',
+                    gridTemplateColumns:
+                      'minmax(150px, 1fr) minmax(220px, 1.2fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(130px, 160px) minmax(170px, 220px)',
+                    gap: '0.75rem',
                     alignItems: 'end',
                   }}
                 >
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Finding #</label>
+                    <input className="input" value={finding.code} readOnly disabled />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Supplier</label>
+                    <input
+                      className="input"
+                      value={finding.supplier ? `${finding.supplier.code}: ${finding.supplier.name}` : ''}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Audit #</label>
+                    {finding.audit?.code ? (
+                      <Link to="/audits" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
+                        {finding.audit.code}
+                      </Link>
+                    ) : (
+                      <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
+                    )}
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Shipment #</label>
+                    {finding.shipment?.code || finding.shipment?.id ? (
+                      <Link to="/shipments" className="finding-code-link" style={{ display: 'inline-block', marginTop: 4 }}>
+                        {finding.shipment.code?.trim() || finding.shipment.id}
+                      </Link>
+                    ) : (
+                      <span style={{ display: 'inline-block', marginTop: 4, color: 'var(--color-text-muted)' }}>None</span>
+                    )}
+                  </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Severity</label>
                     <select
@@ -870,25 +860,36 @@ export function FindingsRecord() {
                       ))}
                     </select>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', paddingBottom: 1, gridColumn: '2 / -1', justifyContent: 'flex-end' }}>
-                    <button type="button" className="btn btn-primary" onClick={() => void handleSave()} disabled={!canSave || actioning}>
-                      {actioning && canSave ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
-                      className={editMode ? 'btn btn-ghost' : 'btn btn-primary'}
-                      onClick={() => setEditMode((v) => !v)}
-                      disabled={!canEditDraft || actioning || editMode || !isEditableFindingStatus}
-                    >
-                      Edit
-                    </button>
-                    <button type="button" className="btn btn-primary" onClick={() => void handleProcess()} disabled={processButtonDisabled}>
-                      {actioning ? '…' : 'Process'}
-                    </button>
-                    <button type="button" className="btn btn-ghost" onClick={() => void handleReverse()} disabled={reverseButtonDisabled}>
-                      {actioning ? '…' : 'Reverse'}
-                    </button>
+                  <div className="input-group" style={{ marginBottom: 0, justifySelf: 'end', width: '100%' }}>
+                    <label className="input-label">Status</label>
+                    <input
+                      className="input"
+                      value={formatFindingStatus(finding.status)}
+                      readOnly
+                      disabled
+                      aria-readonly="true"
+                    />
                   </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn btn-primary" onClick={() => void handleSave()} disabled={!canSave || actioning}>
+                    {actioning && canSave ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    className={editMode ? 'btn btn-ghost' : 'btn btn-primary'}
+                    onClick={() => setEditMode((v) => !v)}
+                    disabled={!canEditDraft || actioning || editMode || !isEditableFindingStatus}
+                  >
+                    Edit
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={() => void handleProcess()} disabled={processButtonDisabled}>
+                    {actioning ? '…' : 'Process'}
+                  </button>
+                  <button type="button" className="btn btn-ghost" onClick={() => void handleReverse()} disabled={reverseButtonDisabled}>
+                    {actioning ? '…' : 'Reverse'}
+                  </button>
                 </div>
               </div>
 

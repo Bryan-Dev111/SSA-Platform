@@ -1,8 +1,8 @@
 /**
- * Global Supply — Farm profile or Processing & quality photos (sidebar pages).
- * Same APIs as Farm Information → Edit farm → photo sections.
+ * Global Supply — Farm profile photos manager.
+ * Processing & quality is accessible from this page via row actions.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -12,7 +12,7 @@ import type { FarmProfileImageRow, FarmRow } from './FarmersInformationPage';
 
 type Section = 'Profile' | 'Processing';
 
-function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; pageTitle: string }) {
+export function GlobalFarmProfilePage() {
   const { token } = useAuth();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,11 +20,14 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
   const [farms, setFarms] = useState<FarmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [farmId, setFarmId] = useState<string>('');
+  const [section, setSection] = useState<Section>('Profile');
   const [images, setImages] = useState<FarmProfileImageRow[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FarmProfileImageRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const selectedFarm = useMemo(() => farms.find((f) => f.id === farmId) || null, [farms, farmId]);
 
   const loadFarms = useCallback(async () => {
     if (!token) return;
@@ -42,7 +45,6 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
     void loadFarms();
   }, [loadFarms]);
 
-  /** Resolve selected farm from `?farmId=` or keep prior selection when URL has no param. */
   useEffect(() => {
     if (farms.length === 0) {
       setFarmId('');
@@ -50,15 +52,11 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
     }
     if (urlFarmId && farms.some((f) => f.id === urlFarmId)) {
       setFarmId(urlFarmId);
+      setSection('Profile');
       return;
     }
-    if (urlFarmId && !farms.some((f) => f.id === urlFarmId)) {
-      setFarmId(farms[0].id);
-      setSearchParams({}, { replace: true });
-      return;
-    }
-    setFarmId((prev) => (prev && farms.some((f) => f.id === prev) ? prev : farms[0].id));
-  }, [farms, urlFarmId, setSearchParams]);
+    setFarmId((prev) => (prev && farms.some((f) => f.id === prev) ? prev : ''));
+  }, [farms, urlFarmId]);
 
   const loadImages = useCallback(async () => {
     if (!token || !farmId) {
@@ -68,10 +66,9 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
     setImagesLoading(true);
     try {
       const q = section === 'Profile' ? '?section=Profile' : '?section=Processing';
-      const r = await apiJson<{ images: FarmProfileImageRow[] }>(
-        `/farms/${farmId}/profile-images${q}`,
-        { token }
-      );
+      const r = await apiJson<{ images: FarmProfileImageRow[] }>(`/farms/${farmId}/profile-images${q}`, {
+        token,
+      });
       setImages(r.images);
     } catch {
       setImages([]);
@@ -84,6 +81,12 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
     void loadImages();
   }, [loadImages]);
 
+  const openManager = (id: string, nextSection: Section) => {
+    setFarmId(id);
+    setSection(nextSection);
+    setSearchParams({ farmId: id }, { replace: true });
+  };
+
   const uploadFiles = async (files: FileList | File[]) => {
     if (!token || !farmId) return;
     const arr = Array.from(files);
@@ -94,11 +97,7 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
         const form = new FormData();
         form.append('file', file);
         form.append('section', section);
-        const res = await apiFetch(`/farms/${farmId}/profile-images`, {
-          token,
-          method: 'POST',
-          body: form,
-        });
+        const res = await apiFetch(`/farms/${farmId}/profile-images`, { token, method: 'POST', body: form });
         if (!res.ok) {
           const text = await res.text();
           throw new Error(text || `HTTP ${res.status}`);
@@ -153,18 +152,11 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
     }
   };
 
-  const uploadInputId = `farm-section-media-${section}`;
-
-  const emptyHint =
-    section === 'Profile'
-      ? 'No profile photos yet.'
-      : 'No processing or quality photos yet.';
-
   if (loading && farms.length === 0) {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">{pageTitle}</h1>
+          <h1 className="page-title">Farm profile</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -174,52 +166,94 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
     );
   }
 
+  const uploadInputId = `farm-profile-media-${section}`;
+
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">{pageTitle}</h1>
+        <h1 className="page-title">Farm profile</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          Choose a farm, then add or remove photos. Also available under{' '}
-          <Link to="/global-vendors/farmers">Farm Information</Link> → Edit farm.
+          Manage profile and processing photos by farm. You can also open this page from{' '}
+          <Link to="/global-vendors/farmers">Farm Information</Link>.
         </p>
       </header>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <label className="field" style={{ marginBottom: '1rem', display: 'block' }}>
-            <span className="field-label">Farm</span>
-            <select
-              className="input"
-              value={farmId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setFarmId(id);
-                setSearchParams(id ? { farmId: id } : {}, { replace: true });
-              }}
-              style={{ maxWidth: 420 }}
-            >
-              {farms.length === 0 ? (
-                <option value="">No farms yet</option>
-              ) : (
-                farms.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.code} — {f.farmName} ({f.country})
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
+          <h2 style={{ marginTop: 0 }}>Farms</h2>
+          <div className="table-wrap">
+            {farms.length === 0 ? (
+              <p className="table-empty">No farms yet.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Farm ID</th>
+                    <th>Farm name</th>
+                    <th>Country</th>
+                    <th>Farm profile</th>
+                    <th>Processing &amp; quality</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {farms.map((f) => (
+                    <tr key={f.id}>
+                      <td>{f.code}</td>
+                      <td>{f.farmName}</td>
+                      <td>{f.country}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className={farmId === f.id && section === 'Profile' ? 'btn btn-primary btn-sm' : 'btn btn-sm btn-ghost'}
+                          onClick={() => openManager(f.id, 'Profile')}
+                        >
+                          Open
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={farmId === f.id && section === 'Processing' ? 'btn btn-primary btn-sm' : 'btn btn-sm btn-ghost'}
+                          onClick={() => openManager(f.id, 'Processing')}
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
 
-          <p className="field-label" style={{ marginBottom: 12 }}>
-            Photos (JPEG, PNG, WebP, or GIF — max ~12 MB each)
-          </p>
-          {imagesLoading ? (
-            <p className="table-empty" style={{ marginBottom: 12 }}>
-              Loading photos…
+      {selectedFarm ? (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>
+              {selectedFarm.code} — {selectedFarm.farmName}
+            </h2>
+            <p className="field-label" style={{ marginBottom: 10 }}>
+              {section === 'Profile' ? 'Farm profile photos' : 'Processing & quality photos'}
             </p>
-          ) : null}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className={section === 'Profile' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
+                onClick={() => setSection('Profile')}
+              >
+                Farm profile
+              </button>
+              <button
+                type="button"
+                className={section === 'Processing' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
+                onClick={() => setSection('Processing')}
+              >
+                Processing &amp; quality
+              </button>
+            </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <input
               id={uploadInputId}
               type="file"
@@ -235,67 +269,70 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
             <button
               type="button"
               className="btn btn-sm btn-ghost"
-              disabled={!farmId || uploadBusy}
+              disabled={uploadBusy}
               onClick={() => document.getElementById(uploadInputId)?.click()}
+              style={{ marginBottom: 12 }}
             >
               {uploadBusy ? 'Uploading…' : 'Add photo'}
             </button>
-          </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-            {images.length === 0 && !imagesLoading ? (
-              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{emptyHint}</span>
-            ) : null}
-            {images.map((img) => (
-              <div key={img.id} style={{ width: 128 }}>
-                {img.url ? (
-                  <img
-                    src={img.url}
-                    alt={img.fileName || pageTitle}
-                    style={{
-                      width: '100%',
-                      height: 96,
-                      objectFit: 'cover',
-                      borderRadius: 6,
-                      border: '1px solid var(--color-border)',
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      height: 96,
-                      borderRadius: 6,
-                      border: '1px dashed var(--color-border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      color: 'var(--color-text-muted)',
-                      padding: 8,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Preview unavailable
+            {imagesLoading ? (
+              <p className="table-empty">Loading photos…</p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                {images.length === 0 ? (
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                    {section === 'Profile' ? 'No profile photos yet.' : 'No processing or quality photos yet.'}
+                  </span>
+                ) : null}
+                {images.map((img) => (
+                  <div key={img.id} style={{ width: 128 }}>
+                    {img.url ? (
+                      <img
+                        src={img.url}
+                        alt={img.fileName || selectedFarm.farmName}
+                        style={{
+                          width: '100%',
+                          height: 96,
+                          objectFit: 'cover',
+                          borderRadius: 6,
+                          border: '1px solid var(--color-border)',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          height: 96,
+                          borderRadius: 6,
+                          border: '1px dashed var(--color-border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          color: 'var(--color-text-muted)',
+                          padding: 8,
+                          textAlign: 'center',
+                        }}
+                      >
+                        Preview unavailable
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      style={{ marginTop: 6, color: 'var(--color-danger, #b91c1c)', width: '100%' }}
+                      disabled={uploadBusy}
+                      onClick={() => setDeleteTarget(img)}
+                    >
+                      Remove
+                    </button>
                   </div>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-sm btn-ghost"
-                  style={{
-                    marginTop: 6,
-                    color: 'var(--color-danger, #b91c1c)',
-                    width: '100%',
-                  }}
-                  disabled={uploadBusy}
-                  onClick={() => setDeleteTarget(img)}
-                >
-                  Remove
-                </button>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
-      </div>
+      ) : null}
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -303,8 +340,7 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
         message={
           deleteTarget ? (
             <span>
-              Remove this photo
-              {deleteTarget.fileName ? ` (${deleteTarget.fileName})` : ''}? This cannot be undone.
+              Remove this photo{deleteTarget.fileName ? ` (${deleteTarget.fileName})` : ''}? This cannot be undone.
             </span>
           ) : (
             ''
@@ -317,12 +353,4 @@ function FarmSectionMediaPageInner({ section, pageTitle }: { section: Section; p
       />
     </div>
   );
-}
-
-export function GlobalFarmProfilePage() {
-  return <FarmSectionMediaPageInner section="Profile" pageTitle="Farm profile" />;
-}
-
-export function GlobalFarmProcessingQualityPage() {
-  return <FarmSectionMediaPageInner section="Processing" pageTitle="Processing & quality" />;
 }

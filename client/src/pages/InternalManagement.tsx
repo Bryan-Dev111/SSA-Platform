@@ -87,8 +87,6 @@ interface ProjectHistoryRow {
   status: string;
   buyerId?: string | null;
   supplierId?: string | null;
-  shipmentMatchPurchaseOrder?: string | null;
-  shipmentMatchPartNumber?: string | null;
   buyer?: ProjectHistoryBuyer | null;
   supplier?: ProjectHistorySupplier | null;
   createdAt: string;
@@ -218,8 +216,6 @@ export function InternalManagement() {
     revenue: '',
     buyerId: '',
     supplierId: '',
-    shipmentMatchPurchaseOrder: '',
-    shipmentMatchPartNumber: '',
   });
   const [projectEditingId, setProjectEditingId] = useState<string | null>(null);
   const [projectSubmitting, setProjectSubmitting] = useState(false);
@@ -799,8 +795,6 @@ export function InternalManagement() {
       revenue: '',
       buyerId: '',
       supplierId: '',
-      shipmentMatchPurchaseOrder: '',
-      shipmentMatchPartNumber: '',
     });
   };
 
@@ -829,8 +823,6 @@ export function InternalManagement() {
             revenue: clientForm.revenue.trim() || null,
             buyerId: clientForm.buyerId.trim() || null,
             supplierId: clientForm.supplierId.trim() || null,
-            shipmentMatchPurchaseOrder: clientForm.shipmentMatchPurchaseOrder.trim() || null,
-            shipmentMatchPartNumber: clientForm.shipmentMatchPartNumber.trim() || null,
           }),
         });
         toast.success('Project history updated');
@@ -851,8 +843,6 @@ export function InternalManagement() {
             revenue: clientForm.revenue.trim() || null,
             buyerId: clientForm.buyerId.trim() || null,
             supplierId: clientForm.supplierId.trim() || null,
-            shipmentMatchPurchaseOrder: clientForm.shipmentMatchPurchaseOrder.trim() || null,
-            shipmentMatchPartNumber: clientForm.shipmentMatchPartNumber.trim() || null,
           }),
         });
         toast.success('Project history added');
@@ -883,8 +873,6 @@ export function InternalManagement() {
       revenue: row.revenue ?? '',
       buyerId: row.buyerId ?? '',
       supplierId: row.supplierId ?? '',
-      shipmentMatchPurchaseOrder: row.shipmentMatchPurchaseOrder ?? '',
-      shipmentMatchPartNumber: row.shipmentMatchPartNumber ?? '',
     });
   };
 
@@ -1780,24 +1768,6 @@ export function InternalManagement() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Shipment match — PO</label>
-                    <input
-                      className="input"
-                      value={clientForm.shipmentMatchPurchaseOrder}
-                      onChange={(e) => setClientForm((p) => ({ ...p, shipmentMatchPurchaseOrder: e.target.value }))}
-                      placeholder="Match inspection requests (optional)"
-                    />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Shipment match — part #</label>
-                    <input
-                      className="input"
-                      value={clientForm.shipmentMatchPartNumber}
-                      onChange={(e) => setClientForm((p) => ({ ...p, shipmentMatchPartNumber: e.target.value }))}
-                      placeholder="With supplier, links shipment to this project"
-                    />
                   </div>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Period of performance — start</label>

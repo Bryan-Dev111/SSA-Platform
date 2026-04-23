@@ -46,7 +46,6 @@ export function ForgotPassword() {
       <div className="login-card">
         <div className="login-brand-row">
           <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
-          <span className="login-wordmark">Sentinel</span>
         </div>
         <div className="login-header">
           <h1 className="login-title">Forgot password</h1>

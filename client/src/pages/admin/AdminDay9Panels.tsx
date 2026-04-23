@@ -244,6 +244,7 @@ export function AdminExpensesPanel({
   toast,
   projectFilter = null,
   fixedTypeProject = null,
+  fixedProject = null,
   countryOptionsEndpoint = null,
   hideProject = false,
   openExpenseTracking = false,
@@ -255,6 +256,8 @@ export function AdminExpensesPanel({
   projectFilter?: string | null;
   /** When set, add form locks Type and Project to these values. */
   fixedTypeProject?: { type: string; project: string } | null;
+  /** When set, add form locks Project only, but Type remains editable. */
+  fixedProject?: string | null;
   /** Optional endpoint that provides country options as { list: { id, name }[] }. */
   countryOptionsEndpoint?: string | null;
   /** Hide project field/column in contexts where project is fixed and should not be shown. */
@@ -268,7 +271,7 @@ export function AdminExpensesPanel({
   const [busy, setBusy] = useState(false);
   const [type, setType] = useState(() => fixedTypeProject?.type ?? '');
   const [description, setDescription] = useState('');
-  const [project, setProject] = useState(() => fixedTypeProject?.project ?? '');
+  const [project, setProject] = useState(() => fixedProject ?? fixedTypeProject?.project ?? '');
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(todayDateInputValue);
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -366,6 +369,12 @@ export function AdminExpensesPanel({
   }, [fixedTypeProject?.type, fixedTypeProject?.project]);
 
   useEffect(() => {
+    if (fixedProject) {
+      setProject(fixedProject);
+    }
+  }, [fixedProject]);
+
+  useEffect(() => {
     if (!token || !countryOptionsEndpoint) {
       setCountryOptions([]);
       return;
@@ -385,6 +394,19 @@ export function AdminExpensesPanel({
       toast.error('Failed to load expenses');
     }
   }, [token, toast]);
+
+  const countryNameOptions = useMemo(() => {
+    const names = new Set<string>();
+    countryOptions.forEach((option) => {
+      const name = option.name.trim();
+      if (name) names.add(name);
+    });
+    list.forEach((row) => {
+      const name = (row.country ?? '').trim();
+      if (name) names.add(name);
+    });
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [countryOptions, list]);
 
   useEffect(() => {
     load();
@@ -467,7 +489,7 @@ export function AdminExpensesPanel({
     if (!token) return;
     const amountNum = Number(amount);
     const typeVal = (fixedTypeProject ? fixedTypeProject.type : type).trim();
-    const projectVal = (fixedTypeProject ? fixedTypeProject.project : project).trim();
+    const projectVal = (fixedProject ?? (fixedTypeProject ? fixedTypeProject.project : project)).trim();
     if (!typeVal || !description.trim() || !projectVal || !Number.isFinite(amountNum) || !expenseDate.trim()) {
       toast.error('Type, description, project, expense date, and amount are required');
       return;
@@ -509,6 +531,9 @@ export function AdminExpensesPanel({
           if (fixedTypeProject) {
             setType(fixedTypeProject.type);
             setProject(fixedTypeProject.project);
+          } else if (fixedProject) {
+            setType('');
+            setProject(fixedProject);
           } else {
             setType('');
             setProject('');
@@ -525,6 +550,9 @@ export function AdminExpensesPanel({
       if (fixedTypeProject) {
         setType(fixedTypeProject.type);
         setProject(fixedTypeProject.project);
+      } else if (fixedProject) {
+        setType('');
+        setProject(fixedProject);
       } else {
         setType('');
         setProject('');
@@ -670,7 +698,7 @@ export function AdminExpensesPanel({
                 className="input"
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
-                disabled={!!fixedTypeProject}
+                disabled={!!fixedTypeProject || !!fixedProject}
               />
             </div>
           )}
@@ -698,18 +726,20 @@ export function AdminExpensesPanel({
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Country</label>
+            <input
+              className="input"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              list={countryOptionsEndpoint ? 'expense-country-options' : undefined}
+              placeholder={countryOptionsEndpoint ? 'Select or type country' : undefined}
+            />
             {countryOptionsEndpoint ? (
-              <select className="input" value={country} onChange={(e) => setCountry(e.target.value)}>
-                <option value="">None</option>
-                {countryOptions.map((option) => (
-                  <option key={option.id} value={option.name}>
-                    {option.name}
-                  </option>
+              <datalist id="expense-country-options">
+                {countryNameOptions.map((name) => (
+                  <option key={name} value={name} />
                 ))}
-              </select>
-            ) : (
-              <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
-            )}
+              </datalist>
+            ) : null}
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Attachment</label>
@@ -863,7 +893,7 @@ export function AdminExpensesPanel({
                             className="input"
                             value={editDraft.project}
                             onChange={(e) => setEditDraft((d) => ({ ...d, project: e.target.value }))}
-                            disabled={!!fixedTypeProject}
+                            disabled={!!fixedTypeProject || !!fixedProject}
                           />
                         ) : (
                           row.project
@@ -915,26 +945,13 @@ export function AdminExpensesPanel({
                     </td>
                     <td>
                       {editId === row.id ? (
-                        countryOptionsEndpoint ? (
-                          <select
-                            className="input"
-                            value={editDraft.country}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
-                          >
-                            <option value="">None</option>
-                            {countryOptions.map((option) => (
-                              <option key={option.id} value={option.name}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            className="input"
-                            value={editDraft.country}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
-                          />
-                        )
+                        <input
+                          className="input"
+                          value={editDraft.country}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          list={countryOptionsEndpoint ? 'expense-country-options' : undefined}
+                          placeholder={countryOptionsEndpoint ? 'Select or type country' : undefined}
+                        />
                       ) : (
                         row.country || '—'
                       )}

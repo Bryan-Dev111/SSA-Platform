@@ -18,7 +18,7 @@ export function GlobalSupplyExpensesSection() {
       token={token}
       toast={toast}
       projectFilter={GLOBAL_VENDORS_PROJECT}
-      fixedTypeProject={{ type: GLOBAL_VENDORS_PROJECT, project: GLOBAL_VENDORS_PROJECT }}
+      fixedProject={GLOBAL_VENDORS_PROJECT}
       countryOptionsEndpoint="/global-supply-options/countries"
       hideProject
       openExpenseTracking
