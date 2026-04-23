@@ -41,6 +41,7 @@ import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPa
 import { PurchaseOrdersPage } from './pages/globalVendors/PurchaseOrdersPage';
 import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
+import { LogisticsProfilePage } from './pages/globalVendors/LogisticsProfilePage';
 import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDashboardPage';
 import {
   GlobalFarmProcessingQualityPage,
@@ -185,6 +186,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/logistics">
                     <LogisticsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="logistics-profile"
+                element={
+                  <ProtectedRoute path="/global-vendors/logistics-profile">
+                    <LogisticsProfilePage />
                   </ProtectedRoute>
                 }
               />

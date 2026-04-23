@@ -87,6 +87,7 @@ function farmRowToExportRow(f: FarmRow): ExportRow {
 
   return {
     'Farm ID': f.code,
+    City: f.city ?? '—',
     'Farm name': f.farmName,
     'Contact name': f.farmerName,
     Country: f.country,
@@ -95,7 +96,6 @@ function farmRowToExportRow(f: FarmRow): ExportRow {
     'Main crop': f.mainCrop ?? '—',
     'Elevation (m)': typeof f.elevationMeters === 'number' ? f.elevationMeters : '—',
     'Production style': f.productionStyle ?? '—',
-    City: f.city ?? '—',
     'Total farm size (ha)': typeof f.totalFarmSizeHa === 'number' ? f.totalFarmSizeHa : '—',
     'Main crop area (ha)': typeof f.mainCropAreaHa === 'number' ? f.mainCropAreaHa : '—',
     'Main crop annual output (kg)':
@@ -485,6 +485,7 @@ export function FarmersInformationPage() {
             <thead>
               <tr>
                 <th>Farm ID</th>
+                <th>City</th>
                 <th>Farm name</th>
                 <th>Contact name</th>
                 <th>Country</th>
@@ -493,7 +494,6 @@ export function FarmersInformationPage() {
                 <th>Main crop</th>
                 <th>Elevation (m)</th>
                 <th>Production style</th>
-                <th>City</th>
                 <th>Total farm size (ha)</th>
                 <th>Main crop area (ha)</th>
                 <th>Main crop annual output (kg)</th>
@@ -547,6 +547,7 @@ export function FarmersInformationPage() {
                         <strong>{f.code}</strong>
                       </Link>
                     </td>
+                    <td>{f.city ?? '—'}</td>
                     <td>{f.farmName}</td>
                     <td>{f.farmerName}</td>
                     <td>{f.country}</td>
@@ -555,7 +556,6 @@ export function FarmersInformationPage() {
                     <td>{f.mainCrop ?? '—'}</td>
                     <td>{typeof f.elevationMeters === 'number' ? f.elevationMeters : '—'}</td>
                     <td>{f.productionStyle ?? '—'}</td>
-                    <td>{f.city ?? '—'}</td>
                     <td>{typeof f.totalFarmSizeHa === 'number' ? f.totalFarmSizeHa : '—'}</td>
                     <td>{typeof f.mainCropAreaHa === 'number' ? f.mainCropAreaHa : '—'}</td>
                     <td>

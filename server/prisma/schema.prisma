@@ -892,9 +892,22 @@ model SupplyLogistics {
   notes              String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  attachments        SupplyLogisticsAttachment[]
 
   @@index([code])
   @@index([siteType])
+}
+
+model SupplyLogisticsAttachment {
+  id               String         @id @default(cuid())
+  supplyLogisticsId String
+  supplyLogistics  SupplyLogistics @relation(fields: [supplyLogisticsId], references: [id], onDelete: Cascade)
+  filePath         String?
+  fileName         String?
+  fileMime         String?
+  createdAt        DateTime       @default(now())
+
+  @@index([supplyLogisticsId])
 }
 
 model GlobalSupplyCrop {

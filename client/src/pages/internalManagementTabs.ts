@@ -4,7 +4,6 @@ export type InternalManagementTab =
   | 'calendar'
   | 'orgChart'
   | 'shipments'
-  | 'contracts'
   | 'documents'
   | 'projectHistory'
   | 'managementAssignments'

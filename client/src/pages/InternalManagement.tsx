@@ -1,5 +1,5 @@
 /**
- * Internal Management — Admin only: Audits, Shipments (schedule), Contracts, internal & project history, etc.
+ * Internal Management — Admin only: Audits, Shipments (schedule), internal & project history, etc.
  * Command Media (shared /documents library) is on the Admin page.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -277,9 +277,10 @@ export function InternalManagement() {
   }, [schedules, shipmentSort]);
 
   const sortedContractRows = useMemo(() => {
-    if (!contractSort.key) return rows;
+    const projectLinkedRows = rows.filter((r) => !!r.projectHistoryId || !!r.projectHistory);
+    if (!contractSort.key) return projectLinkedRows;
     const { key: k, dir } = contractSort;
-    const list = [...rows];
+    const list = [...projectLinkedRows];
     list.sort((a, b) => {
       switch (k) {
         case 'project':
@@ -512,25 +513,18 @@ export function InternalManagement() {
     if (
       !token ||
       !isAdmin ||
-      (tab !== 'projectHistory' &&
-        tab !== 'profit' &&
-        tab !== 'managementAssignments' &&
-        tab !== 'contracts')
+      (tab !== 'projectHistory' && tab !== 'profit' && tab !== 'managementAssignments')
     )
       return;
     if (tab === 'projectHistory') {
       loadProjectHistories();
       loadProjectHistoryBuyers();
+      loadContractEmployees();
     }
     if (tab === 'profit') loadProfit();
     if (tab === 'managementAssignments') {
       loadManagementAssignments();
       loadManagementUsers();
-    }
-    if (tab === 'contracts') {
-      loadProjectHistories();
-      loadProjectHistoryBuyers();
-      loadContractEmployees();
     }
   }, [token, isAdmin, tab]);
 
@@ -922,7 +916,6 @@ export function InternalManagement() {
           [
             ['audits', 'Audits'],
             ['shipments', 'Shipments'],
-            ['contracts', 'Contracts'],
             ['documents', 'Documents'],
             ['projectHistory', 'Project History'],
             ['managementAssignments', 'Management Assignments'],
@@ -1242,11 +1235,11 @@ export function InternalManagement() {
         </>
       )}
 
-      {tab === 'contracts' && (
+      {tab === 'projectHistory' && (
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Upload</h2>
+              <h2 style={{ marginTop: 0 }}>Project attachments</h2>
               <form
                 onSubmit={(e) =>
                   void submit(e, {

@@ -223,6 +223,7 @@ export function SidebarNavIcon({ path }: { path: string }) {
         </Svg>
       );
     case '/global-vendors/logistics':
+    case '/global-vendors/logistics-profile':
       return (
         <Svg>
           <path d="M14 18V6a2 2 0 00-2-2H4a2 2 0 00-2 2v11a2 2 0 002 2h8M14 18h6M14 14h6M14 10h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

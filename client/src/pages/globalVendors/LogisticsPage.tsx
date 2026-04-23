@@ -2,6 +2,7 @@
  * Global Supply — Logistics: sites with typed labels (color-coded).
  */
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
@@ -33,7 +34,15 @@ export interface LogisticsRow {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  attachments: LogisticsAttachmentRow[];
 }
+
+type LogisticsAttachmentRow = {
+  id: string;
+  fileName: string | null;
+  fileMime: string | null;
+  createdAt: string;
+};
 
 function TypeBadge({ siteType }: { siteType: string }) {
   const s = TYPE_STYLE[siteType];
@@ -64,6 +73,7 @@ export function LogisticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [attachSavingId, setAttachSavingId] = useState<string | null>(null);
 
   const [siteType, setSiteType] = useState<string>('Port');
   const [company, setCompany] = useState('');
@@ -176,6 +186,102 @@ export function LogisticsPage() {
       load({ silent: true });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const uploadAttachments = async (logisticsId: string, files: FileList | File[]) => {
+    if (!token) return;
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    setAttachSavingId(logisticsId);
+    try {
+      for (const file of arr) {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await apiFetch(`/supply-logistics/${logisticsId}/attachments`, {
+          token,
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+      }
+      toast.success(arr.length === 1 ? 'Attachment uploaded' : `${arr.length} attachments uploaded`);
+      load({ silent: true });
+    } catch (err) {
+      let msg = 'Could not upload attachment';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setAttachSavingId(null);
+    }
+  };
+
+  const handleAttachmentFiles = (logisticsId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = e.target.files;
+    if (!list?.length) return;
+    void uploadAttachments(logisticsId, list);
+    e.target.value = '';
+  };
+
+  const openAttachmentDownload = async (logisticsId: string, attachmentId: string) => {
+    if (!token) return;
+    try {
+      const r = await apiJson<{ url: string }>(
+        `/supply-logistics/${logisticsId}/attachments/${attachmentId}/url`,
+        { token }
+      );
+      window.open(r.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      let msg = 'Could not open attachment';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    }
+  };
+
+  const deleteAttachment = async (logisticsId: string, attachmentId: string) => {
+    if (!token) return;
+    setAttachSavingId(logisticsId);
+    try {
+      const res = await apiFetch(`/supply-logistics/${logisticsId}/attachments/${attachmentId}`, {
+        token,
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      toast.success('Attachment removed');
+      load({ silent: true });
+    } catch (err) {
+      let msg = 'Could not remove attachment';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setAttachSavingId(null);
     }
   };
 
@@ -320,13 +426,14 @@ export function LogisticsPage() {
                   <th>Longitude</th>
                   <th>Latitude</th>
                   <th>Notes</th>
-                  <th style={{ width: 140 }} />
+                  <th style={{ width: 170 }}>Edit/Delete</th>
+                  <th style={{ minWidth: 220 }}>Attach files</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="table-empty">
+                    <td colSpan={10} className="table-empty">
                       No logistics sites yet. Use the form above to add one.
                     </td>
                   </tr>
@@ -339,7 +446,17 @@ export function LogisticsPage() {
                       <td>
                         <TypeBadge siteType={r.siteType} />
                       </td>
-                      <td>{r.company}</td>
+                      <td>
+                        <Link
+                          to={`/global-vendors/logistics-profile?logisticsId=${encodeURIComponent(r.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="finding-code-link"
+                          title="Open Logistics profile (new tab)"
+                        >
+                          {r.company}
+                        </Link>
+                      </td>
                       <td>{r.country}</td>
                       <td>{r.registrationNumber?.trim() ? r.registrationNumber : '—'}</td>
                       <td>{typeof r.longitude === 'number' ? r.longitude : '—'}</td>
@@ -348,7 +465,12 @@ export function LogisticsPage() {
                         <ExpandableTableText value={r.notes} modalTitle={`Notes — ${r.code}`} />
                       </td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button type="button" className="btn btn-sm" onClick={() => setEditRow({ ...r })}>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setEditRow({ ...r })}
+                          disabled={attachSavingId === r.id}
+                        >
                           Edit
                         </button>{' '}
                         <button
@@ -356,9 +478,66 @@ export function LogisticsPage() {
                           className="btn btn-sm btn-ghost"
                           style={{ color: 'var(--color-danger, #b91c1c)' }}
                           onClick={() => setDeleteRow(r)}
+                          disabled={attachSavingId === r.id}
                         >
                           Delete
                         </button>
+                      </td>
+                      <td style={{ minWidth: 220, whiteSpace: 'normal', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <label className="btn btn-xs">
+                            Add file...
+                            <input
+                              type="file"
+                              multiple
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleAttachmentFiles(r.id, e)}
+                              disabled={attachSavingId === r.id || saving}
+                            />
+                          </label>
+                          {attachSavingId === r.id ? (
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Uploading...
+                            </span>
+                          ) : null}
+                          {r.attachments.length > 0 ? (
+                            <ul
+                              style={{
+                                margin: '4px 0 0',
+                                paddingLeft: 16,
+                                fontSize: 'var(--text-xs)',
+                                listStyle: 'disc',
+                              }}
+                            >
+                              {r.attachments.map((a) => (
+                                <li key={a.id}>
+                                  <button
+                                    type="button"
+                                    className="link-button"
+                                    style={{
+                                      padding: 0,
+                                      fontSize: 'inherit',
+                                      verticalAlign: 'baseline',
+                                    }}
+                                    onClick={() => void openAttachmentDownload(r.id, a.id)}
+                                  >
+                                    {a.fileName || 'Download'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-ghost"
+                                    style={{ marginLeft: 6 }}
+                                    title="Remove attachment"
+                                    disabled={attachSavingId === r.id}
+                                    onClick={() => void deleteAttachment(r.id, a.id)}
+                                  >
+                                    Remove
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))
