@@ -40,16 +40,30 @@ type PurchaseOrderRow = {
   }[];
 };
 
+type CropOption = {
+  id: string;
+  name: string;
+};
+
+function dateInputFromIso(iso: string | null | undefined): string {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
 export function PurchaseOrdersPage() {
   const { token } = useAuth();
   const toast = useToast();
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
   const [farms, setFarms] = useState<FarmRow[]>([]);
+  const [cropOptions, setCropOptions] = useState<CropOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attachSavingId, setAttachSavingId] = useState<string | null>(null);
+  const [closingId, setClosingId] = useState<string | null>(null);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
 
   const [farmId, setFarmId] = useState<string>('');
   const [buyerName, setBuyerName] = useState('');
@@ -74,10 +88,14 @@ export function PurchaseOrdersPage() {
     Promise.all([
       apiJson<PurchaseOrderRow[]>('/purchase-orders', { token }),
       apiJson<FarmRow[]>('/farms', { token }),
+      apiJson<{ list: CropOption[] }>('/global-supply-options/crops', { token }).catch(
+        () => ({ list: [] as CropOption[] })
+      ),
     ])
-      .then(([ordersRes, farmsRes]) => {
+      .then(([ordersRes, farmsRes, cropsRes]) => {
         setOrders(ordersRes);
         setFarms(farmsRes);
+        setCropOptions(cropsRes.list);
       })
       .catch((e) =>
         setError(
@@ -94,8 +112,7 @@ export function PurchaseOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- token-driven refresh
   }, [token]);
 
-  const closeModal = () => {
-    setModalOpen(false);
+  const resetFormFields = () => {
     setFarmId('');
     setBuyerName('');
     setBuyerEmail('');
@@ -111,32 +128,76 @@ export function PurchaseOrdersPage() {
     setPortOfDischarge('');
   };
 
+  const closeModal = () => {
+    setModalOpen(false);
+    resetFormFields();
+    setFormMode('create');
+    setEditOrderId(null);
+  };
+
+  const openCreateModal = () => {
+    resetFormFields();
+    setFormMode('create');
+    setEditOrderId(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (o: PurchaseOrderRow) => {
+    setFormMode('edit');
+    setEditOrderId(o.id);
+    setFarmId(o.farmId ?? '');
+    setBuyerName(o.buyerName);
+    setBuyerEmail(o.buyerEmail ?? '');
+    setCrop(o.crop ?? '');
+    setQuantityKg(o.quantityKg != null ? String(o.quantityKg) : '');
+    setPricePerKg(o.pricePerKg != null ? String(o.pricePerKg) : '');
+    setStatus(o.status ?? '');
+    setNotes(o.notes ?? '');
+    setOrderDate(dateInputFromIso(o.orderDate));
+    setEstimatedFarmerDeliveryDate(dateInputFromIso(o.estimatedFarmerDeliveryDate));
+    setEstimatedArrivalAtBuyer(dateInputFromIso(o.estimatedArrivalAtBuyer));
+    setDestinationCountry(o.destinationCountry ?? '');
+    setPortOfDischarge(o.portOfDischarge ?? '');
+    setModalOpen(true);
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setSaving(true);
     try {
-      await apiJson<PurchaseOrderRow>('/purchase-orders', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({
-          farmId: farmId || null,
-          buyerName,
-          buyerEmail: buyerEmail || null,
-          orderDate: orderDate || null,
-          crop: crop || null,
-          quantityKg: quantityKg === '' ? null : Number(quantityKg),
-          pricePerKg: pricePerKg === '' ? null : Number(pricePerKg),
-          status: status || null,
-          notes: notes || null,
-          estimatedFarmerDeliveryDate:
-            estimatedFarmerDeliveryDate || null,
-          estimatedArrivalAtBuyer: estimatedArrivalAtBuyer || null,
-          destinationCountry: destinationCountry || null,
-          portOfDischarge: portOfDischarge || null,
-        }),
-      });
-      toast.success('Purchase order created');
+      const payload = {
+        farmId: farmId || null,
+        buyerName,
+        buyerEmail: buyerEmail || null,
+        orderDate: orderDate || null,
+        crop: crop || null,
+        quantityKg: quantityKg === '' ? null : Number(quantityKg),
+        pricePerKg: pricePerKg === '' ? null : Number(pricePerKg),
+        status: status || null,
+        notes: notes || null,
+        estimatedFarmerDeliveryDate:
+          estimatedFarmerDeliveryDate || null,
+        estimatedArrivalAtBuyer: estimatedArrivalAtBuyer || null,
+        destinationCountry: destinationCountry || null,
+        portOfDischarge: portOfDischarge || null,
+      };
+
+      if (formMode === 'edit' && editOrderId) {
+        await apiJson<PurchaseOrderRow>(`/purchase-orders/${editOrderId}`, {
+          token,
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        toast.success('Purchase order updated');
+      } else {
+        await apiJson<PurchaseOrderRow>('/purchase-orders', {
+          token,
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        toast.success('Purchase order created');
+      }
       closeModal();
       load({ silent: true });
     } catch (err) {
@@ -155,19 +216,28 @@ export function PurchaseOrdersPage() {
     }
   };
 
-  const attachFile = async (orderId: string, kind: string, file: File) => {
+  const uploadAttachments = async (orderId: string, files: FileList | File[]) => {
     if (!token) return;
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
     setAttachSavingId(orderId);
     try {
-      const form = new FormData();
-      form.append('kind', kind);
-      form.append('file', file);
-      await apiFetch(`/purchase-orders/${orderId}/attachments`, {
-        token,
-        method: 'POST',
-        body: form,
-      });
-      toast.success('Attachment uploaded');
+      for (const file of arr) {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await apiFetch(`/purchase-orders/${orderId}/attachments`, {
+          token,
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+      }
+      toast.success(
+        arr.length === 1 ? 'Attachment uploaded' : `${arr.length} attachments uploaded`
+      );
       load({ silent: true });
     } catch (err) {
       let msg = 'Could not upload attachment';
@@ -185,16 +255,97 @@ export function PurchaseOrdersPage() {
     }
   };
 
-  const handleFileInput = (
+  const handleAttachmentFiles = (
     orderId: string,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const kind = e.target.getAttribute('data-kind') || 'NoteFile';
-    void attachFile(orderId, kind, file);
-    // reset input so selecting the same file again still fires change
+    const list = e.target.files;
+    if (!list?.length) return;
+    void uploadAttachments(orderId, list);
     e.target.value = '';
+  };
+
+  const openAttachmentDownload = async (orderId: string, attachmentId: string) => {
+    if (!token) return;
+    try {
+      const r = await apiJson<{ url: string }>(
+        `/purchase-orders/${orderId}/attachments/${attachmentId}/url`,
+        { token }
+      );
+      window.open(r.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      let msg = 'Could not open attachment';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    }
+  };
+
+  const deleteAttachment = async (orderId: string, attachmentId: string) => {
+    if (!token) return;
+    setAttachSavingId(orderId);
+    try {
+      const res = await apiFetch(
+        `/purchase-orders/${orderId}/attachments/${attachmentId}`,
+        { token, method: 'DELETE' }
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      toast.success('Attachment removed');
+      load({ silent: true });
+    } catch (err) {
+      let msg = 'Could not remove attachment';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setAttachSavingId(null);
+    }
+  };
+
+  const closePurchaseOrder = async (order: PurchaseOrderRow) => {
+    if (!token) return;
+    const currentStatus = (order.status ?? 'Open').trim().toLowerCase();
+    if (currentStatus === 'closed') {
+      toast.info('Purchase order is already closed');
+      return;
+    }
+    setClosingId(order.id);
+    try {
+      await apiJson(`/purchase-orders/${order.id}/close`, {
+        token,
+        method: 'PATCH',
+      });
+      toast.success(`${order.code} closed`);
+      load({ silent: true });
+    } catch (err) {
+      let msg = 'Could not close purchase order';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setClosingId(null);
+    }
   };
 
   if (loading && orders.length === 0) {
@@ -238,7 +389,7 @@ export function PurchaseOrdersPage() {
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() => setModalOpen(true)}
+          onClick={() => openCreateModal()}
         >
           New purchase order
         </button>
@@ -249,10 +400,12 @@ export function PurchaseOrdersPage() {
         </div>
       )}
       <div className="card">
-        <div className="table-wrap">
-          <table className="table table--sticky-header">
+        <div className="table-wrap purchase-orders-table-scroll">
+          <table className="table table--sticky-header table--prevent-shrink">
             <thead>
               <tr>
+                <th>Close PO</th>
+                <th>Edit</th>
                 <th>PO ID</th>
                 <th>Farm</th>
                 <th>Buyer</th>
@@ -273,7 +426,7 @@ export function PurchaseOrdersPage() {
             <tbody>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="table-empty">
+                  <td colSpan={17} className="table-empty">
                     No purchase orders yet. Use{' '}
                     <strong>New purchase order</strong> to create one.
                   </td>
@@ -282,6 +435,33 @@ export function PurchaseOrdersPage() {
                 orders.map((o) => (
                   <tr key={o.id}>
                     <td>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => void closePurchaseOrder(o)}
+                        disabled={
+                          closingId === o.id ||
+                          (o.status ?? 'Open').trim().toLowerCase() === 'closed'
+                        }
+                      >
+                        {(o.status ?? 'Open').trim().toLowerCase() === 'closed'
+                          ? 'Closed'
+                          : closingId === o.id
+                            ? 'Closing…'
+                            : 'Close PO'}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => openEditModal(o)}
+                        disabled={closingId === o.id || attachSavingId === o.id}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                    <td>
                       <strong>{o.code}</strong>
                     </td>
                     <td>
@@ -289,7 +469,7 @@ export function PurchaseOrdersPage() {
                         ? `${o.farm.code} — ${o.farm.farmName}`
                         : '—'}
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: 'normal', verticalAlign: 'top' }}>
                       <div>{o.buyerName}</div>
                       {o.buyerEmail && (
                         <div
@@ -368,7 +548,13 @@ export function PurchaseOrdersPage() {
                         day: 'numeric',
                       })}
                     </td>
-                    <td style={{ minWidth: 220 }}>
+                    <td
+                      style={{
+                        minWidth: 220,
+                        whiteSpace: 'normal',
+                        verticalAlign: 'top',
+                      }}
+                    >
                       <div
                         style={{
                           display: 'flex',
@@ -376,74 +562,71 @@ export function PurchaseOrdersPage() {
                           gap: 4,
                         }}
                       >
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 4,
-                          }}
-                        >
-                          <label className="btn btn-xs">
-                            Invoice
-                            <input
-                              type="file"
-                              style={{ display: 'none' }}
-                              data-kind="Invoice"
-                              onChange={(e) => handleFileInput(o.id, e)}
-                              disabled={attachSavingId === o.id}
-                            />
-                          </label>
-                          <label className="btn btn-xs">
-                            Certificate
-                            <input
-                              type="file"
-                              style={{ display: 'none' }}
-                              data-kind="Certificate"
-                              onChange={(e) => handleFileInput(o.id, e)}
-                              disabled={attachSavingId === o.id}
-                            />
-                          </label>
-                          <label className="btn btn-xs">
-                            Contract
-                            <input
-                              type="file"
-                              style={{ display: 'none' }}
-                              data-kind="Contract"
-                              onChange={(e) => handleFileInput(o.id, e)}
-                              disabled={attachSavingId === o.id}
-                            />
-                          </label>
-                          <label className="btn btn-xs">
-                            Notes file
-                            <input
-                              type="file"
-                              style={{ display: 'none' }}
-                              data-kind="NoteFile"
-                              onChange={(e) => handleFileInput(o.id, e)}
-                              disabled={attachSavingId === o.id}
-                            />
-                          </label>
-                        </div>
+                        <label className="btn btn-xs">
+                          Add file…
+                          <input
+                            type="file"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleAttachmentFiles(o.id, e)}
+                            disabled={attachSavingId === o.id}
+                          />
+                        </label>
+                        {attachSavingId === o.id ? (
+                          <span
+                            style={{
+                              fontSize: 'var(--text-xs)',
+                              color: 'var(--color-text-muted)',
+                            }}
+                          >
+                            Uploading…
+                          </span>
+                        ) : null}
                         {o.attachments.length > 0 && (
                           <ul
                             style={{
-                              margin: 0,
+                              margin: '4px 0 0',
                               paddingLeft: 16,
                               fontSize: 'var(--text-xs)',
+                              listStyle: 'disc',
                             }}
                           >
                             {o.attachments.map((a) => (
                               <li key={a.id}>
-                                <span>{a.kind}</span>{' '}
-                                {a.fileName && (
+                                <button
+                                  type="button"
+                                  className="link-button"
+                                  style={{
+                                    padding: 0,
+                                    fontSize: 'inherit',
+                                    verticalAlign: 'baseline',
+                                  }}
+                                  onClick={() =>
+                                    void openAttachmentDownload(o.id, a.id)
+                                  }
+                                >
+                                  {a.fileName || 'Download'}
+                                </button>
+                                {a.kind && a.kind !== 'Document' ? (
                                   <span
                                     style={{
                                       color: 'var(--color-text-muted)',
+                                      marginLeft: 6,
                                     }}
                                   >
-                                    — {a.fileName}
+                                    ({a.kind})
                                   </span>
-                                )}
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="btn btn-xs btn-ghost"
+                                  style={{ marginLeft: 6 }}
+                                  title="Remove attachment"
+                                  disabled={attachSavingId === o.id}
+                                  onClick={() => void deleteAttachment(o.id, a.id)}
+                                >
+                                  Remove
+                                </button>
                               </li>
                             ))}
                           </ul>
@@ -469,7 +652,7 @@ export function PurchaseOrdersPage() {
         >
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-po-title" className="confirm-dialog-title">
-              New purchase order
+              {formMode === 'edit' ? 'Edit purchase order' : 'New purchase order'}
             </h3>
             <form
               onSubmit={submit}
@@ -520,12 +703,18 @@ export function PurchaseOrdersPage() {
               </label>
               <label className="field">
                 <span className="field-label">Crop</span>
-                <input
+                <select
                   className="input"
                   value={crop}
                   onChange={(e) => setCrop(e.target.value)}
-                  placeholder="e.g. Coffee, Cocoa"
-                />
+                >
+                  <option value="">Select crop</option>
+                  {cropOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="field-grid">
                 <label className="field">
@@ -629,7 +818,11 @@ export function PurchaseOrdersPage() {
                   className="btn btn-primary"
                   disabled={saving}
                 >
-                  {saving ? 'Saving…' : 'Create PO'}
+                  {saving
+                    ? 'Saving…'
+                    : formMode === 'edit'
+                      ? 'Update PO'
+                      : 'Create PO'}
                 </button>
               </div>
             </form>

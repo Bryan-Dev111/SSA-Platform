@@ -11,7 +11,25 @@ type FarmMapPoint = {
   farmName: string;
   latitude: number;
   longitude: number;
+  farmCategory: string | null;
 };
+
+/** Distinct colors for map pins; cycled by farm category (including Uncategorized). */
+const PIN_PALETTE = [
+  { stroke: '#b91c1c', fill: '#ef4444' },
+  { stroke: '#15803d', fill: '#22c55e' },
+  { stroke: '#1d4ed8', fill: '#3b82f6' },
+  { stroke: '#a16207', fill: '#eab308' },
+  { stroke: '#7e22ce', fill: '#a855f7' },
+  { stroke: '#c2410c', fill: '#fb923c' },
+  { stroke: '#0e7490', fill: '#06b6d4' },
+  { stroke: '#be123c', fill: '#fb7185' },
+] as const;
+
+function categoryLabel(raw: string | null | undefined): string {
+  const s = (raw ?? '').trim();
+  return s || 'Uncategorized';
+}
 
 const WORLD_BOUNDS = L.latLngBounds([-85, -180], [85, 180]);
 
@@ -87,6 +105,19 @@ export function FarmsMapPage() {
         ]
       : [20, 0];
 
+  const legendCategories = useMemo(() => {
+    const keys = new Set(farms.map((f) => categoryLabel(f.farmCategory)));
+    return [...keys].sort((a, b) => a.localeCompare(b));
+  }, [farms]);
+
+  const colorByCategory = useMemo(() => {
+    const m = new Map<string, (typeof PIN_PALETTE)[number]>();
+    legendCategories.forEach((cat, i) => {
+      m.set(cat, PIN_PALETTE[i % PIN_PALETTE.length]);
+    });
+    return m;
+  }, [legendCategories]);
+
   if (loading) {
     return (
       <div className="page">
@@ -129,8 +160,8 @@ export function FarmsMapPage() {
                   fontSize: 'var(--text-sm)',
                 }}
               >
-                No farms with latitude/longitude yet. Add coordinates on the farmer
-                records to see pins on this map.
+                No farms with latitude/longitude yet. Add coordinates on farm records in{' '}
+                <strong>Farm Information</strong> to see pins on this map.
               </div>
             ) : (
               <MapContainer
@@ -155,14 +186,16 @@ export function FarmsMapPage() {
                 />
                 <MapLockSingleWorld />
                 <MapFitBounds points={points} />
-                {farms.map((f) => (
+                {farms.map((f) => {
+                  const pal = colorByCategory.get(categoryLabel(f.farmCategory)) ?? PIN_PALETTE[0];
+                  return (
                   <CircleMarker
                     key={f.id}
                     center={[f.latitude, f.longitude]}
                     pathOptions={{
-                      color: '#b91c1c',
+                      color: pal.stroke,
                       weight: 2,
-                      fillColor: '#ef4444',
+                      fillColor: pal.fill,
                       fillOpacity: 0.95,
                     }}
                     radius={10}
@@ -170,13 +203,87 @@ export function FarmsMapPage() {
                     <Tooltip direction="top" opacity={1}>
                       <span>
                         {f.code} · {f.farmName}
+                        {' · '}
+                        {categoryLabel(f.farmCategory)}
                       </span>
                     </Tooltip>
                   </CircleMarker>
-                ))}
+                  );
+                })}
               </MapContainer>
             )}
           </div>
+          {farms.length > 0 ? (
+            <div
+              role="group"
+              aria-label="Map legend"
+              style={{
+                marginTop: '1rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid var(--color-border)',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-text-muted)',
+                  marginBottom: '0.65rem',
+                }}
+              >
+                Legend
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.65rem 1.25rem',
+                  alignItems: 'center',
+                }}
+              >
+                {legendCategories.map((cat) => {
+                  const pal = colorByCategory.get(cat) ?? PIN_PALETTE[0];
+                  return (
+                    <div
+                      key={cat}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: '50%',
+                          border: `2px solid ${pal.stroke}`,
+                          background: pal.fill,
+                          flexShrink: 0,
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <span style={{ fontSize: 'var(--text-sm)' }}>{cat}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p
+                style={{
+                  marginTop: '0.75rem',
+                  marginBottom: 0,
+                  color: 'var(--color-text-muted)',
+                  fontSize: 'var(--text-xs)',
+                }}
+              >
+                Pin color follows <strong>Farm category</strong> from Farm Information. Farms without a category use{' '}
+                <strong>Uncategorized</strong>.
+              </p>
+            </div>
+          ) : (
           <p
             style={{
               marginTop: '0.75rem',
@@ -185,9 +292,9 @@ export function FarmsMapPage() {
               fontSize: 'var(--text-sm)',
             }}
           >
-            Pins show farms with explicit GPS coordinates. Color is fixed red to
-            match the client&apos;s spec for Global Vendors.
+            Pins show farms with explicit GPS coordinates once coordinates are saved on each farm.
           </p>
+          )}
         </div>
       </div>
     </div>

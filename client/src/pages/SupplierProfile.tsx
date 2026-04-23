@@ -107,8 +107,8 @@ interface PortalData {
 interface ShipmentKpis {
   otdPercent: number | null;
   fpyPercent: number | null;
-  /** Inspections later than schedule (OTD late count). */
-  lateVsSchedule?: number;
+  /** Past-due schedule rows where shipped qty is below plan (late PO lines). */
+  shortDeliveries?: number;
 }
 
 interface WeeklyRiskPoint {
@@ -447,7 +447,7 @@ export function SupplierProfile() {
 
   const supplier = data?.supplier;
   const metrics = data?.metrics;
-  const latePoCount = shipmentKpis?.lateVsSchedule ?? 0;
+  const latePoCount = shipmentKpis?.shortDeliveries ?? 0;
 
   return (
     <div className="page">

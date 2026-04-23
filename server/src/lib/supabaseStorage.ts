@@ -51,10 +51,50 @@ export async function uploadDocumentToStorage(args: {
   return { storagePath: key };
 }
 
-export async function createRecordDownloadSignedUrl(storagePath: string): Promise<string> {
+export const FARM_PROFILE_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
+
+/** Signed URL for reading an object from the primary storage bucket. */
+export async function createSignedUrlForPath(
+  storagePath: string,
+  expiresSec: number = 3600
+): Promise<string> {
   const supabase = requireStorageClient();
-  const { data, error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).createSignedUrl(storagePath, 60);
-  if (error || !data?.signedUrl) throw new Error(`Storage signed URL failed: ${error?.message || 'Unknown error'}`);
+  const { data, error } = await supabase.storage
+    .from(SUPABASE_STORAGE_BUCKET)
+    .createSignedUrl(storagePath, expiresSec);
+  if (error || !data?.signedUrl) {
+    throw new Error(`Storage signed URL failed: ${error?.message || 'Unknown error'}`);
+  }
   return data.signedUrl;
+}
+
+export async function createRecordDownloadSignedUrl(storagePath: string): Promise<string> {
+  return createSignedUrlForPath(storagePath, 60);
+}
+
+export async function uploadFarmProfileImageToStorage(args: {
+  farmId: string;
+  section: string;
+  fileName: string;
+  fileMime: string | null;
+  fileBuffer: Buffer;
+}): Promise<{ storagePath: string }> {
+  const supabase = requireStorageClient();
+  const safeName = args.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 140) || 'image.bin';
+  const sectionSafe = args.section.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40) || 'section';
+  const key = `farms/${args.farmId}/${sectionSafe}/${Date.now()}-${randomBytes(6).toString('hex')}-${safeName}`;
+  const { error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).upload(key, args.fileBuffer, {
+    upsert: false,
+    contentType: args.fileMime || 'application/octet-stream',
+  });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return { storagePath: key };
+}
+
+/** Remove one object; ignores \"not found\" style failures so deletes stay idempotent. */
+export async function deleteObjectFromStorage(storagePath: string): Promise<void> {
+  const supabase = requireStorageClient();
+  const { error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).remove([storagePath]);
+  if (error) throw new Error(`Storage delete failed: ${error.message}`);
 }
 

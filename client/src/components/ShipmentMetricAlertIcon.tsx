@@ -1,6 +1,6 @@
 /**
- * Red warning triangle + hover tooltip for shipment KPIs (late PO vs schedule, overdue inspection).
- * Shared by Shipments page (On-Time Delivery) and Dashboard (Shipments card).
+ * Red warning triangle + hover tooltip for shipment KPIs (late PO / qty short, optional overdue inspection).
+ * Shipments On-Time Delivery passes only qty-short lines; Dashboard may include overdue inspection rows.
  * Tooltip is portaled to document.body so Dashboard layout cannot clip or cover it (parity with Shipments).
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';

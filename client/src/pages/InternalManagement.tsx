@@ -121,6 +121,14 @@ interface ManagementAssignmentRow {
   activeProjects: ManagementAssignmentActiveProject[];
 }
 
+interface ManagementUserRow {
+  id: string;
+  email: string;
+  name: string | null;
+  roleNames: string[];
+  qmAssignedQeIds?: string[];
+}
+
 function projectPopToInputDate(iso: string | null | undefined): string {
   if (!iso) return '';
   return iso.slice(0, 10);
@@ -222,6 +230,10 @@ export function InternalManagement() {
   const [contractSort, setContractSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
   const [projectTableSort, setProjectTableSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
   const [mgmtAssignSort, setMgmtAssignSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [managementUsers, setManagementUsers] = useState<ManagementUserRow[]>([]);
+  const [selectedQmId, setSelectedQmId] = useState('');
+  const [selectedQeId, setSelectedQeId] = useState('');
+  const [managementAssignBusy, setManagementAssignBusy] = useState(false);
 
   const filteredProjectHistories = useMemo(() => {
     return projectHistories.filter((r) => {
@@ -373,6 +385,16 @@ export function InternalManagement() {
     return list;
   }, [managementAssignments, mgmtAssignSort]);
 
+  const managementQualityManagers = useMemo(
+    () => managementUsers.filter((u) => u.roleNames.includes('QualityManager')),
+    [managementUsers]
+  );
+
+  const managementQualityEngineers = useMemo(
+    () => managementUsers.filter((u) => u.roleNames.includes('QualityEngineer')),
+    [managementUsers]
+  );
+
   const projectHistoryRevenueTotal = useMemo(() => {
     return filteredProjectHistories.reduce((sum, r) => {
       const n = r.revenueAmount;
@@ -437,6 +459,13 @@ export function InternalManagement() {
       .catch(() => setManagementAssignments([]));
   };
 
+  const loadManagementUsers = () => {
+    if (!token) return;
+    apiJson<ManagementUserRow[]>('/users', { token })
+      .then(setManagementUsers)
+      .catch(() => setManagementUsers([]));
+  };
+
   const load = () => {
     if (!token) return;
     Promise.all([
@@ -494,13 +523,55 @@ export function InternalManagement() {
       loadProjectHistoryBuyers();
     }
     if (tab === 'profit') loadProfit();
-    if (tab === 'managementAssignments') loadManagementAssignments();
+    if (tab === 'managementAssignments') {
+      loadManagementAssignments();
+      loadManagementUsers();
+    }
     if (tab === 'contracts') {
       loadProjectHistories();
       loadProjectHistoryBuyers();
       loadContractEmployees();
     }
   }, [token, isAdmin, tab]);
+
+  const assignQmToQe = async () => {
+    if (!token || !selectedQmId || !selectedQeId) return;
+    setManagementAssignBusy(true);
+    try {
+      await apiJson('/qm-qes', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          qualityManagerId: selectedQmId,
+          qualityEngineerId: selectedQeId,
+        }),
+      });
+      toast.success('QM assigned to QE');
+      setSelectedQeId('');
+      loadManagementUsers();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setManagementAssignBusy(false);
+    }
+  };
+
+  const removeQmToQe = async (qualityManagerId: string, qualityEngineerId: string) => {
+    if (!token) return;
+    setManagementAssignBusy(true);
+    try {
+      await apiJson(`/qm-qes/${qualityManagerId}/${qualityEngineerId}`, {
+        token,
+        method: 'DELETE',
+      });
+      toast.info('QM to QE assignment removed');
+      loadManagementUsers();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setManagementAssignBusy(false);
+    }
+  };
 
   if (user && !isAdmin) {
     return <Navigate to={getDefaultPath(user.roleNames)} replace />;
@@ -850,8 +921,6 @@ export function InternalManagement() {
         {(
           [
             ['audits', 'Audits'],
-            ['calendar', 'Calendar'],
-            ['orgChart', 'Org Chart'],
             ['shipments', 'Shipments'],
             ['contracts', 'Contracts'],
             ['documents', 'Documents'],
@@ -860,6 +929,8 @@ export function InternalManagement() {
             ['profit', 'Profit'],
             ['employeeAssignments', 'Employee Assignments'],
             ['laborCosts', 'Labor Costs'],
+            ['calendar', 'Calendar'],
+            ['orgChart', 'Org Chart'],
           ] as const
         ).map(([t, label]) => (
           <button
@@ -875,7 +946,13 @@ export function InternalManagement() {
 
       {error && <div className="alert-error">{error}</div>}
 
-      {tab === 'orgChart' && <InternalManagementOrgChart onGoToTab={setTab} />}
+      {tab === 'orgChart' && (
+        <InternalManagementOrgChart
+          token={token}
+          viewerDisplayName={user?.name?.trim() || user?.email || 'You'}
+          onGoToTab={setTab}
+        />
+      )}
 
       {tab === 'calendar' && <InternalManagementCalendarView token={token} />}
 
@@ -2001,65 +2078,169 @@ export function InternalManagement() {
       )}
 
       {tab === 'managementAssignments' && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Management Assignments</h2>
-            <p
-              style={{
-                marginTop: 0,
-                marginBottom: '0.75rem',
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              Every row is one supplier. Each list entry is an active project (Period of Performance includes today, UTC).
-              Assign a supplier on each record in Project History.
-            </p>
-            <div className="table-wrap" style={{ overflowX: 'auto' }}>
-              {managementAssignments.length === 0 ? (
-                <p className="table-empty">No suppliers with active projects.</p>
-              ) : (
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>QM to QE assignments</h2>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Quality Manager</label>
+                  <select
+                    className="input"
+                    value={selectedQmId}
+                    onChange={(e) => setSelectedQmId(e.target.value)}
+                    style={{ minWidth: 260 }}
+                  >
+                    <option value="">Select Quality Manager</option>
+                    {managementQualityManagers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name?.trim() ? `${m.name} (${m.email})` : m.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Quality Engineer</label>
+                  <select
+                    className="input"
+                    value={selectedQeId}
+                    onChange={(e) => setSelectedQeId(e.target.value)}
+                    style={{ minWidth: 260 }}
+                  >
+                    <option value="">Select Quality Engineer</option>
+                    {managementQualityEngineers.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {q.name?.trim() ? `${q.name} (${q.email})` : q.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void assignQmToQe()}
+                  disabled={managementAssignBusy || !selectedQmId || !selectedQeId}
+                >
+                  Assign
+                </button>
+              </div>
+
+              <div className="table-wrap" style={{ marginTop: '1rem' }}>
                 <table className="table">
                   <thead>
                     <tr>
-                      <SortableTh
-                        label="Supplier"
-                        columnKey="supplier"
-                        activeKey={mgmtAssignSort.key}
-                        dir={mgmtAssignSort.dir}
-                        onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
-                        style={{ minWidth: 200 }}
-                      />
-                      <SortableTh
-                        label="Active projects"
-                        columnKey="projects"
-                        activeKey={mgmtAssignSort.key}
-                        dir={mgmtAssignSort.dir}
-                        onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
-                      />
+                      <th>Quality Manager</th>
+                      <th>Assigned Quality Engineers</th>
+                      <th style={{ width: 100 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedManagementAssignments.map((row) => (
-                      <tr key={row.supplier?.id ?? '__unassigned__'}>
-                        <td>{row.supplier ? `${row.supplier.code}: ${row.supplier.name}` : 'No supplier assigned'}</td>
-                        <td>
-                          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                            {row.activeProjects.map((p) => (
-                              <li key={p.id} style={{ marginBottom: '0.35rem' }}>
-                                {p.projectCode} — {p.companyName} · {p.clientName} · POP {formatProjectPopCell(p.popStart, p.popEnd)}
-                              </li>
-                            ))}
-                          </ul>
+                    {managementQualityManagers.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="table-empty">
+                          No Quality Managers found.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      managementQualityManagers.flatMap((m) => {
+                        const qeIds = m.qmAssignedQeIds ?? [];
+                        if (qeIds.length === 0) {
+                          return (
+                            <tr key={m.id}>
+                              <td>{m.name?.trim() ? m.name : m.email}</td>
+                              <td colSpan={2} className="table-empty">
+                                None
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return qeIds.map((qid) => {
+                          const qe = managementQualityEngineers.find((x) => x.id === qid);
+                          return (
+                            <tr key={`${m.id}-${qid}`}>
+                              <td>{m.name?.trim() ? m.name : m.email}</td>
+                              <td>{qe?.name?.trim() ? `${qe.name} (${qe.email})` : qe?.email ?? qid}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() => void removeQmToQe(m.id, qid)}
+                                  disabled={managementAssignBusy}
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })
+                    )}
                   </tbody>
                 </table>
-              )}
+              </div>
             </div>
           </div>
-        </div>
+
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-body">
+              <h2 style={{ marginTop: 0 }}>Supplier active projects</h2>
+              <p
+                style={{
+                  marginTop: 0,
+                  marginBottom: '0.75rem',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                Every row is one supplier. Each list entry is an active project (Period of Performance includes today, UTC).
+                Assign a supplier on each record in Project History.
+              </p>
+              <div className="table-wrap" style={{ overflowX: 'auto' }}>
+                {managementAssignments.length === 0 ? (
+                  <p className="table-empty">No suppliers with active projects.</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <SortableTh
+                          label="Supplier"
+                          columnKey="supplier"
+                          activeKey={mgmtAssignSort.key}
+                          dir={mgmtAssignSort.dir}
+                          onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
+                          style={{ minWidth: 200 }}
+                        />
+                        <SortableTh
+                          label="Active projects"
+                          columnKey="projects"
+                          activeKey={mgmtAssignSort.key}
+                          dir={mgmtAssignSort.dir}
+                          onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
+                        />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedManagementAssignments.map((row) => (
+                        <tr key={row.supplier?.id ?? '__unassigned__'}>
+                          <td>{row.supplier ? `${row.supplier.code}: ${row.supplier.name}` : 'No supplier assigned'}</td>
+                          <td>
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                              {row.activeProjects.map((p) => (
+                                <li key={p.id} style={{ marginBottom: '0.35rem' }}>
+                                  {p.projectCode} — {p.companyName} · {p.clientName} · POP {formatProjectPopCell(p.popStart, p.popEnd)}
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {tab === 'profit' && (

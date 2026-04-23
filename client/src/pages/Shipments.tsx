@@ -48,8 +48,8 @@ interface Metrics {
   passed: number;
   failed: number;
   overdueWaiting: number;
+  /** Deprecated in API (always 0); OTD uses {@link shortDeliveries} only. */
   lateVsSchedule: number;
-  /** Populated server-side for each shipment counted in lateVsSchedule */
   lateDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
   /** Waiting inspection past requested date (same as overdueWaiting count). */
   overdueDetails?: Array<{ purchaseOrder: string | null; qty: number | null }>;
@@ -78,13 +78,9 @@ function openShipmentRequestsSubtitle(m: Metrics): string {
 }
 
 function onTimeDeliverySubtitle(m: Metrics): string {
-  const lateVs = m.lateVsSchedule ?? 0;
-  const qtyShort = m.shortDeliveries ?? 0;
-  if (lateVs <= 0 && qtyShort <= 0) return 'No late vs schedule';
-  const parts: string[] = [];
-  if (lateVs > 0) parts.push(`${lateVs} late vs schedule`);
-  if (qtyShort > 0) parts.push(`${qtyShort} qty short vs plan`);
-  return parts.join(' · ');
+  const latePo = m.shortDeliveries ?? 0;
+  if (latePo <= 0) return 'No late POs';
+  return latePo === 1 ? '1 late PO' : `${latePo} late POs`;
 }
 
 const SHIPMENT_TABLE_STATUS_RANK: Record<string, number> = {
@@ -93,7 +89,8 @@ const SHIPMENT_TABLE_STATUS_RANK: Record<string, number> = {
   Failed: 2,
 };
 
-function openShipmentRequestsAlertProps(m: Metrics):
+/** OTD card: alert only for late POs (qty short vs schedule); no inspection-request timing. */
+function onTimeDeliveryAlertProps(m: Metrics):
   | {
       shortDeliveries: number;
       shortDetails: Array<{
@@ -101,18 +98,13 @@ function openShipmentRequestsAlertProps(m: Metrics):
         partNumber: string | null;
         missingQty: number;
       }>;
-      lateVsSchedule: number;
-      lateVsScheduleDetails: Array<{ purchaseOrder: string | null; qty: number | null }>;
     }
   | undefined {
   const qtyShort = m.shortDeliveries ?? 0;
-  const lateVs = m.lateVsSchedule ?? 0;
-  if (qtyShort <= 0 && lateVs <= 0) return undefined;
+  if (qtyShort <= 0) return undefined;
   return {
     shortDeliveries: qtyShort,
     shortDetails: m.shortDeliveryDetails ?? [],
-    lateVsSchedule: lateVs,
-    lateVsScheduleDetails: m.lateDetails ?? [],
   };
 }
 
@@ -468,7 +460,7 @@ export function Shipments() {
             label="On-Time Delivery"
             value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'}
             subtitle={onTimeDeliverySubtitle(metrics)}
-            openShipmentRequestsAlert={openShipmentRequestsAlertProps(metrics)}
+            onTimeDeliveryAlert={onTimeDeliveryAlertProps(metrics)}
           />
         </div>
       )}
@@ -918,25 +910,23 @@ function Metric({
   label,
   value,
   subtitle,
-  openShipmentRequestsAlert,
+  onTimeDeliveryAlert,
 }: {
   label: string;
   value: string | number;
   subtitle?: string;
-  openShipmentRequestsAlert?: {
+  /** When set, shows late-PO (qty short) tooltip only — used on On-Time Delivery KPI. */
+  onTimeDeliveryAlert?: {
     shortDeliveries: number;
     shortDetails: Array<{
       purchaseOrder: string | null;
       partNumber: string | null;
       missingQty: number;
     }>;
-    lateVsSchedule: number;
-    lateVsScheduleDetails: Array<{ purchaseOrder: string | null; qty: number | null }>;
   };
 }) {
-  const cardClass =
-    openShipmentRequestsAlert != null ? 'card shipments-metric-card--overflow-visible' : 'card';
-  const reserveIcon = openShipmentRequestsAlert != null;
+  const cardClass = onTimeDeliveryAlert != null ? 'card shipments-metric-card--overflow-visible' : 'card';
+  const reserveIcon = onTimeDeliveryAlert != null;
 
   return (
     <div className={cardClass} style={reserveIcon ? { position: 'relative', zIndex: 1 } : undefined}>
@@ -948,12 +938,13 @@ function Metric({
           minHeight: reserveIcon ? 88 : undefined,
         }}
       >
-        {openShipmentRequestsAlert != null ? (
+        {onTimeDeliveryAlert != null ? (
           <ShipmentMetricAlertIcon
-            shortDeliveries={openShipmentRequestsAlert.shortDeliveries}
-            shortDetails={openShipmentRequestsAlert.shortDetails}
-            lateVsSchedule={openShipmentRequestsAlert.lateVsSchedule}
-            lateVsScheduleDetails={openShipmentRequestsAlert.lateVsScheduleDetails}
+            shortDeliveries={onTimeDeliveryAlert.shortDeliveries}
+            shortDetails={onTimeDeliveryAlert.shortDetails}
+            lateVsSchedule={0}
+            lateVsScheduleDetails={[]}
+            includeOverdueInspectionInTooltip={false}
           />
         ) : null}
         <div

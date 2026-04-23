@@ -40,12 +40,12 @@ import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
 import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
 import { PurchaseOrdersPage } from './pages/globalVendors/PurchaseOrdersPage';
 import { SamplesPage } from './pages/globalVendors/SamplesPage';
-import { FarmProfilePage } from './pages/globalVendors/FarmProfilePage';
-import { FarmProcessingPage } from './pages/globalVendors/FarmProcessingPage';
+import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
+import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDashboardPage';
 import {
-  GlobalFarmProfilePickerPage,
-  GlobalFarmProcessingPickerPage,
-} from './pages/globalVendors/GlobalFarmSectionPickerPages';
+  GlobalFarmProcessingQualityPage,
+  GlobalFarmProfilePage,
+} from './pages/globalVendors/FarmSectionMediaPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -109,6 +109,14 @@ function App() {
                 }
               />
               <Route
+                path="dashboard"
+                element={
+                  <ProtectedRoute path="/global-vendors/dashboard">
+                    <GlobalSupplyDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="farmers"
                 element={
                   <ProtectedRoute path="/global-vendors/farmers">
@@ -120,15 +128,15 @@ function App() {
                 path="farm-profile"
                 element={
                   <ProtectedRoute path="/global-vendors/farm-profile">
-                    <GlobalFarmProfilePickerPage />
+                    <GlobalFarmProfilePage />
                   </ProtectedRoute>
                 }
               />
               <Route
-                path="farm-processing"
+                path="processing-quality"
                 element={
-                  <ProtectedRoute path="/global-vendors/farm-processing">
-                    <GlobalFarmProcessingPickerPage />
+                  <ProtectedRoute path="/global-vendors/processing-quality">
+                    <GlobalFarmProcessingQualityPage />
                   </ProtectedRoute>
                 }
               />
@@ -173,26 +181,18 @@ function App() {
                 }
               />
               <Route
+                path="logistics"
+                element={
+                  <ProtectedRoute path="/global-vendors/logistics">
+                    <LogisticsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="expenses"
                 element={
                   <ProtectedRoute path="/global-vendors/expenses">
                     <ExpensesPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="farmers/:farmId/profile"
-                element={
-                  <ProtectedRoute path="/global-vendors/farmers">
-                    <FarmProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="farmers/:farmId/processing"
-                element={
-                  <ProtectedRoute path="/global-vendors/farmers">
-                    <FarmProcessingPage />
                   </ProtectedRoute>
                 }
               />

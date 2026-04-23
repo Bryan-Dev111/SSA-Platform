@@ -3,8 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { AdminBuyersSuppliersPanel, AdminPermissionsPanel } from '../admin/AdminDay9Panels';
+import { GlobalSupplyMasterDataPanel } from './GlobalSupplyMasterDataPanel';
 
-type Tab = 'users' | 'permissions';
+type Tab = 'users' | 'permissions' | 'crops' | 'countries';
 
 interface GlobalSupplyStats {
   employees: number;
@@ -59,6 +60,8 @@ export function GlobalVendorsAdmin() {
           [
             ['users', 'Users'],
             ['permissions', 'Permissions'],
+            ['crops', 'Crops'],
+            ['countries', 'Countries'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -94,49 +97,17 @@ export function GlobalVendorsAdmin() {
                   <div className="card metric-card">
                     <div className="metric-card-label">Employees</div>
                     <div className="metric-card-value">{stats.employees}</div>
-                    <div
-                      style={{
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                        marginTop: '0.35rem',
-                      }}
-                    >
-                      Active users flagged as employees
-                    </div>
                   </div>
                   <div className="card metric-card">
                     <div className="metric-card-label">Commodity buyers</div>
                     <div className="metric-card-value">{stats.commodityBuyers}</div>
-                    <div
-                      style={{
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                        marginTop: '0.35rem',
-                      }}
-                    >
-                      Accounts with role <strong>CommodityBuyer</strong>
-                    </div>
                   </div>
                   <div className="card metric-card">
                     <div className="metric-card-label">Farmers</div>
                     <div className="metric-card-value">{stats.farmerAccounts}</div>
-                    <div
-                      style={{
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                        marginTop: '0.35rem',
-                      }}
-                    >
-                      Accounts with role <strong>Farmer</strong> ·{' '}
-                      <strong>{stats.registeredFarms}</strong> registered farm profiles
-                    </div>
                   </div>
                 </div>
               )}
-              <p style={{ marginBottom: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Add roles such as <strong>CommodityBuyer</strong> and <strong>Farmer</strong> under main app{' '}
-                <strong>Admin</strong> if they do not exist yet, then assign them to users.
-              </p>
             </div>
           </div>
           <AdminBuyersSuppliersPanel
@@ -150,6 +121,26 @@ export function GlobalVendorsAdmin() {
 
       {tab === 'permissions' && (
         <AdminPermissionsPanel token={token} toast={toast} scope="globalVendors" />
+      )}
+
+      {tab === 'crops' && (
+        <GlobalSupplyMasterDataPanel
+          token={token}
+          toast={toast}
+          title="Crops"
+          noun="Crop"
+          endpoint="/global-supply-options/crops"
+        />
+      )}
+
+      {tab === 'countries' && (
+        <GlobalSupplyMasterDataPanel
+          token={token}
+          toast={toast}
+          title="Countries"
+          noun="Country"
+          endpoint="/global-supply-options/countries"
+        />
       )}
     </div>
   );

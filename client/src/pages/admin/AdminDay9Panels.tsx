@@ -6,8 +6,17 @@ import { useAuth } from '../../context/AuthContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MetricCard } from '../../components/MetricCard';
+import { ExpandableTableText } from '../../components/ExpandableTableText';
+import { SortableTh } from '../../components/SortableTh';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { formatUsd } from '../../utils/formatUsd';
+import {
+  type SortDir,
+  cmpNum,
+  cmpStr,
+  dateMs,
+  toggleSort,
+} from '../../utils/tableSort';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -185,17 +194,26 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
 
 interface ExpenseRow {
   id: string;
+  code: string;
+  /** Open amounts count toward Open expense; Admin sets Closed via Close action. */
+  status?: string;
   type: string;
   description: string;
   project: string;
   amount: number;
   expenseDate: string;
   paymentMethod: string;
+  country: string | null;
   attachmentFilePath: string | null;
   attachmentFileName: string | null;
   attachmentFileMime: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ExpenseCountryOption {
+  id: string;
+  name: string;
 }
 
 function expenseDateInputValue(iso: string | undefined): string {
@@ -211,11 +229,25 @@ function todayDateInputValue(): string {
   return `${y}-${m}-${day}`;
 }
 
+type ExpenseSortKey =
+  | 'code'
+  | 'type'
+  | 'description'
+  | 'project'
+  | 'amount'
+  | 'expenseDate'
+  | 'paymentMethod'
+  | 'country';
+
 export function AdminExpensesPanel({
   token,
   toast,
   projectFilter = null,
   fixedTypeProject = null,
+  countryOptionsEndpoint = null,
+  hideProject = false,
+  openExpenseTracking = false,
+  canCloseExpense = false,
 }: {
   token: string | null;
   toast: ToastApi;
@@ -223,6 +255,14 @@ export function AdminExpensesPanel({
   projectFilter?: string | null;
   /** When set, add form locks Type and Project to these values. */
   fixedTypeProject?: { type: string; project: string } | null;
+  /** Optional endpoint that provides country options as { list: { id, name }[] }. */
+  countryOptionsEndpoint?: string | null;
+  /** Hide project field/column in contexts where project is fixed and should not be shown. */
+  hideProject?: boolean;
+  /** Global Supply: show Open expense total, Expense ID column, and Close (Admin-only). */
+  openExpenseTracking?: boolean;
+  /** Whether the current user may close expenses (typically Admin). */
+  canCloseExpense?: boolean;
 }) {
   const [list, setList] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -232,8 +272,11 @@ export function AdminExpensesPanel({
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(todayDateInputValue);
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [country, setCountry] = useState('');
+  const [countryOptions, setCountryOptions] = useState<ExpenseCountryOption[]>([]);
   const [addAttachmentFile, setAddAttachmentFile] = useState<File | null>(null);
   const [attachmentBusyId, setAttachmentBusyId] = useState<string | null>(null);
+  const [closeBusyId, setCloseBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     type: string;
@@ -242,6 +285,7 @@ export function AdminExpensesPanel({
     amount: string;
     expenseDate: string;
     paymentMethod: string;
+    country: string;
   }>({
     type: '',
     description: '',
@@ -249,12 +293,70 @@ export function AdminExpensesPanel({
     amount: '',
     expenseDate: '',
     paymentMethod: '',
+    country: '',
   });
   const displayedList = useMemo(
     () => (projectFilter ? list.filter((r) => r.project === projectFilter) : list),
     [list, projectFilter]
   );
+  const [sort, setSort] = useState<{ key: ExpenseSortKey | null; dir: SortDir }>({
+    key: null,
+    dir: 'asc',
+  });
+
+  const sortedDisplayedList = useMemo(() => {
+    const rows = [...displayedList];
+    const k = sort.key;
+    if (!k) return rows;
+    const dir = sort.dir;
+    rows.sort((a, b) => {
+      let c = 0;
+      switch (k) {
+        case 'code':
+          c = cmpStr(a.code ?? '', b.code ?? '', dir);
+          break;
+        case 'type':
+          c = cmpStr(a.type, b.type, dir);
+          break;
+        case 'description':
+          c = cmpStr(a.description, b.description, dir);
+          break;
+        case 'project':
+          c = cmpStr(a.project, b.project, dir);
+          break;
+        case 'amount':
+          c = cmpNum(a.amount, b.amount, dir);
+          break;
+        case 'expenseDate':
+          c = cmpNum(dateMs(a.expenseDate), dateMs(b.expenseDate), dir);
+          break;
+        case 'paymentMethod':
+          c = cmpStr(a.paymentMethod ?? '', b.paymentMethod ?? '', dir);
+          break;
+        case 'country':
+          c = cmpStr(a.country ?? '', b.country ?? '', dir);
+          break;
+        default:
+          break;
+      }
+      if (c !== 0) return c;
+      return cmpStr(a.id, b.id, 'asc');
+    });
+    return rows;
+  }, [displayedList, sort]);
+
   const totalExpenses = useMemo(() => displayedList.reduce((sum, item) => sum + item.amount, 0), [displayedList]);
+  const openExpenseTotal = useMemo(
+    () =>
+      openExpenseTracking
+        ? displayedList
+            .filter((r) => (r.status ?? 'Open') === 'Open')
+            .reduce((sum, item) => sum + item.amount, 0)
+        : 0,
+    [displayedList, openExpenseTracking]
+  );
+
+  const expenseTableColSpan = (hideProject ? 8 : 9) + (openExpenseTracking ? 2 : 0);
 
   useEffect(() => {
     if (fixedTypeProject) {
@@ -262,6 +364,16 @@ export function AdminExpensesPanel({
       setProject(fixedTypeProject.project);
     }
   }, [fixedTypeProject?.type, fixedTypeProject?.project]);
+
+  useEffect(() => {
+    if (!token || !countryOptionsEndpoint) {
+      setCountryOptions([]);
+      return;
+    }
+    apiJson<{ list: ExpenseCountryOption[] }>(countryOptionsEndpoint, { token })
+      .then((r) => setCountryOptions(r.list))
+      .catch(() => setCountryOptions([]));
+  }, [countryOptionsEndpoint, token]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -333,6 +445,24 @@ export function AdminExpensesPanel({
     }
   };
 
+  const closeExpense = async (id: string) => {
+    if (!token || !canCloseExpense) return;
+    setCloseBusyId(id);
+    try {
+      await apiJson(`/expenses/${id}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'Closed' }),
+      });
+      toast.success('Expense closed');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not close expense');
+    } finally {
+      setCloseBusyId(null);
+    }
+  };
+
   const add = async () => {
     if (!token) return;
     const amountNum = Number(amount);
@@ -354,6 +484,7 @@ export function AdminExpensesPanel({
           amount: amountNum,
           expenseDate,
           paymentMethod: paymentMethod.trim(),
+          country: country.trim() || null,
         }),
       });
       if (addAttachmentFile) {
@@ -386,6 +517,7 @@ export function AdminExpensesPanel({
           setAmount('');
           setExpenseDate(todayDateInputValue());
           setPaymentMethod('');
+          setCountry('');
           setAddAttachmentFile(null);
           return;
         }
@@ -401,6 +533,7 @@ export function AdminExpensesPanel({
       setAmount('');
       setExpenseDate(todayDateInputValue());
       setPaymentMethod('');
+      setCountry('');
       setAddAttachmentFile(null);
       toast.success('Expense added');
       await load();
@@ -420,6 +553,7 @@ export function AdminExpensesPanel({
       amount: String(row.amount),
       expenseDate: expenseDateInputValue(row.expenseDate),
       paymentMethod: row.paymentMethod ?? '',
+      country: row.country ?? '',
     });
   };
 
@@ -448,6 +582,7 @@ export function AdminExpensesPanel({
           amount: amountNum,
           expenseDate: editDraft.expenseDate,
           paymentMethod: editDraft.paymentMethod.trim(),
+          country: editDraft.country.trim() || null,
         }),
       });
       setEditId(null);
@@ -461,22 +596,33 @@ export function AdminExpensesPanel({
   };
 
   const exportExcel = () => {
-    if (displayedList.length === 0) {
+    if (sortedDisplayedList.length === 0) {
       toast.info('No expenses to export');
       return;
     }
-    const rows: ExportRow[] = displayedList.map((r) => ({
+    const rows: ExportRow[] = sortedDisplayedList.map((r) => ({
+      ...(openExpenseTracking
+        ? {
+            'Expense ID': r.code ?? '',
+            Status: r.status ?? 'Open',
+          }
+        : {}),
       Type: r.type,
       Description: r.description,
       Project: r.project,
       Amount: r.amount,
       'Expense date': r.expenseDate ? new Date(r.expenseDate).toLocaleDateString() : '',
       'Payment method': r.paymentMethod ?? '',
+      Country: r.country ?? '',
       Attachment: r.attachmentFileName ?? '',
       Recorded: new Date(r.createdAt).toLocaleString(),
     }));
     downloadTableXlsx('expenses', 'Expenses', rows);
     toast.success('Exported expenses');
+  };
+
+  const onSortColumn = (columnKey: string) => {
+    setSort((prev) => toggleSort(prev, columnKey as ExpenseSortKey));
   };
 
   return (
@@ -490,7 +636,11 @@ export function AdminExpensesPanel({
             marginBottom: '0.75rem',
           }}
         >
-          <MetricCard title="Total Expenses" value={totalExpenses.toFixed(2)} />
+          <MetricCard
+            title="Total Expenses"
+            value={openExpenseTracking ? formatUsd(totalExpenses) : totalExpenses.toFixed(2)}
+          />
+          {openExpenseTracking ? <MetricCard title="Open Expense" value={formatUsd(openExpenseTotal)} /> : null}
         </div>
         <div
           style={{
@@ -513,15 +663,17 @@ export function AdminExpensesPanel({
             <label className="input-label">Description</label>
             <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Project</label>
-            <input
-              className="input"
-              value={project}
-              onChange={(e) => setProject(e.target.value)}
-              disabled={!!fixedTypeProject}
-            />
-          </div>
+          {!hideProject && (
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Project</label>
+              <input
+                className="input"
+                value={project}
+                onChange={(e) => setProject(e.target.value)}
+                disabled={!!fixedTypeProject}
+              />
+            </div>
+          )}
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Amount</label>
             <input className="input" type="number" step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -543,6 +695,21 @@ export function AdminExpensesPanel({
               onChange={(e) => setPaymentMethod(e.target.value)}
               placeholder="e.g. Card, Wire transfer"
             />
+          </div>
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <label className="input-label">Country</label>
+            {countryOptionsEndpoint ? (
+              <select className="input" value={country} onChange={(e) => setCountry(e.target.value)}>
+                <option value="">None</option>
+                {countryOptions.map((option) => (
+                  <option key={option.id} value={option.name}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+            )}
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Attachment</label>
@@ -581,26 +748,84 @@ export function AdminExpensesPanel({
           <table className="table">
             <thead>
               <tr>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Project</th>
-                <th>Amount</th>
-                <th>Expense date</th>
-                <th>Payment method</th>
+                {openExpenseTracking && (
+                  <SortableTh
+                    label="Expense ID"
+                    columnKey="code"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                )}
+                <SortableTh
+                  label="Type"
+                  columnKey="type"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Description"
+                  columnKey="description"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                {!hideProject && (
+                  <SortableTh
+                    label="Project"
+                    columnKey="project"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                )}
+                <SortableTh
+                  label="Amount"
+                  columnKey="amount"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Expense date"
+                  columnKey="expenseDate"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Payment method"
+                  columnKey="paymentMethod"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Country"
+                  columnKey="country"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
                 <th style={{ minWidth: 200 }}>Attachment</th>
+                {openExpenseTracking && <th style={{ width: 120 }}>Close</th>}
                 <th style={{ width: 170 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {displayedList.length === 0 ? (
+              {sortedDisplayedList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={expenseTableColSpan} className="table-empty">
                     {projectFilter ? 'No expenses for this project yet.' : 'No expenses yet.'}
                   </td>
                 </tr>
               ) : (
-                displayedList.map((row) => (
+                sortedDisplayedList.map((row) => (
                   <tr key={row.id}>
+                    {openExpenseTracking && (
+                      <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{row.code ?? '—'}</td>
+                    )}
                     <td>
                       {editId === row.id ? (
                         <input
@@ -613,7 +838,7 @@ export function AdminExpensesPanel({
                         row.type
                       )}
                     </td>
-                    <td>
+                    <td style={{ maxWidth: 260, verticalAlign: 'top' }}>
                       {editId === row.id ? (
                         <input
                           className="input"
@@ -621,21 +846,30 @@ export function AdminExpensesPanel({
                           onChange={(e) => setEditDraft((d) => ({ ...d, description: e.target.value }))}
                         />
                       ) : (
-                        row.description
-                      )}
-                    </td>
-                    <td>
-                      {editId === row.id ? (
-                        <input
-                          className="input"
-                          value={editDraft.project}
-                          onChange={(e) => setEditDraft((d) => ({ ...d, project: e.target.value }))}
-                          disabled={!!fixedTypeProject}
+                        <ExpandableTableText
+                          value={row.description}
+                          modalTitle={
+                            row.code?.trim()
+                              ? `Description — ${row.code}`
+                              : 'Expense description'
+                          }
                         />
-                      ) : (
-                        row.project
                       )}
                     </td>
+                    {!hideProject && (
+                      <td>
+                        {editId === row.id ? (
+                          <input
+                            className="input"
+                            value={editDraft.project}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, project: e.target.value }))}
+                            disabled={!!fixedTypeProject}
+                          />
+                        ) : (
+                          row.project
+                        )}
+                      </td>
+                    )}
                     <td>
                       {editId === row.id ? (
                         <input
@@ -680,6 +914,32 @@ export function AdminExpensesPanel({
                       )}
                     </td>
                     <td>
+                      {editId === row.id ? (
+                        countryOptionsEndpoint ? (
+                          <select
+                            className="input"
+                            value={editDraft.country}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          >
+                            <option value="">None</option>
+                            {countryOptions.map((option) => (
+                              <option key={option.id} value={option.name}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            className="input"
+                            value={editDraft.country}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          />
+                        )
+                      ) : (
+                        row.country || '—'
+                      )}
+                    </td>
+                    <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
                         {row.attachmentFileName && row.attachmentFilePath ? (
                           <>
@@ -719,6 +979,25 @@ export function AdminExpensesPanel({
                         </label>
                       </div>
                     </td>
+                    {openExpenseTracking && (
+                      <td>
+                        {(row.status ?? 'Open') === 'Closed' ? (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Closed</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-primary"
+                            disabled={
+                              !canCloseExpense || closeBusyId === row.id || editId === row.id || busy || attachmentBusyId === row.id
+                            }
+                            title={!canCloseExpense ? 'Only administrators can close expenses' : undefined}
+                            onClick={() => void closeExpense(row.id)}
+                          >
+                            {closeBusyId === row.id ? '…' : 'Close'}
+                          </button>
+                        )}
+                      </td>
+                    )}
                     <td>
                       {editId === row.id ? (
                         <>
@@ -786,13 +1065,34 @@ interface SupplierRow {
 
 const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'] as const;
 
-/** Sentinel Supplier Assurance roles only — Global Supply Admin → Users (not Farmer / QE / etc.). */
-const GLOBAL_SUPPLY_USERS_TAB_ROLES = ['Admin', 'Auditor', 'Buyer'] as const;
-type GlobalSupplyUsersTabRole = (typeof GLOBAL_SUPPLY_USERS_TAB_ROLES)[number];
+/** Preferred order for Global Supply Admin → Users role dropdown (must exist in DB). */
+const GLOBAL_SUPPLY_ROLE_PREFERRED_ORDER = ['Admin', 'Buyer', 'CommodityBuyer', 'Farmer'] as const;
+const GLOBAL_SUPPLY_PREFERRED_ROLE_SET = new Set<string>(GLOBAL_SUPPLY_ROLE_PREFERRED_ORDER);
 
-function isGlobalSupplyUsersTabRole(name: string): name is GlobalSupplyUsersTabRole {
-  return (GLOBAL_SUPPLY_USERS_TAB_ROLES as readonly string[]).includes(name);
+/** Never offer these in Global Supply role picks (Auditor / Inspector are SSA workflows). */
+const GLOBAL_SUPPLY_ROLE_EXCLUSIONS = new Set(['Auditor', 'Inspector']);
+
+/** SSA-only accounts are omitted from the Global Supply Users table (Supplier / QE / QM / Auditor / Inspector). */
+const SENTINEL_SUPPLIER_ASSURANCE_ACCOUNT_ROLES = new Set([
+  'Supplier',
+  'QualityEngineer',
+  'QualityManager',
+  'Auditor',
+  'Inspector',
+]);
+
+function isSentinelSupplierAssuranceOnlyAccount(roleNames: string[]): boolean {
+  if (roleNames.length === 0) return false;
+  return roleNames.every((r) => SENTINEL_SUPPLIER_ASSURANCE_ACCOUNT_ROLES.has(r));
 }
+
+/** Roles that belong to main SSA workflows — excluded from GS dropdown so GS admins assign GS roles only. */
+const ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN = new Set([
+  ...GLOBAL_SUPPLY_ROLE_EXCLUSIONS,
+  'Supplier',
+  'QualityEngineer',
+  'QualityManager',
+]);
 
 /** Role rows omitted from Global Supply Admin → Permissions matrix (main SSA roles). */
 const PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES = new Set([
@@ -808,6 +1108,8 @@ const PERMISSION_MATRIX_SENTINEL_HIDE_ROLES = new Set(['Farmer', 'CommodityBuyer
 function formatUserRoleLabel(roleName: string): string {
   if (roleName === 'QualityEngineer') return 'Quality Engineer';
   if (roleName === 'QualityManager') return 'Quality Manager';
+  if (roleName === 'CommodityBuyer') return 'Commodity buyer';
+  if (roleName === 'Farmer') return 'Farmer';
   return roleName;
 }
 
@@ -832,41 +1134,6 @@ interface PermissionMatrixResponse {
   adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
 }
 
-/** Union of Global Supply routes (/global-vendors/*) plus main Admin portal when any role grants it. */
-function summarizeGlobalSupplyPermissions(
-  roleNames: string[],
-  matrix: Record<string, Record<string, boolean>>,
-  pages: PermissionPageDef[]
-): string {
-  const labels: string[] = [];
-  const seen = new Set<string>();
-  const globalPages = pages.filter((p) => p.path.startsWith('/global-vendors'));
-  for (const role of roleNames) {
-    const row = matrix[role];
-    if (!row) continue;
-    for (const page of globalPages) {
-      if (row[page.key] && !seen.has(page.key)) {
-        seen.add(page.key);
-        labels.push(page.label);
-      }
-    }
-  }
-  labels.sort();
-  let hasAdmin = false;
-  for (const role of roleNames) {
-    if (matrix[role]?.Admin) {
-      hasAdmin = true;
-      break;
-    }
-  }
-  const adminLabel = pages.find((p) => p.key === 'Admin')?.label ?? 'Admin';
-  const routePart = labels.join(', ');
-  if (routePart && hasAdmin) return `${routePart}; ${adminLabel}`;
-  if (routePart) return routePart;
-  if (hasAdmin) return adminLabel;
-  return '—';
-}
-
 export function AdminBuyersSuppliersPanel({
   token,
   toast,
@@ -884,7 +1151,7 @@ export function AdminBuyersSuppliersPanel({
   showBuyerSupplierSections?: boolean;
   usersOnlyEmployees?: boolean;
   usersTableTitle?: string;
-  /** Lighter Users tab for Global Supply admin: slim create form, no status/rate columns, permissions column. */
+  /** Lighter Users tab for Global Supply admin: slim create form; no SSA-only users; no Permissions column. */
   globalSupplyUsersMode?: boolean;
 }) {
   const { user: authUser } = useAuth();
@@ -905,8 +1172,6 @@ export function AdminBuyersSuppliersPanel({
   const [newUserCountry, setNewUserCountry] = useState('');
   /** Role names from server (includes custom roles); matrix UI lives only on Permissions tab. */
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
-  const [permissionMatrix, setPermissionMatrix] = useState<Record<string, Record<string, boolean>>>({});
-  const [permissionPages, setPermissionPages] = useState<PermissionPageDef[]>([]);
   const [newSupName, setNewSupName] = useState('');
   const [newSupCity, setNewSupCity] = useState('');
   const [newSupCountry, setNewSupCountry] = useState('');
@@ -933,12 +1198,8 @@ export function AdminBuyersSuppliersPanel({
       setUsers(u);
       if (pm) {
         setAvailableRoles(pm.roles ?? []);
-        setPermissionMatrix(pm.matrix ?? {});
-        setPermissionPages([...(pm.pages ?? [])]);
       } else {
         setAvailableRoles([...USER_ROLE_OPTIONS]);
-        setPermissionMatrix({});
-        setPermissionPages([]);
       }
       if (showBuyerSupplierSections) {
         const [s, ct] = await Promise.all([
@@ -962,9 +1223,6 @@ export function AdminBuyersSuppliersPanel({
 
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
   const supplierUsers = users.filter((u) => u.roleNames.includes('Supplier'));
-  const visibleUsers = usersOnlyEmployees
-    ? users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
-    : users;
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
 
   const serverRoleSet = useMemo(
@@ -972,18 +1230,38 @@ export function AdminBuyersSuppliersPanel({
     [availableRoles]
   );
 
-  /** Create-user dropdown on Global Supply Admin → Users: SSA roles only. */
+  const visibleUsers = useMemo(() => {
+    let list = usersOnlyEmployees
+      ? users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
+      : users;
+    if (globalSupplyUsersMode) {
+      list = list.filter((u) => !isSentinelSupplierAssuranceOnlyAccount(u.roleNames));
+    }
+    return list;
+  }, [users, usersOnlyEmployees, globalSupplyUsersMode]);
+
+  /** Create-user / edit role dropdown: Global Supply roles from server, ordered; no Auditor/Inspector or main SSA workflow roles. */
   const globalSupplyCreateRoleOptions = useMemo(() => {
     if (!globalSupplyUsersMode) return availableRoleOptions;
-    const ordered = GLOBAL_SUPPLY_USERS_TAB_ROLES.filter((r) => serverRoleSet.has(r));
-    return ordered.length > 0 ? ordered : [...GLOBAL_SUPPLY_USERS_TAB_ROLES];
-  }, [globalSupplyUsersMode, availableRoleOptions, serverRoleSet]);
+    const preferred = GLOBAL_SUPPLY_ROLE_PREFERRED_ORDER.filter(
+      (r) => serverRoleSet.has(r) && !ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN.has(r)
+    );
+    const rest = availableRoles.filter(
+      (r) => !ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN.has(r) && !GLOBAL_SUPPLY_PREFERRED_ROLE_SET.has(r)
+    );
+    rest.sort((a, b) => a.localeCompare(b));
+    const combined = [...preferred, ...rest];
+    return combined.length > 0 ? combined : ['Buyer'];
+  }, [globalSupplyUsersMode, availableRoleOptions, availableRoles, serverRoleSet]);
 
-  /** Table role edit: SSA defaults plus current user’s roles if outside that set (so the select stays valid). */
+  /** Table role edit: GS options plus the user’s current role(s) if missing (keeps select valid). */
   const roleOptionsForUserTable = useMemo(() => {
     if (!globalSupplyUsersMode) return availableRoleOptions;
+    const selectable = new Set(globalSupplyCreateRoleOptions);
     const extras =
-      editUser?.roleNames.filter((r) => !isGlobalSupplyUsersTabRole(r)) ?? [];
+      editUser?.roleNames.filter(
+        (r) => !selectable.has(r) && !ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN.has(r)
+      ) ?? [];
     const seen = new Set<string>();
     const out: string[] = [];
     for (const r of [...globalSupplyCreateRoleOptions, ...extras]) {
@@ -991,7 +1269,7 @@ export function AdminBuyersSuppliersPanel({
       seen.add(r);
       out.push(r);
     }
-    return out.length > 0 ? out : [...GLOBAL_SUPPLY_USERS_TAB_ROLES];
+    return out.length > 0 ? out : [...globalSupplyCreateRoleOptions];
   }, [globalSupplyUsersMode, availableRoleOptions, globalSupplyCreateRoleOptions, editUser?.roleNames, editUser?.id]);
 
   useEffect(() => {
@@ -1016,7 +1294,7 @@ export function AdminBuyersSuppliersPanel({
   }, [users, usersOnlyEmployees]);
 
   const userTableColSpan = useMemo(() => {
-    if (globalSupplyUsersMode) return 8;
+    if (globalSupplyUsersMode) return 7;
     if (usersOnlyEmployees) return 9;
     return 6;
   }, [globalSupplyUsersMode, usersOnlyEmployees]);
@@ -1670,7 +1948,6 @@ export function AdminBuyersSuppliersPanel({
                     <>
                       <th>Country</th>
                       <th>Role</th>
-                      <th>Permissions</th>
                       <th>Password</th>
                     </>
                   ) : (
@@ -1766,25 +2043,6 @@ export function AdminBuyersSuppliersPanel({
                               </select>
                             ) : (
                               u.roleNames.map(formatUserRoleLabel).join(', ')
-                            )}
-                          </td>
-                          <td
-                            style={{
-                              fontSize: 'var(--text-xs)',
-                              color: 'var(--color-text-muted)',
-                              maxWidth: 320,
-                              verticalAlign: 'top',
-                            }}
-                            title={summarizeGlobalSupplyPermissions(
-                              editUser?.id === u.id ? editUser.roleNames : u.roleNames,
-                              permissionMatrix,
-                              permissionPages
-                            )}
-                          >
-                            {summarizeGlobalSupplyPermissions(
-                              editUser?.id === u.id ? editUser.roleNames : u.roleNames,
-                              permissionMatrix,
-                              permissionPages
                             )}
                           </td>
                           <td

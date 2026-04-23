@@ -46,6 +46,51 @@ function formatLaborCostDate(r: LaborCostRow): string {
   return r.createdAt.slice(0, 10);
 }
 
+function LaborCostRateField({
+  row,
+  disabled,
+  onCommit,
+}: {
+  row: LaborCostRow;
+  disabled: boolean;
+  onCommit: (id: string, rate: number) => void | Promise<void>;
+}) {
+  const [val, setVal] = useState(() => String(row.rate));
+  useEffect(() => {
+    setVal(String(row.rate));
+  }, [row.rate, row.id]);
+
+  if (row.paidStatus !== 'Pending') {
+    return <span>{formatUsd(row.rate)}</span>;
+  }
+
+  return (
+    <input
+      type="number"
+      min={0}
+      step="0.01"
+      className="input"
+      style={{ maxWidth: '7.5rem', marginBottom: 0 }}
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={() => {
+        const n = Number(val);
+        if (!Number.isFinite(n) || n < 0) {
+          setVal(String(row.rate));
+          return;
+        }
+        if (Math.abs(n - row.rate) > 1e-6) void onCommit(row.id, n);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+      }}
+      disabled={disabled}
+      title="USD per hour — blur or Enter to save"
+      aria-label={`Rate USD per hour for ${row.code}`}
+    />
+  );
+}
+
 export function AdminLaborCostsPanel({
   token,
   listScope = 'mine',
@@ -166,6 +211,24 @@ export function AdminLaborCostsPanel({
     }
   };
 
+  const patchRate = async (id: string, rate: number) => {
+    if (!token) return;
+    setPatchingId(id);
+    setError(null);
+    try {
+      const updated = await apiJson<LaborCostRow>(`/labor-costs/${encodeURIComponent(id)}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ rate }),
+      });
+      setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setPatchingId(null);
+    }
+  };
+
   return (
     <div className="card">
       <div className="card-body">
@@ -258,7 +321,9 @@ export function AdminLaborCostsPanel({
                     <td title={r.workLog?.workDate ? 'Work log date' : 'Created date'}>{formatLaborCostDate(r)}</td>
                     <td>{r.fullName}</td>
                     <td>{r.hours}</td>
-                    <td>{formatUsd(r.rate)}</td>
+                    <td>
+                      <LaborCostRateField row={r} disabled={patchingId === r.id} onCommit={patchRate} />
+                    </td>
                     <td>{formatUsd(r.totalCost)}</td>
                     <td>{r.paidStatus}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>

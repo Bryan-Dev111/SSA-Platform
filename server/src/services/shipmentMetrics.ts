@@ -1,5 +1,6 @@
 /**
- * Day 10: Shipment page metrics — OTD vs schedule, FPY, counts (scoped by supplier).
+ * Day 10: Shipment page metrics — OTD from PO schedule vs shipped qty (no inspection-request timing),
+ * FPY, counts (scoped by supplier).
  */
 import { prisma } from '../lib/prisma';
 import type { Shipment, ShipmentSchedule } from '@prisma/client';
@@ -53,8 +54,9 @@ export interface ShipmentMetricsResult {
   passed: number;
   failed: number;
   overdueWaiting: number;
+  /** @deprecated Always 0; OTD late POs use {@link shortDeliveries} / {@link shortDeliveryDetails}. */
   lateVsSchedule: number;
-  /** Purchase orders / quantities for shipments counted in lateVsSchedule (for UI tooltip). */
+  /** @deprecated Always empty; use {@link shortDeliveryDetails} for late-PO detail lines. */
   lateDetails: LateShipmentDetail[];
   /** Waiting-inspection rows past requested inspection date (for UI tooltip). */
   overdueDetails: LateShipmentDetail[];
@@ -109,15 +111,13 @@ export async function computeShipmentMetrics(
   let passed = 0;
   let failed = 0;
   let overdueWaiting = 0;
-  let lateVsSchedule = 0;
-  const lateDetails: LateShipmentDetail[] = [];
   const overdueDetails: LateShipmentDetail[] = [];
   const shortDeliveryDetails: ShortDeliveryDetail[] = [];
   let shortDeliveries = 0;
   let fpyPassed = 0;
   let fpyFailed = 0;
-  let otdOnTime = 0;
-  let otdLate = 0;
+  /** Past-due schedule rows where shipped qty met plan (OTD on-time side). */
+  let otdScheduleMet = 0;
 
   const scopedSchedules =
     allowedSupplierIds === null
@@ -140,14 +140,6 @@ export async function computeShipmentMetrics(
         overdueWaiting++;
         overdueDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
       }
-      // Past the scheduled ship/inspect window with no Passed/Failed result yet — counts as OTD late.
-      const schWait = findMatchingSchedule(sh, scopedSchedules);
-      const schedWaitDay = schWait?.scheduledDate ? dateOnlyMs(schWait.scheduledDate) : null;
-      if (schedWaitDay !== null && startOfTodayUtc > schedWaitDay) {
-        otdLate++;
-        lateVsSchedule++;
-        lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
-      }
       continue;
     }
 
@@ -165,40 +157,18 @@ export async function computeShipmentMetrics(
       fpyFailed++;
     }
 
-    const sch = findMatchingSchedule(sh, scopedSchedules);
-    if (sch?.scheduledDate && sh.inspectionDate) {
-      const inspDay = dateOnlyMs(sh.inspectionDate);
-      const schedDay = dateOnlyMs(sch.scheduledDate);
-      if (inspDay !== null && schedDay !== null) {
-        if (sh.status === 'Passed' || sh.result === 'Passed') {
-          if (inspDay <= schedDay) otdOnTime++;
-          else {
-            otdLate++;
-            lateVsSchedule++;
-            lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
-          }
-        } else if (sh.status === 'Failed' || sh.result === 'Failed') {
-          // OTD measures timeliness vs schedule (not quality); late failed inspections are OTD misses.
-          if (inspDay > schedDay) {
-            otdLate++;
-            lateVsSchedule++;
-            lateDetails.push({ purchaseOrder: sh.purchaseOrder, qty: sh.qty });
-          } else {
-            otdOnTime++;
-          }
-        }
-      }
-    }
   }
 
-  // Short deliveries: planned qty on schedule vs total shipped qty, after scheduled date.
+  // OTD + short deliveries: past-due schedule rows — compare planned qty to total shipped (Passed only).
   for (const sch of scopedSchedules) {
     const plannedQty = typeof sch.qty === 'number' ? sch.qty : 0;
     const schedDateMs = sch.scheduledDate ? dateOnlyMs(sch.scheduledDate) : null;
     if (!plannedQty || schedDateMs === null || schedDateMs >= startOfTodayUtc) continue;
     const key = makeKey(sch.supplierId ?? '', sch.purchaseOrder ?? null, sch.partNumber ?? null);
     const shippedTotal = shippedByKey.get(key) ?? 0;
-    if (shippedTotal < plannedQty) {
+    if (shippedTotal >= plannedQty) {
+      otdScheduleMet++;
+    } else {
       shortDeliveries++;
       shortDeliveryDetails.push({
         purchaseOrder: sch.purchaseOrder,
@@ -210,7 +180,7 @@ export async function computeShipmentMetrics(
 
   const total = shipments.length;
   const fpyDenom = fpyPassed + fpyFailed;
-  const otdDenom = otdOnTime + otdLate;
+  const otdDenom = otdScheduleMet + shortDeliveries;
 
   return {
     totalInspectionRequests: total,
@@ -218,12 +188,12 @@ export async function computeShipmentMetrics(
     passed,
     failed,
     overdueWaiting,
-    lateVsSchedule,
-    lateDetails,
+    lateVsSchedule: 0,
+    lateDetails: [],
     overdueDetails,
     shortDeliveries,
     shortDeliveryDetails,
-    otdPercent: otdDenom > 0 ? Math.round((otdOnTime / otdDenom) * 1000) / 10 : null,
+    otdPercent: otdDenom > 0 ? Math.round((otdScheduleMet / otdDenom) * 1000) / 10 : null,
     fpyPercent: fpyDenom > 0 ? Math.round((fpyPassed / fpyDenom) * 1000) / 10 : null,
     scheduleRowCount,
   };

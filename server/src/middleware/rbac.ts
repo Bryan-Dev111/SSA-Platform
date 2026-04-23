@@ -20,6 +20,7 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   SupplierProfile: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   SupplierList: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   SuppliersMap: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyDashboard: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   Records: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor'],
   Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
@@ -27,11 +28,14 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   InternalManagement: ['Admin', 'QualityManager'],
   Admin: ['Admin'],
   GlobalSupplyFarmers: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyFarmProfile: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyProcessingQuality: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyApproved: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyMap: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyRelationship: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyPurchaseOrders: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplySamples: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyLogistics: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyExpenses: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   Login: [], // all (no check)
 };

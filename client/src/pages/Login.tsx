@@ -80,7 +80,6 @@ export function Login() {
         </div>
         <div className="login-header">
           <h1 className="login-title">Sign in</h1>
-          <p className="login-subtitle">Continue to Supplier Assurance Platform</p>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">

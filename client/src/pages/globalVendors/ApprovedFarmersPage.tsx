@@ -1,8 +1,7 @@
 /**
- * Global Vendors — Approved Farmers List (same data as Farmer Information; columns per spec where fields exist).
+ * Global Vendors — Approved Farms List (same data as Farm Information; columns per spec where fields exist).
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
@@ -30,7 +29,7 @@ export function ApprovedFarmersPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Farmers List</h1>
+          <h1 className="page-title">Approved Farms List</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -44,7 +43,7 @@ export function ApprovedFarmersPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Farmers List</h1>
+          <h1 className="page-title">Approved Farms List</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -54,7 +53,7 @@ export function ApprovedFarmersPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Approved Farmers List</h1>
+        <h1 className="page-title">Approved Farms List</h1>
       </header>
       <div className="card">
         <div className="table-wrap">
@@ -62,36 +61,26 @@ export function ApprovedFarmersPage() {
             <thead>
               <tr>
                 <th>Farm ID</th>
-                <th>Farm name</th>
                 <th>Farm category</th>
                 <th>Country</th>
                 <th>Region</th>
                 <th>Main crop</th>
                 <th>Elevation (m)</th>
                 <th>Production style</th>
-                <th>Farmer Profile</th>
               </tr>
             </thead>
             <tbody>
               {farms.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="table-empty">
-                    No farms yet. Add farmers from <strong>Farmer Information</strong>.
+                  <td colSpan={7} className="table-empty">
+                    No farms yet. Add farms from <strong>Farm Information</strong>.
                   </td>
                 </tr>
               ) : (
                 farms.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <Link
-                        to={`/global-vendors/farmers/${f.id}/profile`}
-                        style={{ fontWeight: 600, color: 'var(--color-primary)' }}
-                      >
-                        {f.code}
-                      </Link>
-                    </td>
-                    <td>
-                      <Link to={`/global-vendors/farmers/${f.id}/profile`}>{f.farmName}</Link>
+                      <strong>{f.code}</strong>
                     </td>
                     <td>{dash(f.farmCategory)}</td>
                     <td>{f.country}</td>
@@ -99,14 +88,6 @@ export function ApprovedFarmersPage() {
                     <td>{dash(f.mainCrop)}</td>
                     <td>{f.elevationMeters != null ? f.elevationMeters : '—'}</td>
                     <td>{dash(f.productionStyle)}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <Link
-                        to={`/global-vendors/farmers/${f.id}/profile`}
-                        className="btn btn-sm"
-                      >
-                        Farmer Profile
-                      </Link>
-                    </td>
                   </tr>
                 ))
               )}

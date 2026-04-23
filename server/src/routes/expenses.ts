@@ -144,6 +144,7 @@ router.post(
     const expenseDate = parseExpenseDate(req.body?.expenseDate);
     const paymentMethod =
       typeof req.body?.paymentMethod === 'string' ? req.body.paymentMethod.trim() : '';
+    const country = typeof req.body?.country === 'string' ? req.body.country.trim() : '';
 
     if (!type || !description || !project || !Number.isFinite(amount) || !expenseDate || Number.isNaN(expenseDate.getTime())) {
       res
@@ -155,7 +156,17 @@ router.post(
     const code = await getNextCode('EXP');
 
     const created = await prisma.expense.create({
-      data: { code, type, description, project, amount, expenseDate, paymentMethod },
+      data: {
+        code,
+        status: 'Open',
+        type,
+        description,
+        project,
+        amount,
+        expenseDate,
+        paymentMethod,
+        country: country || null,
+      },
     });
     res.status(201).json(created);
   })
@@ -182,6 +193,8 @@ router.patch(
       amount?: number;
       expenseDate?: Date;
       paymentMethod?: string;
+      country?: string | null;
+      status?: string;
     } = {};
     if (typeof req.body?.type === 'string') data.type = req.body.type.trim();
     if (typeof req.body?.description === 'string') data.description = req.body.description.trim();
@@ -205,6 +218,28 @@ router.patch(
     if (req.body?.paymentMethod !== undefined) {
       data.paymentMethod =
         typeof req.body.paymentMethod === 'string' ? req.body.paymentMethod.trim() : '';
+    }
+    if (req.body?.country !== undefined) {
+      data.country = typeof req.body.country === 'string' ? req.body.country.trim() || null : null;
+    }
+
+    if (req.body?.status !== undefined) {
+      const st = typeof req.body.status === 'string' ? req.body.status.trim() : '';
+      if (st !== 'Open' && st !== 'Closed') {
+        res.status(400).json({ error: 'status must be Open or Closed' });
+        return;
+      }
+      const isAdmin = req.user?.roleNames?.includes('Admin') ?? false;
+      if (!isAdmin) {
+        res.status(403).json({ error: 'Only administrators can change expense status' });
+        return;
+      }
+      data.status = st;
+    }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'No valid fields to update' });
+      return;
     }
 
     const updated = await prisma.expense.update({ where: { id }, data });

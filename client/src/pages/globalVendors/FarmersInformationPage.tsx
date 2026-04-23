@@ -1,11 +1,13 @@
 /**
- * Global Vendors — Farmer Information: list farms, add via modal.
+ * Global Vendors — Farm Information: list farms, add via modal.
  */
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { apiJson } from '../../api/client';
+import { apiFetch, apiJson } from '../../api/client';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { ExpandableTableText } from '../../components/ExpandableTableText';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 
 export interface FarmRow {
@@ -58,6 +60,16 @@ export interface FarmRow {
   updatedAt: string;
 }
 
+export type FarmProfileImageRow = {
+  id: string;
+  section: string;
+  fileName: string | null;
+  fileMime: string | null;
+  sortOrder: number | null;
+  createdAt: string;
+  url: string | null;
+};
+
 function farmRowToExportRow(f: FarmRow): ExportRow {
   const mainHarvest =
     f.harvestStartMonth && f.harvestEndMonth
@@ -72,12 +84,11 @@ function farmRowToExportRow(f: FarmRow): ExportRow {
     month: 'short',
     day: 'numeric',
   });
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   return {
     'Farm ID': f.code,
     'Farm name': f.farmName,
-    'Farmer name': f.farmerName,
+    'Contact name': f.farmerName,
     Country: f.country,
     Region: f.region ?? '—',
     'Farm category': f.farmCategory ?? '—',
@@ -112,17 +123,12 @@ function farmRowToExportRow(f: FarmRow): ExportRow {
       typeof f.secondaryQualityScore === 'number' ? f.secondaryQualityScore : '—',
     Language: f.language ?? '—',
     'Samples OK': f.samplesOk == null ? '—' : f.samplesOk ? 'Yes' : 'No',
-    'Farmer email': f.farmerEmail ?? '—',
-    'Farmer mobile': f.farmerMobile ?? '—',
+    'Contact email': f.farmerEmail ?? '—',
+    'Contact mobile': f.farmerMobile ?? '—',
     Latitude: typeof f.latitude === 'number' ? f.latitude : '—',
     Longitude: typeof f.longitude === 'number' ? f.longitude : '—',
+    Notes: f.notes?.trim() ? f.notes : '—',
     Created: created,
-    ...(origin
-      ? {
-          'Profile URL': `${origin}/global-vendors/farmers/${f.id}/profile`,
-          'Processing URL': `${origin}/global-vendors/farmers/${f.id}/processing`,
-        }
-      : {}),
   };
 }
 
@@ -140,6 +146,37 @@ export function FarmersInformationPage() {
   const [city, setCity] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [edit, setEdit] = useState<Partial<FarmRow>>({});
+  const [deleteTarget, setDeleteTarget] = useState<FarmRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [profileImages, setProfileImages] = useState<FarmProfileImageRow[]>([]);
+  const [profileImagesLoading, setProfileImagesLoading] = useState(false);
+  const [imageUploadBusy, setImageUploadBusy] = useState<'Profile' | 'Processing' | null>(null);
+  const [deleteImageTarget, setDeleteImageTarget] = useState<FarmProfileImageRow | null>(null);
+  const [deletingImage, setDeletingImage] = useState(false);
+
+  const loadProfileImages = useCallback(async () => {
+    if (!token || !editId) return;
+    setProfileImagesLoading(true);
+    try {
+      const r = await apiJson<{ images: FarmProfileImageRow[] }>(
+        `/farms/${editId}/profile-images`,
+        { token }
+      );
+      setProfileImages(r.images);
+    } catch {
+      setProfileImages([]);
+    } finally {
+      setProfileImagesLoading(false);
+    }
+  }, [token, editId]);
+
+  useEffect(() => {
+    if (!editId || !token) {
+      setProfileImages([]);
+      return;
+    }
+    void loadProfileImages();
+  }, [editId, token, loadProfileImages]);
 
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
@@ -175,7 +212,7 @@ export function FarmersInformationPage() {
         method: 'POST',
         body: JSON.stringify({ farmName, farmerName, country, city: city || null }),
       });
-      toast.success('Farmer added');
+      toast.success('Farm added');
       closeModal();
       load({ silent: true });
     } catch (err) {
@@ -202,6 +239,77 @@ export function FarmersInformationPage() {
   const closeEdit = () => {
     setEditId(null);
     setEdit({});
+    setProfileImages([]);
+    setDeleteImageTarget(null);
+  };
+
+  const uploadProfileImage = async (section: 'Profile' | 'Processing', files: FileList | File[]) => {
+    if (!token || !editId) return;
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    setImageUploadBusy(section);
+    try {
+      for (const file of arr) {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('section', section);
+        const res = await apiFetch(`/farms/${editId}/profile-images`, {
+          token,
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+      }
+      toast.success(arr.length === 1 ? 'Photo added' : `${arr.length} photos added`);
+      await loadProfileImages();
+    } catch (err) {
+      let msg = 'Could not upload photo';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setImageUploadBusy(null);
+    }
+  };
+
+  const confirmDeleteProfileImage = async () => {
+    if (!token || !editId || !deleteImageTarget || deletingImage) return;
+    setDeletingImage(true);
+    try {
+      const res = await apiFetch(`/farms/${editId}/profile-images/${deleteImageTarget.id}`, {
+        token,
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      toast.success('Photo removed');
+      setDeleteImageTarget(null);
+      await loadProfileImages();
+    } catch (err) {
+      let msg = 'Could not remove photo';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setDeletingImage(false);
+    }
   };
 
   const updateEditField = (field: keyof FarmRow, value: string) => {
@@ -263,7 +371,7 @@ export function FarmersInformationPage() {
         method: 'PATCH',
         body: JSON.stringify(payload),
       });
-      toast.success('Farmer updated');
+      toast.success('Farm updated');
       closeEdit();
       load({ silent: true });
     } catch (err) {
@@ -282,6 +390,32 @@ export function FarmersInformationPage() {
     }
   };
 
+  const confirmDeleteFarm = async () => {
+    if (!token || !deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await apiFetch(`/farms/${deleteTarget.id}`, { token, method: 'DELETE' });
+      if (!res.ok) {
+        let msg = 'Could not delete farm';
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* ignore */
+        }
+        toast.error(msg);
+        return;
+      }
+      toast.success('Farm deleted');
+      setDeleteTarget(null);
+      load({ silent: true });
+    } catch {
+      toast.error('Could not delete farm');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const exportToExcel = useCallback(() => {
     if (farms.length === 0) {
       toast.info('No farms to export yet.');
@@ -290,7 +424,7 @@ export function FarmersInformationPage() {
     try {
       const rows = farms.map(farmRowToExportRow);
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Farmer_Information_${stamp}`, 'Farmer Information', rows);
+      downloadTableXlsx(`Farm_Information_${stamp}`, 'Farm Information', rows);
       toast.success('Exported to Excel');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Export failed');
@@ -301,7 +435,7 @@ export function FarmersInformationPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Farmer Information</h1>
+          <h1 className="page-title">Farm Information</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -315,7 +449,7 @@ export function FarmersInformationPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Farmer Information</h1>
+          <h1 className="page-title">Farm Information</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -328,7 +462,7 @@ export function FarmersInformationPage() {
         className="page-header"
         style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
       >
-        <h1 className="page-title">Farmer Information</h1>
+        <h1 className="page-title">Farm Information</h1>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
@@ -340,7 +474,7 @@ export function FarmersInformationPage() {
             Export to Excel
           </button>
           <button type="button" className="btn btn-primary" onClick={() => setModalOpen(true)}>
-            Add farmer
+            Add farm
           </button>
         </div>
       </header>
@@ -352,7 +486,7 @@ export function FarmersInformationPage() {
               <tr>
                 <th>Farm ID</th>
                 <th>Farm name</th>
-                <th>Farmer name</th>
+                <th>Contact name</th>
                 <th>Country</th>
                 <th>Region</th>
                 <th>Farm category</th>
@@ -382,28 +516,36 @@ export function FarmersInformationPage() {
                 <th>Secondary quality score</th>
                 <th>Language</th>
                 <th>Samples OK</th>
-                <th>Farmer email</th>
-                <th>Farmer mobile</th>
+                <th>Contact email</th>
+                <th>Contact mobile</th>
                 <th>Latitude</th>
                 <th>Longitude</th>
+                <th>Notes</th>
                 <th>Created</th>
-                <th>Profile</th>
-                <th>Processing</th>
                 <th>Edit</th>
+                <th>Delete</th>
               </tr>
             </thead>
             <tbody>
               {farms.length === 0 ? (
                 <tr>
                   <td colSpan={40} className="table-empty">
-                    No farms yet. Use <strong>Add farmer</strong> to create one.
+                    No farms yet. Use <strong>Add farm</strong> to create one.
                   </td>
                 </tr>
               ) : (
                 farms.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <strong>{f.code}</strong>
+                      <Link
+                        to={`/global-vendors/farm-profile?farmId=${encodeURIComponent(f.id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="finding-code-link"
+                        title="Open Farm profile (new tab)"
+                      >
+                        <strong>{f.code}</strong>
+                      </Link>
                     </td>
                     <td>{f.farmName}</td>
                     <td>{f.farmerName}</td>
@@ -476,6 +618,14 @@ export function FarmersInformationPage() {
                     <td>{f.farmerMobile ?? '—'}</td>
                     <td>{typeof f.latitude === 'number' ? f.latitude : '—'}</td>
                     <td>{typeof f.longitude === 'number' ? f.longitude : '—'}</td>
+                    <td
+                      style={{
+                        maxWidth: 220,
+                        verticalAlign: 'top',
+                      }}
+                    >
+                      <ExpandableTableText value={f.notes} modalTitle={`Notes — ${f.code}`} />
+                    </td>
                     <td>
                       {new Date(f.createdAt).toLocaleDateString(undefined, {
                         year: 'numeric',
@@ -483,25 +633,19 @@ export function FarmersInformationPage() {
                         day: 'numeric',
                       })}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <Link
-                        to={`/global-vendors/farmers/${f.id}/profile`}
-                        className="btn btn-sm"
-                      >
-                        Profile
-                      </Link>
-                    </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <Link
-                        to={`/global-vendors/farmers/${f.id}/processing`}
-                        className="btn btn-sm btn-ghost"
-                      >
-                        Processing
-                      </Link>
-                    </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button type="button" className="btn btn-sm" onClick={() => openEdit(f)}>
                         Edit
+                      </button>
+                    </td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        style={{ color: 'var(--color-danger, #b91c1c)' }}
+                        onClick={() => setDeleteTarget(f)}
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -523,7 +667,7 @@ export function FarmersInformationPage() {
         >
           <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-farm-title" className="confirm-dialog-title">
-              Add farmer
+              Add farm
             </h3>
             <form onSubmit={submit} className="stack" style={{ gap: 12, marginTop: 16 }}>
               <label className="field">
@@ -537,7 +681,7 @@ export function FarmersInformationPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Farmer name</span>
+                <span className="field-label">Contact name</span>
                 <input
                   className="input"
                   value={farmerName}
@@ -589,7 +733,7 @@ export function FarmersInformationPage() {
         >
           <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="edit-farm-title" className="confirm-dialog-title">
-              Edit farmer
+              Edit farm
             </h3>
             <form
               onSubmit={(e) => {
@@ -609,7 +753,7 @@ export function FarmersInformationPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Farmer name</span>
+                <span className="field-label">Contact name</span>
                 <input
                   className="input"
                   value={edit.farmerName ?? ''}
@@ -978,7 +1122,7 @@ export function FarmersInformationPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Farmer email</span>
+                <span className="field-label">Contact email</span>
                 <input
                   className="input"
                   value={edit.farmerEmail ?? ''}
@@ -987,7 +1131,7 @@ export function FarmersInformationPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Farmer mobile</span>
+                <span className="field-label">Contact mobile</span>
                 <input
                   className="input"
                   value={edit.farmerMobile ?? ''}
@@ -1031,6 +1175,220 @@ export function FarmersInformationPage() {
                   onChange={(e) => updateEditField('longitude', e.target.value)}
                 />
               </label>
+
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 16,
+                  borderTop: '1px solid var(--color-border)',
+                }}
+              >
+                <p className="field-label" style={{ marginBottom: 12 }}>
+                  Photos (JPEG, PNG, WebP, or GIF — max ~12 MB each)
+                </p>
+                {profileImagesLoading ? (
+                  <p className="table-empty" style={{ marginBottom: 12 }}>
+                    Loading photos…
+                  </p>
+                ) : null}
+
+                <div style={{ marginBottom: 20 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      marginBottom: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span className="field-label" style={{ marginBottom: 0 }}>
+                      Farm profile
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        id="farm-profile-img-upload-profile"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const list = e.target.files;
+                          if (list?.length) void uploadProfileImage('Profile', list);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        disabled={!!imageUploadBusy || saving}
+                        onClick={() =>
+                          document.getElementById('farm-profile-img-upload-profile')?.click()
+                        }
+                      >
+                        {imageUploadBusy === 'Profile' ? 'Uploading…' : 'Add photo'}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    {profileImages.filter((i) => i.section === 'Profile').length === 0 &&
+                    !profileImagesLoading ? (
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                        No profile photos yet.
+                      </span>
+                    ) : null}
+                    {profileImages
+                      .filter((i) => i.section === 'Profile')
+                      .map((img) => (
+                        <div key={img.id} style={{ width: 128 }}>
+                          {img.url ? (
+                            <img
+                              src={img.url}
+                              alt={img.fileName || 'Farm profile'}
+                              style={{
+                                width: '100%',
+                                height: 96,
+                                objectFit: 'cover',
+                                borderRadius: 6,
+                                border: '1px solid var(--color-border)',
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                height: 96,
+                                borderRadius: 6,
+                                border: '1px dashed var(--color-border)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                color: 'var(--color-text-muted)',
+                                padding: 8,
+                                textAlign: 'center',
+                              }}
+                            >
+                              Preview unavailable
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-ghost"
+                            style={{
+                              marginTop: 6,
+                              color: 'var(--color-danger, #b91c1c)',
+                              width: '100%',
+                            }}
+                            disabled={!!imageUploadBusy || saving}
+                            onClick={() => setDeleteImageTarget(img)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      marginBottom: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span className="field-label" style={{ marginBottom: 0 }}>
+                      Processing &amp; quality
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        id="farm-profile-img-upload-processing"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const list = e.target.files;
+                          if (list?.length) void uploadProfileImage('Processing', list);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        disabled={!!imageUploadBusy || saving}
+                        onClick={() =>
+                          document.getElementById('farm-profile-img-upload-processing')?.click()
+                        }
+                      >
+                        {imageUploadBusy === 'Processing' ? 'Uploading…' : 'Add photo'}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    {profileImages.filter((i) => i.section === 'Processing').length === 0 &&
+                    !profileImagesLoading ? (
+                      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                        No processing or quality photos yet.
+                      </span>
+                    ) : null}
+                    {profileImages
+                      .filter((i) => i.section === 'Processing')
+                      .map((img) => (
+                        <div key={img.id} style={{ width: 128 }}>
+                          {img.url ? (
+                            <img
+                              src={img.url}
+                              alt={img.fileName || 'Processing'}
+                              style={{
+                                width: '100%',
+                                height: 96,
+                                objectFit: 'cover',
+                                borderRadius: 6,
+                                border: '1px solid var(--color-border)',
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                height: 96,
+                                borderRadius: 6,
+                                border: '1px dashed var(--color-border)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                color: 'var(--color-text-muted)',
+                                padding: 8,
+                                textAlign: 'center',
+                              }}
+                            >
+                              Preview unavailable
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-ghost"
+                            style={{
+                              marginTop: 6,
+                              color: 'var(--color-danger, #b91c1c)',
+                              width: '100%',
+                            }}
+                            disabled={!!imageUploadBusy || saving}
+                            onClick={() => setDeleteImageTarget(img)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="confirm-dialog-actions" style={{ marginTop: 8 }}>
                 <button
                   type="button"
@@ -1052,6 +1410,44 @@ export function FarmersInformationPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete farm"
+        message={
+          deleteTarget ? (
+            <span>
+              Delete farm <strong>{deleteTarget.code}</strong> ({deleteTarget.farmName})? Purchase orders and samples
+              linked to this farm will be unlinked. This cannot be undone.
+            </span>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        variant="danger"
+        onConfirm={() => void confirmDeleteFarm()}
+        onCancel={() => !deleting && setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteImageTarget !== null}
+        title="Remove photo?"
+        message={
+          deleteImageTarget ? (
+            <span>
+              Remove this photo{deleteImageTarget.fileName ? ` (${deleteImageTarget.fileName})` : ''} from
+              the farm profile? This cannot be undone.
+            </span>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel={deletingImage ? 'Removing…' : 'Remove'}
+        variant="danger"
+        onConfirm={() => void confirmDeleteProfileImage()}
+        onCancel={() => !deletingImage && setDeleteImageTarget(null)}
+      />
     </div>
   );
 }

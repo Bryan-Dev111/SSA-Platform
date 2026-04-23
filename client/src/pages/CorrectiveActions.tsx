@@ -324,7 +324,7 @@ export function CorrectiveActions() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Corrective Actions</h1>
+          <h1 className="page-title">Corrective Actions (CAR)</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -337,7 +337,7 @@ export function CorrectiveActions() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Corrective Actions</h1>
+        <h1 className="page-title">Corrective Actions (CAR)</h1>
       </header>
 
       {error && (

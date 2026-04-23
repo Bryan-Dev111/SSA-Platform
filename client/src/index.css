@@ -953,7 +953,7 @@ select.input {
   border-radius: var(--radius-lg);
 }
 
-/* Global Supply — Farmer Information: scroll inside the table area (wide + tall lists).
+/* Global Supply — Farm Information: scroll inside the table area (wide + tall lists).
    Horizontal: use `scroll` so a bottom scrollbar track stays available (overlay scrollbars
    otherwise make users drag-select to pan). Styled thumbs improve visibility. */
 .farmers-information-table-scroll {
@@ -991,6 +991,41 @@ select.input {
   background: var(--color-border-subtle);
 }
 
+/* Global Supply — Purchase Orders: always show a bottom horizontal scrollbar when the
+   table is wider than the card (wide columns, zoomed view). Pairs with `table--prevent-shrink`. */
+.purchase-orders-table-scroll {
+  overflow-x: scroll;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: var(--color-text-subtle) var(--color-border-subtle);
+}
+
+.purchase-orders-table-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.purchase-orders-table-scroll::-webkit-scrollbar-track {
+  background: var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.purchase-orders-table-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-text-subtle);
+  border-radius: 6px;
+  border: 2px solid var(--color-border-subtle);
+}
+
+.purchase-orders-table-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
+}
+
+.purchase-orders-table-scroll::-webkit-scrollbar-corner {
+  background: var(--color-border-subtle);
+}
+
 .table {
   width: 100%;
   min-width: 320px;
@@ -1011,7 +1046,7 @@ select.input {
   white-space: nowrap;
 }
 
-/* Optional sticky header for wide master tables (e.g. Farmer Information) */
+/* Optional sticky header for wide master tables (e.g. Farm Information) */
 .table--sticky-header thead th {
   position: sticky;
   top: 0;
@@ -1063,7 +1098,40 @@ select.input {
   margin: 0 auto;
 }
 
+.org-chart-inline-tab {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.org-chart-inline-tab:hover {
+  color: var(--color-text);
+}
+
+.org-chart-root-name {
+  display: block;
+  font-weight: var(--font-semibold);
+  font-size: var(--text-lg);
+}
+
+.org-chart-root-sub {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
 .org-chart-node--root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   font-weight: var(--font-semibold);
   font-size: var(--text-lg);
   padding: var(--space-4) var(--space-8);
@@ -1092,14 +1160,103 @@ select.input {
   border-top: 2px solid var(--color-border);
 }
 
+.org-chart-branches--people {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: start;
+}
+
+.org-chart-branch--qm {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.org-chart-role-pill {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.org-chart-node--qm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.org-chart-person-name {
+  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.org-chart-person-email {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.org-chart-connector--narrow {
+  height: 0.75rem;
+}
+
+.org-chart-qe-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.org-chart-qe-heading {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.org-chart-qe-empty {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.org-chart-qe-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.org-chart-node--qe {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  text-align: left;
+}
+
 @media (max-width: 1024px) {
-  .org-chart-branches {
+  .org-chart-branches:not(.org-chart-branches--people) {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 560px) {
-  .org-chart-branches {
+  .org-chart-branches:not(.org-chart-branches--people) {
     grid-template-columns: 1fr;
   }
 }
@@ -1512,7 +1669,7 @@ select.input {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: stretch;
   padding: clamp(1.75rem, 4vw, 2.75rem);
   color: rgba(255, 255, 255, 0.95);
   background: linear-gradient(165deg, var(--login-brand-deep) 0%, #1e3a8a 42%, var(--login-brand-mid) 100%);
@@ -1534,118 +1691,54 @@ select.input {
     100% 100%;
 }
 
-.login-brand-visuals {
+.login-brand-content {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  min-height: 200px;
-}
-
-.login-mock-card {
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
-}
-
-.login-mock-card--analytics {
+  flex-direction: column;
   flex: 1;
-  min-width: 200px;
-  padding: 0.85rem 1rem 1rem;
+  min-height: min(420px, 52vh);
+  justify-content: space-between;
 }
 
-.login-mock-card-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-  margin-bottom: 0.65rem;
-}
-
-.login-mock-chart {
-  height: 72px;
-  margin-bottom: 0.65rem;
-}
-
-.login-mock-chart-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.login-mock-pills {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.login-mock-pill {
-  font-size: 0.65rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.15);
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.login-mock-pill--active {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
-
-.login-mock-card--donut {
-  width: 112px;
-  padding: 0.75rem;
-  margin-top: 2.5rem;
-  margin-left: -2rem;
-  align-self: flex-start;
-}
-
-.login-mock-donut {
-  display: flex;
-  justify-content: center;
-}
-
-.login-mock-donut-svg {
-  width: 56px;
-  height: 56px;
-}
-
-.login-mock-donut-label {
-  text-align: center;
-  font-size: 0.65rem;
-  font-weight: 600;
-  margin-top: 0.35rem;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.login-brand-copy-block {
-  position: relative;
-  z-index: 1;
-  margin-top: auto;
-  padding-top: 1.5rem;
-}
-
-.login-brand-title {
-  margin: 0 0 0.65rem;
-  font-size: clamp(1.35rem, 2.8vw, 1.85rem);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+.login-brand-welcome {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.2vw, 2.125rem);
   font-weight: 700;
+  letter-spacing: -0.02em;
   color: #fff;
 }
 
-.login-brand-copy {
+.login-brand-message {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 1.25rem 0;
+}
+
+.login-brand-product-name {
   margin: 0;
   font-size: var(--text-sm);
-  line-height: 1.65;
-  color: rgba(226, 232, 240, 0.92);
-  max-width: 34ch;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.login-brand-tagline {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.65rem);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.login-brand-attribution {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: rgba(226, 232, 240, 0.88);
 }
 
 .login-card {

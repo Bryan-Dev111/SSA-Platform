@@ -13,6 +13,12 @@ const router = Router();
 
 router.use(authMiddleware);
 
+const laborCostInclude = {
+  workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
+  projectHistory: { select: { id: true, projectCode: true } },
+  createdBy: { select: { id: true, name: true, email: true } },
+} as const;
+
 function canViewAllLaborCosts(user: { roleNames: string[] } | undefined): boolean {
   if (!user) return false;
   return user.roleNames.includes('Admin') || user.roleNames.includes('QualityManager');
@@ -29,11 +35,7 @@ router.get(
     const all = req.query.scope === 'all' && canViewAllLaborCosts(req.user);
     const rows = await prisma.laborCost.findMany({
       where: all ? {} : { createdById: req.user.id },
-      include: {
-        workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
-        projectHistory: { select: { id: true, projectCode: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
+      include: laborCostInclude,
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
@@ -112,17 +114,13 @@ router.post(
         paidStatus: paidStatus as PaidStatus,
         createdById: req.user.id,
       },
-      include: {
-        workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
-        projectHistory: { select: { id: true, projectCode: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
+      include: laborCostInclude,
     });
     res.status(201).json(created);
   })
 );
 
-/** Set payment outcome for a pending labor cost (Internal Management only). */
+/** Update pending labor cost: optional `rate` (recalculates total), or `paidStatus` Paid/Rejected. */
 router.patch(
   '/:id',
   requirePageAccess('InternalManagement'),
@@ -136,9 +134,44 @@ router.patch(
       res.status(400).json({ error: 'id is required' });
       return;
     }
+
+    const rateRaw = req.body?.rate;
+    const rateProvided =
+      rateRaw !== undefined &&
+      rateRaw !== null &&
+      !(typeof rateRaw === 'string' && String(rateRaw).trim() === '');
+
+    if (rateProvided) {
+      const rate = Number(rateRaw);
+      if (!Number.isFinite(rate) || rate < 0) {
+        res.status(400).json({ error: 'rate must be a non-negative number' });
+        return;
+      }
+      const existing = await prisma.laborCost.findUnique({
+        where: { id },
+        select: { id: true, hours: true, paidStatus: true },
+      });
+      if (!existing) {
+        res.status(404).json({ error: 'Labor cost not found' });
+        return;
+      }
+      if (existing.paidStatus !== 'Pending') {
+        res.status(400).json({ error: 'Rate can only be adjusted while paid status is Pending' });
+        return;
+      }
+      const totalCost = existing.hours * rate;
+      const updated = await prisma.laborCost.update({
+        where: { id },
+        data: { rate, totalCost },
+        include: laborCostInclude,
+      });
+      res.json(updated);
+      return;
+    }
+
     const raw = typeof req.body?.paidStatus === 'string' ? req.body.paidStatus.trim() : '';
     if (raw !== 'Paid' && raw !== 'Rejected') {
-      res.status(400).json({ error: 'paidStatus must be Paid or Rejected' });
+      res.status(400).json({ error: 'Send rate to update, or paidStatus Paid or Rejected' });
       return;
     }
 
@@ -158,11 +191,7 @@ router.patch(
     const updated = await prisma.laborCost.update({
       where: { id },
       data: { paidStatus: raw as PaidStatus },
-      include: {
-        workLog: { select: { id: true, code: true, projectHistoryId: true, workDate: true } },
-        projectHistory: { select: { id: true, projectCode: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
+      include: laborCostInclude,
     });
     res.json(updated);
   })

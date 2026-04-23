@@ -751,7 +751,7 @@ export function CARRecord() {
           {car ? `Status: ${formatCarStatusForDisplay(car.status)}` : isNew ? '' : 'CAR not found.'}
         </p>
         <p style={{ marginTop: 4 }}>
-          <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions</Link>
+          <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions (CAR)</Link>
         </p>
       </header>
 
@@ -1202,7 +1202,7 @@ export function CARRecord() {
       {!car && !isNew && (
         <div className="placeholder-empty">
           <strong>CAR not found</strong>
-          Use a valid id or code from the Corrective Actions list.
+          Use a valid id or code from the Corrective Actions (CAR) list.
         </div>
       )}
     </div>

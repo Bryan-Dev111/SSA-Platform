@@ -879,6 +879,38 @@ model PurchaseOrderAttachment {
   @@index([purchaseOrderId])
 }
 
+/// Global Supply — logistics sites (port, exporter, mill, trucking, warehouse).
+model SupplyLogistics {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  siteType           String
+  company            String
+  country            String
+  registrationNumber String?
+  latitude           Float?
+  longitude          Float?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([code])
+  @@index([siteType])
+}
+
+model GlobalSupplyCrop {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GlobalSupplyCountry {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Sample {
   id        String   @id @default(cuid())
   code      String   @unique // SAMP-00001
@@ -906,6 +938,8 @@ model Expense {
   id          String   @id @default(cuid())
   /// Human-friendly code like EXP-00001 for display in the UI.
   code        String   @unique
+  /// Open amounts roll into “Open expense”; Closed removes from open total (Admin closes).
+  status      String   @default("Open")
   type        String
   description String
   project     String
@@ -913,6 +947,7 @@ model Expense {
   /// Calendar date when the expense occurred (may differ from createdAt).
   expenseDate DateTime @db.Date
   paymentMethod       String   @default("")
+  country             String?
   attachmentFilePath  String?
   attachmentFileName  String?
   attachmentFileMime  String?
@@ -921,12 +956,14 @@ model Expense {
 
   @@index([project])
   @@index([type])
+  @@index([country])
+  @@index([status])
   @@index([createdAt])
   @@index([expenseDate])
 }
 
 // For application-level code generation (SUP-00001, AUD-00001, etc.)
 model IdSequence {
-  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM, PO, SAMP, EXP
+  prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM, PO, SAMP, EXP, LOG
   lastValue Int    @default(0)
 }

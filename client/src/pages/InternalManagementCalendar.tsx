@@ -19,16 +19,9 @@ interface ShipmentCalendarRow {
   createdAt: string;
 }
 
-interface ScheduleCalendarRow {
-  id: string;
-  purchaseOrder: string | null;
-  scheduledDate: string | null;
-}
-
 type CalendarItem =
   | { kind: 'audit'; id: string; label: string; dateKey: string }
-  | { kind: 'shipment'; id: string; label: string; dateKey: string }
-  | { kind: 'schedule'; id: string; label: string; dateKey: string };
+  | { kind: 'shipment'; id: string; label: string; dateKey: string };
 
 function isoDateKey(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -84,9 +77,8 @@ function useInternalManagementCalendarItems(token: string | null): {
     Promise.all([
       apiJson<AuditCalendarRow[]>('/audits', { token }),
       apiJson<ShipmentCalendarRow[]>('/shipments', { token }),
-      apiJson<ScheduleCalendarRow[]>('/shipment-schedule', { token }),
     ])
-      .then(([auditList, shipmentList, scheduleList]) => {
+      .then(([auditList, shipmentList]) => {
         const next: CalendarItem[] = [];
         for (const a of auditList) {
           const dk = isoDateKey(a.auditDate);
@@ -98,13 +90,6 @@ function useInternalManagementCalendarItems(token: string | null): {
           if (!dk) continue;
           const label = (s.code && s.code.trim()) || s.id;
           next.push({ kind: 'shipment', id: s.id, label, dateKey: dk });
-        }
-        for (const r of scheduleList) {
-          const dk = isoDateKey(r.scheduledDate);
-          if (!dk) continue;
-          const po = r.purchaseOrder?.trim();
-          const label = po ? `Sch: ${po}` : `Sch: ${r.id.slice(0, 8)}…`;
-          next.push({ kind: 'schedule', id: r.id, label, dateKey: dk });
         }
         next.sort((a, b) => {
           const c = a.dateKey.localeCompare(b.dateKey);
@@ -197,8 +182,8 @@ export function InternalManagementCalendarView({ token }: { token: string | null
         </div>
 
         <p style={{ marginTop: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-          Audit codes, shipment IDs (SHIP codes or record id), and shipment schedule rows (Sch) appear on their
-          scheduled or inspection dates. Shipments without an inspection date use the created date.
+          Audit codes and shipment IDs appear on their inspection dates. Shipments without an inspection date use the
+          created date.
         </p>
 
         {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
@@ -234,21 +219,6 @@ export function InternalManagementCalendarView({ token }: { token: string | null
               }}
             />
             Shipment
-          </span>
-          <span>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                background: 'var(--color-warning-bg, #fef3c7)',
-                marginRight: 6,
-                verticalAlign: 'middle',
-                border: '1px solid var(--color-border)',
-              }}
-            />
-            Schedule
           </span>
         </div>
 
@@ -307,9 +277,7 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                             const bg =
                               it.kind === 'audit'
                                 ? 'var(--color-info-bg, #dbeafe)'
-                                : it.kind === 'shipment'
-                                  ? 'var(--color-success-bg, #dbeafe)'
-                                  : 'var(--color-warning-bg, #fef3c7)';
+                                : 'var(--color-success-bg, #dbeafe)';
                             const inner =
                               it.kind === 'audit' ? (
                                 <Link
@@ -325,7 +293,7 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                                 >
                                   {it.label}
                                 </Link>
-                              ) : it.kind === 'shipment' ? (
+                              ) : (
                                 <Link
                                   to="/shipments"
                                   style={{
@@ -340,18 +308,6 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                                 >
                                   {it.label}
                                 </Link>
-                              ) : (
-                                <span
-                                  style={{
-                                    display: 'block',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={it.label}
-                                >
-                                  {it.label}
-                                </span>
                               );
                             return (
                               <span

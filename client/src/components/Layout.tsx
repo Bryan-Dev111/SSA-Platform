@@ -47,7 +47,7 @@ function desktopMatches(): boolean {
 const MENU_ITEMS: { path: string; label: string }[] = [
   { path: '/dashboard', label: 'Dashboard' },
   { path: '/risk', label: 'Risk' },
-  { path: '/corrective-actions', label: 'Corrective Actions' },
+  { path: '/corrective-actions', label: 'Corrective Actions (CAR)' },
   { path: '/findings', label: 'Findings' },
   { path: '/audits', label: 'Audits' },
   { path: '/shipments', label: 'Shipments' },
@@ -62,14 +62,16 @@ const MENU_ITEMS: { path: string; label: string }[] = [
 ];
 
 const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
-  { path: '/global-vendors/farmers', label: 'Farmer Information' },
+  { path: '/global-vendors/dashboard', label: 'Dashboard' },
+  { path: '/global-vendors/farmers', label: 'Farm Information' },
   { path: '/global-vendors/farm-profile', label: 'Farm profile' },
-  { path: '/global-vendors/farm-processing', label: 'Processing & quality' },
-  { path: '/global-vendors/approved', label: 'Approved Farmers List' },
+  { path: '/global-vendors/processing-quality', label: 'Processing & quality' },
+  { path: '/global-vendors/approved', label: 'Approved Farms List' },
   { path: '/global-vendors/map', label: 'Farms Map' },
   { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
   { path: '/global-vendors/purchase-orders', label: 'Purchase Orders' },
   { path: '/global-vendors/samples', label: 'Samples' },
+  { path: '/global-vendors/logistics', label: 'Logistics' },
   { path: '/global-vendors/expenses', label: 'Expenses' },
   { path: '/global-vendors/admin', label: 'Admin' },
 ];

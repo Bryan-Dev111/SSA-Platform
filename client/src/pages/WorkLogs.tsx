@@ -216,11 +216,6 @@ export function WorkLogs() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Log time</h2>
-          <p style={{ marginTop: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-            Full name is taken from your account. Rate and total cost below use the same employee hourly rate as Admin →
-            Employees (name or email match), consistent with the labor cost line created on save. Project is set from the
-            chosen audit or shipment when applicable.
-          </p>
           {canViewAll && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: 'var(--text-sm)' }}>
               <input type="checkbox" checked={scopeAll} onChange={(e) => setScopeAll(e.target.checked)} />
@@ -257,7 +252,7 @@ export function WorkLogs() {
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Rate (from Employees)</label>
+                <label className="input-label">Rate</label>
                 <input
                   className="input"
                   readOnly
@@ -302,7 +297,7 @@ export function WorkLogs() {
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Project (from audit / shipment)</label>
+                <label className="input-label">Project</label>
                 <input className="input" readOnly value={derivedProjectLabel} title="Filled when you select an audit or shipment" />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>

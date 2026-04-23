@@ -8,8 +8,17 @@ import { canAccessPath, getDefaultPath } from '../../config/rolePageAccess';
 export function GlobalVendorsIndex() {
   const { user } = useAuth();
   const roleNames = user?.roleNames ?? [];
+  if (canAccessPath('/global-vendors/dashboard', roleNames)) {
+    return <Navigate to="/global-vendors/dashboard" replace />;
+  }
   if (canAccessPath('/global-vendors/farmers', roleNames)) {
     return <Navigate to="/global-vendors/farmers" replace />;
+  }
+  if (canAccessPath('/global-vendors/farm-profile', roleNames)) {
+    return <Navigate to="/global-vendors/farm-profile" replace />;
+  }
+  if (canAccessPath('/global-vendors/processing-quality', roleNames)) {
+    return <Navigate to="/global-vendors/processing-quality" replace />;
   }
   if (canAccessPath('/global-vendors/approved', roleNames)) {
     return <Navigate to="/global-vendors/approved" replace />;

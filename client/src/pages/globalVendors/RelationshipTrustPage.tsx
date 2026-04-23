@@ -71,7 +71,9 @@ export function RelationshipTrustPage() {
         [field]:
           field === 'visitCount'
             ? (value === '' ? null : Number(value))
-            : value || null,
+            : field === 'relationshipStatus'
+              ? (value === '' ? null : value)
+              : value || null,
       },
     }));
   };
@@ -159,7 +161,7 @@ export function RelationshipTrustPage() {
               <tr>
                 <th>Farm ID</th>
                 <th>Farm name</th>
-                <th>Farmer</th>
+                <th>Contact name</th>
                 <th>Country</th>
                 <th>First contact</th>
                 <th>Last visit</th>
@@ -172,8 +174,8 @@ export function RelationshipTrustPage() {
               {farms.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="table-empty">
-                    No farms yet. Add farmers first from the{' '}
-                    <strong>Farmer Information</strong> page.
+                    No farms yet. Add farms first from the{' '}
+                    <strong>Farm Information</strong> page.
                   </td>
                 </tr>
               ) : (
@@ -232,9 +234,16 @@ export function RelationshipTrustPage() {
                           }
                         />
                       </td>
-                      <td style={{ minWidth: 160 }}>
-                        <input
+                      <td
+                        style={{
+                          minWidth: 200,
+                          maxWidth: 380,
+                          verticalAlign: 'top',
+                        }}
+                      >
+                        <textarea
                           className="input"
+                          rows={4}
                           value={row.relationshipStatus ?? ''}
                           onChange={(e) =>
                             updateField(
@@ -243,7 +252,13 @@ export function RelationshipTrustPage() {
                               e.target.value
                             )
                           }
-                          placeholder="e.g. Strong, New, At risk"
+                          placeholder="Relationship notes and status…"
+                          style={{
+                            width: '100%',
+                            minHeight: '5rem',
+                            resize: 'vertical',
+                            lineHeight: 1.45,
+                          }}
                         />
                       </td>
                       <td style={{ width: 120, textAlign: 'right' }}>

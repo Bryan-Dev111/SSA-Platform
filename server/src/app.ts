@@ -45,10 +45,12 @@ import dashboardRoutes from './routes/dashboard';
 import alertsRoutes from './routes/alerts';
 import geocodeRoutes from './routes/geocode';
 import farmsRoutes from './routes/farms';
-import farmProfileRoutes from './routes/farm-profile';
 import expensesRoutes from './routes/expenses';
 import purchaseOrdersRoutes from './routes/purchase-orders';
 import samplesRoutes from './routes/samples';
+import globalSupplyOptionsRoutes from './routes/global-supply-options';
+import globalSupplyDashboardRoutes from './routes/global-supply-dashboard';
+import supplyLogisticsRoutes from './routes/supply-logistics';
 import legalRoutes from './routes/legal';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -97,18 +99,22 @@ app.use('/dashboard', dashboardRoutes);
 app.use('/alerts', alertsRoutes);
 app.use('/geocode', geocodeRoutes);
 app.use('/farms', farmsRoutes);
-app.use('/farm-profile', farmProfileRoutes);
 app.use('/expenses', expensesRoutes);
 app.use('/purchase-orders', purchaseOrdersRoutes);
 app.use('/samples', samplesRoutes);
+app.use('/global-supply-options', globalSupplyOptionsRoutes);
+app.use('/global-supply-dashboard', globalSupplyDashboardRoutes);
+app.use('/supply-logistics', supplyLogisticsRoutes);
 app.use('/legal', legalRoutes);
 /** Same router: supports clients whose VITE_API_URL includes /api while hitting Express directly (no Vercel strip). */
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/farms', farmsRoutes);
-app.use('/api/farm-profile', farmProfileRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/purchase-orders', purchaseOrdersRoutes);
 app.use('/api/samples', samplesRoutes);
+app.use('/api/global-supply-options', globalSupplyOptionsRoutes);
+app.use('/api/global-supply-dashboard', globalSupplyDashboardRoutes);
+app.use('/api/supply-logistics', supplyLogisticsRoutes);
 app.use('/api/legal', legalRoutes);
 
 app.use(errorHandler);

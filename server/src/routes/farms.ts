@@ -2,13 +2,36 @@
  * Global Vendors — farms API: list (read for farmers or approved pages), create.
  */
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
 import { requirePageAccess, requirePageAccessAny } from '../middleware/rbac';
 import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
+import {
+  FARM_PROFILE_IMAGE_MAX_BYTES,
+  createSignedUrlForPath,
+  deleteObjectFromStorage,
+  uploadFarmProfileImageToStorage,
+} from '../lib/supabaseStorage';
 
 const router = Router();
+
+const profileImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: FARM_PROFILE_IMAGE_MAX_BYTES },
+});
+
+const FARM_PROFILE_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+function parseProfileSection(raw: unknown): 'Profile' | 'Processing' | null {
+  if (raw === 'Profile' || raw === 'Processing') return raw;
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (t === 'Profile' || t === 'Processing') return t;
+  }
+  return null;
+}
 
 router.use(authMiddleware);
 
@@ -65,7 +88,12 @@ const farmSelect = {
 
 router.get(
   '/',
-  requirePageAccessAny(['GlobalSupplyFarmers', 'GlobalSupplyApproved']),
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+    'GlobalSupplyApproved',
+  ]),
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const farms = await prisma.farm.findMany({
       select: farmSelect,
@@ -78,7 +106,12 @@ router.get(
 // Lightweight payload for map pins
 router.get(
   '/map',
-  requirePageAccessAny(['GlobalSupplyFarmers', 'GlobalSupplyApproved']),
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+    'GlobalSupplyApproved',
+  ]),
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const farms = await prisma.farm.findMany({
       where: {
@@ -91,10 +124,203 @@ router.get(
         farmName: true,
         latitude: true,
         longitude: true,
+        farmCategory: true,
       },
       orderBy: { code: 'asc' },
     });
     res.json(farms);
+  })
+);
+
+router.get(
+  '/:farmId/profile-images',
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+    'GlobalSupplyApproved',
+  ]),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const farmId = req.params.farmId;
+    const sectionFilter = parseProfileSection(req.query.section);
+
+    const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true } });
+    if (!farm) {
+      res.status(404).json({ error: 'Farm not found' });
+      return;
+    }
+
+    const rows = await prisma.farmProfileImage.findMany({
+      where: {
+        farmId,
+        ...(sectionFilter ? { section: sectionFilter } : {}),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        section: true,
+        filePath: true,
+        fileName: true,
+        fileMime: true,
+        sortOrder: true,
+        createdAt: true,
+      },
+    });
+
+    const images: {
+      id: string;
+      section: string;
+      fileName: string | null;
+      fileMime: string | null;
+      sortOrder: number | null;
+      createdAt: Date;
+      url: string | null;
+    }[] = [];
+
+    for (const row of rows) {
+      let url: string | null = null;
+      if (row.filePath) {
+        try {
+          url = await createSignedUrlForPath(row.filePath, 3600);
+        } catch {
+          url = null;
+        }
+      }
+      images.push({
+        id: row.id,
+        section: row.section,
+        fileName: row.fileName,
+        fileMime: row.fileMime,
+        sortOrder: row.sortOrder,
+        createdAt: row.createdAt,
+        url,
+      });
+    }
+
+    res.json({ images });
+  })
+);
+
+router.post(
+  '/:farmId/profile-images',
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+  ]),
+  profileImageUpload.single('file'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const farmId = req.params.farmId;
+    const section = parseProfileSection(req.body?.section);
+
+    if (!req.file) {
+      res.status(400).json({ error: 'file is required (multipart field "file")' });
+      return;
+    }
+    if (!section) {
+      res.status(400).json({ error: 'section must be Profile or Processing' });
+      return;
+    }
+
+    const mime = (req.file.mimetype || '').toLowerCase();
+    if (!FARM_PROFILE_IMAGE_MIMES.has(mime)) {
+      res.status(400).json({ error: 'Only JPEG, PNG, WebP, or GIF images are allowed' });
+      return;
+    }
+
+    const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true } });
+    if (!farm) {
+      res.status(404).json({ error: 'Farm not found' });
+      return;
+    }
+
+    const uploadName = req.file.originalname || 'image';
+    try {
+      const uploaded = await uploadFarmProfileImageToStorage({
+        farmId,
+        section,
+        fileName: uploadName,
+        fileMime: mime || null,
+        fileBuffer: req.file.buffer,
+      });
+
+      const created = await prisma.farmProfileImage.create({
+        data: {
+          farmId,
+          section,
+          filePath: uploaded.storagePath,
+          fileName: uploadName.slice(0, 255) || null,
+          fileMime: mime ? mime.slice(0, 255) : null,
+        },
+        select: {
+          id: true,
+          section: true,
+          filePath: true,
+          fileName: true,
+          fileMime: true,
+          sortOrder: true,
+          createdAt: true,
+        },
+      });
+
+      let url: string | null = null;
+      if (created.filePath) {
+        try {
+          url = await createSignedUrlForPath(created.filePath, 3600);
+        } catch {
+          url = null;
+        }
+      }
+
+      res.status(201).json({
+        image: {
+          id: created.id,
+          section: created.section,
+          fileName: created.fileName,
+          fileMime: created.fileMime,
+          sortOrder: created.sortOrder,
+          createdAt: created.createdAt,
+          url,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Could not upload image',
+      });
+    }
+  })
+);
+
+router.delete(
+  '/:farmId/profile-images/:imageId',
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+  ]),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const farmId = req.params.farmId;
+    const imageId = req.params.imageId;
+
+    const row = await prisma.farmProfileImage.findFirst({
+      where: { id: imageId, farmId },
+      select: { id: true, filePath: true },
+    });
+    if (!row) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    if (row.filePath) {
+      try {
+        await deleteObjectFromStorage(row.filePath);
+      } catch {
+        // Continue with DB delete so operators are not blocked if the object was already removed.
+      }
+    }
+
+    await prisma.farmProfileImage.delete({ where: { id: row.id } });
+    res.status(204).send();
   })
 );
 
@@ -344,6 +570,25 @@ router.patch(
     });
 
     res.json(updated);
+  })
+);
+
+router.delete(
+  '/:id',
+  requirePageAccess('GlobalSupplyFarmers'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = req.params.id;
+    const existing = await prisma.farm.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) {
+      res.status(404).json({ error: 'Farm not found' });
+      return;
+    }
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseOrder.updateMany({ where: { farmId: id }, data: { farmId: null } });
+      await tx.sample.updateMany({ where: { farmId: id }, data: { farmId: null } });
+      await tx.farm.delete({ where: { id } });
+    });
+    res.status(204).send();
   })
 );
 
