@@ -4,6 +4,7 @@
  * B) Quality Engineer → Buyer (QE derives suppliers from Buyer → Suppliers)
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
 
@@ -99,6 +100,7 @@ export function AdminEmployeeAssignmentsPanel({
   toast,
   globalSupplyEmployeeRosterMode = false,
   canEditStaffRoster = false,
+  employeeProfilePathPrefix = '/global-vendors/employee-profile',
 }: {
   token: string | null;
   toast: ToastApi;
@@ -106,6 +108,8 @@ export function AdminEmployeeAssignmentsPanel({
   globalSupplyEmployeeRosterMode?: boolean;
   /** Only Admin may edit Country, Responsibilities, Rate, Notes (server enforces Admin on PATCH). */
   canEditStaffRoster?: boolean;
+  /** Base path without trailing slash; name links go to `${prefix}/${userId}`. */
+  employeeProfilePathPrefix?: string;
 }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -416,8 +420,12 @@ export function AdminEmployeeAssignmentsPanel({
                     return (
                       <tr key={u.id}>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{u.name?.trim() || '—'}</div>
-                          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{u.email}</div>
+                          <div style={{ fontWeight: 600 }}>
+                            <Link to={`${employeeProfilePathPrefix}/${u.id}`}>{u.name?.trim() || u.email}</Link>
+                          </div>
+                          {u.name?.trim() ? (
+                            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{u.email}</div>
+                          ) : null}
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4 }}>
                             {u.isContractor ? 'Contractor' : 'Employee'}
                           </div>
@@ -638,7 +646,9 @@ export function AdminEmployeeAssignmentsPanel({
                     if (supplierIds.length === 0) {
                       return (
                         <tr key={a.id}>
-                          <td>{a.name?.trim() ? a.name : a.email}</td>
+                          <td>
+                            <Link to={`${employeeProfilePathPrefix}/${a.id}`}>{a.name?.trim() ? a.name : a.email}</Link>
+                          </td>
                           <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
                           <td>{formatCountriesCell(a)}</td>
                           <td colSpan={2} className="table-empty">
@@ -653,7 +663,9 @@ export function AdminEmployeeAssignmentsPanel({
                         <tr key={`${a.id}-${sid}`}>
                           {idx === 0 ? (
                             <>
-                              <td rowSpan={supplierIds.length}>{a.name?.trim() ? a.name : a.email}</td>
+                              <td rowSpan={supplierIds.length}>
+                                <Link to={`${employeeProfilePathPrefix}/${a.id}`}>{a.name?.trim() ? a.name : a.email}</Link>
+                              </td>
                               <td rowSpan={supplierIds.length}>{a.isContractor ? 'Contractor' : 'Employee'}</td>
                               <td rowSpan={supplierIds.length}>{formatCountriesCell(a)}</td>
                             </>

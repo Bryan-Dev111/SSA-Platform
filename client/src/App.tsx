@@ -44,6 +44,7 @@ import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDas
 import { FarmDashboardPage } from './pages/globalVendors/FarmDashboardPage';
 import { GlobalFarmProfilePage } from './pages/globalVendors/FarmSectionMediaPage';
 import { GlobalSupplyInternalManagementPage } from './pages/globalVendors/GlobalSupplyInternalManagementPage';
+import { GlobalEmployeeProfilePage } from './pages/globalVendors/GlobalEmployeeProfilePage';
 import { BuyerRelationshipsPage } from './pages/globalVendors/BuyerRelationshipsPage';
 
 function RedirectToDefault() {
@@ -96,6 +97,14 @@ function App() {
             <Route path="documents" element={<ProtectedRoute path="/documents"><Documents /></ProtectedRoute>} />
             <Route path="work-logs" element={<ProtectedRoute path="/work-logs"><WorkLogs /></ProtectedRoute>} />
             <Route path="internal-management" element={<ProtectedRoute path="/internal-management"><InternalManagement /></ProtectedRoute>} />
+            <Route
+              path="internal-management/employee-profile/:userId"
+              element={
+                <ProtectedRoute path="/internal-management/employee-profile">
+                  <GlobalEmployeeProfilePage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="admin" element={<ProtectedRoute path="/admin"><Admin /></ProtectedRoute>} />
             <Route path="no-access" element={<ProtectedRoute path="/no-access"><NoAccess /></ProtectedRoute>} />
             <Route path="global-vendors">
@@ -216,6 +225,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/internal-management">
                     <GlobalSupplyInternalManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="employee-profile/:userId"
+                element={
+                  <ProtectedRoute path="/global-vendors/employee-profile">
+                    <GlobalEmployeeProfilePage />
                   </ProtectedRoute>
                 }
               />

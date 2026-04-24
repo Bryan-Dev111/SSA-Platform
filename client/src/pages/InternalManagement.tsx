@@ -2036,7 +2036,11 @@ export function InternalManagement() {
 
       {tab === 'employeeAssignments' && (
         <div style={{ marginTop: '1rem' }}>
-          <AdminEmployeeAssignmentsPanel token={token} toast={toast} />
+          <AdminEmployeeAssignmentsPanel
+            token={token}
+            toast={toast}
+            employeeProfilePathPrefix="/internal-management/employee-profile"
+          />
         </div>
       )}
 

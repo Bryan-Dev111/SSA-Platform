@@ -3,10 +3,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { AdminBuyersSuppliersPanel, AdminPermissionsPanel } from '../admin/AdminDay9Panels';
+import { AdminEmailAlertsPanel } from '../admin/AdminEmailAlertsPanel';
 import { GlobalSupplyMasterDataPanel } from './GlobalSupplyMasterDataPanel';
 import { GlobalSupplyBuyersPanel } from './GlobalSupplyBuyersPanel';
 
-type Tab = 'users' | 'buyers' | 'permissions' | 'crops' | 'countries';
+type Tab = 'users' | 'buyers' | 'permissions' | 'crops' | 'countries' | 'emailAlerts';
 
 interface GlobalSupplyStats {
   employees: number;
@@ -61,6 +62,7 @@ export function GlobalVendorsAdmin() {
             ['permissions', 'Permissions'],
             ['crops', 'Crops'],
             ['countries', 'Countries'],
+            ['emailAlerts', 'Email alerts'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -143,6 +145,8 @@ export function GlobalVendorsAdmin() {
           endpoint="/global-supply-options/countries"
         />
       )}
+
+      {tab === 'emailAlerts' && <AdminEmailAlertsPanel token={token} toast={toast} />}
     </div>
   );
 }

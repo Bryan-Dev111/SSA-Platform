@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { MetricCard } from '../../components/MetricCard';
+import {
+  ChartCard,
+  ContinuousLineChart,
+  VerticalBarChart,
+  type BarChartRow,
+  type TimePointRow,
+} from '../../components/DashboardBarCharts';
 import {
   computeClosedPurchaseOrderFinancials,
   filterGlobalVendorsExpenses,
 } from '../../utils/globalSupplyClosedPoMetrics';
 
 type CountryValueRow = { country: string; value: number };
-type TimePointRow = { date: string; count: number };
 
 type DashboardPayload = {
   revenueByCountry: CountryValueRow[];
@@ -49,190 +55,8 @@ function formatSampleCount(value: number): string {
   return `${Math.round(value).toLocaleString()} samples`;
 }
 
-function formatDateLabel(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) return date;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function VerticalBarChart({
-  rows,
-  valueFormatter,
-  positiveColor = 'var(--color-primary)',
-  negativeColor = 'var(--color-danger)',
-}: {
-  rows: CountryValueRow[];
-  valueFormatter: (value: number) => string;
-  positiveColor?: string;
-  negativeColor?: string;
-}) {
-  const topRows = rows.slice(0, 10);
-  const maxAbs = Math.max(1, ...topRows.map((row) => Math.abs(row.value)));
-
-  if (topRows.length === 0) {
-    return <p className="table-empty">No data yet.</p>;
-  }
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ display: 'grid', gap: 8, minWidth: 520 }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${topRows.length}, minmax(0, 1fr))`,
-            alignItems: 'end',
-            gap: 10,
-            height: 240,
-            padding: '0.75rem 0.5rem 0.25rem',
-            borderBottom: '1px solid var(--color-border)',
-            borderLeft: '1px solid var(--color-border)',
-          }}
-        >
-          {topRows.map((row) => {
-            const height = `${Math.max(6, (Math.abs(row.value) / maxAbs) * 160)}px`;
-            const color = row.value >= 0 ? positiveColor : negativeColor;
-            return (
-              <div key={row.country} style={{ display: 'grid', justifyItems: 'center', alignItems: 'end', gap: 6 }}>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                  {valueFormatter(row.value)}
-                </span>
-                <div
-                  style={{
-                    width: '100%',
-                    maxWidth: 42,
-                    minWidth: 20,
-                    height,
-                    background: color,
-                    borderRadius: '6px 6px 0 0',
-                  }}
-                  title={`${row.country}: ${valueFormatter(row.value)}`}
-                />
-              </div>
-            );
-          })}
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${topRows.length}, minmax(0, 1fr))`,
-            gap: 10,
-            padding: '0 0.5rem',
-          }}
-        >
-          {topRows.map((row) => (
-            <span
-              key={`${row.country}-label`}
-              style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-text-muted)',
-                textAlign: 'center',
-                lineHeight: 1.3,
-                wordBreak: 'break-word',
-              }}
-            >
-              {row.country}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ContinuousLineChart({ rows }: { rows: TimePointRow[] }) {
-  const width = 880;
-  const height = 240;
-  const padding = { top: 18, right: 16, bottom: 42, left: 42 };
-  const innerWidth = width - padding.left - padding.right;
-  const innerHeight = height - padding.top - padding.bottom;
-
-  const maxY = Math.max(1, ...rows.map((row) => row.count));
-  const points = rows.map((row, index) => {
-    const x =
-      rows.length <= 1
-        ? padding.left + innerWidth / 2
-        : padding.left + (index / (rows.length - 1)) * innerWidth;
-    const y = padding.top + innerHeight - (row.count / maxY) * innerHeight;
-    return { ...row, x, y };
-  });
-  const path = points.map((p) => `${p.x},${p.y}`).join(' ');
-
-  if (rows.length === 0) return <p className="table-empty">No open PO trend data yet.</p>;
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        style={{ width: '100%', minWidth: 600, display: 'block' }}
-        aria-label="Open PO creation over time"
-      >
-        <line
-          x1={padding.left}
-          y1={padding.top + innerHeight}
-          x2={padding.left + innerWidth}
-          y2={padding.top + innerHeight}
-          stroke="var(--color-border)"
-        />
-        <line
-          x1={padding.left}
-          y1={padding.top}
-          x2={padding.left}
-          y2={padding.top + innerHeight}
-          stroke="var(--color-border)"
-        />
-        <polyline
-          fill="none"
-          stroke="var(--color-primary)"
-          strokeWidth={3}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          points={path}
-        />
-        {points.map((point, index) => (
-          <g key={`${point.date}-${index}`}>
-            <circle cx={point.x} cy={point.y} r={3.5} fill="var(--color-primary)" />
-            {index % Math.max(1, Math.ceil(points.length / 7)) === 0 || index === points.length - 1 ? (
-              <text
-                x={point.x}
-                y={padding.top + innerHeight + 18}
-                textAnchor="middle"
-                fontSize="11"
-                fill="var(--color-text-muted)"
-              >
-                {new Date(`${point.date}T00:00:00Z`).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </text>
-            ) : null}
-            <title>{`${formatDateLabel(point.date)}: ${point.count} open PO(s)`}</title>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-function ChartCard({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="card dashboard-section-card">
-      <div className="card-body">
-        <h2 className="dashboard-section-heading" style={{ marginBottom: 4 }}>
-          {title}
-        </h2>
-        {subtitle ? <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--color-text-muted)' }}>{subtitle}</p> : null}
-        {children}
-      </div>
-    </div>
-  );
+function countryRowsToBar(rows: CountryValueRow[]): BarChartRow[] {
+  return rows.map((r) => ({ label: r.country, value: r.value }));
 }
 
 export function GlobalSupplyDashboardPage() {
@@ -281,11 +105,11 @@ export function GlobalSupplyDashboardPage() {
     [poOrdersKpi, poExpensesKpi]
   );
 
-  const topRevenue = useMemo(() => (data?.revenueByCountry ?? []).slice(0, 12), [data]);
-  const topProfit = useMemo(() => (data?.profitByCountry ?? []).slice(0, 12), [data]);
-  const coffeeKg = useMemo(() => (data?.kgCountryCoffee ?? []).slice(0, 12), [data]);
-  const cocoaKg = useMemo(() => (data?.kgCountryCocoa ?? []).slice(0, 12), [data]);
-  const sampleByCountry = useMemo(() => (data?.sampleCountByCountry ?? []).slice(0, 24), [data]);
+  const topRevenue = useMemo(() => countryRowsToBar((data?.revenueByCountry ?? []).slice(0, 12)), [data]);
+  const topProfit = useMemo(() => countryRowsToBar((data?.profitByCountry ?? []).slice(0, 12)), [data]);
+  const coffeeKg = useMemo(() => countryRowsToBar((data?.kgCountryCoffee ?? []).slice(0, 12)), [data]);
+  const cocoaKg = useMemo(() => countryRowsToBar((data?.kgCountryCocoa ?? []).slice(0, 12)), [data]);
+  const sampleByCountry = useMemo(() => countryRowsToBar((data?.sampleCountByCountry ?? []).slice(0, 24)), [data]);
   const openPoTrend = data?.poCreationOverTimeOpen ?? [];
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -355,15 +179,11 @@ export function GlobalSupplyDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard
-          title="Revenue by Country"
-        >
+        <ChartCard title="Revenue by Country">
           <VerticalBarChart rows={topRevenue} valueFormatter={formatMoney} />
         </ChartCard>
 
-        <ChartCard
-          title="Profit by Country"
-        >
+        <ChartCard title="Profit by Country">
           <VerticalBarChart rows={topProfit} valueFormatter={formatMoney} />
         </ChartCard>
       </div>
@@ -376,15 +196,11 @@ export function GlobalSupplyDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard
-          title="Weight by Country (Coffee)"
-        >
+        <ChartCard title="Weight by Country (Coffee)">
           <VerticalBarChart rows={coffeeKg} valueFormatter={formatKg} />
         </ChartCard>
 
-        <ChartCard
-          title="Weight by Country (Cocoa)"
-        >
+        <ChartCard title="Weight by Country (Cocoa)">
           <VerticalBarChart rows={cocoaKg} valueFormatter={formatKg} />
         </ChartCard>
       </div>
@@ -400,14 +216,13 @@ export function GlobalSupplyDashboardPage() {
           <VerticalBarChart rows={sampleByCountry} valueFormatter={formatSampleCount} />
         </ChartCard>
 
-        <div className="card dashboard-section-card">
-          <div className="card-body">
-            <h2 className="dashboard-section-heading" style={{ marginBottom: 4 }}>
-              Purchase Order Creation
-            </h2>
-            <ContinuousLineChart rows={openPoTrend} />
-          </div>
-        </div>
+        <ChartCard title="Purchase Order Creation">
+          <ContinuousLineChart
+            rows={openPoTrend}
+            ariaLabel="Open PO creation over time"
+            valueLabel="open PO(s)"
+          />
+        </ChartCard>
       </div>
     </div>
   );

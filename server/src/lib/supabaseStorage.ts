@@ -91,6 +91,23 @@ export async function uploadFarmProfileImageToStorage(args: {
   return { storagePath: key };
 }
 
+export async function uploadEmployeeProfileImageToStorage(args: {
+  userId: string;
+  fileName: string;
+  fileMime: string | null;
+  fileBuffer: Buffer;
+}): Promise<{ storagePath: string }> {
+  const supabase = requireStorageClient();
+  const safeName = args.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 140) || 'image.bin';
+  const key = `employee-profiles/${args.userId}/${Date.now()}-${randomBytes(6).toString('hex')}-${safeName}`;
+  const { error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).upload(key, args.fileBuffer, {
+    upsert: false,
+    contentType: args.fileMime || 'application/octet-stream',
+  });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return { storagePath: key };
+}
+
 /** Remove one object; ignores \"not found\" style failures so deletes stay idempotent. */
 export async function deleteObjectFromStorage(storagePath: string): Promise<void> {
   const supabase = requireStorageClient();

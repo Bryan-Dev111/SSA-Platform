@@ -83,6 +83,31 @@ model User {
   internalDocsAsEmployee InternalDoc[]   @relation("InternalDocEmployee")
   workLogsCreated   WorkLog[]   @relation("WorkLogCreatedBy")
   laborCostsCreated LaborCost[] @relation("LaborCostCreatedBy")
+
+  /// Global Supply / Internal Management — optional rich text + gallery (Employee Profile page).
+  employeeProfile       EmployeeProfile?
+  employeeProfileImages EmployeeProfileImage[]
+}
+
+/// Rich text / notes for an employee or contractor profile (one row per user).
+model EmployeeProfile {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model EmployeeProfileImage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filePath  String?
+  fileName  String?
+  fileMime  String?
+  sortOrder Int?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// One-time token for self-service password reset (raw token is emailed; only SHA-256 hash is stored).
@@ -760,6 +785,8 @@ enum AlertCategory {
   shipmentInspectionRequest
   rejectedShipmentDocument
   lateShipment
+  /// Sourcing Directors: email when a Global Supply PO is opened/closed in a farm country matching Employee Assignments.
+  sourcingDirectorPoCountryEmail
 }
 
 model UserAlertPreference {

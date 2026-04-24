@@ -9,6 +9,7 @@ import { requirePageAccess } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import { createRecordDownloadSignedUrl, uploadRecordToStorage } from '../lib/supabaseStorage';
+import { notifySourcingDirectorsOfPurchaseOrderEvent } from '../services/sourcingDirectorPoEmail';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -159,6 +160,8 @@ router.post(
       },
       include: purchaseOrderListInclude,
     });
+
+    void notifySourcingDirectorsOfPurchaseOrderEvent({ po: created, event: 'opened' }).catch(() => {});
 
     res.status(201).json(created);
   })
@@ -337,6 +340,8 @@ router.patch(
       data: { status: 'Closed' },
       include: purchaseOrderListInclude,
     });
+
+    void notifySourcingDirectorsOfPurchaseOrderEvent({ po: updated, event: 'closed' }).catch(() => {});
 
     res.json(updated);
   })

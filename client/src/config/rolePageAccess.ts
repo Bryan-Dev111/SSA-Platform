@@ -25,6 +25,18 @@ export const PATH_ROLES: Record<string, string[]> = {
     'CommodityBuyer',
     'SourcingDirector',
   ],
+  /** Employee roster profile (linked from Employee Assignments); same gate as Global Supply Internal Management. */
+  '/global-vendors/employee-profile': [
+    'Admin',
+    'Viewer',
+    'QualityEngineer',
+    'QualityManager',
+    'Buyer',
+    'CommodityBuyer',
+    'SourcingDirector',
+  ],
+  /** Supplier Assurance Internal Management — employee profile detail. */
+  '/internal-management/employee-profile': ['Admin', 'QualityManager'],
   '/global-vendors/work-logs': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/purchase-orders': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/samples': ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
@@ -110,6 +122,16 @@ export function getDefaultPath(roleNames: string[]): string {
 export function canAccessPath(pathname: string, roleNames: string[]): boolean {
   const path = pathname.replace(/\/$/, '') || '/';
   if (path === NO_ACCESS_PATH) return true;
+  if (path.startsWith('/global-vendors/employee-profile/')) {
+    const allowed = runtimePathRoles['/global-vendors/employee-profile'];
+    if (!allowed?.length) return false;
+    return roleNames.some((r) => allowed.includes(r));
+  }
+  if (path.startsWith('/internal-management/employee-profile/')) {
+    const allowed = runtimePathRoles['/internal-management/employee-profile'];
+    if (!allowed?.length) return false;
+    return roleNames.some((r) => allowed.includes(r));
+  }
   const pathBase = path.split('/').slice(0, 2).join('/') || path;
   /** Prefer longest match so `/global-vendors/farmers` can differ from `/global-vendors/approved`. */
   const allowed = runtimePathRoles[path] ?? runtimePathRoles[pathBase];

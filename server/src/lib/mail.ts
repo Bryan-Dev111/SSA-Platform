@@ -151,6 +151,38 @@ export async function sendAccessRequestNotification(params: {
   return { sent: true };
 }
 
+/**
+ * Generic transactional email (Global Supply PO notifications, etc.).
+ */
+export async function sendTransactionalEmail(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  appName?: string;
+}): Promise<{ sent: boolean; devLogged?: boolean }> {
+  const { to, subject, text, html } = params;
+  const appName = params.appName ?? 'Sentinel Supplier Assurance';
+  const from = defaultFrom(appName);
+
+  const transporter = buildSmtpTransport();
+  if (!transporter) {
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mail] SMTP not configured. Transactional email not sent.\nTo: ${to}\nSubject: ${subject}\n${text}`
+      );
+      return { sent: false, devLogged: true };
+    }
+    // eslint-disable-next-line no-console
+    console.error('[mail] SMTP not configured; cannot send transactional email in production');
+    return { sent: false };
+  }
+
+  await transporter.sendMail({ from, to, subject, text, html });
+  return { sent: true };
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')

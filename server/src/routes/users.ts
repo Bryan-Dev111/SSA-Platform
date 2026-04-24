@@ -10,8 +10,11 @@ import { authMiddleware } from '../middleware/auth';
 import { API_PAGE_ROLES, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { DEFAULT_PATH_ROLES, PAGE_DEFINITIONS } from '../lib/permissions';
+import { isSmtpConfigured } from '../lib/mail';
 
 const router = Router();
+
+const SOURCING_DIRECTOR_PO_EMAIL_CATEGORY: AlertCategory = 'sourcingDirectorPoCountryEmail';
 
 /** In-app / dashboard alerts (email delivery can be wired later); matches `createAlertForRecipients` categories. */
 const ALERT_EMAIL_MATRIX_CATEGORIES: AlertCategory[] = [
@@ -279,6 +282,85 @@ router.put(
           })
         );
       }
+    }
+    if (ops.length > 0) {
+      await prismaBase.$transaction(ops);
+    }
+    res.json({ ok: true });
+  })
+);
+
+/** Global Supply Admin → Email alerts: Sourcing Director PO notifications by assigned country. */
+router.get(
+  '/sourcing-director-po-email-preferences',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    function normCountry(s: string | null | undefined): string {
+      return (s ?? '').trim();
+    }
+    const directors = await prisma.user.findMany({
+      where: { userRoles: { some: { role: { name: 'SourcingDirector' } } } },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        country: true,
+        assignedCountries: { select: { country: true }, orderBy: { country: 'asc' } },
+      },
+      orderBy: { email: 'asc' },
+    });
+    const ids = directors.map((d) => d.id);
+    const prefs =
+      ids.length === 0
+        ? []
+        : await prisma.userAlertPreference.findMany({
+            where: { userId: { in: ids }, alertCategory: SOURCING_DIRECTOR_PO_EMAIL_CATEGORY },
+            select: { userId: true, enabled: true },
+          });
+    const prefMap = new Map(prefs.map((p) => [p.userId, p.enabled]));
+
+    res.json({
+      smtpConfigured: isSmtpConfigured(),
+      directors: directors.map((d) => {
+        const countries = [
+          ...d.assignedCountries.map((c) => normCountry(c.country)).filter(Boolean),
+          ...(normCountry(d.country) ? [normCountry(d.country)] : []),
+        ];
+        const unique = [...new Set(countries)];
+        return {
+          id: d.id,
+          email: d.email,
+          name: d.name,
+          assignedCountryNames: unique.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+          emailEnabled: prefMap.get(d.id) !== false,
+        };
+      }),
+    });
+  })
+);
+
+router.put(
+  '/sourcing-director-po-email-preferences',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const raw = req.body?.preferences as Record<string, boolean> | undefined;
+    if (!raw || typeof raw !== 'object') {
+      res.status(400).json({ error: 'preferences object is required' });
+      return;
+    }
+    const directors = await prisma.user.findMany({
+      where: { userRoles: { some: { role: { name: 'SourcingDirector' } } } },
+      select: { id: true },
+    });
+    const allowed = new Set(directors.map((d) => d.id));
+    const ops = [];
+    for (const [userId, enabled] of Object.entries(raw)) {
+      if (!allowed.has(userId)) continue;
+      ops.push(
+        prismaBase.userAlertPreference.upsert({
+          where: { userId_alertCategory: { userId, alertCategory: SOURCING_DIRECTOR_PO_EMAIL_CATEGORY } },
+          create: { userId, alertCategory: SOURCING_DIRECTOR_PO_EMAIL_CATEGORY, enabled: Boolean(enabled) },
+          update: { enabled: Boolean(enabled) },
+        })
+      );
     }
     if (ops.length > 0) {
       await prismaBase.$transaction(ops);
