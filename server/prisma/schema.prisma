@@ -882,7 +882,7 @@ model PurchaseOrderAttachment {
 /// Global Supply — logistics sites (port, exporter, mill, trucking, warehouse).
 model SupplyLogistics {
   id                 String   @id @default(cuid())
-  code               String   @unique
+  code               String   @unique // BUS-00001
   siteType           String
   company            String
   country            String

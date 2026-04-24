@@ -201,6 +201,76 @@ router.get(
   })
 );
 
+router.get(
+  '/:farmId/profile-content',
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+    'GlobalSupplyApproved',
+  ]),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const farmId = req.params.farmId;
+    const section = parseProfileSection(req.query.section);
+    if (!section) {
+      res.status(400).json({ error: 'section query must be Profile or Processing' });
+      return;
+    }
+
+    const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true } });
+    if (!farm) {
+      res.status(404).json({ error: 'Farm not found' });
+      return;
+    }
+
+    const row = await prisma.farmProfileContent.findUnique({
+      where: {
+        farmId_section: { farmId, section },
+      },
+      select: { body: true, updatedAt: true },
+    });
+
+    res.json({
+      section,
+      body: row?.body ?? '',
+      updatedAt: row?.updatedAt ?? null,
+    });
+  })
+);
+
+router.patch(
+  '/:farmId/profile-content',
+  requirePageAccessAny([
+    'GlobalSupplyFarmers',
+    'GlobalSupplyFarmProfile',
+    'GlobalSupplyProcessingQuality',
+  ]),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const farmId = req.params.farmId;
+    const section = parseProfileSection(req.body?.section);
+    const body = typeof req.body?.body === 'string' ? req.body.body : '';
+    if (!section) {
+      res.status(400).json({ error: 'section must be Profile or Processing' });
+      return;
+    }
+
+    const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true } });
+    if (!farm) {
+      res.status(404).json({ error: 'Farm not found' });
+      return;
+    }
+
+    const saved = await prisma.farmProfileContent.upsert({
+      where: { farmId_section: { farmId, section } },
+      create: { farmId, section, body },
+      update: { body },
+      select: { section: true, body: true, updatedAt: true },
+    });
+
+    res.json(saved);
+  })
+);
+
 router.post(
   '/:farmId/profile-images',
   requirePageAccessAny([

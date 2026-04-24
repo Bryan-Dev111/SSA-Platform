@@ -2,6 +2,7 @@
  * Global Vendors — Approved Farms List (same data as Farm Information; columns per spec where fields exist).
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
@@ -80,7 +81,15 @@ export function ApprovedFarmersPage() {
                 farms.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <strong>{f.code}</strong>
+                      <Link
+                        to={`/global-vendors/farm-profile?farmId=${encodeURIComponent(f.id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="finding-code-link"
+                        title="Open farm profile (new tab)"
+                      >
+                        <strong>{f.code}</strong>
+                      </Link>
                     </td>
                     <td>{dash(f.farmCategory)}</td>
                     <td>{f.country}</td>

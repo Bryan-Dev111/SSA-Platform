@@ -22,11 +22,21 @@ router.use(authMiddleware);
 router.use(requirePageAccess('Shipments'));
 
 function canRecordInspectionResult(roleNames: string[]): boolean {
-  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager');
+  return (
+    roleNames.includes('Admin') ||
+    roleNames.includes('QualityEngineer') ||
+    roleNames.includes('QualityManager') ||
+    roleNames.includes('Inspector')
+  );
 }
 
 function canEditInspector(roleNames: string[]): boolean {
-  return roleNames.includes('Admin') || roleNames.includes('QualityEngineer') || roleNames.includes('QualityManager');
+  return (
+    roleNames.includes('Admin') ||
+    roleNames.includes('QualityEngineer') ||
+    roleNames.includes('QualityManager') ||
+    roleNames.includes('Inspector')
+  );
 }
 
 router.get(
@@ -186,8 +196,17 @@ router.get(
     }
     const users = await prisma.user.findMany({
       where: {
-        isEmployee: true,
         employmentStatus: 'Active',
+        OR: [{ isEmployee: true }, { isContractor: true }],
+        userRoles: {
+          some: {
+            role: {
+              name: {
+                in: ['Admin', 'QualityEngineer', 'QualityManager', 'Inspector'],
+              },
+            },
+          },
+        },
       },
       select: {
         id: true,
@@ -433,7 +452,7 @@ router.patch(
     if (hasResultUpdate) {
       if (!canResult) {
         res.status(403).json({
-          error: 'Only Admin, Quality Engineer, or Quality Manager can record inspection results',
+          error: 'Only Admin, Quality Engineer, Quality Manager, or Inspector can record inspection results',
         });
         return;
       }

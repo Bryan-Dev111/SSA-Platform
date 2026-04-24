@@ -33,6 +33,10 @@ type DisplayPoint = {
   subtitle?: string;
 };
 
+function logisticsDisplayCode(code: string): string {
+  return code.startsWith('LOG-') ? `BUS-${code.slice(4)}` : code;
+}
+
 const FARM_MARKER_COLOR = { stroke: '#b91c1c', fill: '#ef4444' } as const;
 const LOGISTICS_COLOR_BY_TYPE: Map<string, { stroke: string; fill: string }> = new Map(
   LOGISTICS_SITE_TYPES.map((t) => [t.value, { stroke: t.bg, fill: t.bg }] as const)
@@ -125,7 +129,7 @@ export function FarmsMapPage() {
       latitude: l.latitude,
       longitude: l.longitude,
       legendLabel: l.siteType,
-      title: `${l.code} · ${l.company}`,
+      title: `${logisticsDisplayCode(l.code)} · ${l.company}`,
       subtitle: l.siteType,
     }));
     return [...farmPoints, ...logisticsPoints];

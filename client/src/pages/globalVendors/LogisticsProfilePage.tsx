@@ -31,6 +31,10 @@ type LogisticsProfileRow = {
   attachments: LogisticsAttachment[];
 };
 
+function logisticsDisplayCode(code: string): string {
+  return code.startsWith('LOG-') ? `BUS-${code.slice(4)}` : code;
+}
+
 function isImageAttachment(a: LogisticsAttachment): boolean {
   if (a.fileMime && a.fileMime.toLowerCase().startsWith('image/')) return true;
   const name = (a.fileName || '').toLowerCase();
@@ -274,7 +278,7 @@ export function LogisticsProfilePage() {
               ) : (
                 rows.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.code} - {r.company}
+                    {logisticsDisplayCode(r.code)} - {r.company}
                   </option>
                 ))
               )}
@@ -296,7 +300,7 @@ export function LogisticsProfilePage() {
                 }}
               >
                 <div>
-                  <strong>Code:</strong> {selected.code}
+                  <strong>Code:</strong> {logisticsDisplayCode(selected.code)}
                 </div>
                 <div>
                   <strong>Type:</strong> {selected.siteType}

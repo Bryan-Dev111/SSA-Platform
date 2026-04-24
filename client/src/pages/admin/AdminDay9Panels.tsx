@@ -668,7 +668,7 @@ export function AdminExpensesPanel({
             title="Total Expenses"
             value={openExpenseTracking ? formatUsd(totalExpenses) : totalExpenses.toFixed(2)}
           />
-          {openExpenseTracking ? <MetricCard title="Open Expense" value={formatUsd(openExpenseTotal)} /> : null}
+          {openExpenseTracking ? <MetricCard title="Open Expenses" value={formatUsd(openExpenseTotal)} /> : null}
         </div>
         <div
           style={{

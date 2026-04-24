@@ -26,6 +26,9 @@ export function GlobalFarmProfilePage() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FarmProfileImageRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [content, setContent] = useState('');
+  const [contentLoading, setContentLoading] = useState(false);
+  const [savingContent, setSavingContent] = useState(false);
 
   const selectedFarm = useMemo(() => farms.find((f) => f.id === farmId) || null, [farms, farmId]);
 
@@ -81,10 +84,60 @@ export function GlobalFarmProfilePage() {
     void loadImages();
   }, [loadImages]);
 
+  useEffect(() => {
+    if (!token || !farmId) {
+      setContent('');
+      return;
+    }
+    let cancelled = false;
+    const loadContent = async () => {
+      setContentLoading(true);
+      try {
+        const q = section === 'Profile' ? '?section=Profile' : '?section=Processing';
+        const r = await apiJson<{ body: string }>(`/farms/${farmId}/profile-content${q}`, { token });
+        if (!cancelled) setContent(r.body || '');
+      } catch {
+        if (!cancelled) setContent('');
+      } finally {
+        if (!cancelled) setContentLoading(false);
+      }
+    };
+    void loadContent();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, farmId, section]);
+
   const openManager = (id: string, nextSection: Section) => {
     setFarmId(id);
     setSection(nextSection);
     setSearchParams({ farmId: id }, { replace: true });
+  };
+
+  const saveContent = async () => {
+    if (!token || !farmId || savingContent) return;
+    setSavingContent(true);
+    try {
+      await apiJson(`/farms/${farmId}/profile-content`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ section, body: content }),
+      });
+      toast.success(section === 'Profile' ? 'Farm profile text saved' : 'Processing & quality text saved');
+    } catch (err) {
+      let msg = 'Could not save text';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setSavingContent(false);
+    }
   };
 
   const uploadFiles = async (files: FileList | File[]) => {
@@ -180,6 +233,30 @@ export function GlobalFarmProfilePage() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
+          <label className="field" style={{ marginBottom: 0, display: 'block', maxWidth: 420 }}>
+            <span className="field-label">Supplier lookup by Farm ID</span>
+            <select
+              className="input"
+              value={farmId}
+              onChange={(e) => {
+                const id = e.target.value;
+                setFarmId(id);
+                setSearchParams(id ? { farmId: id } : {}, { replace: true });
+              }}
+            >
+              <option value="">Select farm</option>
+              {farms.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.code} - {f.farmName}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Farms</h2>
           <div className="table-wrap">
             {farms.length === 0 ? (
@@ -234,6 +311,21 @@ export function GlobalFarmProfilePage() {
             <h2 style={{ marginTop: 0 }}>
               {selectedFarm.code} — {selectedFarm.farmName}
             </h2>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 10,
+                marginBottom: 14,
+              }}
+            >
+              <div><strong>Farm ID:</strong> {selectedFarm.code}</div>
+              <div><strong>Farm Name:</strong> {selectedFarm.farmName}</div>
+              <div><strong>Main/Secondary Crop:</strong> {selectedFarm.mainCrop || '—'} / {selectedFarm.secondaryCrop || '—'}</div>
+              <div><strong>Country:</strong> {selectedFarm.country}</div>
+              <div><strong>Region:</strong> {selectedFarm.region || '—'}</div>
+              <div><strong>Elevation:</strong> {typeof selectedFarm.elevationMeters === 'number' ? `${selectedFarm.elevationMeters} m` : '—'}</div>
+            </div>
             <p className="field-label" style={{ marginBottom: 10 }}>
               {section === 'Profile' ? 'Farm profile photos' : 'Processing & quality photos'}
             </p>
@@ -253,6 +345,104 @@ export function GlobalFarmProfilePage() {
                 Processing &amp; quality
               </button>
             </div>
+
+            <div className="table-wrap" style={{ marginBottom: 12 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    {section === 'Profile' ? (
+                      <>
+                        <th>Total Farm Size (ha)</th>
+                        <th>Production Area (ha) Main/Secondary</th>
+                        <th>Annual Output (Kg) Main/Secondary</th>
+                        <th>Production Style</th>
+                        <th>Varieties</th>
+                        <th>Harvest Window (Main)</th>
+                        <th>Harvest Window (Secondary)</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Main Processing Methods</th>
+                        <th>Main Fermentation Days</th>
+                        <th>Main Drying Method</th>
+                        <th>Main Bean Size</th>
+                        <th>Main Quality Score</th>
+                        <th>Secondary Processing Details</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {section === 'Profile' ? (
+                      <>
+                        <td>{typeof selectedFarm.totalFarmSizeHa === 'number' ? selectedFarm.totalFarmSizeHa : '—'}</td>
+                        <td>
+                          {typeof selectedFarm.mainCropAreaHa === 'number' ? selectedFarm.mainCropAreaHa : '—'} /{' '}
+                          {typeof selectedFarm.secondaryCropAreaHa === 'number' ? selectedFarm.secondaryCropAreaHa : '—'}
+                        </td>
+                        <td>
+                          {typeof selectedFarm.mainCropAnnualOutputKg === 'number' ? selectedFarm.mainCropAnnualOutputKg.toLocaleString() : '—'} /{' '}
+                          {typeof selectedFarm.secondaryCropAnnualOutputKg === 'number' ? selectedFarm.secondaryCropAnnualOutputKg.toLocaleString() : '—'}
+                        </td>
+                        <td>{selectedFarm.productionStyle || '—'}</td>
+                        <td>{selectedFarm.mainVarieties || '—'}{selectedFarm.secondaryVarieties ? ` / ${selectedFarm.secondaryVarieties}` : ''}</td>
+                        <td>
+                          {selectedFarm.harvestStartMonth && selectedFarm.harvestEndMonth
+                            ? `${selectedFarm.harvestStartMonth} - ${selectedFarm.harvestEndMonth}`
+                            : '—'}
+                        </td>
+                        <td>
+                          {selectedFarm.secondaryHarvestStartMonth && selectedFarm.secondaryHarvestEndMonth
+                            ? `${selectedFarm.secondaryHarvestStartMonth} - ${selectedFarm.secondaryHarvestEndMonth}`
+                            : '—'}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{selectedFarm.mainProcessingMethods || '—'}</td>
+                        <td>{typeof selectedFarm.mainFermentationDays === 'number' ? selectedFarm.mainFermentationDays : '—'}</td>
+                        <td>{selectedFarm.mainDryingMethod || '—'}</td>
+                        <td>{selectedFarm.mainBeanSize || '—'}</td>
+                        <td>{typeof selectedFarm.mainQualityScore === 'number' ? selectedFarm.mainQualityScore : '—'}</td>
+                        <td>
+                          {selectedFarm.secondaryProcessingMethods || selectedFarm.secondaryFermentationDays || selectedFarm.secondaryDryingMethod || selectedFarm.secondaryBeanSize || selectedFarm.secondaryQualityScore
+                            ? `${selectedFarm.secondaryProcessingMethods || 'Method: —'} | Fermentation: ${typeof selectedFarm.secondaryFermentationDays === 'number' ? selectedFarm.secondaryFermentationDays : '—'} | Drying: ${selectedFarm.secondaryDryingMethod || '—'} | Bean Size: ${selectedFarm.secondaryBeanSize || '—'} | Quality: ${typeof selectedFarm.secondaryQualityScore === 'number' ? selectedFarm.secondaryQualityScore : '—'}`
+                            : 'No secondary processing data'}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <label className="field" style={{ display: 'block', marginBottom: 12 }}>
+              <span className="field-label">
+                {section === 'Profile' ? 'Farm profile text' : 'Processing & quality text'}
+              </span>
+              <textarea
+                className="input"
+                rows={4}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={
+                  section === 'Profile'
+                    ? 'Add profile narrative for this farm...'
+                    : 'Add processing and quality narrative for this farm...'
+                }
+                disabled={contentLoading}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void saveContent()}
+              disabled={savingContent || contentLoading}
+              style={{ marginBottom: 12 }}
+            >
+              {savingContent ? 'Saving…' : 'Save text'}
+            </button>
 
             <input
               id={uploadInputId}

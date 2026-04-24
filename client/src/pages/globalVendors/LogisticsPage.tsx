@@ -15,6 +15,7 @@ export const LOGISTICS_SITE_TYPES = [
   { value: 'Mill', label: 'Mill', bg: '#16a34a', fg: '#ffffff' },
   { value: 'Trucking', label: 'Trucking', bg: '#eab308', fg: '#422006' },
   { value: 'Warehouse', label: 'Warehouse', bg: '#ea580c', fg: '#ffffff' },
+  { value: 'Inspection', label: 'Inspection', bg: '#8b5a2b', fg: '#ffffff' },
 ] as const;
 
 const TYPE_STYLE = Object.fromEntries(LOGISTICS_SITE_TYPES.map((t) => [t.value, t])) as Record<
@@ -43,6 +44,10 @@ type LogisticsAttachmentRow = {
   fileMime: string | null;
   createdAt: string;
 };
+
+function logisticsDisplayCode(code: string): string {
+  return code.startsWith('LOG-') ? `BUS-${code.slice(4)}` : code;
+}
 
 function TypeBadge({ siteType }: { siteType: string }) {
   const s = TYPE_STYLE[siteType];
@@ -314,9 +319,6 @@ export function LogisticsPage() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Logistics</h1>
-        <p className="page-description" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
-          Register ports, exporters, mills, trucking, and warehouses with location and registration details.
-        </p>
       </header>
 
       {error && rows.length === 0 ? <div className="alert-error">{error}</div> : null}
@@ -426,8 +428,8 @@ export function LogisticsPage() {
                   <th>Longitude</th>
                   <th>Latitude</th>
                   <th>Notes</th>
-                  <th style={{ width: 170 }}>Edit/Delete</th>
                   <th style={{ minWidth: 220 }}>Attach files</th>
+                  <th style={{ width: 170 }}>Edit/Delete</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,7 +443,7 @@ export function LogisticsPage() {
                   rows.map((r) => (
                     <tr key={r.id}>
                       <td>
-                        <strong>{r.code}</strong>
+                        <strong>{logisticsDisplayCode(r.code)}</strong>
                       </td>
                       <td>
                         <TypeBadge siteType={r.siteType} />
@@ -462,39 +464,26 @@ export function LogisticsPage() {
                       <td>{typeof r.longitude === 'number' ? r.longitude : '—'}</td>
                       <td>{typeof r.latitude === 'number' ? r.latitude : '—'}</td>
                       <td style={{ maxWidth: 260, verticalAlign: 'top' }}>
-                        <ExpandableTableText value={r.notes} modalTitle={`Notes — ${r.code}`} />
-                      </td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          className="btn btn-sm"
-                          onClick={() => setEditRow({ ...r })}
-                          disabled={attachSavingId === r.id}
-                        >
-                          Edit
-                        </button>{' '}
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-ghost"
-                          style={{ color: 'var(--color-danger, #b91c1c)' }}
-                          onClick={() => setDeleteRow(r)}
-                          disabled={attachSavingId === r.id}
-                        >
-                          Delete
-                        </button>
+                        <ExpandableTableText value={r.notes} modalTitle={`Notes — ${logisticsDisplayCode(r.code)}`} />
                       </td>
                       <td style={{ minWidth: 220, whiteSpace: 'normal', verticalAlign: 'top' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <label className="btn btn-xs">
-                            Add file...
-                            <input
-                              type="file"
-                              multiple
-                              style={{ display: 'none' }}
-                              onChange={(e) => handleAttachmentFiles(r.id, e)}
-                              disabled={attachSavingId === r.id || saving}
-                            />
-                          </label>
+                        <input
+                          id={`logistics-file-upload-${r.id}`}
+                          type="file"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleAttachmentFiles(r.id, e)}
+                          disabled={attachSavingId === r.id || saving}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-xs"
+                          onClick={() => document.getElementById(`logistics-file-upload-${r.id}`)?.click()}
+                          disabled={attachSavingId === r.id || saving}
+                        >
+                          Add file
+                        </button>
                           {attachSavingId === r.id ? (
                             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
                               Uploading...
@@ -539,6 +528,25 @@ export function LogisticsPage() {
                           ) : null}
                         </div>
                       </td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => setEditRow({ ...r })}
+                        disabled={attachSavingId === r.id}
+                      >
+                        Edit
+                      </button>{' '}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        style={{ color: 'var(--color-danger, #b91c1c)' }}
+                        onClick={() => setDeleteRow(r)}
+                        disabled={attachSavingId === r.id}
+                      >
+                        Delete
+                      </button>
+                    </td>
                     </tr>
                   ))
                 )}

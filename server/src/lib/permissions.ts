@@ -64,7 +64,7 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   GlobalSupplyLogistics: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyExpenses: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   Records: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
-  Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor'],
+  Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor', 'Inspector'],
   Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
   WorkLogs: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
   InternalManagement: ['Admin', 'QualityManager'],
@@ -80,6 +80,7 @@ const ALL_APP_ROLES_HUB = [
   'QualityManager',
   'Buyer',
   'Auditor',
+  'Inspector',
   'Supplier',
 ] as const;
 

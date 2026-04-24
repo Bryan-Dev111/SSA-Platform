@@ -35,15 +35,14 @@ import { GlobalVendorsIndex } from './pages/globalVendors/GlobalVendorsIndex';
 import { FarmersInformationPage } from './pages/globalVendors/FarmersInformationPage';
 import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
 import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
-import { ExpensesPage } from './pages/globalVendors/ExpensesPage';
 import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
 import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
-import { PurchaseOrdersPage } from './pages/globalVendors/PurchaseOrdersPage';
 import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
 import { LogisticsProfilePage } from './pages/globalVendors/LogisticsProfilePage';
 import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDashboardPage';
 import { GlobalFarmProfilePage } from './pages/globalVendors/FarmSectionMediaPage';
+import { GlobalSupplyInternalManagementPage } from './pages/globalVendors/GlobalSupplyInternalManagementPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -158,7 +157,7 @@ function App() {
                 path="purchase-orders"
                 element={
                   <ProtectedRoute path="/global-vendors/purchase-orders">
-                    <PurchaseOrdersPage />
+                    <Navigate to="/global-vendors/internal-management" replace />
                   </ProtectedRoute>
                 }
               />
@@ -190,7 +189,15 @@ function App() {
                 path="expenses"
                 element={
                   <ProtectedRoute path="/global-vendors/expenses">
-                    <ExpensesPage />
+                    <Navigate to="/global-vendors/internal-management" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="internal-management"
+                element={
+                  <ProtectedRoute path="/global-vendors/internal-management">
+                    <GlobalSupplyInternalManagementPage />
                   </ProtectedRoute>
                 }
               />

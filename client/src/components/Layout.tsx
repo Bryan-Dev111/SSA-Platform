@@ -64,15 +64,12 @@ const MENU_ITEMS: { path: string; label: string }[] = [
 const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
   { path: '/global-vendors/dashboard', label: 'Dashboard' },
   { path: '/global-vendors/farmers', label: 'Farm Information' },
-  { path: '/global-vendors/farm-profile', label: 'Farm Profile' },
   { path: '/global-vendors/approved', label: 'Approved Farms List' },
   { path: '/global-vendors/map', label: 'Farms Map' },
   { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
-  { path: '/global-vendors/purchase-orders', label: 'Purchase Orders' },
+  { path: '/global-vendors/internal-management', label: 'Internal Management' },
   { path: '/global-vendors/samples', label: 'Samples' },
   { path: '/global-vendors/logistics', label: 'Logistics' },
-  { path: '/global-vendors/logistics-profile', label: 'Logistics Profile' },
-  { path: '/global-vendors/expenses', label: 'Expenses' },
   { path: '/global-vendors/admin', label: 'Admin' },
 ];
 
@@ -409,7 +406,6 @@ export function Layout() {
               <MenuIcon />
             </button>
             <div className="app-header-brand" aria-label="Sentinel Supplier Assurance">
-              <span className="app-header-brand-mark" aria-hidden />
               <div className="app-header-brand-text">
                 <span className="app-header-brand-name">Sentinel</span>
                 <span className="app-header-brand-tagline">Supplier Assurance</span>

@@ -143,9 +143,10 @@ export function Shipments() {
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
   const isQM = user?.roleNames?.includes('QualityManager') ?? false;
+  const isInspector = user?.roleNames?.includes('Inspector') ?? false;
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
-  const canReview = isAdmin || isQE || isQM;
-  const canEditInspector = isAdmin || isQE || isQM;
+  const canReview = isAdmin || isQE || isQM || isInspector;
+  const canEditInspector = isAdmin || isQE || isQM || isInspector;
   const canCreateFinding = (user?.roleNames ?? []).some((r) =>
     ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r)
   );
