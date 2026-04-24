@@ -143,10 +143,9 @@ export function Shipments() {
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
   const isQM = user?.roleNames?.includes('QualityManager') ?? false;
-  const isInspector = user?.roleNames?.includes('Inspector') ?? false;
   const isSupplier = user?.roleNames?.includes('Supplier') ?? false;
-  const canReview = isAdmin || isQE || isQM || isInspector;
-  const canEditInspector = isAdmin || isQE || isQM || isInspector;
+  const canReviewByRole = isAdmin || isQE || isQM;
+  const canEditInspector = isAdmin || isQE || isQM;
   const canCreateFinding = (user?.roleNames ?? []).some((r) =>
     ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'].includes(r)
   );
@@ -159,6 +158,16 @@ export function Shipments() {
       user?.roleNames?.includes('Buyer'));
 
   const [inspectorDrafts, setInspectorDrafts] = useState<Record<string, string>>({});
+
+  const normalizePersonText = (value: string | null | undefined) => (value ?? '').trim().toLowerCase();
+  const currentUserName = normalizePersonText(user?.name ?? null);
+  const currentUserEmail = normalizePersonText(user?.email ?? null);
+  const canReviewShipment = (shipment: ShipmentRow) => {
+    if (canReviewByRole) return true;
+    const assigned = normalizePersonText(shipment.inspector);
+    if (!assigned) return false;
+    return assigned === currentUserName || assigned === currentUserEmail;
+  };
 
   const initializeInspectorDrafts = (list: ShipmentRow[]) => {
     const next: Record<string, string> = {};
@@ -808,7 +817,7 @@ export function Shipments() {
                       </td>
                       <td>{r.createdAt?.slice(0, 10) ?? '—'}</td>
                       <td>
-                        {canReview && r.status === 'WaitingInspection' ? (
+                        {canReviewShipment(r) && r.status === 'WaitingInspection' ? (
                           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             <button
                               type="button"

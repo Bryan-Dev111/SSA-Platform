@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
@@ -19,6 +19,7 @@ export function RelationshipTrustPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, EditableFields>>({});
+  const [countrySortDir, setCountrySortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     if (!token) return;
@@ -111,6 +112,13 @@ export function RelationshipTrustPage() {
     }
   };
 
+  const sortedFarms = useMemo(() => {
+    return [...farms].sort((a, b) => {
+      const cmp = (a.country ?? '').localeCompare(b.country ?? '', undefined, { sensitivity: 'base' });
+      return countrySortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [farms, countrySortDir]);
+
   if (loading && farms.length === 0) {
     return (
       <div className="page">
@@ -143,17 +151,6 @@ export function RelationshipTrustPage() {
       </header>
       <div className="card">
         <div className="card-body">
-          <p
-            style={{
-              marginTop: 0,
-              marginBottom: '0.75rem',
-              color: 'var(--color-text-muted)',
-              fontSize: 'var(--text-sm)',
-            }}
-          >
-            Track first contact, last visit, visit count, and overall relationship
-            status for each farm. Changes save per row.
-          </p>
         </div>
         <div className="table-wrap">
           <table className="table">
@@ -162,7 +159,13 @@ export function RelationshipTrustPage() {
                 <th>Farm ID</th>
                 <th>Farm name</th>
                 <th>Contact name</th>
-                <th>Country</th>
+                <th
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  title="Sort by country"
+                >
+                  Country {countrySortDir === 'asc' ? '↑' : '↓'}
+                </th>
                 <th>First contact</th>
                 <th>Last visit</th>
                 <th>Visit count</th>
@@ -179,7 +182,7 @@ export function RelationshipTrustPage() {
                   </td>
                 </tr>
               ) : (
-                farms.map((f) => {
+                sortedFarms.map((f) => {
                   const row = editing[f.id] ?? {
                     firstContactDate: null,
                     lastVisitDate: null,

@@ -1,7 +1,7 @@
 /**
  * Global Vendors — Farm Information: list farms, add via modal.
  */
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -70,6 +70,16 @@ export type FarmProfileImageRow = {
   url: string | null;
 };
 
+type CountryOption = {
+  id: string;
+  name: string;
+};
+
+type CropOption = {
+  id: string;
+  name: string;
+};
+
 function farmRowToExportRow(f: FarmRow): ExportRow {
   const mainHarvest =
     f.harvestStartMonth && f.harvestEndMonth
@@ -133,7 +143,8 @@ function farmRowToExportRow(f: FarmRow): ExportRow {
 }
 
 export function FarmersInformationPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = !!user?.roleNames?.includes('Admin');
   const toast = useToast();
   const [farms, setFarms] = useState<FarmRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +154,7 @@ export function FarmersInformationPage() {
   const [farmName, setFarmName] = useState('');
   const [farmerName, setFarmerName] = useState('');
   const [country, setCountry] = useState('');
+  const [mainCrop, setMainCrop] = useState('');
   const [city, setCity] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [edit, setEdit] = useState<Partial<FarmRow>>({});
@@ -153,6 +165,9 @@ export function FarmersInformationPage() {
   const [imageUploadBusy, setImageUploadBusy] = useState<'Profile' | 'Processing' | null>(null);
   const [deleteImageTarget, setDeleteImageTarget] = useState<FarmProfileImageRow | null>(null);
   const [deletingImage, setDeletingImage] = useState(false);
+  const [countrySortDir, setCountrySortDir] = useState<'asc' | 'desc'>('asc');
+  const [countryOptions, setCountryOptions] = useState<CountryOption[]>([]);
+  const [cropOptions, setCropOptions] = useState<CropOption[]>([]);
 
   const loadProfileImages = useCallback(async () => {
     if (!token || !editId) return;
@@ -181,8 +196,20 @@ export function FarmersInformationPage() {
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
     if (!opts?.silent) setLoading(true);
-    apiJson<FarmRow[]>('/farms', { token })
-      .then(setFarms)
+    Promise.all([
+      apiJson<FarmRow[]>('/farms', { token }),
+      apiJson<{ list: CountryOption[] }>('/global-supply-options/countries', { token }).catch(() => ({
+        list: [] as CountryOption[],
+      })),
+      apiJson<{ list: CropOption[] }>('/global-supply-options/crops', { token }).catch(() => ({
+        list: [] as CropOption[],
+      })),
+    ])
+      .then(([farmRows, countriesRes, cropsRes]) => {
+        setFarms(farmRows);
+        setCountryOptions(countriesRes.list);
+        setCropOptions(cropsRes.list);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load farms'))
       .finally(() => {
         if (!opts?.silent) setLoading(false);
@@ -199,6 +226,7 @@ export function FarmersInformationPage() {
     setFarmName('');
     setFarmerName('');
     setCountry('');
+    setMainCrop('');
     setCity('');
   };
 
@@ -210,7 +238,13 @@ export function FarmersInformationPage() {
       await apiJson<FarmRow>('/farms', {
         token,
         method: 'POST',
-        body: JSON.stringify({ farmName, farmerName, country, city: city || null }),
+        body: JSON.stringify({
+          farmName,
+          farmerName,
+          country,
+          mainCrop: mainCrop || null,
+          city: city || null,
+        }),
       });
       toast.success('Farm added');
       closeModal();
@@ -431,6 +465,15 @@ export function FarmersInformationPage() {
     }
   }, [farms, toast]);
 
+  const sortedFarms = useMemo(() => {
+    return [...farms].sort((a, b) => {
+      const av = (a.country ?? '').trim();
+      const bv = (b.country ?? '').trim();
+      const cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
+      return countrySortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [farms, countrySortDir]);
+
   if (loading && farms.length === 0) {
     return (
       <div className="page">
@@ -485,11 +528,17 @@ export function FarmersInformationPage() {
             <thead>
               <tr>
                 <th>Farm ID</th>
-                <th>City</th>
                 <th>Farm name</th>
                 <th>Contact name</th>
-                <th>Country</th>
+                <th
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  title="Sort by country"
+                >
+                  Country {countrySortDir === 'asc' ? '↑' : '↓'}
+                </th>
                 <th>Region</th>
+                <th>City</th>
                 <th>Farm category</th>
                 <th>Main crop</th>
                 <th>Elevation (m)</th>
@@ -522,8 +571,8 @@ export function FarmersInformationPage() {
                 <th>Longitude</th>
                 <th>Notes</th>
                 <th>Created</th>
-                <th>Edit</th>
-                <th>Delete</th>
+                {isAdmin ? <th>Edit</th> : null}
+                {isAdmin ? <th>Delete</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -534,24 +583,22 @@ export function FarmersInformationPage() {
                   </td>
                 </tr>
               ) : (
-                farms.map((f) => (
+                sortedFarms.map((f) => (
                   <tr key={f.id}>
                     <td>
                       <Link
                         to={`/global-vendors/farm-profile?farmId=${encodeURIComponent(f.id)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className="finding-code-link"
-                        title="Open Farm profile (new tab)"
+                        title="Open Farm profile"
                       >
                         <strong>{f.code}</strong>
                       </Link>
                     </td>
-                    <td>{f.city ?? '—'}</td>
                     <td>{f.farmName}</td>
                     <td>{f.farmerName}</td>
                     <td>{f.country}</td>
                     <td>{f.region ?? '—'}</td>
+                    <td>{f.city ?? '—'}</td>
                     <td>{f.farmCategory ?? '—'}</td>
                     <td>{f.mainCrop ?? '—'}</td>
                     <td>{typeof f.elevationMeters === 'number' ? f.elevationMeters : '—'}</td>
@@ -633,21 +680,25 @@ export function FarmersInformationPage() {
                         day: 'numeric',
                       })}
                     </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button type="button" className="btn btn-sm" onClick={() => openEdit(f)}>
-                        Edit
-                      </button>
-                    </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-ghost"
-                        style={{ color: 'var(--color-danger, #b91c1c)' }}
-                        onClick={() => setDeleteTarget(f)}
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {isAdmin ? (
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button type="button" className="btn btn-sm" onClick={() => openEdit(f)}>
+                          Edit
+                        </button>
+                      </td>
+                    ) : null}
+                    {isAdmin ? (
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          style={{ color: 'var(--color-danger, #b91c1c)' }}
+                          onClick={() => setDeleteTarget(f)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))
               )}
@@ -692,13 +743,19 @@ export function FarmersInformationPage() {
               </label>
               <label className="field">
                 <span className="field-label">Country</span>
-                <input
+                <select
                   className="input"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   required
-                  autoComplete="country-name"
-                />
+                >
+                  <option value="">Select country</option>
+                  {countryOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span className="field-label">City</span>
@@ -708,6 +765,21 @@ export function FarmersInformationPage() {
                   onChange={(e) => setCity(e.target.value)}
                   autoComplete="address-level2"
                 />
+              </label>
+              <label className="field">
+                <span className="field-label">Crop</span>
+                <select
+                  className="input"
+                  value={mainCrop}
+                  onChange={(e) => setMainCrop(e.target.value)}
+                >
+                  <option value="">Select crop</option>
+                  {cropOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="confirm-dialog-actions" style={{ marginTop: 8 }}>
                 <button type="button" className="btn btn-ghost" onClick={closeModal} disabled={saving}>
@@ -763,12 +835,19 @@ export function FarmersInformationPage() {
               </label>
               <label className="field">
                 <span className="field-label">Country</span>
-                <input
+                <select
                   className="input"
                   value={edit.country ?? ''}
                   onChange={(e) => updateEditField('country', e.target.value)}
                   required
-                />
+                >
+                  <option value="">Select country</option>
+                  {countryOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span className="field-label">City</span>
@@ -796,11 +875,18 @@ export function FarmersInformationPage() {
               </label>
               <label className="field">
                 <span className="field-label">Main crop</span>
-                <input
+                <select
                   className="input"
                   value={edit.mainCrop ?? ''}
                   onChange={(e) => updateEditField('mainCrop', e.target.value)}
-                />
+                >
+                  <option value="">Select crop</option>
+                  {cropOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span className="field-label">Elevation (meters)</span>
@@ -870,11 +956,18 @@ export function FarmersInformationPage() {
               </label>
               <label className="field">
                 <span className="field-label">Secondary crop</span>
-                <input
+                <select
                   className="input"
                   value={edit.secondaryCrop ?? ''}
                   onChange={(e) => updateEditField('secondaryCrop', e.target.value)}
-                />
+                >
+                  <option value="">Select crop</option>
+                  {cropOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span className="field-label">Secondary crop area (ha)</span>

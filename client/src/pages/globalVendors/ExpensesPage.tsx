@@ -12,7 +12,7 @@ const GLOBAL_VENDORS_PROJECT = 'Global Vendors';
 export function GlobalSupplyExpensesSection() {
   const { token, user } = useAuth();
   const toast = useToast();
-  const canCloseExpense = !!user?.roleNames?.includes('Admin');
+  const isAdmin = !!user?.roleNames?.includes('Admin');
   return (
     <AdminExpensesPanel
       token={token}
@@ -22,7 +22,8 @@ export function GlobalSupplyExpensesSection() {
       countryOptionsEndpoint="/global-supply-options/countries"
       hideProject
       openExpenseTracking
-      canCloseExpense={canCloseExpense}
+      canCloseExpense={isAdmin}
+      canEditExpense={isAdmin}
     />
   );
 }

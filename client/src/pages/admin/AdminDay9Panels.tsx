@@ -249,6 +249,7 @@ export function AdminExpensesPanel({
   hideProject = false,
   openExpenseTracking = false,
   canCloseExpense = false,
+  canEditExpense = true,
 }: {
   token: string | null;
   toast: ToastApi;
@@ -266,6 +267,8 @@ export function AdminExpensesPanel({
   openExpenseTracking?: boolean;
   /** Whether the current user may close expenses (typically Admin). */
   canCloseExpense?: boolean;
+  /** Whether the current user may add/edit expense rows and manage expense attachments. */
+  canEditExpense?: boolean;
 }) {
   const [list, setList] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -355,6 +358,13 @@ export function AdminExpensesPanel({
         ? displayedList
             .filter((r) => (r.status ?? 'Open') === 'Open')
             .reduce((sum, item) => sum + item.amount, 0)
+        : 0,
+    [displayedList, openExpenseTracking]
+  );
+  const openExpenseCount = useMemo(
+    () =>
+      openExpenseTracking
+        ? displayedList.filter((r) => (r.status ?? 'Open') === 'Open').length
         : 0,
     [displayedList, openExpenseTracking]
   );
@@ -669,6 +679,7 @@ export function AdminExpensesPanel({
             value={openExpenseTracking ? formatUsd(totalExpenses) : totalExpenses.toFixed(2)}
           />
           {openExpenseTracking ? <MetricCard title="Open Expenses" value={formatUsd(openExpenseTotal)} /> : null}
+          {openExpenseTracking ? <MetricCard title="Open Expense Count" value={openExpenseCount} /> : null}
         </div>
         <div
           style={{
@@ -684,12 +695,12 @@ export function AdminExpensesPanel({
               className="input"
               value={type}
               onChange={(e) => setType(e.target.value)}
-              disabled={!!fixedTypeProject}
+              disabled={!!fixedTypeProject || !canEditExpense}
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Description</label>
-            <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEditExpense} />
           </div>
           {!hideProject && (
             <div className="input-group" style={{ marginBottom: 0 }}>
@@ -698,13 +709,13 @@ export function AdminExpensesPanel({
                 className="input"
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
-                disabled={!!fixedTypeProject || !!fixedProject}
+                disabled={!!fixedTypeProject || !!fixedProject || !canEditExpense}
               />
             </div>
           )}
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Amount</label>
-            <input className="input" type="number" step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <input className="input" type="number" step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!canEditExpense} />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Expense date</label>
@@ -713,6 +724,7 @@ export function AdminExpensesPanel({
               type="date"
               value={expenseDate}
               onChange={(e) => setExpenseDate(e.target.value)}
+              disabled={!canEditExpense}
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
@@ -722,6 +734,7 @@ export function AdminExpensesPanel({
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
               placeholder="e.g. Card, Wire transfer"
+              disabled={!canEditExpense}
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
@@ -732,6 +745,7 @@ export function AdminExpensesPanel({
               onChange={(e) => setCountry(e.target.value)}
               list={countryOptionsEndpoint ? 'expense-country-options' : undefined}
               placeholder={countryOptionsEndpoint ? 'Select or type country' : undefined}
+              disabled={!canEditExpense}
             />
             {countryOptionsEndpoint ? (
               <datalist id="expense-country-options">
@@ -746,6 +760,7 @@ export function AdminExpensesPanel({
             <input
               className="input"
               type="file"
+              disabled={!canEditExpense}
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 setAddAttachmentFile(f);
@@ -765,7 +780,7 @@ export function AdminExpensesPanel({
             ) : null}
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-            <button type="button" className="btn btn-primary" onClick={add} disabled={busy}>
+            <button type="button" className="btn btn-primary" onClick={add} disabled={busy || !canEditExpense} title={!canEditExpense ? 'Only administrators can edit expenses' : undefined}>
               Add
             </button>
             <button type="button" className="btn btn-ghost" onClick={exportExcel}>
@@ -973,7 +988,7 @@ export function AdminExpensesPanel({
                               type="button"
                               className="btn btn-xs btn-ghost"
                               onClick={() => void removeAttachment(row.id)}
-                              disabled={attachmentBusyId === row.id || editId === row.id}
+                              disabled={attachmentBusyId === row.id || editId === row.id || !canEditExpense}
                             >
                               Remove file
                             </button>
@@ -986,7 +1001,7 @@ export function AdminExpensesPanel({
                           <input
                             type="file"
                             style={{ display: 'none' }}
-                            disabled={attachmentBusyId === row.id || editId === row.id}
+                            disabled={attachmentBusyId === row.id || editId === row.id || !canEditExpense}
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) void uploadRowAttachment(row.id, file);
@@ -1018,7 +1033,7 @@ export function AdminExpensesPanel({
                     <td>
                       {editId === row.id ? (
                         <>
-                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveEdit} disabled={busy}>
+                          <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveEdit} disabled={busy || !canEditExpense}>
                             Save
                           </button>
                           <button type="button" className="btn btn-ghost" onClick={() => setEditId(null)}>
@@ -1026,7 +1041,7 @@ export function AdminExpensesPanel({
                           </button>
                         </>
                       ) : (
-                        <button type="button" className="btn btn-ghost" onClick={() => startEdit(row)}>
+                        <button type="button" className="btn btn-ghost" onClick={() => startEdit(row)} disabled={!canEditExpense} title={!canEditExpense ? 'Only administrators can edit expenses' : undefined}>
                           Edit
                         </button>
                       )}
@@ -1400,7 +1415,7 @@ export function AdminBuyersSuppliersPanel({
           email: newUserEmail.trim(),
           password: newUserPassword,
           isEmployee: newUserIsEmployee === 'Yes',
-          isContractor: newUserIsEmployee === 'Contractor',
+          isContractor: globalSupplyUsersMode ? false : newUserIsEmployee === 'Contractor',
           ...(globalSupplyUsersMode
             ? {
                 employmentStatus: 'Active',
@@ -1631,7 +1646,7 @@ export function AdminBuyersSuppliersPanel({
                 >
                   <option value="No">No</option>
                   <option value="Yes">Yes</option>
-                  <option value="Contractor">Contractor</option>
+                  {!globalSupplyUsersMode && <option value="Contractor">Contractor</option>}
                 </select>
               </div>
               {!globalSupplyUsersMode && (

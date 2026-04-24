@@ -124,31 +124,60 @@ router.post(
     }
 
     const code = await getNextCode('SAMP');
+    const expenseCode = await getNextCode('EXP');
 
-    const created = await prisma.sample.create({
-      data: {
-        code,
-        farmId,
-        buyerName,
-        buyerEmail,
-        crop,
-        shipmentAddress,
-        notes,
-        sentDate,
-        notesFilePath,
-        notesFileName,
-        notesFileMime,
-      },
-      include: {
-        farm: {
-          select: {
-            id: true,
-            code: true,
-            farmName: true,
-            country: true,
+    let sampleCountry: string | null = null;
+    if (farmId) {
+      const farm = await prisma.farm.findUnique({
+        where: { id: farmId },
+        select: { country: true },
+      });
+      sampleCountry = farm?.country?.trim() || null;
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      const sample = await tx.sample.create({
+        data: {
+          code,
+          farmId,
+          buyerName,
+          buyerEmail,
+          crop,
+          shipmentAddress,
+          notes,
+          sentDate,
+          notesFilePath,
+          notesFileName,
+          notesFileMime,
+        },
+        include: {
+          farm: {
+            select: {
+              id: true,
+              code: true,
+              farmName: true,
+              country: true,
+            },
           },
         },
-      },
+      });
+
+      // Every sample shipment creates an "Open" Global Vendors expense placeholder.
+      await tx.expense.create({
+        data: {
+          code: expenseCode,
+          status: 'Open',
+          type: 'Sample',
+          description: code,
+          project: 'Global Vendors',
+          amount: 0,
+          expenseDate: sentDate ?? new Date(),
+          paymentMethod: '',
+          country: sampleCountry,
+        },
+      });
+
+      return sample;
     });
 
     res.status(201).json(created);

@@ -36,7 +36,7 @@ function formatDateLabel(date: string): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function HorizontalBarChart({
+function VerticalBarChart({
   rows,
   valueFormatter,
   positiveColor = 'var(--color-primary)',
@@ -47,41 +47,75 @@ function HorizontalBarChart({
   positiveColor?: string;
   negativeColor?: string;
 }) {
-  const maxAbs = Math.max(1, ...rows.map((row) => Math.abs(row.value)));
+  const topRows = rows.slice(0, 10);
+  const maxAbs = Math.max(1, ...topRows.map((row) => Math.abs(row.value)));
 
-  if (rows.length === 0) {
+  if (topRows.length === 0) {
     return <p className="table-empty">No data yet.</p>;
   }
 
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
-      {rows.map((row) => {
-        const width = `${Math.max(2, (Math.abs(row.value) / maxAbs) * 100)}%`;
-        const color = row.value >= 0 ? positiveColor : negativeColor;
-        return (
-          <div key={row.country} style={{ display: 'grid', gap: 4 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {row.country}
-              </strong>
-              <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-                {valueFormatter(row.value)}
-              </span>
-            </div>
-            <div
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gap: 8, minWidth: 520 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${topRows.length}, minmax(0, 1fr))`,
+            alignItems: 'end',
+            gap: 10,
+            height: 240,
+            padding: '0.75rem 0.5rem 0.25rem',
+            borderBottom: '1px solid var(--color-border)',
+            borderLeft: '1px solid var(--color-border)',
+          }}
+        >
+          {topRows.map((row) => {
+            const height = `${Math.max(6, (Math.abs(row.value) / maxAbs) * 160)}px`;
+            const color = row.value >= 0 ? positiveColor : negativeColor;
+            return (
+              <div key={row.country} style={{ display: 'grid', justifyItems: 'center', alignItems: 'end', gap: 6 }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                  {valueFormatter(row.value)}
+                </span>
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: 42,
+                    minWidth: 20,
+                    height,
+                    background: color,
+                    borderRadius: '6px 6px 0 0',
+                  }}
+                  title={`${row.country}: ${valueFormatter(row.value)}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${topRows.length}, minmax(0, 1fr))`,
+            gap: 10,
+            padding: '0 0.5rem',
+          }}
+        >
+          {topRows.map((row) => (
+            <span
+              key={`${row.country}-label`}
               style={{
-                width: '100%',
-                background: 'var(--color-bg-muted)',
-                borderRadius: 6,
-                overflow: 'hidden',
-                height: 12,
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-text-muted)',
+                textAlign: 'center',
+                lineHeight: 1.3,
+                wordBreak: 'break-word',
               }}
             >
-              <div style={{ width, height: '100%', background: color }} />
-            </div>
-          </div>
-        );
-      })}
+              {row.country}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -166,7 +200,7 @@ function ChartCard({
   children,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   children: ReactNode;
 }) {
   return (
@@ -175,7 +209,7 @@ function ChartCard({
         <h2 className="dashboard-section-heading" style={{ marginBottom: 4 }}>
           {title}
         </h2>
-        <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--color-text-muted)' }}>{subtitle}</p>
+        {subtitle ? <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--color-text-muted)' }}>{subtitle}</p> : null}
         {children}
       </div>
     </div>
@@ -183,7 +217,7 @@ function ChartCard({
 }
 
 export function GlobalSupplyDashboardPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -207,13 +241,20 @@ export function GlobalSupplyDashboardPage() {
   const cocoaKg = useMemo(() => (data?.kgCountryCocoa ?? []).slice(0, 12), [data]);
   const sampleByCountry = useMemo(() => (data?.sampleCountByCountry ?? []).slice(0, 24), [data]);
   const openPoTrend = data?.poCreationOverTimeOpen ?? [];
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+  const displayName = user?.name?.trim() || 'John T.';
 
   return (
     <div className="page page-dashboard">
       <header className="page-header">
         <h1 className="page-title">Dashboard</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          Global Supply analytics for purchase orders and expenses.
+          {greeting}, {displayName}. Here is what is happening with your farms today.
         </p>
       </header>
 
@@ -225,60 +266,64 @@ export function GlobalSupplyDashboardPage() {
         </div>
       ) : null}
 
-      <div className="dashboard-trio-grid dashboard-trio-grid--spaced">
-        <div className="card dashboard-section-card" style={{ gridColumn: '1 / -1' }}>
-          <div className="card-body">
-            <h2 className="dashboard-section-heading" style={{ marginBottom: 4 }}>
-              Bar graph: Sample count by country
-            </h2>
-            <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--color-text-muted)' }}>
-              Count of samples grouped by the linked farm&apos;s country (samples without a farm appear as{' '}
-              <strong>None</strong>).
-            </p>
-            <HorizontalBarChart rows={sampleByCountry} valueFormatter={formatSampleCount} />
-          </div>
-        </div>
-      </div>
-
-      <div className="dashboard-trio-grid dashboard-trio-grid--spaced">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: '0.9rem',
+          marginBottom: '0.9rem',
+        }}
+      >
         <ChartCard
-          title="Bar Graph: Revenue by Country"
-          subtitle="Closed purchase orders only."
+          title="Revenue by Country"
         >
-          <HorizontalBarChart rows={topRevenue} valueFormatter={formatMoney} />
+          <VerticalBarChart rows={topRevenue} valueFormatter={formatMoney} />
         </ChartCard>
 
         <ChartCard
-          title="Bar Graph: Profit by Country"
-          subtitle="Closed purchase orders and closed/final Global Supply expenses."
+          title="Profit by Country"
         >
-          <HorizontalBarChart rows={topProfit} valueFormatter={formatMoney} />
-        </ChartCard>
-
-        <ChartCard
-          title="Bar Graph: Kg Country (Coffee)"
-          subtitle="Closed purchase orders only."
-        >
-          <HorizontalBarChart rows={coffeeKg} valueFormatter={formatKg} />
+          <VerticalBarChart rows={topProfit} valueFormatter={formatMoney} />
         </ChartCard>
       </div>
 
-      <div className="dashboard-trio-grid dashboard-trio-grid--spaced">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: '0.9rem',
+          marginBottom: '0.9rem',
+        }}
+      >
         <ChartCard
-          title="Bar Graph: Kg Country (Cocoa)"
-          subtitle="Closed purchase orders only."
+          title="Weight by Country (Coffee)"
         >
-          <HorizontalBarChart rows={cocoaKg} valueFormatter={formatKg} />
+          <VerticalBarChart rows={coffeeKg} valueFormatter={formatKg} />
         </ChartCard>
 
-        <div className="card dashboard-section-card" style={{ gridColumn: 'span 2' }}>
+        <ChartCard
+          title="Weight by Country (Cocoa)"
+        >
+          <VerticalBarChart rows={cocoaKg} valueFormatter={formatKg} />
+        </ChartCard>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: '0.9rem',
+        }}
+      >
+        <ChartCard title="Sample Count by Country">
+          <VerticalBarChart rows={sampleByCountry} valueFormatter={formatSampleCount} />
+        </ChartCard>
+
+        <div className="card dashboard-section-card">
           <div className="card-body">
             <h2 className="dashboard-section-heading" style={{ marginBottom: 4 }}>
-              Continuous Line Graph: PO Creation over time
+              Purchase Order Creation
             </h2>
-            <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--color-text-muted)' }}>
-              Open purchase orders only.
-            </p>
             <ContinuousLineChart rows={openPoTrend} />
           </div>
         </div>

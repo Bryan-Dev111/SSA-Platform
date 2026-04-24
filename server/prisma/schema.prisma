@@ -886,6 +886,7 @@ model SupplyLogistics {
   siteType           String
   company            String
   country            String
+  city               String?
   registrationNumber String?
   latitude           Float?
   longitude          Float?
@@ -922,6 +923,19 @@ model GlobalSupplyCountry {
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model GlobalSupplyBuyer {
+  id           String   @id @default(cuid())
+  name         String
+  country      String?
+  city         String?
+  contactEmail String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([name])
 }
 
 model Sample {

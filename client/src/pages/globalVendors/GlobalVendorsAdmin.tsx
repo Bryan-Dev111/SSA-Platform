@@ -4,8 +4,9 @@ import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { AdminBuyersSuppliersPanel, AdminPermissionsPanel } from '../admin/AdminDay9Panels';
 import { GlobalSupplyMasterDataPanel } from './GlobalSupplyMasterDataPanel';
+import { GlobalSupplyBuyersPanel } from './GlobalSupplyBuyersPanel';
 
-type Tab = 'users' | 'permissions' | 'crops' | 'countries';
+type Tab = 'users' | 'buyers' | 'permissions' | 'crops' | 'countries';
 
 interface GlobalSupplyStats {
   employees: number;
@@ -59,6 +60,7 @@ export function GlobalVendorsAdmin() {
         {(
           [
             ['users', 'Users'],
+            ['buyers', 'Buyers'],
             ['permissions', 'Permissions'],
             ['crops', 'Crops'],
             ['countries', 'Countries'],
@@ -122,6 +124,8 @@ export function GlobalVendorsAdmin() {
       {tab === 'permissions' && (
         <AdminPermissionsPanel token={token} toast={toast} scope="globalVendors" />
       )}
+
+      {tab === 'buyers' && <GlobalSupplyBuyersPanel token={token} toast={toast} />}
 
       {tab === 'crops' && (
         <GlobalSupplyMasterDataPanel

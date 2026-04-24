@@ -6,7 +6,7 @@ import multer from 'multer';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess } from '../middleware/rbac';
+import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import { createRecordDownloadSignedUrl, uploadRecordToStorage } from '../lib/supabaseStorage';
@@ -24,6 +24,7 @@ const selectFields = {
   siteType: true,
   company: true,
   country: true,
+  city: true,
   registrationNumber: true,
   latitude: true,
   longitude: true,
@@ -76,6 +77,7 @@ router.post(
     const siteType = typeof req.body?.siteType === 'string' ? req.body.siteType.trim() : '';
     const company = typeof req.body?.company === 'string' ? req.body.company.trim() : '';
     const country = typeof req.body?.country === 'string' ? req.body.country.trim() : '';
+    const city = typeof req.body?.city === 'string' ? req.body.city.trim() || null : null;
     const registrationNumber =
       typeof req.body?.registrationNumber === 'string'
         ? req.body.registrationNumber.trim() || null
@@ -121,6 +123,7 @@ router.post(
         siteType,
         company,
         country,
+        city,
         registrationNumber,
         latitude,
         longitude,
@@ -135,6 +138,7 @@ router.post(
 router.patch(
   '/:id',
   requirePageAccess('GlobalSupplyLogistics'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const client = ensureSupplyLogisticsClient();
     const id = req.params.id;
@@ -154,6 +158,11 @@ router.patch(
     }
     if (typeof body.country === 'string' && body.country.trim()) {
       data.country = body.country.trim();
+    }
+    if (typeof body.city === 'string') {
+      (data as any).city = body.city.trim() || null;
+    } else if (body.city === null) {
+      (data as any).city = null;
     }
     if (typeof body.registrationNumber === 'string') {
       data.registrationNumber = body.registrationNumber.trim() || null;
@@ -212,6 +221,7 @@ router.patch(
 router.delete(
   '/:id',
   requirePageAccess('GlobalSupplyLogistics'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const client = ensureSupplyLogisticsClient();
     const id = req.params.id;

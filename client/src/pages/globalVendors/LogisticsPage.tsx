@@ -29,6 +29,7 @@ export interface LogisticsRow {
   siteType: string;
   company: string;
   country: string;
+  city: string | null;
   registrationNumber: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -72,17 +73,20 @@ function TypeBadge({ siteType }: { siteType: string }) {
 }
 
 export function LogisticsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = !!user?.roleNames?.includes('Admin');
   const toast = useToast();
   const [rows, setRows] = useState<LogisticsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attachSavingId, setAttachSavingId] = useState<string | null>(null);
+  const [countrySortDir, setCountrySortDir] = useState<'asc' | 'desc'>('asc');
 
   const [siteType, setSiteType] = useState<string>('Port');
   const [company, setCompany] = useState('');
   const [country, setCountry] = useState('');
+  const [city, setCity] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [longitude, setLongitude] = useState('');
   const [latitude, setLatitude] = useState('');
@@ -115,6 +119,7 @@ export function LogisticsPage() {
     setSiteType('Port');
     setCompany('');
     setCountry('');
+    setCity('');
     setRegistrationNumber('');
     setLongitude('');
     setLatitude('');
@@ -133,6 +138,7 @@ export function LogisticsPage() {
           siteType,
           company: company.trim(),
           country: country.trim(),
+          city: city.trim() || null,
           registrationNumber: registrationNumber.trim() || null,
           longitude: longitude.trim() === '' ? null : Number(longitude),
           latitude: latitude.trim() === '' ? null : Number(latitude),
@@ -161,6 +167,7 @@ export function LogisticsPage() {
           siteType: editRow.siteType,
           company: editRow.company,
           country: editRow.country,
+          city: editRow.city,
           registrationNumber: editRow.registrationNumber,
           longitude: editRow.longitude,
           latitude: editRow.latitude,
@@ -290,17 +297,12 @@ export function LogisticsPage() {
     }
   };
 
-  const legend = useMemo(
-    () => (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginTop: 8 }}>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Types:</span>
-        {LOGISTICS_SITE_TYPES.map((t) => (
-          <TypeBadge key={t.value} siteType={t.value} />
-        ))}
-      </div>
-    ),
-    []
-  );
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const cmp = (a.country ?? '').localeCompare(b.country ?? '', undefined, { sensitivity: 'base' });
+      return countrySortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [rows, countrySortDir]);
 
   if (loading && rows.length === 0) {
     return (
@@ -325,8 +327,6 @@ export function LogisticsPage() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Add logistics site</h2>
-          {legend}
           <form onSubmit={submitAdd} className="stack" style={{ gap: 12, marginTop: 16 }}>
             <div
               style={{
@@ -364,6 +364,15 @@ export function LogisticsPage() {
                   onChange={(e) => setCountry(e.target.value)}
                   required
                   autoComplete="country-name"
+                />
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span className="field-label">City</span>
+                <input
+                  className="input"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  autoComplete="address-level2"
                 />
               </label>
               <label className="field" style={{ marginBottom: 0 }}>
@@ -423,24 +432,31 @@ export function LogisticsPage() {
                   <th>Code</th>
                   <th>Type</th>
                   <th>Company</th>
-                  <th>Country</th>
+                  <th
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                    title="Sort by country"
+                  >
+                    Country {countrySortDir === 'asc' ? '↑' : '↓'}
+                  </th>
+                  <th>City</th>
                   <th>Registration #</th>
                   <th>Longitude</th>
                   <th>Latitude</th>
                   <th>Notes</th>
                   <th style={{ minWidth: 220 }}>Attach files</th>
-                  <th style={{ width: 170 }}>Edit/Delete</th>
+                  {isAdmin ? <th style={{ width: 170 }}>Edit/Delete</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="table-empty">
+                    <td colSpan={11} className="table-empty">
                       No logistics sites yet. Use the form above to add one.
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
+                  sortedRows.map((r) => (
                     <tr key={r.id}>
                       <td>
                         <strong>{logisticsDisplayCode(r.code)}</strong>
@@ -451,15 +467,14 @@ export function LogisticsPage() {
                       <td>
                         <Link
                           to={`/global-vendors/logistics-profile?logisticsId=${encodeURIComponent(r.id)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="finding-code-link"
-                          title="Open Logistics profile (new tab)"
+                          title="Open Logistics profile"
                         >
                           {r.company}
                         </Link>
                       </td>
                       <td>{r.country}</td>
+                      <td>{r.city?.trim() ? r.city : '—'}</td>
                       <td>{r.registrationNumber?.trim() ? r.registrationNumber : '—'}</td>
                       <td>{typeof r.longitude === 'number' ? r.longitude : '—'}</td>
                       <td>{typeof r.latitude === 'number' ? r.latitude : '—'}</td>
@@ -528,25 +543,27 @@ export function LogisticsPage() {
                           ) : null}
                         </div>
                       </td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={() => setEditRow({ ...r })}
-                        disabled={attachSavingId === r.id}
-                      >
-                        Edit
-                      </button>{' '}
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-ghost"
-                        style={{ color: 'var(--color-danger, #b91c1c)' }}
-                        onClick={() => setDeleteRow(r)}
-                        disabled={attachSavingId === r.id}
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {isAdmin ? (
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setEditRow({ ...r })}
+                          disabled={attachSavingId === r.id}
+                        >
+                          Edit
+                        </button>{' '}
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          style={{ color: 'var(--color-danger, #b91c1c)' }}
+                          onClick={() => setDeleteRow(r)}
+                          disabled={attachSavingId === r.id}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    ) : null}
                     </tr>
                   ))
                 )}
@@ -600,6 +617,14 @@ export function LogisticsPage() {
                   value={editRow.country}
                   onChange={(e) => setEditRow((p) => (p ? { ...p, country: e.target.value } : null))}
                   required
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">City</span>
+                <input
+                  className="input"
+                  value={editRow.city ?? ''}
+                  onChange={(e) => setEditRow((p) => (p ? { ...p, city: e.target.value || null } : null))}
                 />
               </label>
               <label className="field">

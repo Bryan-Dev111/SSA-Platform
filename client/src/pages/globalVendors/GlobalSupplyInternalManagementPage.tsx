@@ -16,22 +16,63 @@ type GlobalInternalTab = 'purchaseOrders' | 'documents' | 'calendar' | 'expenses
 
 type PurchaseOrderStatusRow = {
   status: string | null;
+  quantityKg: number | null;
+  pricePerKg: number | null;
+  totalAmount: number | null;
+};
+
+type ExpenseStatusRow = {
+  status?: string | null;
+  amount: number;
+  project: string;
 };
 
 export function GlobalSupplyInternalManagementPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const toast = useToast();
+  const isAdmin = !!user?.roleNames?.includes('Admin');
   const [tab, setTab] = useState<GlobalInternalTab>('purchaseOrders');
   const [openPoCount, setOpenPoCount] = useState<number | null>(null);
+  const [openPoValue, setOpenPoValue] = useState<number | null>(null);
+  const [hasOpenExpenseMissingAmount, setHasOpenExpenseMissingAmount] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     apiJson<PurchaseOrderStatusRow[]>('/purchase-orders', { token })
       .then((rows) => {
-        const openCount = rows.filter((r) => (r.status ?? 'Open').trim().toLowerCase() !== 'closed').length;
+        const openRows = rows.filter(
+          (r) => (r.status ?? 'Open').trim().toLowerCase() !== 'closed'
+        );
+        const openCount = openRows.length;
+        const openValue = openRows.reduce((sum, row) => {
+          const computedTotal =
+            row.totalAmount ??
+            (row.quantityKg != null && row.pricePerKg != null
+              ? row.quantityKg * row.pricePerKg
+              : 0);
+          return sum + computedTotal;
+        }, 0);
         setOpenPoCount(openCount);
+        setOpenPoValue(openValue);
       })
-      .catch(() => setOpenPoCount(null));
+      .catch(() => {
+        setOpenPoCount(null);
+        setOpenPoValue(null);
+      });
+  }, [token, tab]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiJson<{ list: ExpenseStatusRow[] }>('/expenses', { token })
+      .then((res) => {
+        const hasMissing = res.list.some((row) => {
+          if (row.project !== 'Global Vendors') return false;
+          const status = (row.status ?? 'Open').trim().toLowerCase();
+          return status !== 'closed' && (!Number.isFinite(row.amount) || row.amount <= 0);
+        });
+        setHasOpenExpenseMissingAmount(hasMissing);
+      })
+      .catch(() => setHasOpenExpenseMissingAmount(false));
   }, [token]);
 
   const pageDescription = useMemo(() => {
@@ -66,24 +107,81 @@ export function GlobalSupplyInternalManagementPage() {
             onClick={() => setTab(id)}
           >
             {label}
+            {id === 'expenses' && hasOpenExpenseMissingAmount ? (
+              <span
+                aria-label="Open expenses missing amount"
+                title="Open expense line has no amount entered"
+                style={{
+                  marginLeft: 8,
+                  display: 'inline-flex',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '8px solid transparent',
+                  borderRight: '8px solid transparent',
+                  borderBottom: '14px solid #dc2626',
+                  position: 'relative',
+                  top: -1,
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    left: -2,
+                    top: 2,
+                    color: '#ffffff',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                  }}
+                >
+                  !
+                </span>
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
 
       {tab === 'purchaseOrders' && (
         <>
-          <div style={{ marginBottom: '1rem', width: '100%', maxWidth: '100%', minWidth: 0 }}>
+          <div
+            className="dashboard-metric-grid"
+            style={{
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              marginBottom: '1rem',
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+            }}
+          >
             <MetricCard
               title="Open PO's"
               value={openPoCount == null ? '—' : openPoCount}
               subtitle="Purchase orders not closed"
+            />
+            <MetricCard
+              title="Open PO Value"
+              value={
+                openPoValue == null
+                  ? '—'
+                  : new Intl.NumberFormat(undefined, {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(openPoValue)
+              }
+              subtitle="Total value of open purchase orders"
             />
           </div>
           <PurchaseOrdersPage />
         </>
       )}
 
-      {tab === 'documents' && <GlobalSupplyDocumentsPanel token={token} toast={toast} />}
+      {tab === 'documents' && (
+        <GlobalSupplyDocumentsPanel token={token} toast={toast} canDelete={isAdmin} />
+      )}
 
       {tab === 'calendar' && <InternalManagementCalendarView token={token} />}
 

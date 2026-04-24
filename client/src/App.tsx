@@ -43,6 +43,7 @@ import { LogisticsProfilePage } from './pages/globalVendors/LogisticsProfilePage
 import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDashboardPage';
 import { GlobalFarmProfilePage } from './pages/globalVendors/FarmSectionMediaPage';
 import { GlobalSupplyInternalManagementPage } from './pages/globalVendors/GlobalSupplyInternalManagementPage';
+import { BuyerRelationshipsPage } from './pages/globalVendors/BuyerRelationshipsPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -150,6 +151,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/relationship">
                     <RelationshipTrustPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="buyer-relationships"
+                element={
+                  <ProtectedRoute path="/global-vendors/buyer-relationships">
+                    <BuyerRelationshipsPage />
                   </ProtectedRoute>
                 }
               />

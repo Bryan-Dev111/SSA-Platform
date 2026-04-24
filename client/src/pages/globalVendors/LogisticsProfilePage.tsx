@@ -3,7 +3,7 @@
  * Opens from Logistics table to show one company's details, content, and images.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
@@ -253,10 +253,6 @@ export function LogisticsProfilePage() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Logistics profile</h1>
-        <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          Choose a logistics company from <Link to="/global-vendors/logistics">Logistics</Link>, then manage profile
-          content and images.
-        </p>
       </header>
 
       <div className="card" style={{ marginBottom: 12 }}>

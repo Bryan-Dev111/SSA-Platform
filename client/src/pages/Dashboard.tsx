@@ -264,16 +264,16 @@ export function Dashboard() {
         <MetricCard
           title="Shipments"
           value={metrics.shipmentRequests}
-          subtitle={`${metrics.shipmentLate ?? 0} Late PO · ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
+          subtitle={`${metrics.shipmentLate ?? 0} Late PO`}
           customAlert={
-            (metrics.shipmentLate ?? 0) > 0 || (metrics.shipmentOverdue ?? 0) > 0 ? (
+            (metrics.shipmentLate ?? 0) > 0 ? (
               <ShipmentMetricAlertIcon
                 shortDeliveries={metrics.shipmentLate ?? 0}
                 shortDetails={metrics.shipmentShortDeliveryDetails ?? []}
-                overdueInspectionCount={metrics.shipmentOverdue ?? 0}
-                overdueInspectionDetails={metrics.shipmentOverdueInspectionDetails ?? []}
+                overdueInspectionCount={0}
+                overdueInspectionDetails={[]}
                 includeOverdueInspectionInTooltip={false}
-                summaryFallbackWhenNoTooltipLines={`${metrics.shipmentLate ?? 0} Late PO · ${metrics.shipmentOverdue ?? 0} Overdue Inspection`}
+                summaryFallbackWhenNoTooltipLines={`${metrics.shipmentLate ?? 0} Late PO`}
               />
             ) : undefined
           }

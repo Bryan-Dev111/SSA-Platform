@@ -33,6 +33,7 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   GlobalSupplyApproved: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyMap: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyRelationship: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyBuyerRelationships: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyPurchaseOrders: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplySamples: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyLogistics: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],

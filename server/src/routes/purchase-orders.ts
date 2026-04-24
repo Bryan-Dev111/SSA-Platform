@@ -86,10 +86,6 @@ router.post(
       pricePerKgRaw === null || pricePerKgRaw === undefined || pricePerKgRaw === ''
         ? null
         : Number(pricePerKgRaw);
-    const status =
-      typeof req.body?.status === 'string'
-        ? req.body.status.trim() || null
-        : null;
     const notes =
       typeof req.body?.notes === 'string'
         ? req.body.notes.trim() || null
@@ -154,7 +150,7 @@ router.post(
         quantityKg,
         pricePerKg,
         totalAmount,
-        status,
+        status: 'Open',
         notes,
         estimatedFarmerDeliveryDate,
         estimatedArrivalAtBuyer,
@@ -254,10 +250,6 @@ router.patch(
       }
     }
 
-    const status =
-      typeof body.status === 'string'
-        ? body.status.trim() || null
-        : existing.status ?? null;
 
     const notes =
       typeof body.notes === 'string'
@@ -301,7 +293,6 @@ router.patch(
         quantityKg,
         pricePerKg,
         totalAmount,
-        status,
         notes,
         estimatedFarmerDeliveryDate,
         estimatedArrivalAtBuyer,

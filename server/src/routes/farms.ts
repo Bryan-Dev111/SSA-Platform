@@ -5,7 +5,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess, requirePageAccessAny } from '../middleware/rbac';
+import { requirePageAccess, requirePageAccessAny, requireRole } from '../middleware/rbac';
 import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
 import {
@@ -429,6 +429,7 @@ router.post(
 router.patch(
   '/:id',
   requirePageAccess('GlobalSupplyFarmers'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id;
     const {
@@ -646,6 +647,7 @@ router.patch(
 router.delete(
   '/:id',
   requirePageAccess('GlobalSupplyFarmers'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id;
     const existing = await prisma.farm.findUnique({ where: { id }, select: { id: true } });

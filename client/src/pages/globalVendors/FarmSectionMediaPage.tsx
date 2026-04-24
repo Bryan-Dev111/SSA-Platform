@@ -12,6 +12,40 @@ import type { FarmProfileImageRow, FarmRow } from './FarmersInformationPage';
 
 type Section = 'Profile' | 'Processing';
 
+type ProcessingBlock = {
+  id: string;
+  text: string;
+  imageIds: string[];
+};
+
+function newProcessingBlock(): ProcessingBlock {
+  return {
+    id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    text: '',
+    imageIds: [],
+  };
+}
+
+function parseProcessingBlocks(raw: string): ProcessingBlock[] {
+  const text = raw.trim();
+  if (!text) return [newProcessingBlock()];
+  try {
+    const parsed = JSON.parse(text) as { blocks?: Array<{ id?: string; text?: string; imageIds?: string[] }> };
+    if (!Array.isArray(parsed.blocks) || parsed.blocks.length === 0) {
+      return [newProcessingBlock()];
+    }
+    const blocks = parsed.blocks.map((b, idx) => ({
+      id: typeof b.id === 'string' && b.id.trim() ? b.id : `block-${idx + 1}`,
+      text: typeof b.text === 'string' ? b.text : '',
+      imageIds: Array.isArray(b.imageIds) ? b.imageIds.filter((id): id is string => typeof id === 'string') : [],
+    }));
+    return blocks.length > 0 ? blocks : [newProcessingBlock()];
+  } catch {
+    // Backward compatibility: existing plain text becomes the first block's text.
+    return [{ ...newProcessingBlock(), text: raw }];
+  }
+}
+
 export function GlobalFarmProfilePage() {
   const { token } = useAuth();
   const toast = useToast();
@@ -27,6 +61,7 @@ export function GlobalFarmProfilePage() {
   const [deleteTarget, setDeleteTarget] = useState<FarmProfileImageRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [content, setContent] = useState('');
+  const [processingBlocks, setProcessingBlocks] = useState<ProcessingBlock[]>([newProcessingBlock()]);
   const [contentLoading, setContentLoading] = useState(false);
   const [savingContent, setSavingContent] = useState(false);
 
@@ -87,6 +122,7 @@ export function GlobalFarmProfilePage() {
   useEffect(() => {
     if (!token || !farmId) {
       setContent('');
+      setProcessingBlocks([newProcessingBlock()]);
       return;
     }
     let cancelled = false;
@@ -95,9 +131,20 @@ export function GlobalFarmProfilePage() {
       try {
         const q = section === 'Profile' ? '?section=Profile' : '?section=Processing';
         const r = await apiJson<{ body: string }>(`/farms/${farmId}/profile-content${q}`, { token });
-        if (!cancelled) setContent(r.body || '');
+        if (!cancelled) {
+          const body = r.body || '';
+          setContent(body);
+          if (section === 'Processing') {
+            setProcessingBlocks(parseProcessingBlocks(body));
+          }
+        }
       } catch {
-        if (!cancelled) setContent('');
+        if (!cancelled) {
+          setContent('');
+          if (section === 'Processing') {
+            setProcessingBlocks([newProcessingBlock()]);
+          }
+        }
       } finally {
         if (!cancelled) setContentLoading(false);
       }
@@ -118,10 +165,14 @@ export function GlobalFarmProfilePage() {
     if (!token || !farmId || savingContent) return;
     setSavingContent(true);
     try {
+      const bodyToSave =
+        section === 'Processing'
+          ? JSON.stringify({ blocks: processingBlocks.map((b) => ({ id: b.id, text: b.text, imageIds: b.imageIds })) })
+          : content;
       await apiJson(`/farms/${farmId}/profile-content`, {
         token,
         method: 'PATCH',
-        body: JSON.stringify({ section, body: content }),
+        body: JSON.stringify({ section, body: bodyToSave }),
       });
       toast.success(section === 'Profile' ? 'Farm profile text saved' : 'Processing & quality text saved');
     } catch (err) {
@@ -140,12 +191,13 @@ export function GlobalFarmProfilePage() {
     }
   };
 
-  const uploadFiles = async (files: FileList | File[]) => {
+  const uploadFiles = async (files: FileList | File[], blockId?: string) => {
     if (!token || !farmId) return;
     const arr = Array.from(files);
     if (arr.length === 0) return;
     setUploadBusy(true);
     try {
+      const uploadedIds: string[] = [];
       for (const file of arr) {
         const form = new FormData();
         form.append('file', file);
@@ -155,9 +207,29 @@ export function GlobalFarmProfilePage() {
           const text = await res.text();
           throw new Error(text || `HTTP ${res.status}`);
         }
+        if (section === 'Processing' && blockId) {
+          try {
+            const json = (await res.json()) as { image?: { id?: string } };
+            if (json.image?.id) uploadedIds.push(json.image.id);
+          } catch {
+            // ignore parse issues, gallery still reloads
+          }
+        }
       }
       toast.success(arr.length === 1 ? 'Photo added' : `${arr.length} photos added`);
       await loadImages();
+      if (section === 'Processing' && blockId && uploadedIds.length > 0) {
+        setProcessingBlocks((prev) =>
+          prev.map((block) =>
+            block.id === blockId
+              ? {
+                  ...block,
+                  imageIds: [...new Set([...block.imageIds, ...uploadedIds])],
+                }
+              : block
+          )
+        );
+      }
     } catch (err) {
       let msg = 'Could not upload photo';
       if (err instanceof Error) {
@@ -189,6 +261,14 @@ export function GlobalFarmProfilePage() {
       toast.success('Photo removed');
       setDeleteTarget(null);
       await loadImages();
+      if (section === 'Processing') {
+        setProcessingBlocks((prev) =>
+          prev.map((block) => ({
+            ...block,
+            imageIds: block.imageIds.filter((id) => id !== deleteTarget.id),
+          }))
+        );
+      }
     } catch (err) {
       let msg = 'Could not remove photo';
       if (err instanceof Error) {
@@ -418,21 +498,172 @@ export function GlobalFarmProfilePage() {
             </div>
 
             <label className="field" style={{ display: 'block', marginBottom: 12 }}>
-              <span className="field-label">
-                {section === 'Profile' ? 'Farm profile text' : 'Processing & quality text'}
-              </span>
-              <textarea
-                className="input"
-                rows={4}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={
-                  section === 'Profile'
-                    ? 'Add profile narrative for this farm...'
-                    : 'Add processing and quality narrative for this farm...'
-                }
-                disabled={contentLoading}
-              />
+              {section === 'Profile' ? (
+                <>
+                  <span className="field-label">Farm profile text</span>
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="Add profile narrative for this farm..."
+                    disabled={contentLoading}
+                  />
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span className="field-label" style={{ marginBottom: 0 }}>
+                      Processing &amp; quality blocks
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() =>
+                        setProcessingBlocks((prev) => [...prev, newProcessingBlock()])
+                      }
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {processingBlocks.map((block, idx) => (
+                      <div
+                        key={block.id}
+                        style={{
+                          border: '1px solid var(--color-border)',
+                          borderRadius: 8,
+                          padding: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: 8,
+                          }}
+                        >
+                          <strong>Block {idx + 1}</strong>
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-ghost"
+                            onClick={() =>
+                              setProcessingBlocks((prev) =>
+                                prev.length <= 1
+                                  ? [{ ...prev[0], text: '', imageIds: [] }]
+                                  : prev.filter((b) => b.id !== block.id)
+                              )
+                            }
+                          >
+                            Remove block
+                          </button>
+                        </div>
+                        <textarea
+                          className="input"
+                          rows={3}
+                          value={block.text}
+                          onChange={(e) =>
+                            setProcessingBlocks((prev) =>
+                              prev.map((b) =>
+                                b.id === block.id ? { ...b, text: e.target.value } : b
+                              )
+                            )
+                          }
+                          placeholder="Add processing and quality narrative for this block..."
+                          disabled={contentLoading}
+                        />
+                        <div style={{ marginTop: 8 }}>
+                          <input
+                            id={`processing-block-upload-${block.id}`}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const list = e.target.files;
+                              if (list?.length) void uploadFiles(list, block.id);
+                              e.target.value = '';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-ghost"
+                            disabled={uploadBusy}
+                            onClick={() =>
+                              document
+                                .getElementById(`processing-block-upload-${block.id}`)
+                                ?.click()
+                            }
+                          >
+                            Add photo to block
+                          </button>
+                        </div>
+                        {block.imageIds.length > 0 ? (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: 8,
+                            }}
+                          >
+                            {block.imageIds.map((imageId) => {
+                              const image = images.find((img) => img.id === imageId);
+                              if (!image) return null;
+                              return (
+                                <div
+                                  key={image.id}
+                                  style={{ width: 90, display: 'flex', flexDirection: 'column', gap: 4 }}
+                                >
+                                  {image.url ? (
+                                    <img
+                                      src={image.url}
+                                      alt={image.fileName || 'Block image'}
+                                      style={{
+                                        width: '100%',
+                                        height: 70,
+                                        objectFit: 'cover',
+                                        borderRadius: 6,
+                                        border: '1px solid var(--color-border)',
+                                      }}
+                                    />
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-ghost"
+                                    onClick={() =>
+                                      setProcessingBlocks((prev) =>
+                                        prev.map((b) =>
+                                          b.id === block.id
+                                            ? {
+                                                ...b,
+                                                imageIds: b.imageIds.filter((id) => id !== image.id),
+                                              }
+                                            : b
+                                        )
+                                      )
+                                    }
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </label>
             <button
               type="button"

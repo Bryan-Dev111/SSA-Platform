@@ -42,12 +42,23 @@ type SampleRow = {
 type EditDraft = {
   id: string;
   farmId: string;
+  country: string;
   buyerName: string;
   buyerEmail: string;
   crop: string;
   shipmentAddress: string;
   notes: string;
   sentDate: string;
+};
+
+type CropOption = {
+  id: string;
+  name: string;
+};
+
+type CountryOption = {
+  id: string;
+  name: string;
 };
 
 type SampleSortKey =
@@ -100,12 +111,15 @@ export function SamplesPage() {
   const toast = useToast();
   const [samples, setSamples] = useState<SampleRow[]>([]);
   const [farms, setFarms] = useState<FarmRow[]>([]);
+  const [cropOptions, setCropOptions] = useState<CropOption[]>([]);
+  const [countryOptions, setCountryOptions] = useState<CountryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [farmId, setFarmId] = useState<string>('');
+  const [country, setCountry] = useState('');
   const [buyerName, setBuyerName] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [crop, setCrop] = useState('');
@@ -179,10 +193,18 @@ export function SamplesPage() {
     Promise.all([
       apiJson<SampleRow[]>('/samples', { token }),
       apiJson<FarmRow[]>('/farms', { token }),
+      apiJson<{ list: CropOption[] }>('/global-supply-options/crops', { token }).catch(
+        () => ({ list: [] as CropOption[] })
+      ),
+      apiJson<{ list: CountryOption[] }>('/global-supply-options/countries', { token }).catch(
+        () => ({ list: [] as CountryOption[] })
+      ),
     ])
-      .then(([samplesRes, farmsRes]) => {
+      .then(([samplesRes, farmsRes, cropsRes, countriesRes]) => {
         setSamples(samplesRes);
         setFarms(farmsRes);
+        setCropOptions(cropsRes.list);
+        setCountryOptions(countriesRes.list);
       })
       .catch((e) =>
         setError(e instanceof Error ? e.message : 'Failed to load samples')
@@ -200,6 +222,7 @@ export function SamplesPage() {
   const closeModal = () => {
     setModalOpen(false);
     setFarmId('');
+    setCountry('');
     setBuyerName('');
     setBuyerEmail('');
     setCrop('');
@@ -213,6 +236,7 @@ export function SamplesPage() {
     setEditDraft({
       id: s.id,
       farmId: s.farmId ?? '',
+      country: s.farm?.country ?? '',
       buyerName: s.buyerName,
       buyerEmail: s.buyerEmail ?? '',
       crop: s.crop ?? '',
@@ -358,6 +382,16 @@ export function SamplesPage() {
   const onSortColumn = (columnKey: string) => {
     setSort((prev) => toggleSort(prev, columnKey as SampleSortKey));
   };
+
+  const addFarmOptions = useMemo(() => {
+    if (!country) return farms;
+    return farms.filter((f) => (f.country ?? '').trim() === country);
+  }, [farms, country]);
+
+  const editFarmOptions = useMemo(() => {
+    if (!editDraft?.country) return farms;
+    return farms.filter((f) => (f.country ?? '').trim() === editDraft.country);
+  }, [farms, editDraft?.country]);
 
   if (loading && samples.length === 0) {
     return (
@@ -608,14 +642,44 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
+                <span className="field-label">Country</span>
+                <select
+                  className="input"
+                  value={country}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setCountry(next);
+                    if (!next) return;
+                    const selectedFarm = farms.find((f) => f.id === farmId);
+                    if (selectedFarm && selectedFarm.country !== next) {
+                      setFarmId('');
+                    }
+                  }}
+                >
+                  <option value="">Select country</option>
+                  {countryOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
                 <span className="field-label">Farm (optional)</span>
                 <select
                   className="input"
                   value={farmId}
-                  onChange={(e) => setFarmId(e.target.value)}
+                  onChange={(e) => {
+                    const nextFarmId = e.target.value;
+                    setFarmId(nextFarmId);
+                    const selectedFarm = farms.find((f) => f.id === nextFarmId);
+                    if (selectedFarm) {
+                      setCountry(selectedFarm.country);
+                    }
+                  }}
                 >
                   <option value="">No farm selected</option>
-                  {farms.map((f) => (
+                  {addFarmOptions.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.code} — {f.farmName} ({f.country})
                     </option>
@@ -624,12 +688,18 @@ export function SamplesPage() {
               </label>
               <label className="field">
                 <span className="field-label">Crop</span>
-                <input
+                <select
                   className="input"
                   value={crop}
                   onChange={(e) => setCrop(e.target.value)}
-                  placeholder="e.g. Coffee, Cocoa"
-                />
+                >
+                  <option value="">Select crop</option>
+                  {cropOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span className="field-label">Shipping address</span>
@@ -735,16 +805,52 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
+                <span className="field-label">Country</span>
+                <select
+                  className="input"
+                  value={editDraft.country}
+                  onChange={(e) =>
+                    setEditDraft((d) => {
+                      if (!d) return null;
+                      const next = e.target.value;
+                      const selectedFarm = farms.find((f) => f.id === d.farmId);
+                      return {
+                        ...d,
+                        country: next,
+                        farmId:
+                          selectedFarm && selectedFarm.country !== next ? '' : d.farmId,
+                      };
+                    })
+                  }
+                >
+                  <option value="">Select country</option>
+                  {countryOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
                 <span className="field-label">Farm (optional)</span>
                 <select
                   className="input"
                   value={editDraft.farmId}
                   onChange={(e) =>
-                    setEditDraft((d) => (d ? { ...d, farmId: e.target.value } : null))
+                    setEditDraft((d) => {
+                      if (!d) return null;
+                      const nextFarmId = e.target.value;
+                      const selectedFarm = farms.find((f) => f.id === nextFarmId);
+                      return {
+                        ...d,
+                        farmId: nextFarmId,
+                        country: selectedFarm ? selectedFarm.country : d.country,
+                      };
+                    })
                   }
                 >
                   <option value="">No farm selected</option>
-                  {farms.map((f) => (
+                  {editFarmOptions.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.code} — {f.farmName} ({f.country})
                     </option>
@@ -753,14 +859,20 @@ export function SamplesPage() {
               </label>
               <label className="field">
                 <span className="field-label">Crop</span>
-                <input
+                <select
                   className="input"
                   value={editDraft.crop}
                   onChange={(e) =>
                     setEditDraft((d) => (d ? { ...d, crop: e.target.value } : null))
                   }
-                  placeholder="e.g. Coffee, Cocoa"
-                />
+                >
+                  <option value="">Select crop</option>
+                  {cropOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span className="field-label">Shipping address</span>

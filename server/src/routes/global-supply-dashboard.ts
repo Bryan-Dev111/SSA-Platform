@@ -37,6 +37,7 @@ router.get(
           pricePerKg: true,
           totalAmount: true,
           createdAt: true,
+          farm: { select: { country: true } },
         },
         orderBy: { createdAt: 'asc' },
       }),
@@ -70,7 +71,7 @@ router.get(
     }
 
     for (const order of closedOrders) {
-      const country = normalizeCountry(order.destinationCountry);
+      const country = normalizeCountry(order.farm?.country ?? order.destinationCountry);
       const revenue =
         order.totalAmount ??
         (order.quantityKg != null && order.pricePerKg != null

@@ -1,7 +1,7 @@
 /**
  * Global Vendors — Approved Farms List (same data as Farm Information; columns per spec where fields exist).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { apiJson } from '../../api/client';
@@ -17,6 +17,7 @@ export function ApprovedFarmersPage() {
   const [farms, setFarms] = useState<FarmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [countrySortDir, setCountrySortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     if (!token) return;
@@ -25,6 +26,13 @@ export function ApprovedFarmersPage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load farms'))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const sortedFarms = useMemo(() => {
+    return [...farms].sort((a, b) => {
+      const cmp = (a.country ?? '').localeCompare(b.country ?? '', undefined, { sensitivity: 'base' });
+      return countrySortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [farms, countrySortDir]);
 
   if (loading) {
     return (
@@ -62,12 +70,18 @@ export function ApprovedFarmersPage() {
             <thead>
               <tr>
                 <th>Farm ID</th>
-                <th>Farm category</th>
-                <th>Country</th>
+                <th
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                  title="Sort by country"
+                >
+                  Country {countrySortDir === 'asc' ? '↑' : '↓'}
+                </th>
                 <th>Region</th>
-                <th>Main crop</th>
-                <th>Elevation (m)</th>
-                <th>Production style</th>
+                <th>Elevation</th>
+                <th>Crops</th>
+                <th>Production Style</th>
+                <th>Farm Category</th>
               </tr>
             </thead>
             <tbody>
@@ -78,7 +92,7 @@ export function ApprovedFarmersPage() {
                   </td>
                 </tr>
               ) : (
-                farms.map((f) => (
+                sortedFarms.map((f) => (
                   <tr key={f.id}>
                     <td>
                       <Link
@@ -91,12 +105,16 @@ export function ApprovedFarmersPage() {
                         <strong>{f.code}</strong>
                       </Link>
                     </td>
-                    <td>{dash(f.farmCategory)}</td>
                     <td>{f.country}</td>
                     <td>{dash(f.region)}</td>
-                    <td>{dash(f.mainCrop)}</td>
                     <td>{f.elevationMeters != null ? f.elevationMeters : '—'}</td>
+                    <td>
+                      {f.mainCrop?.trim()
+                        ? [f.mainCrop.trim(), f.secondaryCrop?.trim()].filter(Boolean).join(', ')
+                        : '—'}
+                    </td>
                     <td>{dash(f.productionStyle)}</td>
+                    <td>{dash(f.farmCategory)}</td>
                   </tr>
                 ))
               )}

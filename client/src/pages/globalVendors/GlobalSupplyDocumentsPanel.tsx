@@ -17,7 +17,15 @@ type ToastApi = {
   error: (message: string) => void;
 };
 
-export function GlobalSupplyDocumentsPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+export function GlobalSupplyDocumentsPanel({
+  token,
+  toast,
+  canDelete = false,
+}: {
+  token: string | null;
+  toast: ToastApi;
+  canDelete?: boolean;
+}) {
   const [rows, setRows] = useState<InternalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -285,14 +293,18 @@ export function GlobalSupplyDocumentsPanel({ token, toast }: { token: string | n
                       </td>
                       <td>{new Date(r.updatedAt).toLocaleString()}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          disabled={deletingId === r.id}
-                          onClick={() => setDeleteConfirmId(r.id)}
-                        >
-                          Delete
-                        </button>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            disabled={deletingId === r.id}
+                            onClick={() => setDeleteConfirmId(r.id)}
+                          >
+                            Delete
+                          </button>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -304,7 +316,7 @@ export function GlobalSupplyDocumentsPanel({ token, toast }: { token: string | n
       </div>
 
       <ConfirmDialog
-        open={deleteConfirmId !== null}
+        open={canDelete && deleteConfirmId !== null}
         title="Delete document"
         message="Delete this document? This cannot be undone."
         confirmLabel="Delete"

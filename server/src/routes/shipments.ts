@@ -25,8 +25,7 @@ function canRecordInspectionResult(roleNames: string[]): boolean {
   return (
     roleNames.includes('Admin') ||
     roleNames.includes('QualityEngineer') ||
-    roleNames.includes('QualityManager') ||
-    roleNames.includes('Inspector')
+    roleNames.includes('QualityManager')
   );
 }
 
@@ -34,9 +33,20 @@ function canEditInspector(roleNames: string[]): boolean {
   return (
     roleNames.includes('Admin') ||
     roleNames.includes('QualityEngineer') ||
-    roleNames.includes('QualityManager') ||
-    roleNames.includes('Inspector')
+    roleNames.includes('QualityManager')
   );
+}
+
+function normalizePersonText(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function isAssignedInspector(user: NonNullable<Request['user']>, inspectorValue: string | null | undefined): boolean {
+  const assigned = normalizePersonText(inspectorValue);
+  if (!assigned) return false;
+  const byName = normalizePersonText(user.name);
+  const byEmail = normalizePersonText(user.email);
+  return assigned === byName || assigned === byEmail;
 }
 
 router.get(
@@ -197,16 +207,6 @@ router.get(
     const users = await prisma.user.findMany({
       where: {
         employmentStatus: 'Active',
-        OR: [{ isEmployee: true }, { isContractor: true }],
-        userRoles: {
-          some: {
-            role: {
-              name: {
-                in: ['Admin', 'QualityEngineer', 'QualityManager', 'Inspector'],
-              },
-            },
-          },
-        },
       },
       select: {
         id: true,
@@ -425,7 +425,8 @@ router.patch(
 
     const shouldBePending = existing.status === 'WaitingInspection';
     const canInspector = canEditInspector(req.user.roleNames);
-    const canResult = canRecordInspectionResult(req.user.roleNames);
+    const canResultByRole = canRecordInspectionResult(req.user.roleNames);
+    const canResultAsAssignedInspector = isAssignedInspector(req.user, existing.inspector);
 
     // Inspector-only edit: allowed only while waiting.
     if (hasInspectorUpdate && !hasResultUpdate) {
@@ -450,9 +451,10 @@ router.patch(
 
     // Result update: only Admin/QE. Also requires pending status.
     if (hasResultUpdate) {
-      if (!canResult) {
+      if (!canResultByRole && !canResultAsAssignedInspector) {
         res.status(403).json({
-          error: 'Only Admin, Quality Engineer, Quality Manager, or Inspector can record inspection results',
+          error:
+            'Only Admin, Quality Engineer, Quality Manager, or the assigned inspector can record inspection results',
         });
         return;
       }
