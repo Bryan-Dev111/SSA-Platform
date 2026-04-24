@@ -807,8 +807,6 @@ export function Shipments() {
                               to={`/records?shipmentId=${encodeURIComponent(r.id)}&supplierId=${encodeURIComponent(r.supplierId)}`}
                               className="btn btn-ghost"
                               style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                              target="_blank"
-                              rel="noopener noreferrer"
                             >
                               + Add record
                             </Link>
@@ -853,8 +851,6 @@ export function Shipments() {
                             to={`/findings/create?supplierId=${encodeURIComponent(r.supplierId)}&shipmentId=${encodeURIComponent(r.id)}`}
                             className="btn btn-ghost"
                             style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                            target="_blank"
-                            rel="noopener noreferrer"
                           >
                             + New Finding
                           </Link>

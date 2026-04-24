@@ -199,6 +199,41 @@ export function CorrectiveActions() {
   }));
   const maxAgeBucketCount = Math.max(1, ...ageBuckets.map((b) => b.count));
 
+  /** Open CAR count at sample times: created by end of window, not yet closed (Closed uses updatedAt as close proxy). */
+  const openCarsTimeSeries = useMemo(() => {
+    if (list.length === 0) return [];
+    const parse = (s: string) => new Date(s).getTime();
+    const now = Date.now();
+    const dayMs = 86_400_000;
+    const minCreated = Math.min(...list.map((c) => parse(c.createdAt)));
+    if (!Number.isFinite(minCreated)) return [];
+    const rangeStartMs = Math.max(minCreated, now - 365 * dayMs);
+    const totalSpan = Math.max(dayMs, now - rangeStartMs);
+    const maxBuckets = 100;
+    const stepMs = Math.max(dayMs, Math.ceil(totalSpan / maxBuckets));
+    const bucketEnds: number[] = [];
+    let t = rangeStartMs + stepMs;
+    while (t < now) {
+      bucketEnds.push(t);
+      t += stepMs;
+    }
+    bucketEnds.push(now);
+    return bucketEnds.map((end) => {
+      const count = list.filter((c) => {
+        const created = parse(c.createdAt);
+        if (created > end) return false;
+        if (c.status !== 'Closed') return true;
+        return parse(c.updatedAt) > end;
+      }).length;
+      const d = new Date(end);
+      return {
+        t: end,
+        count,
+        label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+      };
+    });
+  }, [list]);
+
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
     if (page > maxPage) setPage(maxPage);
@@ -569,68 +604,83 @@ export function CorrectiveActions() {
           {list.length > 0 && (
             <div className="card">
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
                 <div
-                  aria-label="CAR age distribution for open CARs only bar chart"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '40px 1fr',
-                    gap: '0.75rem',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '1.5rem',
                     alignItems: 'stretch',
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      justifyContent: 'center',
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-muted)',
-                      writingMode: 'vertical-rl',
-                      transform: 'rotate(180deg)',
-                    }}
-                  >
-                    Number of open CARs
-                  </div>
                   <div>
+                    <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
                     <div
+                      aria-label="CAR age distribution for open CARs only bar chart"
                       style={{
-                        height: 180,
-                        borderLeft: '1px solid var(--color-border)',
-                        borderBottom: '1px solid var(--color-border)',
-                        display: 'flex',
-                        alignItems: 'flex-end',
-                        justifyContent: 'space-around',
+                        display: 'grid',
+                        gridTemplateColumns: '40px 1fr',
                         gap: '0.75rem',
-                        padding: '0.5rem 0.5rem 0 0.5rem',
-                        background:
-                          'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
+                        alignItems: 'stretch',
                       }}
                     >
-                      {ageBuckets.map((bucket) => (
-                        <div key={bucket.label} style={{ width: '22%', maxWidth: 80, minWidth: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>
-                            {bucket.count}
-                          </span>
-                          <div
-                            style={{
-                              width: '100%',
-                              height: `${Math.max(8, (bucket.count / maxAgeBucketCount) * 125)}px`,
-                              background: '#4f46e5',
-                              borderRadius: '4px 4px 0 0',
-                              transition: 'height 0.2s ease',
-                            }}
-                          />
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'center',
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-text-muted)',
+                          writingMode: 'vertical-rl',
+                          transform: 'rotate(180deg)',
+                        }}
+                      >
+                        Number of open CARs
+                      </div>
+                      <div>
+                        <div
+                          style={{
+                            height: 180,
+                            borderLeft: '1px solid var(--color-border)',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex',
+                            alignItems: 'flex-end',
+                            justifyContent: 'space-around',
+                            gap: '0.75rem',
+                            padding: '0.5rem 0.5rem 0 0.5rem',
+                            background:
+                              'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
+                          }}
+                        >
+                          {ageBuckets.map((bucket) => (
+                            <div key={bucket.label} style={{ width: '22%', maxWidth: 80, minWidth: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>
+                                {bucket.count}
+                              </span>
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: `${Math.max(8, (bucket.count / maxAgeBucketCount) * 125)}px`,
+                                  background: '#4f46e5',
+                                  borderRadius: '4px 4px 0 0',
+                                  transition: 'height 0.2s ease',
+                                }}
+                              />
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                        <div style={{ display: 'flex', justifyContent: 'space-around', gap: '0.75rem', padding: '0.35rem 0.5rem 0 0.5rem' }}>
+                          {ageBuckets.map((bucket) => (
+                            <span key={`${bucket.label}-axis`} style={{ width: '22%', maxWidth: 80, minWidth: 44, textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              {bucket.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-around', gap: '0.75rem', padding: '0.35rem 0.5rem 0 0.5rem' }}>
-                      {ageBuckets.map((bucket) => (
-                        <span key={`${bucket.label}-axis`} style={{ width: '22%', maxWidth: 80, minWidth: 44, textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                          {bucket.label}
-                        </span>
-                      ))}
-                    </div>
+                  </div>
+                  <div>
+                    <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Open CARs over time</h2>
+                    <OpenCarsOverTimeChart points={openCarsTimeSeries} />
                   </div>
                 </div>
               </div>
@@ -694,8 +744,6 @@ export function CorrectiveActions() {
                       <Link
                         to={`/audit-record?id=${encodeURIComponent(c.audit.id)}`}
                         className="finding-code-link"
-                        target="_blank"
-                        rel="noopener noreferrer"
                       >
                         {c.audit.code}
                       </Link>
@@ -706,8 +754,6 @@ export function CorrectiveActions() {
                           to={`/findings-record?findingId=${encodeURIComponent(c.finding.code)}`}
                           className="finding-code-link"
                           style={{ fontSize: 'var(--text-sm)' }}
-                          target="_blank"
-                          rel="noopener noreferrer"
                         >
                           {c.finding.code}
                         </Link>
@@ -865,6 +911,81 @@ export function CorrectiveActions() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+type OpenCarTimePoint = { t: number; count: number; label: string };
+
+/** Red line + shaded area under: count of CARs still open at each sample (Closed ≈ last updated). */
+function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
+  const width = 520;
+  const height = 200;
+  const padL = 40;
+  const padR = 10;
+  const padT = 14;
+  const padB = 30;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+
+  if (points.length === 0) {
+    return <p className="table-empty" style={{ margin: 0 }}>No CAR data to chart.</p>;
+  }
+
+  const maxY = Math.max(4, Math.ceil(Math.max(...points.map((p) => p.count)) * 1.08));
+  const n = points.length;
+  const xAt = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  const yAt = (v: number) => padT + plotH - (v / maxY) * plotH;
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(p.count).toFixed(2)}`).join(' ');
+  const baseY = (padT + plotH).toFixed(2);
+  const areaPath = `${linePath} L ${xAt(n - 1).toFixed(2)} ${baseY} L ${xAt(0).toFixed(2)} ${baseY} Z`;
+  const stroke = '#dc2626';
+  const fill = 'rgba(220, 38, 38, 0.22)';
+
+  const labelIdx = [...new Set([0, Math.floor((n - 1) / 2), n - 1])].sort((a, b) => a - b);
+
+  return (
+    <div>
+      <div className="table-wrap" style={{ overflowX: 'auto' }}>
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ width: '100%', minWidth: 280, maxWidth: '100%', height: 'auto', display: 'block' }}
+          aria-label="Open CARs over time: number of CARs still open at each sample date"
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
+            const y = padT + plotH * f;
+            const val = Math.round(maxY * (1 - f));
+            return (
+              <g key={`grid-${idx}`}>
+                <line x1={padL} y1={y} x2={width - padR} y2={y} stroke="var(--color-border-subtle, #e5e7eb)" strokeWidth="1" />
+                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="var(--color-text-muted, #6b7280)">
+                  {val}
+                </text>
+              </g>
+            );
+          })}
+          <line x1={padL} y1={padT + plotH} x2={width - padR} y2={padT + plotH} stroke="#9ca3af" strokeWidth="1" />
+          <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#9ca3af" strokeWidth="1" />
+          <path d={areaPath} fill={fill} stroke="none" />
+          <path
+            d={linePath}
+            fill="none"
+            stroke={stroke}
+            strokeWidth="2.25"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          {labelIdx.map((i) => (
+            <text key={i} x={xAt(i)} y={height - 6} textAnchor="middle" fontSize="10" fill="var(--color-text-muted, #6b7280)">
+              {points[i].label}
+            </text>
+          ))}
+        </svg>
+      </div>
+      <p style={{ margin: '0.35rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+        Count of CARs open at each sample (last 365 days of history in scope; closing time approximated from last
+        update when status is Closed).
+      </p>
     </div>
   );
 }

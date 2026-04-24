@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
+import { computeCurrentRiskLevelForRisk } from '../services/riskRegisterCurrent';
 
 const router = Router();
 
@@ -130,12 +131,18 @@ router.post(
       residualRiskLevel = deriveRiskLevel(residualLikelihood, residualSeverity);
     }
 
-    const syncOpportunity =
+    const syncOpportunityStatus =
       dbStatus === 'Mitigated' &&
       risk.type === 'risk' &&
       residualLikelihood != null &&
       residualSeverity != null &&
       residualRiskLevel != null;
+
+    const actionsBefore = await prisma.riskAction.findMany({
+      where: { riskId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const levelBefore = computeCurrentRiskLevelForRisk(risk, actionsBefore);
 
     const actionInclude = {
       supplier: { select: { id: true, code: true, name: true } },
@@ -162,22 +169,29 @@ router.post(
           },
           include: actionInclude,
         });
-        if (syncOpportunity && residualLikelihood && residualSeverity && residualRiskLevel) {
+        if (syncOpportunityStatus) {
           await tx.opportunity.update({
             where: { id: riskId },
-            data: {
-              likelihood: residualLikelihood,
-              severity: residualSeverity,
-              riskLevel: residualRiskLevel,
-              status: 'Mitigated',
-            },
+            data: { status: 'Mitigated' },
           });
-          return { ...row, risk: { ...row.risk, riskLevel: residualRiskLevel } };
         }
         return row;
       },
       { timeout: 20_000, maxWait: 10_000 },
     );
+
+    const actionsAfter = await prisma.riskAction.findMany({
+      where: { riskId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const riskAfter = await prisma.opportunity.findUnique({ where: { id: riskId } });
+    if (riskAfter && levelBefore !== computeCurrentRiskLevelForRisk(riskAfter, actionsAfter)) {
+      await prisma.opportunity.update({
+        where: { id: riskId },
+        data: { currentRiskUpdatedAt: new Date() },
+      });
+    }
+
     // Translate DB status to UI status for the frontend.
     const statusForUi = created.status === 'Mitigated' ? 'Closed' : 'Open';
     res.status(201).json({ ...created, status: statusForUi });
@@ -296,12 +310,19 @@ router.patch(
     const riskType = existing.risk.type;
     const riskId = existing.riskId;
 
-    const syncOpportunity =
+    const syncOpportunityStatus =
       dbStatus === 'Mitigated' &&
       riskType === 'risk' &&
       residualLikelihood &&
       residualSeverity &&
       residualRiskLevel;
+
+    const riskOpp = await prisma.opportunity.findUnique({ where: { id: riskId } });
+    const actionsBeforePatch = await prisma.riskAction.findMany({
+      where: { riskId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const levelBeforePatch = riskOpp ? computeCurrentRiskLevelForRisk(riskOpp, actionsBeforePatch) : null;
 
     const actionData = {
       description,
@@ -327,22 +348,31 @@ router.patch(
           data: actionData,
           include: actionInclude,
         });
-        if (syncOpportunity && residualLikelihood && residualSeverity && residualRiskLevel) {
+        if (syncOpportunityStatus) {
           await tx.opportunity.update({
             where: { id: riskId },
-            data: {
-              likelihood: residualLikelihood,
-              severity: residualSeverity,
-              riskLevel: residualRiskLevel,
-              status: 'Mitigated',
-            },
+            data: { status: 'Mitigated' },
           });
-          return { ...row, risk: { ...row.risk, riskLevel: residualRiskLevel } };
         }
         return row;
       },
       { timeout: 20_000, maxWait: 10_000 },
     );
+
+    const actionsAfterPatch = await prisma.riskAction.findMany({
+      where: { riskId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const riskAfterPatch = await prisma.opportunity.findUnique({ where: { id: riskId } });
+    if (
+      riskAfterPatch &&
+      levelBeforePatch !== computeCurrentRiskLevelForRisk(riskAfterPatch, actionsAfterPatch)
+    ) {
+      await prisma.opportunity.update({
+        where: { id: riskId },
+        data: { currentRiskUpdatedAt: new Date() },
+      });
+    }
 
     const statusForUi = updated.status === 'Mitigated' ? 'Closed' : 'Open';
     res.json({ ...updated, status: statusForUi });

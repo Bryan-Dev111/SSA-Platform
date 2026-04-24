@@ -286,7 +286,7 @@ export function SuppliersMap() {
             </p>
           )}
           <p style={{ marginTop: '0.75rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-            Real map tiles with supplier markers. Pins are color-coded by supplier risk: High (red), Medium (yellow), Low (green), or gray when no risk snapshot.
+            Real map tiles with supplier markers. Pins are color-coded by supplier Quality Score: High (red), Medium (yellow), Low (green), or gray when no risk snapshot.
           </p>
         </div>
       </div>
@@ -300,7 +300,7 @@ export function SuppliersMap() {
                 <th>City</th>
                 <th>Country</th>
                 <th>Risk level</th>
-                <th>Risk score</th>
+                <th>Quality Score</th>
               </tr>
             </thead>
             <tbody>

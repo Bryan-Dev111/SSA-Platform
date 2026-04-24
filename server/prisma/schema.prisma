@@ -646,6 +646,8 @@ model Opportunity {
   actions     RiskAction[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  /// Bumped when derived Current Risk Level changes (actions) or risk row is edited.
+  currentRiskUpdatedAt DateTime @default(now())
 }
 
 model RiskAction {

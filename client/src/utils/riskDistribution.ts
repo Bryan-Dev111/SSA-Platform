@@ -1,6 +1,6 @@
 /**
  * Risk-register distribution (Low / Medium / High), matching the Risk page:
- * Mitigated risks use the opportunity row (server syncs it from actions and from risk-table edits).
+ * Current level = latest closed action residual when present, else inherent opportunity level.
  */
 
 export type RiskDistribution = { low: number; medium: number; high: number };
@@ -14,7 +14,6 @@ export interface RiskRegisterItem {
   likelihood: RiskLikelihood | null;
   severity: RiskSeverity | null;
   riskLevel: 'Low' | 'Medium' | 'High' | null;
-  /** When Mitigated, use risk row level (matches Risk page matrix after table edits). */
   status?: 'Open' | 'Mitigated' | 'Closed' | 'Realized';
 }
 
@@ -27,6 +26,20 @@ export interface RiskRegisterAction {
   createdAt: string;
 }
 
+/** Matches Risk page “Current Risk Level” / chart (newest action per risk wins). */
+export function computeRegisterCurrentRiskLevel(
+  row: RiskRegisterItem,
+  latestAction: RiskRegisterAction | undefined,
+): 'Low' | 'Medium' | 'High' | null {
+  if (row.type !== 'risk') return row.riskLevel;
+  const useResidual =
+    latestAction?.status === 'Closed' &&
+    latestAction.residualLikelihood != null &&
+    latestAction.residualSeverity != null &&
+    latestAction.residualRiskLevel != null;
+  return useResidual ? latestAction.residualRiskLevel : row.riskLevel;
+}
+
 export function computeRiskRegisterDistribution(items: RiskRegisterItem[], actions: RiskRegisterAction[]): RiskDistribution {
   const sorted = [...actions].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   const latestActionByRisk = new Map<string, RiskRegisterAction>();
@@ -36,19 +49,9 @@ export function computeRiskRegisterDistribution(items: RiskRegisterItem[], actio
 
   const effectiveRisks = items
     .filter((r) => r.type === 'risk')
-    .map((r) => {
-      if (r.status === 'Mitigated') {
-        return { effectiveRiskLevel: r.riskLevel };
-      }
-      const action = latestActionByRisk.get(r.id);
-      const useResidual =
-        action?.status === 'Closed' &&
-        !!action.residualLikelihood &&
-        !!action.residualSeverity &&
-        !!action.residualRiskLevel;
-      const effectiveRiskLevel = useResidual ? action.residualRiskLevel : r.riskLevel;
-      return { effectiveRiskLevel };
-    });
+    .map((r) => ({
+      effectiveRiskLevel: computeRegisterCurrentRiskLevel(r, latestActionByRisk.get(r.id)),
+    }));
 
   return {
     low: effectiveRisks.filter((r) => r.effectiveRiskLevel === 'Low').length,

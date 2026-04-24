@@ -494,8 +494,6 @@ export function Audits() {
                       <Link
                         to={`/audit-record?id=${encodeURIComponent(a.id)}`}
                         className="finding-code-link"
-                        target="_blank"
-                        rel="noopener noreferrer"
                       >
                         {a.code}
                       </Link>
@@ -568,8 +566,6 @@ export function Audits() {
                               key={code}
                               to={`/findings-record?findingId=${encodeURIComponent(code)}`}
                               style={{ display: 'block', marginBottom: 2 }}
-                              target="_blank"
-                              rel="noopener noreferrer"
                             >
                               {code}
                             </Link>
@@ -580,8 +576,6 @@ export function Audits() {
                             to={`/findings/create?auditId=${encodeURIComponent(a.code)}&supplierId=${encodeURIComponent(a.supplierId)}`}
                             className="btn btn-ghost"
                             style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                            target="_blank"
-                            rel="noopener noreferrer"
                           >
                             + New Finding
                           </Link>
@@ -616,27 +610,16 @@ export function Audits() {
                             </button>
                           ))
                         )}
-                        {canAttachRecord && (
-                          <>
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                              onClick={() => openRecordUploadModal(a)}
-                            >
-                              + Add record
-                            </button>
-                            <Link
-                              to={`/records?auditId=${encodeURIComponent(a.id)}&supplierId=${encodeURIComponent(a.supplierId)}`}
-                              className="btn btn-ghost"
-                              style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Records page
-                            </Link>
-                          </>
-                        )}
+                        {canAttachRecord ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
+                            onClick={() => openRecordUploadModal(a)}
+                          >
+                            + Add record
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                     {isAdmin && (

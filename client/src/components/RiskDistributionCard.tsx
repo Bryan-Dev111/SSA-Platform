@@ -112,7 +112,6 @@ export function RiskDistributionCard({ distribution }: { distribution: RiskDistr
       <div className="card-body risk-distribution-card-body">
         <div className="risk-distribution-card-header">
           <h2 className="risk-distribution-card-title">Risk Distribution</h2>
-          <p className="risk-distribution-card-subtitle">Risks by risk level</p>
         </div>
         <div className="risk-distribution-donut-wrap" aria-label="Risk distribution donut chart">
           <svg

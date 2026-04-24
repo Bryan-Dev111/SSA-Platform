@@ -261,10 +261,17 @@ export function Dashboard() {
           value={metrics.openFindingsTotal || metrics.openFindingsMajorCritical}
           subtitle={`${metrics.openFindingsMajorCritical} Major/Critical open`}
         />
+        {/* Open inspection count in subtitle; red triangle + tooltip only for late PO (qty short), never for open requests. */}
         <MetricCard
           title="Shipments"
           value={metrics.shipmentRequests}
-          subtitle={`${metrics.shipmentLate ?? 0} Late PO`}
+          subtitle={(() => {
+            const late = metrics.shipmentLate ?? 0;
+            const open = metrics.shipmentRequests ?? 0;
+            const openLabel =
+              open === 1 ? '1 Open Inspection Request' : `${open} Open Inspection Requests`;
+            return `${late} Late PO * ${openLabel}`;
+          })()}
           customAlert={
             (metrics.shipmentLate ?? 0) > 0 ? (
               <ShipmentMetricAlertIcon

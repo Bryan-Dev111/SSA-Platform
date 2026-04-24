@@ -6,7 +6,7 @@ import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { apiJson } from '../api/client';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
-import { computeRiskRegisterDistribution } from '../utils/riskDistribution';
+import { computeRegisterCurrentRiskLevel, computeRiskRegisterDistribution } from '../utils/riskDistribution';
 
 interface Supplier {
   id: string;
@@ -27,6 +27,8 @@ interface OpportunityRow {
   riskLevel: 'Low' | 'Medium' | 'High' | null;
   status: 'Open' | 'Mitigated' | 'Closed' | 'Realized';
   createdAt: string;
+  /** Server-maintained: bumps when current risk level changes (actions) or risk row is edited. */
+  currentRiskUpdatedAt?: string;
 }
 
 interface RiskSnapshotRow {
@@ -110,7 +112,9 @@ type RiskItemSortKey =
   | 'severity'
   | 'riskLevel'
   | 'status'
-  | 'created';
+  | 'currentRiskLevel'
+  | 'created'
+  | 'currentRiskUpdatedAt';
 type RiskActionSortKey =
   | 'supplier'
   | 'riskCode'
@@ -230,32 +234,37 @@ export function Risk() {
     return items
       .filter((r) => r.type === 'risk')
       .map((r) => {
-        // Mitigated risks: matrix uses the opportunity row. Server keeps it in sync from both tables:
-        // PATCH risk-actions (closed) updates opportunity; PATCH opportunities updates latest closed action residual.
-        if (r.status === 'Mitigated') {
-          return {
-            ...r,
-            effectiveLikelihood: r.likelihood as OpportunityRow['likelihood'],
-            effectiveSeverity: r.severity as OpportunityRow['severity'],
-            effectiveRiskLevel: r.riskLevel,
-          };
-        }
         const action = latestActionByRisk.get(r.id);
         const useResidual =
-          action?.status === 'Closed' && !!action.residualLikelihood && !!action.residualSeverity && !!action.residualRiskLevel;
+          action?.status === 'Closed' &&
+          !!action.residualLikelihood &&
+          !!action.residualSeverity &&
+          !!action.residualRiskLevel;
+        const effectiveRiskLevel = computeRegisterCurrentRiskLevel(r, action);
         return {
           ...r,
           effectiveLikelihood: (useResidual ? action!.residualLikelihood : r.likelihood) as OpportunityRow['likelihood'],
           effectiveSeverity: (useResidual ? action!.residualSeverity : r.severity) as OpportunityRow['severity'],
-          effectiveRiskLevel: useResidual ? action!.residualRiskLevel : r.riskLevel,
+          effectiveRiskLevel,
         };
       });
   }, [items, latestActionByRisk]);
+
+  /** Same levels as the Risk chart / distribution: residual from latest closed action when applicable, else register row. */
+  const effectiveRiskLevelByItemId = useMemo(() => {
+    const m = new Map<string, 'Low' | 'Medium' | 'High' | null>();
+    for (const r of effectiveRisks) {
+      m.set(r.id, r.effectiveRiskLevel);
+    }
+    return m;
+  }, [effectiveRisks]);
 
   const distribution = useMemo(() => computeRiskRegisterDistribution(items, actions), [items, actions]);
 
   const sortedRiskItems = useMemo(() => {
     const dir = sortDirItems === 'asc' ? 1 : -1;
+    const currentLevel = (row: OpportunityRow) =>
+      row.type === 'risk' ? effectiveRiskLevelByItemId.get(row.id) ?? row.riskLevel : row.riskLevel;
     const getValue = (row: OpportunityRow): string | number => {
       switch (sortByItems) {
         case 'code':
@@ -274,6 +283,12 @@ export function Risk() {
           return row.riskLevel ? RISK_LEVEL_SORT[row.riskLevel] ?? 0 : 0;
         case 'status':
           return OPPORTUNITY_STATUS_SORT[row.status] ?? 0;
+        case 'currentRiskLevel': {
+          const lv = currentLevel(row);
+          return lv ? RISK_LEVEL_SORT[lv] ?? 0 : 0;
+        }
+        case 'currentRiskUpdatedAt':
+          return new Date(row.currentRiskUpdatedAt ?? row.createdAt).getTime();
         case 'created':
           return new Date(row.createdAt).getTime();
       }
@@ -284,7 +299,7 @@ export function Risk() {
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
       return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
     });
-  }, [items, sortByItems, sortDirItems]);
+  }, [items, sortByItems, sortDirItems, effectiveRiskLevelByItemId]);
 
   const sortedRiskActions = useMemo(() => {
     const dir = sortDirActions === 'asc' ? 1 : -1;
@@ -386,12 +401,12 @@ export function Risk() {
     const mitigatedRisks = actions.filter((x) => x.status === 'Closed').length;
     const openActions = actions.filter((x) => x.status === 'Open').length;
     const overdueActions = actions.filter((x) => x.status === 'Open' && x.dueDate && new Date(x.dueDate) < now).length;
-    const opportunities = items.filter((x) => x.type === 'opportunity').length;
+    const openOpportunities = items.filter((x) => x.type === 'opportunity' && x.status === 'Open').length;
     const realizedOpportunities = items.filter((x) => x.type === 'opportunity' && x.status === 'Realized').length;
-    return { avgScore, openRisks, mitigatedRisks, openActions, overdueActions, opportunities, realizedOpportunities };
+    return { avgScore, openRisks, mitigatedRisks, openActions, overdueActions, openOpportunities, realizedOpportunities };
   }, [effectiveRisks, actions, items]);
 
-  /** Per-supplier average register risk weight (same 30/60/90 scale as Risk score avg), not a raw sum. */
+  /** Per-supplier average register risk weight (same 30/60/90 scale as Quality Score), not a raw sum. */
   const topRiskSuppliers = useMemo(() => {
     const bySupplier = new Map<string, { supplier: Supplier; sum: number; count: number }>();
     for (const risk of effectiveRisks) {
@@ -441,17 +456,23 @@ export function Risk() {
 
   const handleExportRiskTable = () => {
     try {
-      const rows: ExportRow[] = sortedRiskItems.map((row) => ({
-        ID: row.code,
-        Supplier: `${row.supplier.code} - ${row.supplier.name}`,
-        Type: row.type,
-        Description: row.description,
-        Likelihood: row.likelihood ?? '—',
-        Severity: row.severity ?? '—',
-        'Risk level': row.riskLevel ?? '—',
-        Status: row.status,
-        Created: new Date(row.createdAt).toLocaleString(),
-      }));
+      const rows: ExportRow[] = sortedRiskItems.map((row) => {
+        const currentLv =
+          row.type === 'risk' ? effectiveRiskLevelByItemId.get(row.id) ?? row.riskLevel : row.riskLevel;
+        return {
+          ID: row.code,
+          Supplier: `${row.supplier.code} - ${row.supplier.name}`,
+          Type: row.type,
+          Description: row.description,
+          Likelihood: row.likelihood ?? '—',
+          Severity: row.severity ?? '—',
+          'Initial Risk Level': row.riskLevel ?? '—',
+          Status: row.status,
+          'Current Risk Level': currentLv ?? '—',
+          Created: new Date(row.createdAt).toLocaleString(),
+          Updated: new Date(row.currentRiskUpdatedAt ?? row.createdAt).toLocaleString(),
+        };
+      });
       if (rows.length === 0) return;
       const supplierSuffix =
         suppliers.find((s) => s.id === filterSupplierId)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
@@ -651,31 +672,37 @@ export function Risk() {
 
       <div className="risk-kpi-grid">
         <MetricCard
-          title="Risk score (avg)"
+          title="Quality Score"
           value={String(stats.avgScore)}
           trend={{ pct: avgTrendPercent }}
         />
         <MetricCard
-          title="Open risks"
+          title="Open Risks"
           value={String(stats.openRisks)}
           subtitle={
             stats.mitigatedRisks === 0
-              ? 'No completed mitigations'
-              : `${stats.mitigatedRisks} mitigated`
+              ? 'No Completed Mitigations'
+              : `${stats.mitigatedRisks} Mitigated`
           }
         />
         <MetricCard
-          title="Open actions"
+          title="Open Actions"
           value={String(stats.openActions)}
-          subtitle={`${stats.overdueActions} overdue action${stats.overdueActions === 1 ? '' : 's'}`}
+          subtitle={
+            stats.overdueActions === 0
+              ? 'No Overdue Actions'
+              : `${stats.overdueActions} Overdue Action${stats.overdueActions === 1 ? '' : 's'}`
+          }
         />
         <MetricCard
-          title="Open opportunities"
-          value={String(stats.opportunities)}
+          title="Open Opportunities"
+          value={String(stats.openOpportunities)}
           subtitle={
-            stats.realizedOpportunities === 1
-              ? '1 realized opportunity'
-              : `${stats.realizedOpportunities} realized opportunities`
+            stats.realizedOpportunities === 0
+              ? '0 Realized Opportunities'
+              : stats.realizedOpportunities === 1
+                ? '1 Realized Opportunity'
+                : `${stats.realizedOpportunities} Realized Opportunities`
           }
         />
       </div>
@@ -856,20 +883,29 @@ export function Risk() {
                       Severity {sortIndicatorItems('severity')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('riskLevel')}>
-                      Risk level {sortIndicatorItems('riskLevel')}
+                      Initial Risk Level {sortIndicatorItems('riskLevel')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('status')}>
                       Status {sortIndicatorItems('status')}
                     </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('currentRiskLevel')}>
+                      Current Risk Level {sortIndicatorItems('currentRiskLevel')}
+                    </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('created')}>
                       Created {sortIndicatorItems('created')}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('currentRiskUpdatedAt')}>
+                      Updated {sortIndicatorItems('currentRiskUpdatedAt')}
                     </th>
                     {canEditRiskItems ? <th>Action</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedRiskItems.map((row) => (
-                    <tr key={row.id} style={getRiskLevelRowStyle(row.riskLevel)}>
+                  {sortedRiskItems.map((row) => {
+                    const currentRiskLevel =
+                      row.type === 'risk' ? effectiveRiskLevelByItemId.get(row.id) ?? row.riskLevel : row.riskLevel;
+                    return (
+                    <tr key={row.id} style={getRiskRegisterRowStyle(row, currentRiskLevel)}>
                       <td>{row.code}</td>
                       <td>{row.supplier.code} - {row.supplier.name}</td>
                       <td>{row.type}</td>
@@ -878,7 +914,9 @@ export function Risk() {
                       <td>{row.severity ?? '—'}</td>
                       <td>{row.riskLevel ?? '—'}</td>
                       <td>{row.status}</td>
+                      <td>{currentRiskLevel ?? '—'}</td>
                       <td>{new Date(row.createdAt).toLocaleString()}</td>
+                      <td>{new Date(row.currentRiskUpdatedAt ?? row.createdAt).toLocaleString()}</td>
                       {canEditRiskItems ? (
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <button
@@ -901,7 +939,8 @@ export function Risk() {
                         </td>
                       ) : null}
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             )}
@@ -914,23 +953,46 @@ export function Risk() {
           <div className="card-body">
             <h2 style={{ marginTop: 0 }}>Add action</h2>
             <form onSubmit={createAction} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr 1fr 1fr auto', gap: '0.75rem' }}>
-              <select className="input" value={newActionSupplierId} onChange={(e) => setNewActionSupplierId(e.target.value)} required>
+              <select
+                className="input"
+                value={newActionRiskId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setNewActionRiskId(id);
+                  if (!id) return;
+                  const risk = items.find((i) => i.id === id && i.type === 'risk');
+                  if (risk) setNewActionSupplierId(risk.supplierId);
+                }}
+                required
+              >
+                <option value="">Related Risk</option>
+                {items
+                  .filter((i) => i.type === 'risk')
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.code} — {r.supplier.code}
+                    </option>
+                  ))}
+              </select>
+              <select
+                className="input"
+                value={newActionSupplierId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNewActionSupplierId(v);
+                  if (newActionRiskId) {
+                    const linked = items.find((i) => i.id === newActionRiskId);
+                    if (linked && linked.supplierId !== v) setNewActionRiskId('');
+                  }
+                }}
+                required
+              >
                 <option value="">Supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} - {s.name}
                   </option>
                 ))}
-              </select>
-              <select className="input" value={newActionRiskId} onChange={(e) => setNewActionRiskId(e.target.value)} required>
-                <option value="">Related Risk</option>
-                {items
-                  .filter((i) => i.type === 'risk' && (!newActionSupplierId || i.supplierId === newActionSupplierId))
-                  .map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.code}
-                    </option>
-                  ))}
               </select>
               <input className="input" placeholder="Action description" value={newActionDescription} onChange={(e) => setNewActionDescription(e.target.value)} required />
               <input className="input" placeholder="Owner" value={newActionOwner} onChange={(e) => setNewActionOwner(e.target.value)} />
@@ -1022,7 +1084,7 @@ export function Risk() {
                         ? deriveResidualRiskLevel(draft.residualLikelihood, draft.residualSeverity)
                         : null;
                     return (
-                      <tr key={row.id} style={getRiskLevelRowStyle(row.residualRiskLevel ?? row.risk.riskLevel)}>
+                      <tr key={row.id} style={getRiskActionRowStyle(row)}>
                         <td>{row.supplier.code} - {row.supplier.name}</td>
                         <td>{row.risk.code}</td>
                         <td>{row.risk.description}</td>
@@ -1264,12 +1326,12 @@ export function Risk() {
   );
 }
 
-/** Reference: supplier risk snapshot score formula (formerly shown on Admin → Risk weights). */
+/** Reference: supplier snapshot Quality Score formula (formerly shown on Admin → Risk weights). */
 function SupplierRiskEquationFooter() {
   return (
     <div className="card" style={{ marginTop: '1.5rem' }}>
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Supplier risk score</h2>
+        <h2 style={{ marginTop: 0 }}>Supplier Quality Score</h2>
         <div
           style={{
             padding: '0.6rem 0.75rem',
@@ -1281,7 +1343,7 @@ function SupplierRiskEquationFooter() {
           }}
         >
           <p style={{ margin: '0 0 0.5rem', color: 'var(--color-text-muted)' }}>
-            The supplier risk score is built from <strong>shipments</strong> and <strong>audits</strong> only:{' '}
+            The supplier Quality Score is built from <strong>shipments</strong> and <strong>audits</strong> only:{' '}
             <strong>first-pass yield (FPY)</strong> (pass rate) plus a <strong>severity index</strong> from findings tied to
             each side. It is not a single generic “overall quality” index.
           </p>
@@ -1316,7 +1378,7 @@ function SupplierRiskEquationFooter() {
             {`SS = 0.5 · (1 − FPY_ship) + 0.5 · Sev_ship     ← shipment-side composite
 AS = 0.5 · (1 − FPY_audit) + 0.5 · Sev_audit   ← audit-side composite
 QS = 0.5 · SS + 0.5 · AS                        (SS, AS clamped to [0, 1])
-Risk score (0–100, higher = worse) = QS × 100`}
+Quality Score (0–100, higher = worse) = QS × 100`}
           </pre>
           <p style={{ margin: '0.6rem 0 0', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
             <strong>Severity index</strong> (for each side): Sev = (C·1 + M·0.7 + m·0.3) ÷ (U × n), where C/M/m are counts
@@ -1411,4 +1473,30 @@ function getRiskLevelRowStyle(level: 'Low' | 'Medium' | 'High' | null | undefine
   if (level === 'Medium') return { backgroundColor: 'rgba(234, 179, 8, 0.16)' };
   if (level === 'Low') return { backgroundColor: 'var(--risk-row-low-bg)' };
   return undefined;
+}
+
+/** Risk register: closed = darker grey, mitigated = lighter grey; open uses current risk level tint (matches chart). */
+function getRiskRegisterRowStyle(
+  row: OpportunityRow,
+  currentRiskLevel?: 'Low' | 'Medium' | 'High' | null
+): CSSProperties | undefined {
+  if (row.status === 'Closed') {
+    return { backgroundColor: '#d1d5db', color: '#111827' };
+  }
+  if (row.status === 'Mitigated') {
+    return { backgroundColor: '#f3f4f6', color: 'var(--color-text, #111827)' };
+  }
+  if (row.status === 'Realized') {
+    return { backgroundColor: '#f9fafb', color: 'var(--color-text, #111827)' };
+  }
+  const tintLevel = row.type === 'risk' ? currentRiskLevel ?? row.riskLevel : row.riskLevel;
+  return getRiskLevelRowStyle(tintLevel);
+}
+
+/** Actions table: closed rows use darker grey; open rows keep residual / inherent risk level tint. */
+function getRiskActionRowStyle(row: RiskActionRow): CSSProperties | undefined {
+  if (row.status === 'Closed') {
+    return { backgroundColor: '#d1d5db', color: '#111827' };
+  }
+  return getRiskLevelRowStyle(row.residualRiskLevel ?? row.risk.riskLevel);
 }

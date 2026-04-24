@@ -1078,8 +1078,6 @@ export function CARRecord() {
                   <Link
                     to={`/records?supplierId=${encodeURIComponent(car.supplierId)}&carId=${encodeURIComponent(car.id)}`}
                     className="btn btn-ghost"
-                    target="_blank"
-                    rel="noopener noreferrer"
                   >
                     + Add attachment
                   </Link>

@@ -1,7 +1,7 @@
 /**
  * Supplier scope helpers for data access.
  * Buyer/QE/Auditor: assigned suppliers only; employees/contractors also use EmployeeSupplierAssignment;
- * QualityManager/Admin: all suppliers; Supplier: only own data.
+ * QualityManager/Admin: all suppliers (Admin even when also Buyer/QE/Auditor); Supplier: only own data.
  */
 import { prisma } from '../lib/prisma';
 
@@ -90,6 +90,11 @@ export async function getAllowedSupplierIds(user: {
 
   // Quality Managers oversee all suppliers (e.g. cover for QE); do not restrict to QE buyer/supplier assignments.
   if (user.roleNames.includes('QualityManager')) {
+    return null;
+  }
+
+  // Admins operate on the full supplier list; do not narrow to Buyer/QE/Auditor assignments on the same account.
+  if (user.roleNames.includes('Admin')) {
     return null;
   }
 

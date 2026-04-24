@@ -3013,10 +3013,6 @@ body.sidebar-open {
   color: var(--accent-blue-deep);
 }
 
-.page-dashboard .risk-distribution-card-subtitle {
-  color: var(--accent-blue-mid);
-}
-
 .page-dashboard .risk-distribution-legend-item:hover {
   background: rgba(23, 37, 84, 0.05);
   border-radius: 8px;
@@ -3158,12 +3154,6 @@ body.sidebar-open {
   font-weight: var(--font-bold);
   color: var(--color-text);
   line-height: var(--leading-tight);
-}
-
-.risk-distribution-card-subtitle {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
 }
 
 .risk-distribution-donut-wrap {

@@ -147,6 +147,9 @@ export function SupplierProfile() {
 
   const isSupplier = user?.roleNames?.includes('Supplier');
   const roleNames = user?.roleNames ?? [];
+  const isAdmin = roleNames.includes('Admin');
+  /** Supplier portal or Admin acting on the selected supplier profile. */
+  const canShowSupplierRequestAndRecord = isSupplier || isAdmin;
   const canSelectSupplier = !isSupplier && roleNames.some((r) => ['Admin', 'Buyer', 'QualityEngineer', 'QualityManager'].includes(r));
 
   useEffect(() => {
@@ -212,7 +215,7 @@ export function SupplierProfile() {
   }, [token, data?.supplier?.id]);
 
   useEffect(() => {
-    if (!token || !data?.supplier?.id || !isSupplier) {
+    if (!token || !data?.supplier?.id || !(isSupplier || isAdmin)) {
       setEligibleShipmentProjects([]);
       return;
     }
@@ -222,10 +225,10 @@ export function SupplierProfile() {
     )
       .then(setEligibleShipmentProjects)
       .catch(() => setEligibleShipmentProjects([]));
-  }, [token, data?.supplier?.id, isSupplier]);
+  }, [token, data?.supplier?.id, isSupplier, isAdmin]);
 
   useEffect(() => {
-    if (!isSupplier || !data?.supplier?.id || !token) return;
+    if (!(isSupplier || isAdmin) || !data?.supplier?.id || !token) return;
     const po = shipPo.trim();
     if (!po) {
       setShipPartOptions([]);
@@ -248,7 +251,7 @@ export function SupplierProfile() {
         .finally(() => setShipPartLoading(false));
     }, 400);
     return () => window.clearTimeout(t);
-  }, [isSupplier, data?.supplier?.id, shipPo, token]);
+  }, [isSupplier, isAdmin, data?.supplier?.id, shipPo, token]);
 
   const refresh = () => {
     if (!token) return;
@@ -539,45 +542,26 @@ export function SupplierProfile() {
         </div>
       </div>
 
-      {isSupplier && (
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Upload record</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Submit a document for review. Your organization is linked automatically (no supplier picker).
-          </p>
-          <form onSubmit={submitRecord}>
-            <div className="input-group">
-              <label className="input-label">Name *</label>
-              <input className="input" value={recordName} onChange={(e) => setRecordName(e.target.value)} required />
-            </div>
-            <div className="input-group">
-              <label className="input-label">File *</label>
-              <input
-                className="input"
-                type="file"
-                onChange={(e) => setRecordFile(e.target.files?.[0] ?? null)}
-                required
-              />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Notes (optional)</label>
-              <textarea className="input" rows={2} value={recordNotes} onChange={(e) => setRecordNotes(e.target.value)} />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? '…' : 'Submit'}
-            </button>
-          </form>
-        </div>
-      </div>
-      )}
+      <SectionTable
+        title="Quality Score history"
+        empty="No Quality Score snapshots."
+        rowCount={data.riskSnapshots.length}
+      >
+        {weeklyRiskSeries.length === 0 ? (
+          <p className="table-empty">No numeric Quality Scores yet.</p>
+        ) : (
+          <RiskHistoryLineChart points={weeklyRiskSeries} />
+        )}
+      </SectionTable>
 
-      {isSupplier && (
+      {canShowSupplierRequestAndRecord ? (
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Upload shipment</h2>
+          <h2 style={{ marginTop: 0 }}>Shipment request</h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-            Request a shipment inspection. Appears on Shipments and Internal Management for your team.
+            {isAdmin && !isSupplier
+              ? 'Add an inspection request for the supplier selected above. It appears on Shipments and Internal Management.'
+              : 'Request a shipment inspection. Appears on Shipments and Internal Management for your team.'}
           </p>
           <form onSubmit={submitShipment}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
@@ -640,7 +624,140 @@ export function SupplierProfile() {
           </form>
         </div>
       </div>
-      )}
+      ) : null}
+
+      {canShowSupplierRequestAndRecord ? (
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Record upload</h2>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            {isAdmin && !isSupplier
+              ? 'Upload a file for the supplier selected above. It is submitted for review like supplier uploads.'
+              : 'Submit a document for review. Your organization is linked automatically (no supplier picker).'}
+          </p>
+          <form onSubmit={submitRecord}>
+            <div className="input-group">
+              <label className="input-label">Name *</label>
+              <input className="input" value={recordName} onChange={(e) => setRecordName(e.target.value)} required />
+            </div>
+            <div className="input-group">
+              <label className="input-label">File *</label>
+              <input
+                className="input"
+                type="file"
+                onChange={(e) => setRecordFile(e.target.files?.[0] ?? null)}
+                required
+              />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Notes (optional)</label>
+              <textarea className="input" rows={2} value={recordNotes} onChange={(e) => setRecordNotes(e.target.value)} />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? '…' : 'Upload'}
+            </button>
+          </form>
+        </div>
+      </div>
+      ) : null}
+
+      <SectionTable title="Shipment Inspection Requests" empty="No requests." rowCount={data.shipments.length}>
+        <table className="table">
+          <thead>
+            <tr style={{ verticalAlign: 'bottom' }}>
+              <th>Shipment ID</th>
+              <th>Supplier</th>
+              <th>P.O.</th>
+              <th>Part Number</th>
+              <th>Quantity</th>
+              <th>Lot</th>
+              <th style={{ whiteSpace: 'nowrap' }}>Requested inspection date</th>
+              <th>User</th>
+              <th>Date Created</th>
+              <th>NOTES</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.shipments.map((s) => (
+              <tr key={s.id}>
+                <td>{s.code ?? '—'}</td>
+                <td>
+                  {supplier?.code ?? '—'}: {supplier?.name ?? ''}
+                </td>
+                <td>{s.purchaseOrder ?? '—'}</td>
+                <td>{s.partNumber ?? '—'}</td>
+                <td>{s.qty ?? '—'}</td>
+                <td>{s.lot ?? '—'}</td>
+                <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
+                <td>{formatShipmentCreatedByLabel(s.createdBy)}</td>
+                <td>
+                  {new Date(s.createdAt).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </td>
+                <td
+                  style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={s.notes ?? ''}
+                >
+                  {s.notes?.trim() ? s.notes : '—'}
+                </td>
+                <td>{shipmentInspectionStatusLabel(s.status)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SectionTable>
+
+      <SectionTable
+        title="Records"
+        empty="No records."
+        rowCount={data.records.length}
+        excelExport={{
+          filename: `${safeExportFilePart(supplier.code)}_Records`,
+          sheetName: 'Records',
+          getRows: () =>
+            data.records.map(
+              (r): ExportRow => ({
+                Name: r.name,
+                Notes: r.notes ?? '',
+                File: r.filePath ? 'Yes' : '',
+                Source: r.internalOrSupplier,
+                Status: r.status,
+                Created: new Date(r.createdAt).toLocaleString(),
+              })
+            ),
+        }}
+      >
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Notes</th>
+              <th>File</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.records.map((r) => (
+              <tr key={r.id}>
+                <td>{r.name}</td>
+                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes ?? ''}>
+                  {r.notes?.trim() ? r.notes : '—'}
+                </td>
+                <td>{r.filePath ? 'Yes' : '—'}</td>
+                <td>{r.internalOrSupplier}</td>
+                <td>{r.status}</td>
+                <td>{new Date(r.createdAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SectionTable>
 
       <SectionTable
         title="Audits"
@@ -752,116 +869,6 @@ export function SupplierProfile() {
           </tbody>
         </table>
       </SectionTable>
-
-      <SectionTable
-        title="Risk history"
-        empty="No risk snapshots."
-        rowCount={data.riskSnapshots.length}
-      >
-        {weeklyRiskSeries.length === 0 ? (
-          <p className="table-empty">No numeric risk scores yet.</p>
-        ) : (
-          <RiskHistoryLineChart points={weeklyRiskSeries} />
-        )}
-      </SectionTable>
-
-      <SectionTable
-        title="Records"
-        empty="No records."
-        rowCount={data.records.length}
-        excelExport={{
-          filename: `${safeExportFilePart(supplier.code)}_Records`,
-          sheetName: 'Records',
-          getRows: () =>
-            data.records.map(
-              (r): ExportRow => ({
-                Name: r.name,
-                Notes: r.notes ?? '',
-                File: r.filePath ? 'Yes' : '',
-                Source: r.internalOrSupplier,
-                Status: r.status,
-                Created: new Date(r.createdAt).toLocaleString(),
-              })
-            ),
-        }}
-      >
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Notes</th>
-              <th>File</th>
-              <th>Source</th>
-              <th>Status</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.records.map((r) => (
-              <tr key={r.id}>
-                <td>{r.name}</td>
-                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes ?? ''}>
-                  {r.notes?.trim() ? r.notes : '—'}
-                </td>
-                <td>{r.filePath ? 'Yes' : '—'}</td>
-                <td>{r.internalOrSupplier}</td>
-                <td>{r.status}</td>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </SectionTable>
-
-      <SectionTable title="Shipment inspection requests" empty="No requests." rowCount={data.shipments.length}>
-        <table className="table">
-          <thead>
-            <tr style={{ verticalAlign: 'bottom' }}>
-              <th>Shipment ID</th>
-              <th>Supplier</th>
-              <th>P.O.</th>
-              <th>Part Number</th>
-              <th>Quantity</th>
-              <th>Lot</th>
-              <th style={{ whiteSpace: 'nowrap' }}>Requested inspection date</th>
-              <th>User</th>
-              <th>Date Created</th>
-              <th>NOTES</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.shipments.map((s) => (
-              <tr key={s.id}>
-                <td>{s.code ?? '—'}</td>
-                <td>
-                  {supplier?.code ?? '—'}: {supplier?.name ?? ''}
-                </td>
-                <td>{s.purchaseOrder ?? '—'}</td>
-                <td>{s.partNumber ?? '—'}</td>
-                <td>{s.qty ?? '—'}</td>
-                <td>{s.lot ?? '—'}</td>
-                <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
-                <td>{formatShipmentCreatedByLabel(s.createdBy)}</td>
-                <td>
-                  {new Date(s.createdAt).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </td>
-                <td
-                  style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                  title={s.notes ?? ''}
-                >
-                  {s.notes?.trim() ? s.notes : '—'}
-                </td>
-                <td>{shipmentInspectionStatusLabel(s.status)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </SectionTable>
       </>
       )}
 
@@ -949,7 +956,7 @@ function RiskHistoryLineChart({ points }: { points: WeeklyRiskPoint[] }) {
   return (
     <div>
       <div style={{ marginBottom: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-        Weekly risk score trend
+        Weekly Quality Score trend
       </div>
       <div className="table-wrap" style={{ overflowX: 'auto' }}>
         <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', minWidth: 680, height: 'auto', display: 'block' }}>

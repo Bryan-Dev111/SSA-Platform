@@ -500,8 +500,6 @@ export function Findings() {
                             <Link
                               to={`/findings-record?id=${encodeURIComponent(f.id)}`}
                               className="finding-code-link"
-                              target="_blank"
-                              rel="noopener noreferrer"
                             >
                               {f.code}
                             </Link>
@@ -514,8 +512,6 @@ export function Findings() {
                                 to={`/shipments?supplierId=${encodeURIComponent(f.supplierId)}`}
                                 className="finding-code-link"
                                 title={`Shipment ${f.shipment.code?.trim() || f.shipment.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
                               >
                                 {f.shipment.code?.trim() || f.shipment.id}
                               </Link>
@@ -566,8 +562,6 @@ export function Findings() {
                                     to={`/car-record?id=${encodeURIComponent(c.id)}`}
                                     className="finding-code-link"
                                     style={{ fontSize: 'var(--text-sm)' }}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
                                   >
                                     {c.code}
                                     <span style={{ color: 'var(--color-text-muted)', marginLeft: 4 }}>({c.status})</span>
@@ -579,8 +573,6 @@ export function Findings() {
                                   to={`/car-record?findingId=${encodeURIComponent(f.id)}`}
                                   className="btn btn-ghost"
                                   style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
                                 >
                                   + New CAR
                                 </Link>
