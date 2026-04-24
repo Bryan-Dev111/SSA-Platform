@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { MetricCard } from '../../components/MetricCard';
+import {
+  computeClosedPurchaseOrderFinancials,
+  filterGlobalVendorsExpenses,
+} from '../../utils/globalSupplyClosedPoMetrics';
 
 type CountryValueRow = { country: string; value: number };
 type TimePointRow = { date: string; count: number };
@@ -12,6 +17,20 @@ type DashboardPayload = {
   kgCountryCocoa: CountryValueRow[];
   poCreationOverTimeOpen: TimePointRow[];
   sampleCountByCountry: CountryValueRow[];
+};
+
+type PurchaseOrderKpiRow = {
+  id: string;
+  status: string | null;
+  quantityKg: number | null;
+  pricePerKg: number | null;
+  totalAmount: number | null;
+};
+
+type ExpenseKpiRow = {
+  amount: number;
+  project: string;
+  purchaseOrderId?: string | null;
 };
 
 function formatMoney(value: number): string {
@@ -221,6 +240,9 @@ export function GlobalSupplyDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardPayload | null>(null);
+  const [poKpiLoading, setPoKpiLoading] = useState(true);
+  const [poOrdersKpi, setPoOrdersKpi] = useState<PurchaseOrderKpiRow[]>([]);
+  const [poExpensesKpi, setPoExpensesKpi] = useState<ExpenseKpiRow[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -234,6 +256,30 @@ export function GlobalSupplyDashboardPage() {
       })
       .finally(() => setLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setPoOrdersKpi([]);
+      setPoExpensesKpi([]);
+      setPoKpiLoading(false);
+      return;
+    }
+    setPoKpiLoading(true);
+    Promise.all([
+      apiJson<PurchaseOrderKpiRow[]>('/purchase-orders', { token }).catch(() => [] as PurchaseOrderKpiRow[]),
+      apiJson<{ list: ExpenseKpiRow[] }>('/expenses', { token }).catch(() => ({ list: [] as ExpenseKpiRow[] })),
+    ])
+      .then(([orders, ex]) => {
+        setPoOrdersKpi(orders);
+        setPoExpensesKpi(ex.list);
+      })
+      .finally(() => setPoKpiLoading(false));
+  }, [token]);
+
+  const closedPoKpis = useMemo(
+    () => computeClosedPurchaseOrderFinancials(poOrdersKpi, filterGlobalVendorsExpenses(poExpensesKpi)),
+    [poOrdersKpi, poExpensesKpi]
+  );
 
   const topRevenue = useMemo(() => (data?.revenueByCountry ?? []).slice(0, 12), [data]);
   const topProfit = useMemo(() => (data?.profitByCountry ?? []).slice(0, 12), [data]);
@@ -252,7 +298,7 @@ export function GlobalSupplyDashboardPage() {
   return (
     <div className="page page-dashboard">
       <header className="page-header">
-        <h1 className="page-title">Dashboard</h1>
+        <h1 className="page-title">Business Dashboard</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
           {greeting}, {displayName}. Here is what is happening with your farms today.
         </p>
@@ -262,9 +308,44 @@ export function GlobalSupplyDashboardPage() {
       {loading && !data ? (
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading global supply dashboard…</p>
+          <p style={{ marginTop: 12 }}>Loading business dashboard…</p>
         </div>
       ) : null}
+
+      <div
+        className="dashboard-metric-grid"
+        style={{
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          marginBottom: '1rem',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+        }}
+      >
+        <MetricCard
+          title="Total Closed POs"
+          value={poKpiLoading ? '—' : closedPoKpis.closedCount}
+          subtitle="Purchase orders with status Closed"
+        />
+        <MetricCard
+          title="Average Revenue per PO"
+          value={
+            poKpiLoading || closedPoKpis.closedCount === 0
+              ? '—'
+              : formatMoney(closedPoKpis.averageRevenuePerClosedPo)
+          }
+          subtitle="Mean revenue among closed purchase orders only"
+        />
+        <MetricCard
+          title="Average Profit per PO"
+          value={
+            poKpiLoading || closedPoKpis.closedCount === 0
+              ? '—'
+              : formatMoney(closedPoKpis.averageProfitPerClosedPo)
+          }
+          subtitle="Mean (revenue − linked Global Vendors expenses) for closed POs"
+        />
+      </div>
 
       <div
         style={{

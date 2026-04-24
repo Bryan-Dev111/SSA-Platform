@@ -181,11 +181,6 @@ export function InternalManagementCalendarView({ token }: { token: string | null
           </div>
         </div>
 
-        <p style={{ marginTop: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-          Audit codes and shipment IDs appear on their inspection dates. Shipments without an inspection date use the
-          created date.
-        </p>
-
         {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
         {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
 

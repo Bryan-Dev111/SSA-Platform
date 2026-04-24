@@ -90,6 +90,7 @@ router.get(
   '/',
   requirePageAccessAny([
     'GlobalSupplyFarmers',
+    'GlobalSupplyFarmDashboard',
     'GlobalSupplyFarmProfile',
     'GlobalSupplyProcessingQuality',
     'GlobalSupplyApproved',

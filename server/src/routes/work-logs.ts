@@ -128,7 +128,7 @@ router.post(
 
     const me = await prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, email: true },
+      select: { name: true, email: true, country: true },
     });
     const fullName = (me?.name?.trim() || me?.email || '').trim();
     if (!fullName) {
@@ -156,6 +156,9 @@ router.post(
     const rate = await hourlyRateForFullName(fullName);
     const totalCost = hoursWorked * rate;
     const costCode = await getNextCode('COST');
+    const expCode = await getNextCode('EXP');
+    const expenseCountry = me?.country?.trim() || null;
+    const payrollDescription = `Paying ${fullName}`;
 
     const created = await prisma.$transaction(async (tx) => {
       const wl = await tx.workLog.create({
@@ -184,6 +187,19 @@ router.post(
           totalCost,
           paidStatus: 'Pending',
           createdById: userId,
+        },
+      });
+      await tx.expense.create({
+        data: {
+          code: expCode,
+          status: 'Open',
+          type: 'Payroll',
+          description: payrollDescription,
+          project: 'Global Vendors',
+          amount: totalCost,
+          expenseDate: workDate,
+          paymentMethod: '',
+          country: expenseCountry,
         },
       });
       return tx.workLog.findUniqueOrThrow({

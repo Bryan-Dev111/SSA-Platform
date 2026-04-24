@@ -10,7 +10,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 const router = Router();
 
 router.use(authMiddleware);
-router.use(requireRole(['Admin']));
+router.use(requireRole(['Admin', 'QualityManager']));
 
 router.post(
   '/',

@@ -12,6 +12,7 @@ const READ_ROLES = [
   'Auditor',
   'Buyer',
   'CommodityBuyer',
+  'SourcingDirector',
   'Farmer',
 ] as const;
 

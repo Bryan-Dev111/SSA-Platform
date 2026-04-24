@@ -42,9 +42,6 @@ export function GlobalVendorsAdmin() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">Admin</h1>
-        <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          Sentinel Global Supply — users and permissions.
-        </p>
       </header>
 
       <div

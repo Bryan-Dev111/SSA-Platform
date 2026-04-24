@@ -11,6 +11,9 @@ export function GlobalVendorsIndex() {
   if (canAccessPath('/global-vendors/dashboard', roleNames)) {
     return <Navigate to="/global-vendors/dashboard" replace />;
   }
+  if (canAccessPath('/global-vendors/farm-dashboard', roleNames)) {
+    return <Navigate to="/global-vendors/farm-dashboard" replace />;
+  }
   if (canAccessPath('/global-vendors/farmers', roleNames)) {
     return <Navigate to="/global-vendors/farmers" replace />;
   }

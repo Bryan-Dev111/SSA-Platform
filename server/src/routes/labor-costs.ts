@@ -43,6 +43,32 @@ router.get(
   })
 );
 
+/** Pending (open) labor costs: count and total USD; same scope rules as GET /. */
+router.get(
+  '/open-summary',
+  requirePageAccess('WorkLogs'),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const all = req.query.scope === 'all' && canViewAllLaborCosts(req.user);
+    const where = {
+      paidStatus: 'Pending' as const,
+      ...(all ? {} : { createdById: req.user.id }),
+    };
+    const [sumRow, openCount] = await Promise.all([
+      prisma.laborCost.aggregate({
+        where,
+        _sum: { totalCost: true },
+      }),
+      prisma.laborCost.count({ where }),
+    ]);
+    const openTotalUsd = sumRow._sum.totalCost ?? 0;
+    res.json({ openCount, openTotalUsd });
+  })
+);
+
 router.post(
   '/',
   requirePageAccess('InternalManagement'),

@@ -32,6 +32,25 @@ export function SidebarNavIcon({ path }: { path: string }) {
           <rect x="13" y="13" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="2" />
         </Svg>
       );
+    case '/global-vendors/farm-dashboard':
+      return (
+        <Svg>
+          <path
+            d="M3 21h18M6 21V12l6-5 6 5v9M10 21v-5h4v5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M12 3v2M9 5h6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
     case '/risk':
       return (
         <Svg>
@@ -220,6 +239,22 @@ export function SidebarNavIcon({ path }: { path: string }) {
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+        </Svg>
+      );
+    case '/global-vendors/internal-management':
+      return (
+        <Svg>
+          <path d="M12 3v18M8 8h8M8 16h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="12" cy="6" r="2" stroke="currentColor" strokeWidth="2" />
+          <circle cx="8" cy="14" r="2" stroke="currentColor" strokeWidth="2" />
+          <circle cx="16" cy="14" r="2" stroke="currentColor" strokeWidth="2" />
+        </Svg>
+      );
+    case '/global-vendors/work-logs':
+      return (
+        <Svg>
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+          <path d="M12 7v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case '/global-vendors/purchase-orders':

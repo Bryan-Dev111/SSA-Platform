@@ -41,6 +41,7 @@ import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
 import { LogisticsProfilePage } from './pages/globalVendors/LogisticsProfilePage';
 import { GlobalSupplyDashboardPage } from './pages/globalVendors/GlobalSupplyDashboardPage';
+import { FarmDashboardPage } from './pages/globalVendors/FarmDashboardPage';
 import { GlobalFarmProfilePage } from './pages/globalVendors/FarmSectionMediaPage';
 import { GlobalSupplyInternalManagementPage } from './pages/globalVendors/GlobalSupplyInternalManagementPage';
 import { BuyerRelationshipsPage } from './pages/globalVendors/BuyerRelationshipsPage';
@@ -111,6 +112,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/dashboard">
                     <GlobalSupplyDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farm-dashboard"
+                element={
+                  <ProtectedRoute path="/global-vendors/farm-dashboard">
+                    <FarmDashboardPage />
                   </ProtectedRoute>
                 }
               />
@@ -207,6 +216,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/internal-management">
                     <GlobalSupplyInternalManagementPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="work-logs"
+                element={
+                  <ProtectedRoute path="/global-vendors/work-logs">
+                    <WorkLogs variant="globalSupplyTopRow" />
                   </ProtectedRoute>
                 }
               />

@@ -22,6 +22,7 @@ export function GlobalSupplyExpensesSection() {
       countryOptionsEndpoint="/global-supply-options/countries"
       hideProject
       openExpenseTracking
+      showPurchaseOrderPicker
       canCloseExpense={isAdmin}
       canEditExpense={isAdmin}
     />

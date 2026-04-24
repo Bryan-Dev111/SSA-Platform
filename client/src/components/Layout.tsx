@@ -62,13 +62,15 @@ const MENU_ITEMS: { path: string; label: string }[] = [
 ];
 
 const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
-  { path: '/global-vendors/dashboard', label: 'Dashboard' },
+  { path: '/global-vendors/dashboard', label: 'Business Dashboard' },
+  { path: '/global-vendors/farm-dashboard', label: 'Farm Dashboard' },
   { path: '/global-vendors/farmers', label: 'Farm Information' },
   { path: '/global-vendors/approved', label: 'Approved Farms List' },
   { path: '/global-vendors/map', label: 'Farms Map' },
   { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
   { path: '/global-vendors/buyer-relationships', label: 'Buyer Relationships' },
   { path: '/global-vendors/internal-management', label: 'Internal Management' },
+  { path: '/global-vendors/work-logs', label: 'Work Logs' },
   { path: '/global-vendors/samples', label: 'Samples' },
   { path: '/global-vendors/logistics', label: 'Logistics' },
   { path: '/global-vendors/admin', label: 'Admin' },

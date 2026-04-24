@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
 import { formatUsd } from '../../utils/formatUsd';
+import { formatDisplayCalendarDate } from '../../utils/formatDisplayDates';
+import { MetricCard } from '../../components/MetricCard';
 
 interface LaborCostRow {
   id: string;
@@ -40,10 +42,15 @@ interface UserOption {
   hourlyRate?: number | null;
 }
 
+interface LaborCostOpenSummary {
+  openCount: number;
+  openTotalUsd: number;
+}
+
 function formatLaborCostDate(r: LaborCostRow): string {
   const w = r.workLog?.workDate;
-  if (w) return w.slice(0, 10);
-  return r.createdAt.slice(0, 10);
+  if (w) return formatDisplayCalendarDate(w);
+  return formatDisplayCalendarDate(r.createdAt);
 }
 
 function LaborCostRateField({
@@ -100,6 +107,7 @@ export function AdminLaborCostsPanel({
   listScope?: 'mine' | 'all';
 }) {
   const [rows, setRows] = useState<LaborCostRow[]>([]);
+  const [openSummary, setOpenSummary] = useState<LaborCostOpenSummary | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLogOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,18 +126,30 @@ export function AdminLaborCostsPanel({
 
   const qs = listScope === 'all' ? '?scope=all' : '';
 
+  const refreshOpenSummary = useCallback(async () => {
+    if (!token) return;
+    try {
+      const s = await apiJson<LaborCostOpenSummary>(`/labor-costs/open-summary${qs}`, { token });
+      setOpenSummary(s);
+    } catch {
+      /* keep prior summary on transient errors */
+    }
+  }, [token, qs]);
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
     setError(null);
     Promise.all([
       apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }),
+      apiJson<LaborCostOpenSummary>(`/labor-costs/open-summary${qs}`, { token }).catch(() => null),
       apiJson<WorkLogOption[]>(`/work-logs${qs}`, { token }).catch(() => []),
       apiJson<ProjectOption[]>('/project-history', { token }).catch(() => []),
       apiJson<UserOption[]>('/users', { token }).catch(() => []),
     ])
-      .then(([costs, logs, proj, users]) => {
+      .then(([costs, summary, logs, proj, users]) => {
         setRows(costs);
+        setOpenSummary(summary ?? null);
         setWorkLogs(logs);
         setProjects(proj);
         const next: Record<string, number> = {};
@@ -178,6 +198,7 @@ export function AdminLaborCostsPanel({
         }),
       });
       setRows((prev) => [created, ...prev]);
+      void refreshOpenSummary();
       setForm({
         workLogId: '',
         projectHistoryId: '',
@@ -204,6 +225,7 @@ export function AdminLaborCostsPanel({
         body: JSON.stringify({ paidStatus }),
       });
       setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
+      void refreshOpenSummary();
     } catch (e) {
       setError(parseApiError(e));
     } finally {
@@ -222,6 +244,7 @@ export function AdminLaborCostsPanel({
         body: JSON.stringify({ rate }),
       });
       setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
+      void refreshOpenSummary();
     } catch (e) {
       setError(parseApiError(e));
     } finally {
@@ -233,6 +256,27 @@ export function AdminLaborCostsPanel({
     <div className="card">
       <div className="card-body">
         <h2 style={{ marginTop: 0 }}>Labor Costs</h2>
+        <div
+          className="dashboard-metric-grid"
+          style={{
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            marginBottom: '1rem',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+          }}
+        >
+          <MetricCard
+            title="Total Open Costs"
+            value={openSummary == null ? '—' : openSummary.openCount}
+            subtitle="Labor cost rows with status Pending"
+          />
+          <MetricCard
+            title="Open Costs ($ value)"
+            value={openSummary == null ? '—' : formatUsd(openSummary.openTotalUsd)}
+            subtitle="Sum of total cost (USD) for pending rows"
+          />
+        </div>
         {error && <div className="alert-error">{error}</div>}
         <form onSubmit={createCost} style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>

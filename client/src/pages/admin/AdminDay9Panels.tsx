@@ -204,11 +204,18 @@ interface ExpenseRow {
   expenseDate: string;
   paymentMethod: string;
   country: string | null;
+  purchaseOrderId?: string | null;
+  purchaseOrder?: { id: string; code: string } | null;
   attachmentFilePath: string | null;
   attachmentFileName: string | null;
   attachmentFileMime: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface ExpenseOpenPoOption {
+  id: string;
+  code: string;
 }
 
 interface ExpenseCountryOption {
@@ -234,6 +241,7 @@ type ExpenseSortKey =
   | 'type'
   | 'description'
   | 'project'
+  | 'po'
   | 'amount'
   | 'expenseDate'
   | 'paymentMethod'
@@ -248,6 +256,7 @@ export function AdminExpensesPanel({
   countryOptionsEndpoint = null,
   hideProject = false,
   openExpenseTracking = false,
+  showPurchaseOrderPicker = false,
   canCloseExpense = false,
   canEditExpense = true,
 }: {
@@ -265,6 +274,8 @@ export function AdminExpensesPanel({
   hideProject?: boolean;
   /** Global Supply: show Open expense total, Expense ID column, and Close (Admin-only). */
   openExpenseTracking?: boolean;
+  /** Global Supply: PO dropdown (None + open POs only) on add/edit and table column. */
+  showPurchaseOrderPicker?: boolean;
   /** Whether the current user may close expenses (typically Admin). */
   canCloseExpense?: boolean;
   /** Whether the current user may add/edit expense rows and manage expense attachments. */
@@ -280,6 +291,8 @@ export function AdminExpensesPanel({
   const [paymentMethod, setPaymentMethod] = useState('');
   const [country, setCountry] = useState('');
   const [countryOptions, setCountryOptions] = useState<ExpenseCountryOption[]>([]);
+  const [openPurchaseOrders, setOpenPurchaseOrders] = useState<ExpenseOpenPoOption[]>([]);
+  const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [addAttachmentFile, setAddAttachmentFile] = useState<File | null>(null);
   const [attachmentBusyId, setAttachmentBusyId] = useState<string | null>(null);
   const [closeBusyId, setCloseBusyId] = useState<string | null>(null);
@@ -292,6 +305,7 @@ export function AdminExpensesPanel({
     expenseDate: string;
     paymentMethod: string;
     country: string;
+    purchaseOrderId: string;
   }>({
     type: '',
     description: '',
@@ -300,6 +314,7 @@ export function AdminExpensesPanel({
     expenseDate: '',
     paymentMethod: '',
     country: '',
+    purchaseOrderId: '',
   });
   const displayedList = useMemo(
     () => (projectFilter ? list.filter((r) => r.project === projectFilter) : list),
@@ -309,6 +324,20 @@ export function AdminExpensesPanel({
     key: null,
     dir: 'asc',
   });
+
+  const editPurchaseOrderSelectOptions = useMemo(() => {
+    if (!showPurchaseOrderPicker) return openPurchaseOrders;
+    const base = [...openPurchaseOrders];
+    if (!editId) return base;
+    const row = list.find((r) => r.id === editId);
+    if (row?.purchaseOrderId && !base.some((o) => o.id === row.purchaseOrderId)) {
+      base.unshift({
+        id: row.purchaseOrderId,
+        code: `${row.purchaseOrder?.code ?? 'PO'} (closed)`,
+      });
+    }
+    return base;
+  }, [showPurchaseOrderPicker, openPurchaseOrders, editId, list]);
 
   const sortedDisplayedList = useMemo(() => {
     const rows = [...displayedList];
@@ -329,6 +358,9 @@ export function AdminExpensesPanel({
           break;
         case 'project':
           c = cmpStr(a.project, b.project, dir);
+          break;
+        case 'po':
+          c = cmpStr(a.purchaseOrder?.code ?? '', b.purchaseOrder?.code ?? '', dir);
           break;
         case 'amount':
           c = cmpNum(a.amount, b.amount, dir);
@@ -369,7 +401,7 @@ export function AdminExpensesPanel({
     [displayedList, openExpenseTracking]
   );
 
-  const expenseTableColSpan = (hideProject ? 8 : 9) + (openExpenseTracking ? 2 : 0);
+  const expenseTableColSpan = (hideProject ? 8 : 9) + (openExpenseTracking ? 2 : 0) + (showPurchaseOrderPicker ? 1 : 0);
 
   useEffect(() => {
     if (fixedTypeProject) {
@@ -399,11 +431,19 @@ export function AdminExpensesPanel({
     try {
       const r = await apiJson<{ list: ExpenseRow[] }>('/expenses', { token });
       setList(r.list);
+      if (showPurchaseOrderPicker) {
+        try {
+          const po = await apiJson<{ list: ExpenseOpenPoOption[] }>('/expenses/open-purchase-orders', { token });
+          setOpenPurchaseOrders(po.list);
+        } catch {
+          setOpenPurchaseOrders([]);
+        }
+      }
     } catch {
       setList([]);
       toast.error('Failed to load expenses');
     }
-  }, [token, toast]);
+  }, [token, toast, showPurchaseOrderPicker]);
 
   const countryNameOptions = useMemo(() => {
     const names = new Set<string>();
@@ -517,6 +557,7 @@ export function AdminExpensesPanel({
           expenseDate,
           paymentMethod: paymentMethod.trim(),
           country: country.trim() || null,
+          ...(showPurchaseOrderPicker ? { purchaseOrderId: purchaseOrderId.trim() || null } : {}),
         }),
       });
       if (addAttachmentFile) {
@@ -553,6 +594,7 @@ export function AdminExpensesPanel({
           setExpenseDate(todayDateInputValue());
           setPaymentMethod('');
           setCountry('');
+          setPurchaseOrderId('');
           setAddAttachmentFile(null);
           return;
         }
@@ -572,6 +614,7 @@ export function AdminExpensesPanel({
       setExpenseDate(todayDateInputValue());
       setPaymentMethod('');
       setCountry('');
+      setPurchaseOrderId('');
       setAddAttachmentFile(null);
       toast.success('Expense added');
       await load();
@@ -592,6 +635,7 @@ export function AdminExpensesPanel({
       expenseDate: expenseDateInputValue(row.expenseDate),
       paymentMethod: row.paymentMethod ?? '',
       country: row.country ?? '',
+      purchaseOrderId: row.purchaseOrderId ?? '',
     });
   };
 
@@ -621,6 +665,7 @@ export function AdminExpensesPanel({
           expenseDate: editDraft.expenseDate,
           paymentMethod: editDraft.paymentMethod.trim(),
           country: editDraft.country.trim() || null,
+          ...(showPurchaseOrderPicker ? { purchaseOrderId: editDraft.purchaseOrderId.trim() || null } : {}),
         }),
       });
       setEditId(null);
@@ -652,6 +697,7 @@ export function AdminExpensesPanel({
       'Expense date': r.expenseDate ? new Date(r.expenseDate).toLocaleDateString() : '',
       'Payment method': r.paymentMethod ?? '',
       Country: r.country ?? '',
+      ...(showPurchaseOrderPicker ? { PO: r.purchaseOrder?.code ?? '' } : {}),
       Attachment: r.attachmentFileName ?? '',
       Recorded: new Date(r.createdAt).toLocaleString(),
     }));
@@ -755,6 +801,24 @@ export function AdminExpensesPanel({
               </datalist>
             ) : null}
           </div>
+          {showPurchaseOrderPicker && (
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label className="input-label">Purchase order</label>
+              <select
+                className="input"
+                value={purchaseOrderId}
+                onChange={(e) => setPurchaseOrderId(e.target.value)}
+                disabled={!canEditExpense}
+              >
+                <option value="">None</option>
+                {openPurchaseOrders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Attachment</label>
             <input
@@ -820,6 +884,15 @@ export function AdminExpensesPanel({
                   <SortableTh
                     label="Project"
                     columnKey="project"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                )}
+                {showPurchaseOrderPicker && (
+                  <SortableTh
+                    label="PO"
+                    columnKey="po"
                     activeKey={sort.key}
                     dir={sort.dir}
                     onSort={onSortColumn}
@@ -912,6 +985,27 @@ export function AdminExpensesPanel({
                           />
                         ) : (
                           row.project
+                        )}
+                      </td>
+                    )}
+                    {showPurchaseOrderPicker && (
+                      <td>
+                        {editId === row.id ? (
+                          <select
+                            className="input"
+                            value={editDraft.purchaseOrderId}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, purchaseOrderId: e.target.value }))}
+                            disabled={!canEditExpense}
+                          >
+                            <option value="">None</option>
+                            {editPurchaseOrderSelectOptions.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.code}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          row.purchaseOrder?.code ?? '—'
                         )}
                       </td>
                     )}
@@ -1095,10 +1189,19 @@ interface SupplierRow {
   longitude?: number | null;
 }
 
-const USER_ROLE_OPTIONS = ['Admin', 'Buyer', 'Supplier', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'] as const;
+const USER_ROLE_OPTIONS = [
+  'Admin',
+  'Buyer',
+  'Supplier',
+  'Viewer',
+  'QualityEngineer',
+  'QualityManager',
+  'Auditor',
+  'SourcingDirector',
+] as const;
 
-/** Preferred order for Global Supply Admin → Users role dropdown (must exist in DB). */
-const GLOBAL_SUPPLY_ROLE_PREFERRED_ORDER = ['Admin', 'Buyer', 'CommodityBuyer', 'Farmer'] as const;
+/** Preferred order for Global Supply Admin → Users role dropdown (must exist in DB). SSA Buyer is omitted; GS uses CommodityBuyer. */
+const GLOBAL_SUPPLY_ROLE_PREFERRED_ORDER = ['Admin', 'CommodityBuyer', 'SourcingDirector', 'Farmer'] as const;
 const GLOBAL_SUPPLY_PREFERRED_ROLE_SET = new Set<string>(GLOBAL_SUPPLY_ROLE_PREFERRED_ORDER);
 
 /** Never offer these in Global Supply role picks (Auditor / Inspector are SSA workflows). */
@@ -1121,13 +1224,15 @@ function isSentinelSupplierAssuranceOnlyAccount(roleNames: string[]): boolean {
 /** Roles that belong to main SSA workflows — excluded from GS dropdown so GS admins assign GS roles only. */
 const ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN = new Set([
   ...GLOBAL_SUPPLY_ROLE_EXCLUSIONS,
+  'Buyer',
   'Supplier',
   'QualityEngineer',
   'QualityManager',
 ]);
 
-/** Role rows omitted from Global Supply Admin → Permissions matrix (main SSA roles). */
+/** Role rows omitted from Global Supply Admin → Permissions matrix (main SSA roles + Buyer; GS uses CommodityBuyer). */
 const PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES = new Set([
+  'Buyer',
   'QualityEngineer',
   'QualityManager',
   'Supplier',
@@ -1135,12 +1240,13 @@ const PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES = new Set([
 ]);
 
 /** Role rows omitted from main Admin → Permissions matrix (Global Supply product roles). */
-const PERMISSION_MATRIX_SENTINEL_HIDE_ROLES = new Set(['Farmer', 'CommodityBuyer']);
+const PERMISSION_MATRIX_SENTINEL_HIDE_ROLES = new Set(['Farmer', 'CommodityBuyer', 'SourcingDirector']);
 
 function formatUserRoleLabel(roleName: string): string {
   if (roleName === 'QualityEngineer') return 'Quality Engineer';
   if (roleName === 'QualityManager') return 'Quality Manager';
-  if (roleName === 'CommodityBuyer') return 'Commodity buyer';
+  if (roleName === 'CommodityBuyer') return 'Commodity Buyer';
+  if (roleName === 'SourcingDirector') return 'Sourcing Director';
   if (roleName === 'Farmer') return 'Farmer';
   return roleName;
 }
@@ -1283,7 +1389,7 @@ export function AdminBuyersSuppliersPanel({
     );
     rest.sort((a, b) => a.localeCompare(b));
     const combined = [...preferred, ...rest];
-    return combined.length > 0 ? combined : ['Buyer'];
+    return combined.length > 0 ? combined : ['CommodityBuyer'];
   }, [globalSupplyUsersMode, availableRoleOptions, availableRoles, serverRoleSet]);
 
   /** Table role edit: GS options plus the user’s current role(s) if missing (keeps select valid). */
@@ -1306,7 +1412,7 @@ export function AdminBuyersSuppliersPanel({
 
   useEffect(() => {
     if (!globalSupplyUsersMode) return;
-    setNewUserRole((prev) => (globalSupplyCreateRoleOptions.includes(prev) ? prev : globalSupplyCreateRoleOptions[0] ?? 'Buyer'));
+    setNewUserRole((prev) => (globalSupplyCreateRoleOptions.includes(prev) ? prev : globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer'));
   }, [globalSupplyUsersMode, globalSupplyCreateRoleOptions]);
 
   const employeeContractorStats = useMemo(() => {
@@ -2063,7 +2169,7 @@ export function AdminBuyersSuppliersPanel({
                                 className="input"
                                 value={
                                   editUser.roleNames[0] ??
-                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer')
+                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Viewer')
                                 }
                                 onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
                               >
@@ -2174,7 +2280,7 @@ export function AdminBuyersSuppliersPanel({
                                 className="input"
                                 value={
                                   editUser.roleNames[0] ??
-                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer')
+                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Viewer')
                                 }
                                 onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
                               >
@@ -2219,7 +2325,7 @@ export function AdminBuyersSuppliersPanel({
                                   ...u,
                                   roleNames: u.roleNames.length
                                     ? [...u.roleNames]
-                                    : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'Buyer' : 'Viewer'],
+                                    : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Viewer'],
                                 });
                                 setEditUserPassword('');
                               }}

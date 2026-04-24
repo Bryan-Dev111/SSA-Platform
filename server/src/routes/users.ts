@@ -31,6 +31,7 @@ const ROLE_ALIASES: Record<string, string> = {
   qualityengineer: 'QualityEngineer',
   qualitymanager: 'QualityManager',
   qualitymanger: 'QualityManager',
+  sourcingdirector: 'SourcingDirector',
 };
 
 function normalizeRoleName(name: string): string {
@@ -83,6 +84,18 @@ function parseIsContractor(value: unknown): boolean {
   }
   if (typeof value === 'number') return value === 1;
   return false;
+}
+
+function assignedCountryNamesFromUser(u: {
+  assignedCountries: { country: string }[];
+  country: string | null;
+}): string[] {
+  const fromRows = u.assignedCountries.map((r) => r.country).filter(Boolean);
+  if (fromRows.length > 0) {
+    return [...new Set(fromRows)].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }
+  const legacy = u.country?.trim();
+  return legacy ? [legacy] : [];
 }
 
 router.use(authMiddleware);
@@ -322,6 +335,8 @@ router.get(
         hourlyRate: true,
         currency: true,
         country: true,
+        employmentResponsibilities: true,
+        employmentNotes: true,
         createdAt: true,
         userRoles: { include: { role: true } },
         supplier: { select: { id: true, code: true, name: true } },
@@ -331,6 +346,8 @@ router.get(
         employeeSuppliers: { select: { supplierId: true } },
         qeBuyers: { select: { buyerId: true } },
         qmQes: { select: { qualityEngineerId: true } },
+        sourcingDirectorStaffAsDirector: { select: { staffUserId: true } },
+        assignedCountries: { select: { country: true }, orderBy: { country: 'asc' } },
       },
       orderBy: { email: 'asc' },
     });
@@ -345,6 +362,9 @@ router.get(
         hourlyRate: u.hourlyRate,
         currency: u.currency,
         country: u.country,
+        assignedCountryNames: assignedCountryNamesFromUser(u),
+        employmentResponsibilities: u.employmentResponsibilities,
+        employmentNotes: u.employmentNotes,
         createdAt: u.createdAt,
         passwordPlain: decryptPassword(u.passwordEncrypted),
         roleNames: u.userRoles.map((ur) => ur.role.name),
@@ -355,6 +375,7 @@ router.get(
         employeeAssignedSupplierIds: u.employeeSuppliers.map((a) => a.supplierId),
         qeAssignedBuyerIds: u.qeBuyers.map((qb) => qb.buyerId),
         qmAssignedQeIds: u.qmQes.map((qq) => qq.qualityEngineerId),
+        sourcingDirectorAssignedStaffIds: u.sourcingDirectorStaffAsDirector.map((r) => r.staffUserId),
       }))
     );
   })
@@ -522,6 +543,8 @@ router.patch(
       hourlyRate?: number | null;
       currency?: string | null;
       country?: string | null;
+      employmentResponsibilities?: string | null;
+      employmentNotes?: string | null;
       passwordHash?: string;
       passwordEncrypted?: string | null;
     } = {};
@@ -576,8 +599,57 @@ router.patch(
       data.currency = typeof req.body?.currency === 'string' ? req.body.currency.trim() || null : null;
     }
 
-    if ('country' in req.body) {
+    /** When set, `UserAssignedCountry` rows are replaced after delete (keeps roster multi-country in sync). */
+    let replaceAssignedCountries: string[] | undefined;
+    if ('assignedCountryNames' in req.body) {
+      const raw = req.body?.assignedCountryNames;
+      if (raw !== null && !Array.isArray(raw)) {
+        res.status(400).json({ error: 'assignedCountryNames must be an array of strings or null' });
+        return;
+      }
+      const arr = raw === null ? [] : (raw as unknown[]);
+      const names = [...new Set(arr.map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean))];
+      for (const n of names) {
+        if (n.length > 128) {
+          res.status(400).json({ error: 'Each country must be at most 128 characters' });
+          return;
+        }
+      }
+      if (names.length > 64) {
+        res.status(400).json({ error: 'At most 64 countries per user' });
+        return;
+      }
+      replaceAssignedCountries = names;
+      data.country = names[0] ?? null;
+    } else if ('country' in req.body) {
       data.country = typeof req.body?.country === 'string' ? req.body.country.trim() || null : null;
+      replaceAssignedCountries = data.country ? [data.country] : [];
+    }
+
+    if ('employmentResponsibilities' in req.body) {
+      const raw = req.body?.employmentResponsibilities;
+      if (raw === null || raw === undefined) {
+        data.employmentResponsibilities = null;
+      } else if (typeof raw === 'string') {
+        const t = raw.trim();
+        data.employmentResponsibilities = t.length > 0 ? t.slice(0, 8000) : null;
+      } else {
+        res.status(400).json({ error: 'employmentResponsibilities must be a string or null' });
+        return;
+      }
+    }
+
+    if ('employmentNotes' in req.body) {
+      const raw = req.body?.employmentNotes;
+      if (raw === null || raw === undefined) {
+        data.employmentNotes = null;
+      } else if (typeof raw === 'string') {
+        const t = raw.trim();
+        data.employmentNotes = t.length > 0 ? t.slice(0, 8000) : null;
+      } else {
+        res.status(400).json({ error: 'employmentNotes must be a string or null' });
+        return;
+      }
     }
 
     if ('password' in req.body) {
@@ -608,6 +680,14 @@ router.patch(
         await tx.userRole.deleteMany({ where: { userId: id } });
         await tx.userRole.createMany({ data: roleRows.map((r) => ({ userId: id, roleId: r.id })) });
       }
+      if (replaceAssignedCountries !== undefined) {
+        await tx.userAssignedCountry.deleteMany({ where: { userId: id } });
+        if (replaceAssignedCountries.length > 0) {
+          await tx.userAssignedCountry.createMany({
+            data: replaceAssignedCountries.map((country) => ({ userId: id, country })),
+          });
+        }
+      }
       return tx.user.update({
         where: { id },
         data,
@@ -622,11 +702,14 @@ router.patch(
           hourlyRate: true,
           currency: true,
           country: true,
+          employmentResponsibilities: true,
+          employmentNotes: true,
           createdAt: true,
           userRoles: { include: { role: true } },
           supplier: { select: { id: true, code: true, name: true } },
           buyerSuppliers: { select: { supplierId: true } },
           qeSuppliers: { select: { supplierId: true } },
+          assignedCountries: { select: { country: true }, orderBy: { country: 'asc' } },
         },
       });
     });
@@ -641,6 +724,9 @@ router.patch(
       hourlyRate: updated.hourlyRate,
       currency: updated.currency,
       country: updated.country,
+      assignedCountryNames: assignedCountryNamesFromUser(updated),
+      employmentResponsibilities: updated.employmentResponsibilities,
+      employmentNotes: updated.employmentNotes,
       createdAt: updated.createdAt,
       passwordPlain: decryptPassword(updated.passwordEncrypted),
       roleNames: normalizeRoleNames(updated.userRoles.map((ur) => ur.role.name)),

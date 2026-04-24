@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
+import { formatDisplayCalendarDate, formatDisplayDateTime } from '../utils/formatDisplayDates';
 
 interface WorkLogRow {
   id: string;
@@ -77,9 +78,12 @@ interface EmployeeRatePreview {
   currency: string | null;
 }
 
-export function WorkLogs() {
+export type WorkLogsVariant = 'page' | 'embedded' | 'globalSupplyTopRow';
+
+export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   const { token, user } = useAuth();
   const toast = useToast();
+  const isGlobalSupplyTopRow = variant === 'globalSupplyTopRow';
   const [workLogs, setWorkLogs] = useState<WorkLogRow[]>([]);
   const [laborCosts, setLaborCosts] = useState<LaborCostRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -95,7 +99,8 @@ export function WorkLogs() {
     user?.roleNames.includes('Admin') || user?.roleNames.includes('QualityManager')
   );
 
-  const qs = scopeAll && canViewAll ? '?scope=all' : '';
+  /** Global Supply standalone page: no history tables, so scope toggle is hidden and always self scope. */
+  const qs = !isGlobalSupplyTopRow && scopeAll && canViewAll ? '?scope=all' : '';
 
   const selfLabel = useMemo(() => {
     const name = user?.name?.trim();
@@ -105,7 +110,7 @@ export function WorkLogs() {
   const [form, setForm] = useState({
     workDate: '',
     hoursWorked: '',
-    workType: 'Audit' as WorkLogRow['workType'],
+    workType: (variant === 'globalSupplyTopRow' ? 'Other' : 'Audit') as WorkLogRow['workType'],
     supplierId: '',
     auditId: '',
     shipmentId: '',
@@ -137,6 +142,20 @@ export function WorkLogs() {
     if (!token) return;
     setLoading(true);
     setError(null);
+    if (isGlobalSupplyTopRow) {
+      apiJson<EmployeeRatePreview>('/work-logs/preview-rate', { token })
+        .then((ratePreview) => {
+          setWorkLogs([]);
+          setLaborCosts([]);
+          setSuppliers([]);
+          setAudits([]);
+          setShipments([]);
+          setEmployeeRatePreview(ratePreview);
+        })
+        .catch((e) => setError(parseApiError(e)))
+        .finally(() => setLoading(false));
+      return;
+    }
     Promise.all([
       apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
       apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
@@ -158,7 +177,7 @@ export function WorkLogs() {
       })
       .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
-  }, [token, qs]);
+  }, [token, qs, isGlobalSupplyTopRow]);
 
   useEffect(() => {
     load();
@@ -187,13 +206,17 @@ export function WorkLogs() {
           description: form.description.trim() || null,
         }),
       });
-      setWorkLogs((prev) => [created, ...prev]);
-      const costs = await apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []);
-      setLaborCosts(costs);
+      if (!isGlobalSupplyTopRow) {
+        setWorkLogs((prev) => [created, ...prev]);
+        const costs = await apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []);
+        setLaborCosts(costs);
+      } else {
+        void load();
+      }
       setForm({
         workDate: '',
         hoursWorked: '',
-        workType: 'Audit',
+        workType: isGlobalSupplyTopRow ? 'Other' : 'Audit',
         supplierId: '',
         auditId: '',
         shipmentId: '',
@@ -207,16 +230,12 @@ export function WorkLogs() {
     }
   };
 
-  return (
-    <div className="page">
-      <header className="page-header">
-        <h1 className="page-title">Work Logs</h1>
-      </header>
-
+  const body = (
+    <>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Log time</h2>
-          {canViewAll && (
+          {canViewAll && !isGlobalSupplyTopRow && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: 'var(--text-sm)' }}>
               <input type="checkbox" checked={scopeAll} onChange={(e) => setScopeAll(e.target.checked)} />
               Show all users&apos; entries (Admin / Quality Manager)
@@ -224,6 +243,91 @@ export function WorkLogs() {
           )}
           {error && <div className="alert-error">{error}</div>}
           <form onSubmit={createWorkLog}>
+            {isGlobalSupplyTopRow ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: '0.5rem',
+                  alignItems: 'end',
+                }}
+              >
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Full name</label>
+                  <input className="input" value={selfLabel || '—'} readOnly title="Taken from your account" />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Date</label>
+                  <input
+                    className="input"
+                    type="date"
+                    value={form.workDate}
+                    onChange={(e) => setForm((p) => ({ ...p, workDate: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Hours worked</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.hoursWorked}
+                    onChange={(e) => setForm((p) => ({ ...p, hoursWorked: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Rate</label>
+                  <input
+                    className="input"
+                    readOnly
+                    value={
+                      employeeRatePreview === null
+                        ? 'Loading…'
+                        : `${employeeRatePreview.hourlyRate.toFixed(2)}${
+                            employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : ''
+                          }`
+                    }
+                    title="Matched by your account name or email to an employee user’s hourly rate"
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Total cost (estimate)</label>
+                  <input
+                    className="input"
+                    readOnly
+                    value={
+                      employeeRatePreview === null
+                        ? 'Loading…'
+                        : previewTotalCost !== null
+                          ? previewTotalCost.toFixed(2) +
+                            (employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : '')
+                          : '—'
+                    }
+                    title="Hours × rate (same calculation as the labor cost row when you save)"
+                  />
+                </div>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label className="input-label">Work type</label>
+                  <select
+                    className="input"
+                    value={form.workType}
+                    onChange={(e) => setForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))}
+                  >
+                    <option value="Audit">Audit</option>
+                    <option value="Inspection">Inspection</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={submitting || !selfLabel.trim()}>
+                  {submitting ? 'Saving…' : 'Save work log'}
+                </button>
+              </div>
+            ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Full name</label>
@@ -341,11 +445,14 @@ export function WorkLogs() {
                 {submitting ? 'Saving…' : 'Save work log'}
               </button>
             </div>
+            )}
           </form>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      {!isGlobalSupplyTopRow ? (
+        <>
+          <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>{scopeAll && canViewAll ? 'All work logs' : 'My work logs'}</h2>
           <div className="table-wrap">
@@ -372,14 +479,14 @@ export function WorkLogs() {
                     <tr key={r.id}>
                       <td>{r.code}</td>
                       <td>{r.fullName}</td>
-                      <td>{r.workDate?.slice(0, 10) ?? '—'}</td>
+                      <td>{formatDisplayCalendarDate(r.workDate)}</td>
                       <td>{r.hoursWorked}</td>
                       <td>{r.workType}</td>
                       <td>{r.projectHistory?.projectCode ?? '—'}</td>
                       <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description ?? ''}>
                         {r.description?.trim() ? r.description : '—'}
                       </td>
-                      <td>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td>{formatDisplayDateTime(r.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -392,9 +499,6 @@ export function WorkLogs() {
       <div className="card">
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>{scopeAll && canViewAll ? 'All labor cost lines (from logs)' : 'My labor cost lines'}</h2>
-          <p style={{ marginTop: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-            Rows created automatically when you save a work log. Internal Management → Labor Costs lists all entries for admins.
-          </p>
           <div className="table-wrap">
             {loading ? (
               <p className="table-empty">Loading…</p>
@@ -433,6 +537,21 @@ export function WorkLogs() {
           </div>
         </div>
       </div>
+        </>
+      ) : null}
+    </>
+  );
+
+  if (variant === 'embedded') {
+    return <div className="work-logs-embedded">{body}</div>;
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <h1 className="page-title">Work Logs</h1>
+      </header>
+      {body}
     </div>
   );
 }

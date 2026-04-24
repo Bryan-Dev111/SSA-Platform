@@ -18,6 +18,12 @@ import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/table
 import { InternalManagementOrgChart } from './InternalManagementOrgChart';
 import { InternalManagementCalendarView } from './InternalManagementCalendar';
 import type { InternalManagementTab as ImTab } from './internalManagementTabs';
+import { ManagementAssignmentsPanel } from './ManagementAssignmentsPanel';
+import {
+  formatDisplayCalendarDate,
+  formatDisplayCalendarRange,
+  formatDisplayDateTime,
+} from '../utils/formatDisplayDates';
 
 interface ProjectHistoryBuyer {
   id: string;
@@ -104,37 +110,13 @@ interface ProfitRow {
   status: string;
 }
 
-interface ManagementAssignmentActiveProject {
-  id: string;
-  projectCode: string;
-  companyName: string;
-  clientName: string;
-  popStart: string | null;
-  popEnd: string | null;
-  status: string;
-}
-
-interface ManagementAssignmentRow {
-  supplier: ProjectHistorySupplier | null;
-  activeProjects: ManagementAssignmentActiveProject[];
-}
-
-interface ManagementUserRow {
-  id: string;
-  email: string;
-  name: string | null;
-  roleNames: string[];
-  qmAssignedQeIds?: string[];
-}
-
 function projectPopToInputDate(iso: string | null | undefined): string {
   if (!iso) return '';
   return iso.slice(0, 10);
 }
 
 function formatProjectPopCell(popStart: string | null, popEnd: string | null): string {
-  if (!popStart || !popEnd) return '—';
-  return `${popStart.slice(0, 10)} – ${popEnd.slice(0, 10)}`;
+  return formatDisplayCalendarRange(popStart, popEnd);
 }
 
 function formatContractProjectCell(r: InternalRow): string {
@@ -221,15 +203,9 @@ export function InternalManagement() {
   const [projectSubmitting, setProjectSubmitting] = useState(false);
   const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
-  const [managementAssignments, setManagementAssignments] = useState<ManagementAssignmentRow[]>([]);
   const [shipmentSort, setShipmentSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
   const [contractSort, setContractSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
   const [projectTableSort, setProjectTableSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
-  const [mgmtAssignSort, setMgmtAssignSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
-  const [managementUsers, setManagementUsers] = useState<ManagementUserRow[]>([]);
-  const [selectedQmId, setSelectedQmId] = useState('');
-  const [selectedQeId, setSelectedQeId] = useState('');
-  const [managementAssignBusy, setManagementAssignBusy] = useState(false);
 
   const filteredProjectHistories = useMemo(() => {
     return projectHistories.filter((r) => {
@@ -366,32 +342,6 @@ export function InternalManagement() {
     return list;
   }, [filteredProjectHistories, projectTableSort]);
 
-  const sortedManagementAssignments = useMemo(() => {
-    if (!mgmtAssignSort.key) return managementAssignments;
-    const { key: k, dir } = mgmtAssignSort;
-    const list = [...managementAssignments];
-    const supplierLabel = (row: ManagementAssignmentRow) =>
-      row.supplier ? `${row.supplier.code} ${row.supplier.name}` : 'No supplier assigned';
-    const projectsKey = (row: ManagementAssignmentRow) =>
-      [...row.activeProjects].map((p) => p.projectCode).sort().join('\u0001');
-    list.sort((a, b) => {
-      if (k === 'supplier') return cmpStr(supplierLabel(a), supplierLabel(b), dir);
-      if (k === 'projects') return cmpStr(projectsKey(a), projectsKey(b), dir);
-      return 0;
-    });
-    return list;
-  }, [managementAssignments, mgmtAssignSort]);
-
-  const managementQualityManagers = useMemo(
-    () => managementUsers.filter((u) => u.roleNames.includes('QualityManager')),
-    [managementUsers]
-  );
-
-  const managementQualityEngineers = useMemo(
-    () => managementUsers.filter((u) => u.roleNames.includes('QualityEngineer')),
-    [managementUsers]
-  );
-
   const projectHistoryRevenueTotal = useMemo(() => {
     return filteredProjectHistories.reduce((sum, r) => {
       const n = r.revenueAmount;
@@ -449,20 +399,6 @@ export function InternalManagement() {
       .catch(() => setProfitRows([]));
   };
 
-  const loadManagementAssignments = () => {
-    if (!token) return;
-    apiJson<ManagementAssignmentRow[]>('/project-history/management-assignments', { token })
-      .then(setManagementAssignments)
-      .catch(() => setManagementAssignments([]));
-  };
-
-  const loadManagementUsers = () => {
-    if (!token) return;
-    apiJson<ManagementUserRow[]>('/users', { token })
-      .then(setManagementUsers)
-      .catch(() => setManagementUsers([]));
-  };
-
   const load = () => {
     if (!token) return;
     Promise.all([
@@ -506,62 +442,14 @@ export function InternalManagement() {
   }, [token, isAdmin, tab]);
 
   useEffect(() => {
-    if (
-      !token ||
-      !isAdmin ||
-      (tab !== 'projectHistory' && tab !== 'profit' && tab !== 'managementAssignments')
-    )
-      return;
+    if (!token || !isAdmin || (tab !== 'projectHistory' && tab !== 'profit')) return;
     if (tab === 'projectHistory') {
       loadProjectHistories();
       loadProjectHistoryBuyers();
       loadContractEmployees();
     }
     if (tab === 'profit') loadProfit();
-    if (tab === 'managementAssignments') {
-      loadManagementAssignments();
-      loadManagementUsers();
-    }
   }, [token, isAdmin, tab]);
-
-  const assignQmToQe = async () => {
-    if (!token || !selectedQmId || !selectedQeId) return;
-    setManagementAssignBusy(true);
-    try {
-      await apiJson('/qm-qes', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({
-          qualityManagerId: selectedQmId,
-          qualityEngineerId: selectedQeId,
-        }),
-      });
-      toast.success('QM assigned to QE');
-      setSelectedQeId('');
-      loadManagementUsers();
-    } catch (e) {
-      toast.error(parseApiError(e));
-    } finally {
-      setManagementAssignBusy(false);
-    }
-  };
-
-  const removeQmToQe = async (qualityManagerId: string, qualityEngineerId: string) => {
-    if (!token) return;
-    setManagementAssignBusy(true);
-    try {
-      await apiJson(`/qm-qes/${qualityManagerId}/${qualityEngineerId}`, {
-        token,
-        method: 'DELETE',
-      });
-      toast.info('QM to QE assignment removed');
-      loadManagementUsers();
-    } catch (e) {
-      toast.error(parseApiError(e));
-    } finally {
-      setManagementAssignBusy(false);
-    }
-  };
 
   if (user && !isAdmin) {
     return <Navigate to={getDefaultPath(user.roleNames)} replace />;
@@ -850,7 +738,6 @@ export function InternalManagement() {
       resetProjectForm();
       loadProjectHistories();
       loadProfit();
-      loadManagementAssignments();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -885,7 +772,6 @@ export function InternalManagement() {
       if (projectEditingId === id) resetProjectForm();
       loadProjectHistories();
       loadProfit();
-      loadManagementAssignments();
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -904,13 +790,13 @@ export function InternalManagement() {
           [
             ['audits', 'Audits'],
             ['shipments', 'Shipments'],
+            ['calendar', 'Calendar'],
             ['documents', 'Documents'],
             ['projectHistory', 'Project History'],
-            ['managementAssignments', 'Management Assignments'],
             ['profit', 'Profit'],
-            ['employeeAssignments', 'Employee Assignments'],
             ['laborCosts', 'Labor Costs'],
-            ['calendar', 'Calendar'],
+            ['employeeAssignments', 'Employee Assignments'],
+            ['managementAssignments', 'Management Assignments'],
             ['orgChart', 'Org Chart'],
           ] as const
         ).map(([t, label]) => (
@@ -1198,7 +1084,7 @@ export function InternalManagement() {
                           <td>{r.purchaseOrder ?? '—'}</td>
                           <td>{r.partNumber ?? '—'}</td>
                           <td>{r.qty ?? '—'}</td>
-                          <td>{r.scheduledDate ? String(r.scheduledDate).slice(0, 10) : '—'}</td>
+                          <td>{formatDisplayCalendarDate(r.scheduledDate ? String(r.scheduledDate) : null)}</td>
                           <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {r.notes?.trim() ? r.notes : '—'}
                           </td>
@@ -1208,284 +1094,6 @@ export function InternalManagement() {
                               className="btn btn-danger"
                               disabled={scheduleBusyId === r.id}
                               onClick={() => setScheduleDeleteId(r.id)}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {tab === 'projectHistory' && (
-        <>
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Project attachments</h2>
-              <form
-                onSubmit={(e) =>
-                  void submit(e, {
-                    projectHistoryId: contractsProjectId.trim() ? contractsProjectId.trim() : null,
-                    buyerId: contractsBuyerId.trim() ? contractsBuyerId.trim() : null,
-                    employeeUserId: contractsEmployeeId.trim() ? contractsEmployeeId.trim() : null,
-                  })
-                }
-              >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns:
-                      'minmax(200px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(160px, 1fr) minmax(220px, 1.2fr) minmax(240px, 1.2fr) auto',
-                    gap: '0.75rem',
-                    alignItems: 'flex-end',
-                    paddingBottom: 22,
-                  }}
-                >
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Project</label>
-                    <select
-                      className="input"
-                      value={contractsProjectId}
-                      onChange={(e) => setContractsProjectId(e.target.value)}
-                    >
-                      <option value="">None</option>
-                      {[...projectHistories]
-                        .sort((a, b) => a.projectCode.localeCompare(b.projectCode))
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.projectCode} — {p.companyName}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Buyer</label>
-                    <select
-                      className="input"
-                      value={contractsBuyerId}
-                      onChange={(e) => setContractsBuyerId(e.target.value)}
-                    >
-                      <option value="">None</option>
-                      {buyerOptions.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {formatStaffFullName(b)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Employee</label>
-                    <select
-                      className="input"
-                      value={contractsEmployeeId}
-                      onChange={(e) => setContractsEmployeeId(e.target.value)}
-                    >
-                      <option value="">None</option>
-                      {contractEmployeeOptions.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {formatStaffFullName(u)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Name *</label>
-                    <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Type</label>
-                    <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Note</label>
-                    <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
-                    <label className="input-label">File (optional)</label>
-                    <input
-                      ref={fileInputRef}
-                      className="input"
-                      type="file"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        setFile(e.target.files?.[0] ?? null);
-                        setUploadProgress(null);
-                      }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button
-                        type="button"
-                        className="btn file-picker-btn"
-                        onClick={() => fileInputRef.current?.click()}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        Choose file
-                      </button>
-                      <span
-                        style={{
-                          fontSize: 'var(--text-xs)',
-                          color: 'var(--color-text-muted)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                          maxWidth: 170,
-                        }}
-                        title={file?.name || 'No file chosen'}
-                      >
-                        {file?.name || 'No file chosen'}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        minHeight: 18,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                      }}
-                    >
-                      <span>
-                        {file
-                          ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${
-                              file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'
-                            }`
-                          : ''}
-                      </span>
-                      {uploadProgress !== null && file ? (
-                        <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
-                          <span>{uploadProgress}%</span>
-                        </span>
-                      ) : (
-                        <span />
-                      )}
-                    </div>
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? '…' : 'Add'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Library</h2>
-              <div className="table-wrap">
-                {loading ? (
-                  <p className="table-empty">Loading…</p>
-                ) : rows.length === 0 ? (
-                  <p className="table-empty">No internal documents.</p>
-                ) : (
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <SortableTh
-                          label="Project"
-                          columnKey="project"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Buyer"
-                          columnKey="buyer"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Employee"
-                          columnKey="employee"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Name"
-                          columnKey="name"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Type"
-                          columnKey="type"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Note"
-                          columnKey="note"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <th>View</th>
-                        <SortableTh
-                          label="Updated"
-                          columnKey="updated"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedContractRows.map((r) => (
-                        <tr key={r.id}>
-                          <td>{formatContractProjectCell(r)}</td>
-                          <td>{formatStaffFullName(r.buyer)}</td>
-                          <td>{formatStaffFullName(r.employee)}</td>
-                          <td>{r.name}</td>
-                          <td>{r.category ?? '—'}</td>
-                          <td>{r.note ?? '—'}</td>
-                          <td>
-                            {r.filePath ? (
-                              <button
-                                type="button"
-                                className="btn"
-                                onClick={() => download(r)}
-                                disabled={downloading[r.id] !== undefined}
-                                style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
-                              >
-                                {downloading[r.id] !== undefined ? (
-                                  <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
-                                    <span>{downloading[r.id]}%</span>
-                                  </span>
-                                ) : (
-                                  'Download'
-                                )}
-                              </button>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td>{new Date(r.updatedAt).toLocaleString()}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              disabled={deletingId === r.id}
-                              onClick={() => setDeleteConfirmId(r.id)}
                             >
                               Delete
                             </button>
@@ -1652,7 +1260,7 @@ export function InternalManagement() {
                               '—'
                             )}
                           </td>
-                          <td>{new Date(r.updatedAt).toLocaleString()}</td>
+                          <td>{formatDisplayDateTime(r.updatedAt)}</td>
                           <td>
                             <button
                               type="button"
@@ -2037,163 +1645,273 @@ export function InternalManagement() {
               </div>
             </div>
           </div>
-        </>
-      )}
 
-      {tab === 'managementAssignments' && (
-        <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>QM to QE assignments</h2>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Quality Manager</label>
-                  <select
-                    className="input"
-                    value={selectedQmId}
-                    onChange={(e) => setSelectedQmId(e.target.value)}
-                    style={{ minWidth: 260 }}
-                  >
-                    <option value="">Select Quality Manager</option>
-                    {managementQualityManagers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name?.trim() ? `${m.name} (${m.email})` : m.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Quality Engineer</label>
-                  <select
-                    className="input"
-                    value={selectedQeId}
-                    onChange={(e) => setSelectedQeId(e.target.value)}
-                    style={{ minWidth: 260 }}
-                  >
-                    <option value="">Select Quality Engineer</option>
-                    {managementQualityEngineers.map((q) => (
-                      <option key={q.id} value={q.id}>
-                        {q.name?.trim() ? `${q.name} (${q.email})` : q.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void assignQmToQe()}
-                  disabled={managementAssignBusy || !selectedQmId || !selectedQeId}
+              <h2 style={{ marginTop: 0 }}>Project attachments</h2>
+              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Upload files linked to a project (optional buyer / employee). Rows appear in the library below.
+              </p>
+              <form
+                onSubmit={(e) =>
+                  void submit(e, {
+                    projectHistoryId: contractsProjectId.trim() ? contractsProjectId.trim() : null,
+                    buyerId: contractsBuyerId.trim() ? contractsBuyerId.trim() : null,
+                    employeeUserId: contractsEmployeeId.trim() ? contractsEmployeeId.trim() : null,
+                  })
+                }
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    gap: '0.75rem',
+                    alignItems: 'flex-end',
+                    paddingBottom: 22,
+                  }}
                 >
-                  Assign
-                </button>
-              </div>
-
-              <div className="table-wrap" style={{ marginTop: '1rem' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Quality Manager</th>
-                      <th>Assigned Quality Engineers</th>
-                      <th style={{ width: 100 }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {managementQualityManagers.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="table-empty">
-                          No Quality Managers found.
-                        </td>
-                      </tr>
-                    ) : (
-                      managementQualityManagers.flatMap((m) => {
-                        const qeIds = m.qmAssignedQeIds ?? [];
-                        if (qeIds.length === 0) {
-                          return (
-                            <tr key={m.id}>
-                              <td>{m.name?.trim() ? m.name : m.email}</td>
-                              <td colSpan={2} className="table-empty">
-                                None
-                              </td>
-                            </tr>
-                          );
-                        }
-                        return qeIds.map((qid) => {
-                          const qe = managementQualityEngineers.find((x) => x.id === qid);
-                          return (
-                            <tr key={`${m.id}-${qid}`}>
-                              <td>{m.name?.trim() ? m.name : m.email}</td>
-                              <td>{qe?.name?.trim() ? `${qe.name} (${qe.email})` : qe?.email ?? qid}</td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="btn btn-ghost"
-                                  onClick={() => void removeQmToQe(m.id, qid)}
-                                  disabled={managementAssignBusy}
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Project</label>
+                    <select
+                      className="input"
+                      value={contractsProjectId}
+                      onChange={(e) => setContractsProjectId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {[...projectHistories]
+                        .sort((a, b) => a.projectCode.localeCompare(b.projectCode))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.projectCode} — {p.companyName}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Buyer</label>
+                    <select
+                      className="input"
+                      value={contractsBuyerId}
+                      onChange={(e) => setContractsBuyerId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {buyerOptions.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {formatStaffFullName(b)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Employee</label>
+                    <select
+                      className="input"
+                      value={contractsEmployeeId}
+                      onChange={(e) => setContractsEmployeeId(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {contractEmployeeOptions.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {formatStaffFullName(u)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Name *</label>
+                    <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Type</label>
+                    <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">Note</label>
+                    <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+                  </div>
+                  <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
+                    <label className="input-label">File (optional)</label>
+                    <input
+                      ref={fileInputRef}
+                      className="input"
+                      type="file"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        setFile(e.target.files?.[0] ?? null);
+                        setUploadProgress(null);
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn file-picker-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Choose file
+                      </button>
+                      <span
+                        style={{
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-text-muted)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                          maxWidth: 170,
+                        }}
+                        title={file?.name || 'No file chosen'}
+                      >
+                        {file?.name || 'No file chosen'}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        minHeight: 18,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                      }}
+                    >
+                      <span>
+                        {file
+                          ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${
+                              file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'
+                            }`
+                          : ''}
+                      </span>
+                      {uploadProgress !== null && file ? (
+                        <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
+                          <span>{uploadProgress}%</span>
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  </div>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? '…' : 'Add'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
 
-          <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Supplier active projects</h2>
-              <p
-                style={{
-                  marginTop: 0,
-                  marginBottom: '0.75rem',
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                Every row is one supplier. Each list entry is an active project (Period of Performance includes today, UTC).
-                Assign a supplier on each record in Project History.
-              </p>
+              <h2 style={{ marginTop: 0 }}>Project attachment library</h2>
               <div className="table-wrap" style={{ overflowX: 'auto' }}>
-                {managementAssignments.length === 0 ? (
-                  <p className="table-empty">No suppliers with active projects.</p>
+                {loading ? (
+                  <p className="table-empty">Loading…</p>
+                ) : rows.length === 0 ? (
+                  <p className="table-empty">No internal documents.</p>
                 ) : (
                   <table className="table">
                     <thead>
                       <tr>
                         <SortableTh
-                          label="Supplier"
-                          columnKey="supplier"
-                          activeKey={mgmtAssignSort.key}
-                          dir={mgmtAssignSort.dir}
-                          onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
-                          style={{ minWidth: 200 }}
+                          label="Project"
+                          columnKey="project"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
-                          label="Active projects"
-                          columnKey="projects"
-                          activeKey={mgmtAssignSort.key}
-                          dir={mgmtAssignSort.dir}
-                          onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
+                          label="Buyer"
+                          columnKey="buyer"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
                         />
+                        <SortableTh
+                          label="Employee"
+                          columnKey="employee"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Name"
+                          columnKey="name"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Type"
+                          columnKey="type"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <SortableTh
+                          label="Note"
+                          columnKey="note"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <th>View</th>
+                        <SortableTh
+                          label="Updated"
+                          columnKey="updated"
+                          activeKey={contractSort.key}
+                          dir={contractSort.dir}
+                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
+                        />
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedManagementAssignments.map((row) => (
-                        <tr key={row.supplier?.id ?? '__unassigned__'}>
-                          <td>{row.supplier ? `${row.supplier.code}: ${row.supplier.name}` : 'No supplier assigned'}</td>
+                      {sortedContractRows.map((r) => (
+                        <tr key={r.id}>
+                          <td>{formatContractProjectCell(r)}</td>
+                          <td>{formatStaffFullName(r.buyer)}</td>
+                          <td>{formatStaffFullName(r.employee)}</td>
+                          <td>{r.name}</td>
+                          <td>{r.category ?? '—'}</td>
+                          <td>{r.note ?? '—'}</td>
                           <td>
-                            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                              {row.activeProjects.map((p) => (
-                                <li key={p.id} style={{ marginBottom: '0.35rem' }}>
-                                  {p.projectCode} — {p.companyName} · {p.clientName} · POP {formatProjectPopCell(p.popStart, p.popEnd)}
-                                </li>
-                              ))}
-                            </ul>
+                            {r.filePath ? (
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => download(r)}
+                                disabled={downloading[r.id] !== undefined}
+                                style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
+                              >
+                                {downloading[r.id] !== undefined ? (
+                                  <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
+                                    <span>{downloading[r.id]}%</span>
+                                  </span>
+                                ) : (
+                                  'Download'
+                                )}
+                              </button>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td>{formatDisplayDateTime(r.updatedAt)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              disabled={deletingId === r.id}
+                              onClick={() => setDeleteConfirmId(r.id)}
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -2205,6 +1923,8 @@ export function InternalManagement() {
           </div>
         </>
       )}
+
+      {tab === 'managementAssignments' && <ManagementAssignmentsPanel token={token} toast={toast} />}
 
       {tab === 'profit' && (
         <>

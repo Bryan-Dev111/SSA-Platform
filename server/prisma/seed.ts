@@ -27,6 +27,12 @@ async function main() {
   }
   console.log('Roles seeded.');
 
+  await prisma.role.upsert({
+    where: { name: 'SourcingDirector' },
+    update: {},
+    create: { name: 'SourcingDirector' },
+  });
+
   const adminRole = await prisma.role.findUnique({ where: { name: 'Admin' } });
   if (!adminRole) throw new Error('Admin role not found');
 

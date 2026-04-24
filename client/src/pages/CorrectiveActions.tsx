@@ -234,6 +234,15 @@ export function CorrectiveActions() {
     });
   }, [list]);
 
+  /** One row of analytics cards; count drives `repeat(n, …)` so the grid never wraps to a second line. */
+  const carAnalyticsColumnCount = useMemo(() => {
+    let n = 0;
+    if (defectCodeCounts.length > 0) n += 1;
+    if (rootCauseCodeCounts.length > 0) n += 1;
+    if (list.length > 0) n += 4;
+    return Math.max(1, n);
+  }, [defectCodeCounts.length, rootCauseCodeCounts.length, list.length]);
+
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
     if (page > maxPage) setPage(maxPage);
@@ -429,13 +438,16 @@ export function CorrectiveActions() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            width: '100%',
+            overflowX: 'auto',
+            paddingBottom: 4,
+            gridTemplateColumns: `repeat(${carAnalyticsColumnCount}, minmax(180px, 1fr))`,
             gap: '1rem',
             marginBottom: '1.5rem',
           }}
         >
           {defectCodeCounts.length > 0 && (
-            <div className="card">
+            <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
                 <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Defect codes Pareto (CARs)</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -463,7 +475,7 @@ export function CorrectiveActions() {
             </div>
           )}
           {rootCauseCodeCounts.length > 0 && (
-            <div className="card">
+            <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
                 <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Root cause codes Pareto (CARs)</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -491,7 +503,7 @@ export function CorrectiveActions() {
             </div>
           )}
           {list.length > 0 && (
-            <div className="card">
+            <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
                 <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by severity</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -532,7 +544,7 @@ export function CorrectiveActions() {
             </div>
           )}
           {list.length > 0 && (
-            <div className="card">
+            <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
                 <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by status</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -602,87 +614,80 @@ export function CorrectiveActions() {
             </div>
           )}
           {list.length > 0 && (
-            <div className="card">
+            <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
                 <div
+                  aria-label="CAR age distribution for open CARs only bar chart"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                    gap: '1.5rem',
+                    gridTemplateColumns: '40px 1fr',
+                    gap: '0.75rem',
                     alignItems: 'stretch',
                   }}
                 >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'center',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      writingMode: 'vertical-rl',
+                      transform: 'rotate(180deg)',
+                    }}
+                  >
+                    Number of open CARs
+                  </div>
                   <div>
-                    <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
                     <div
-                      aria-label="CAR age distribution for open CARs only bar chart"
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: '40px 1fr',
+                        height: 180,
+                        borderLeft: '1px solid var(--color-border)',
+                        borderBottom: '1px solid var(--color-border)',
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        justifyContent: 'space-around',
                         gap: '0.75rem',
-                        alignItems: 'stretch',
+                        padding: '0.5rem 0.5rem 0 0.5rem',
+                        background:
+                          'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
                       }}
                     >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          justifyContent: 'center',
-                          fontSize: 'var(--text-xs)',
-                          color: 'var(--color-text-muted)',
-                          writingMode: 'vertical-rl',
-                          transform: 'rotate(180deg)',
-                        }}
-                      >
-                        Number of open CARs
-                      </div>
-                      <div>
-                        <div
-                          style={{
-                            height: 180,
-                            borderLeft: '1px solid var(--color-border)',
-                            borderBottom: '1px solid var(--color-border)',
-                            display: 'flex',
-                            alignItems: 'flex-end',
-                            justifyContent: 'space-around',
-                            gap: '0.75rem',
-                            padding: '0.5rem 0.5rem 0 0.5rem',
-                            background:
-                              'linear-gradient(to top, transparent 24%, rgba(148,163,184,0.12) 25%, transparent 26%, transparent 49%, rgba(148,163,184,0.12) 50%, transparent 51%, transparent 74%, rgba(148,163,184,0.12) 75%, transparent 76%)',
-                          }}
-                        >
-                          {ageBuckets.map((bucket) => (
-                            <div key={bucket.label} style={{ width: '22%', maxWidth: 80, minWidth: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>
-                                {bucket.count}
-                              </span>
-                              <div
-                                style={{
-                                  width: '100%',
-                                  height: `${Math.max(8, (bucket.count / maxAgeBucketCount) * 125)}px`,
-                                  background: '#4f46e5',
-                                  borderRadius: '4px 4px 0 0',
-                                  transition: 'height 0.2s ease',
-                                }}
-                              />
-                            </div>
-                          ))}
+                      {ageBuckets.map((bucket) => (
+                        <div key={bucket.label} style={{ width: '22%', maxWidth: 80, minWidth: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1 }}>
+                            {bucket.count}
+                          </span>
+                          <div
+                            style={{
+                              width: '100%',
+                              height: `${Math.max(8, (bucket.count / maxAgeBucketCount) * 125)}px`,
+                              background: '#4f46e5',
+                              borderRadius: '4px 4px 0 0',
+                              transition: 'height 0.2s ease',
+                            }}
+                          />
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-around', gap: '0.75rem', padding: '0.35rem 0.5rem 0 0.5rem' }}>
-                          {ageBuckets.map((bucket) => (
-                            <span key={`${bucket.label}-axis`} style={{ width: '22%', maxWidth: 80, minWidth: 44, textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                              {bucket.label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', gap: '0.75rem', padding: '0.35rem 0.5rem 0 0.5rem' }}>
+                      {ageBuckets.map((bucket) => (
+                        <span key={`${bucket.label}-axis`} style={{ width: '22%', maxWidth: 80, minWidth: 44, textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                          {bucket.label}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div>
-                    <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Open CARs over time</h2>
-                    <OpenCarsOverTimeChart points={openCarsTimeSeries} />
-                  </div>
                 </div>
+              </div>
+            </div>
+          )}
+          {list.length > 0 && (
+            <div className="card" style={{ minWidth: 0 }}>
+              <div className="card-body">
+                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Open CARs over time</h2>
+                <OpenCarsOverTimeChart points={openCarsTimeSeries} />
               </div>
             </div>
           )}

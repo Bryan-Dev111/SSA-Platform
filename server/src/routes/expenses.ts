@@ -26,12 +26,60 @@ function parseExpenseDate(val: unknown): Date | null {
   return new Date(val.trim().slice(0, 10) + 'T12:00:00.000Z');
 }
 
+function isPurchaseOrderOpenStatus(status: string | null | undefined): boolean {
+  return (status ?? 'Open').trim().toLowerCase() !== 'closed';
+}
+
+/** For create/update: null clears link; id must exist and be open (not Closed). */
+async function resolvePurchaseOrderIdForWrite(
+  raw: unknown,
+  res: Response
+): Promise<string | null | undefined> {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  if (typeof raw === 'string' && !raw.trim()) return null;
+  const id = typeof raw === 'string' ? raw.trim() : '';
+  if (!id) return null;
+  const po = await prisma.purchaseOrder.findUnique({
+    where: { id },
+    select: { id: true, status: true },
+  });
+  if (!po) {
+    res.status(400).json({ error: 'purchaseOrderId is not a valid purchase order' });
+    return undefined;
+  }
+  if (!isPurchaseOrderOpenStatus(po.status)) {
+    res.status(400).json({ error: 'Only open purchase orders can be linked to an expense' });
+    return undefined;
+  }
+  return id;
+}
+
 router.get(
   '/',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const list = await prisma.expense.findMany({
       orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        purchaseOrder: { select: { id: true, code: true } },
+      },
     });
+    res.json({ list });
+  })
+);
+
+/** Open POs only (status not Closed), for Global Supply expense form. Same auth as other expense routes. */
+router.get(
+  '/open-purchase-orders',
+  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const rows = await prisma.purchaseOrder.findMany({
+      select: { id: true, code: true, status: true },
+      orderBy: { code: 'asc' },
+      take: 500,
+    });
+    const list = rows
+      .filter((r) => isPurchaseOrderOpenStatus(r.status))
+      .map(({ id, code }) => ({ id, code }));
     res.json({ list });
   })
 );
@@ -153,6 +201,13 @@ router.post(
       return;
     }
 
+    let purchaseOrderId: string | null | undefined;
+    if (req.body?.purchaseOrderId !== undefined) {
+      const resolved = await resolvePurchaseOrderIdForWrite(req.body.purchaseOrderId, res);
+      if (resolved === undefined) return;
+      purchaseOrderId = resolved;
+    }
+
     const code = await getNextCode('EXP');
 
     const created = await prisma.expense.create({
@@ -166,6 +221,10 @@ router.post(
         expenseDate,
         paymentMethod,
         country: country || null,
+        purchaseOrderId: purchaseOrderId ?? null,
+      },
+      include: {
+        purchaseOrder: { select: { id: true, code: true } },
       },
     });
     res.status(201).json(created);
@@ -195,6 +254,7 @@ router.patch(
       paymentMethod?: string;
       country?: string | null;
       status?: string;
+      purchaseOrderId?: string | null;
     } = {};
     if (typeof req.body?.type === 'string') data.type = req.body.type.trim();
     if (typeof req.body?.description === 'string') data.description = req.body.description.trim();
@@ -223,6 +283,12 @@ router.patch(
       data.country = typeof req.body.country === 'string' ? req.body.country.trim() || null : null;
     }
 
+    if (req.body?.purchaseOrderId !== undefined) {
+      const resolved = await resolvePurchaseOrderIdForWrite(req.body.purchaseOrderId, res);
+      if (resolved === undefined) return;
+      data.purchaseOrderId = resolved;
+    }
+
     if (req.body?.status !== undefined) {
       const st = typeof req.body.status === 'string' ? req.body.status.trim() : '';
       if (st !== 'Open' && st !== 'Closed') {
@@ -242,7 +308,13 @@ router.patch(
       return;
     }
 
-    const updated = await prisma.expense.update({ where: { id }, data });
+    const updated = await prisma.expense.update({
+      where: { id },
+      data,
+      include: {
+        purchaseOrder: { select: { id: true, code: true } },
+      },
+    });
     res.json(updated);
   })
 );

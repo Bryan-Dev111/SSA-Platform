@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
+import { parseApiError } from '../../utils/apiHelpers';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -25,6 +26,13 @@ interface UserRow {
   roleNames: string[];
   isEmployee?: boolean;
   isContractor?: boolean;
+  country?: string | null;
+  /** Operational countries (roster); falls back to legacy `country` when empty on server. */
+  assignedCountryNames?: string[];
+  hourlyRate?: number | null;
+  currency?: string | null;
+  employmentResponsibilities?: string | null;
+  employmentNotes?: string | null;
   // Buyer → Suppliers
   assignedSupplierIds?: string[];
   // Auditor → Suppliers
@@ -36,18 +44,82 @@ interface UserRow {
   qmAssignedQeIds?: string[];
 }
 
+function formatRoleLabel(role: string): string {
+  if (role === 'QualityEngineer') return 'Quality Engineer';
+  if (role === 'QualityManager') return 'Quality Manager';
+  if (role === 'CommodityBuyer') return 'Commodity Buyer';
+  if (role === 'SourcingDirector') return 'Sourcing Director';
+  return role;
+}
+
+function formatRolesCell(roleNames: string[]): string {
+  if (!roleNames.length) return '—';
+  return roleNames.map(formatRoleLabel).join(', ');
+}
+
+function formatRateCell(hourlyRate: number | null | undefined, currency: string | null | undefined): string {
+  if (hourlyRate == null || !Number.isFinite(hourlyRate)) return '—';
+  const cur = (currency ?? 'USD').trim() || 'USD';
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: cur.length === 3 ? cur : 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(hourlyRate);
+  } catch {
+    return `${hourlyRate.toFixed(2)} ${cur}`;
+  }
+}
+
+type RosterDraft = {
+  assignedCountryNames: string[];
+  employmentResponsibilities: string;
+  hourlyRate: string;
+  currency: string;
+  employmentNotes: string;
+};
+
+const emptyDraft = (): RosterDraft => ({
+  assignedCountryNames: [],
+  employmentResponsibilities: '',
+  hourlyRate: '',
+  currency: 'USD',
+  employmentNotes: '',
+});
+
+function formatCountriesCell(u: UserRow): string {
+  const list = u.assignedCountryNames?.filter(Boolean) ?? [];
+  if (list.length) return list.join(', ');
+  return u.country?.trim() || '—';
+}
+
 export function AdminEmployeeAssignmentsPanel({
   token,
   toast,
+  globalSupplyEmployeeRosterMode = false,
+  canEditStaffRoster = false,
 }: {
   token: string | null;
   toast: ToastApi;
+  /** Global Supply Internal Management: roster-only view (loads from /management-directory so QM can read). */
+  globalSupplyEmployeeRosterMode?: boolean;
+  /** Only Admin may edit Country, Responsibilities, Rate, Notes (server enforces Admin on PATCH). */
+  canEditStaffRoster?: boolean;
 }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!globalSupplyEmployeeRosterMode);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [rosterUsers, setRosterUsers] = useState<UserRow[]>([]);
+  const [rosterLoading, setRosterLoading] = useState(globalSupplyEmployeeRosterMode);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [rosterDraft, setRosterDraft] = useState<RosterDraft>(() => emptyDraft());
+  const [rosterSaveBusy, setRosterSaveBusy] = useState(false);
+  const [countryOptions, setCountryOptions] = useState<{ id: string; name: string }[]>([]);
 
   const [employeeId, setEmployeeId] = useState('');
   const [employeeSupplierId, setEmployeeSupplierId] = useState('');
@@ -57,7 +129,7 @@ export function AdminEmployeeAssignmentsPanel({
   const [qmId, setQmId] = useState('');
   const [qmQeId, setQmQeId] = useState('');
 
-  const load = useCallback(async () => {
+  const loadDefaultPanel = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
@@ -74,14 +146,50 @@ export function AdminEmployeeAssignmentsPanel({
     }
   }, [token]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const loadRoster = useCallback(async () => {
+    if (!token) {
+      setRosterUsers([]);
+      setRosterLoading(false);
+      return;
+    }
+    setRosterLoading(true);
+    setRosterError(null);
+    try {
+      const rows = await apiJson<UserRow[]>('/management-directory', { token });
+      setRosterUsers(rows);
+    } catch (e) {
+      setRosterUsers([]);
+      setRosterError(e instanceof Error ? e.message : 'Failed to load roster');
+    } finally {
+      setRosterLoading(false);
+    }
+  }, [token]);
 
-  const employeeContractors = useMemo(
-    () => users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor)),
-    [users]
-  );
+  useEffect(() => {
+    if (globalSupplyEmployeeRosterMode) {
+      void loadRoster();
+    } else {
+      void loadDefaultPanel();
+    }
+  }, [globalSupplyEmployeeRosterMode, loadDefaultPanel, loadRoster]);
+
+  useEffect(() => {
+    if (!token) return;
+    void apiJson<{ list: { id: string; name: string }[] }>('/global-supply-options/countries', { token })
+      .then((r) => setCountryOptions(Array.isArray(r.list) ? r.list : []))
+      .catch(() => setCountryOptions([]));
+  }, [token]);
+
+  const employeeContractors = useMemo(() => {
+    const pool = globalSupplyEmployeeRosterMode ? rosterUsers : users;
+    return pool
+      .filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
+      .sort((a, b) => {
+        const na = (a.name?.trim() || a.email).toLocaleLowerCase();
+        const nb = (b.name?.trim() || b.email).toLocaleLowerCase();
+        return na.localeCompare(nb, undefined, { sensitivity: 'base' });
+      });
+  }, [globalSupplyEmployeeRosterMode, rosterUsers, users]);
   const buyers = useMemo(() => users.filter((u) => u.roleNames.includes('Buyer')), [users]);
   const qes = useMemo(() => users.filter((u) => u.roleNames.includes('QualityEngineer')), [users]);
   const qualityManagers = useMemo(() => users.filter((u) => u.roleNames.includes('QualityManager')), [users]);
@@ -111,7 +219,7 @@ export function AdminEmployeeAssignmentsPanel({
       });
       toast.success('Employee/contractor assignment created');
       setEmployeeSupplierId('');
-      await load();
+      await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Assignment failed');
     } finally {
@@ -125,7 +233,7 @@ export function AdminEmployeeAssignmentsPanel({
     try {
       await apiJson(`/employee-suppliers/${aId}/${sId}`, { token, method: 'DELETE' });
       toast.info('Employee/contractor assignment removed');
-      await load();
+      await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Remove failed');
     } finally {
@@ -144,7 +252,7 @@ export function AdminEmployeeAssignmentsPanel({
       });
       toast.success('QE → Buyer assignment created');
       setQeBuyerId('');
-      await load();
+      await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Assignment failed');
     } finally {
@@ -158,7 +266,7 @@ export function AdminEmployeeAssignmentsPanel({
     try {
       await apiJson(`/qe-buyers/${qId}/${bId}`, { token, method: 'DELETE' });
       toast.info('QE → Buyer assignment removed');
-      await load();
+      await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Remove failed');
     } finally {
@@ -177,7 +285,7 @@ export function AdminEmployeeAssignmentsPanel({
       });
       toast.success('Quality Manager → Quality Engineer assignment created');
       setQmQeId('');
-      await load();
+      await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Assignment failed');
     } finally {
@@ -191,13 +299,258 @@ export function AdminEmployeeAssignmentsPanel({
     try {
       await apiJson(`/qm-qes/${managerId}/${engineerId}`, { token, method: 'DELETE' });
       toast.info('Quality Manager → Quality Engineer assignment removed');
-      await load();
+      await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Remove failed');
     } finally {
       setBusy(false);
     }
   };
+
+  const beginEditStaffRow = (u: UserRow) => {
+    setEditingStaffId(u.id);
+    const existing =
+      u.assignedCountryNames && u.assignedCountryNames.length > 0
+        ? [...u.assignedCountryNames]
+        : u.country?.trim()
+          ? [u.country.trim()]
+          : [];
+    setRosterDraft({
+      assignedCountryNames: existing,
+      employmentResponsibilities: u.employmentResponsibilities ?? '',
+      hourlyRate: u.hourlyRate != null && Number.isFinite(u.hourlyRate) ? String(u.hourlyRate) : '',
+      currency: (u.currency ?? 'USD').trim() || 'USD',
+      employmentNotes: u.employmentNotes ?? '',
+    });
+  };
+
+  const cancelEditStaffRow = () => {
+    setEditingStaffId(null);
+    setRosterDraft(emptyDraft());
+  };
+
+  const saveStaffRosterRow = async (userId: string) => {
+    if (!token || !canEditStaffRoster) return;
+    setRosterSaveBusy(true);
+    try {
+      const hourlyParsed =
+        rosterDraft.hourlyRate.trim() === '' ? null : Number(rosterDraft.hourlyRate.replace(/,/g, ''));
+      if (hourlyParsed !== null && (!Number.isFinite(hourlyParsed) || hourlyParsed < 0)) {
+        toast.error('Rate must be a non-negative number or empty');
+        return;
+      }
+      await apiJson(`/users/${userId}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          assignedCountryNames: rosterDraft.assignedCountryNames,
+          employmentResponsibilities: rosterDraft.employmentResponsibilities.trim() || null,
+          employmentNotes: rosterDraft.employmentNotes.trim() || null,
+          hourlyRate: hourlyParsed,
+          currency: hourlyParsed !== null ? rosterDraft.currency.trim() || 'USD' : null,
+        }),
+      });
+      toast.success('Roster updated');
+      setEditingStaffId(null);
+      setRosterDraft(emptyDraft());
+      await loadRoster();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setRosterSaveBusy(false);
+    }
+  };
+
+  if (globalSupplyEmployeeRosterMode) {
+    if (rosterLoading) {
+      return (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Employee Assignments</h2>
+            <div className="loading-message" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div className="loading-spinner" />
+              <p style={{ margin: 0 }}>Loading roster…</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (rosterError) {
+      return (
+        <div className="card">
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Employee Assignments</h2>
+            <div className="alert-error">{rosterError}</div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="card">
+        <div className="card-body">
+          <h2 style={{ marginTop: 0 }}>Employees & contractors</h2>
+          <div className="table-wrap" style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ minWidth: 200 }}>Name</th>
+                  <th style={{ minWidth: 120 }}>Country</th>
+                  <th style={{ minWidth: 160 }}>Role</th>
+                  <th style={{ minWidth: 220 }}>Responsibilities</th>
+                  <th style={{ minWidth: 120 }}>Rate</th>
+                  <th style={{ minWidth: 200 }}>Notes</th>
+                  {canEditStaffRoster ? <th style={{ width: 140 }}>Actions</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {employeeContractors.length === 0 ? (
+                  <tr>
+                    <td colSpan={canEditStaffRoster ? 7 : 6} className="table-empty">
+                      No employees or contractors. Mark users as Employee or Contractor in Admin → Users.
+                    </td>
+                  </tr>
+                ) : (
+                  employeeContractors.map((u) => {
+                    const isEditing = editingStaffId === u.id;
+                    return (
+                      <tr key={u.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{u.name?.trim() || '—'}</div>
+                          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{u.email}</div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4 }}>
+                            {u.isContractor ? 'Contractor' : 'Employee'}
+                          </div>
+                        </td>
+                        <td style={{ minWidth: 200, maxWidth: 320 }}>
+                          {isEditing && canEditStaffRoster ? (
+                            <div>
+                              <label className="input-label" style={{ marginBottom: 6 }}>
+                                Countries
+                              </label>
+                              <select
+                                multiple
+                                className="input"
+                                size={Math.min(12, Math.max(4, countryOptions.length || 4))}
+                                value={rosterDraft.assignedCountryNames}
+                                onChange={(e) => {
+                                  const selected = Array.from(e.target.selectedOptions, (o) => o.value);
+                                  setRosterDraft((d) => ({ ...d, assignedCountryNames: selected }));
+                                }}
+                                aria-label="Countries"
+                                style={{ width: '100%' }}
+                              >
+                                {countryOptions.map((c) => (
+                                  <option key={c.id} value={c.name}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <p
+                                style={{
+                                  margin: '6px 0 0',
+                                  fontSize: 'var(--text-xs)',
+                                  color: 'var(--color-text-muted)',
+                                }}
+                              >
+                                Hold Ctrl (Windows) or Cmd (Mac) and click to select multiple countries.
+                              </p>
+                            </div>
+                          ) : (
+                            formatCountriesCell(u)
+                          )}
+                        </td>
+                        <td>{formatRolesCell(u.roleNames)}</td>
+                        <td>
+                          {isEditing && canEditStaffRoster ? (
+                            <textarea
+                              className="input"
+                              rows={3}
+                              value={rosterDraft.employmentResponsibilities}
+                              onChange={(e) =>
+                                setRosterDraft((d) => ({ ...d, employmentResponsibilities: e.target.value }))
+                              }
+                              aria-label="Responsibilities"
+                              style={{ minWidth: 200, resize: 'vertical' }}
+                            />
+                          ) : (
+                            <span style={{ whiteSpace: 'pre-wrap' }}>{u.employmentResponsibilities?.trim() || '—'}</span>
+                          )}
+                        </td>
+                        <td>
+                          {isEditing && canEditStaffRoster ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                              <input
+                                className="input"
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={rosterDraft.hourlyRate}
+                                onChange={(e) => setRosterDraft((d) => ({ ...d, hourlyRate: e.target.value }))}
+                                placeholder="Hourly rate"
+                                aria-label="Hourly rate"
+                              />
+                              <input
+                                className="input"
+                                value={rosterDraft.currency}
+                                onChange={(e) => setRosterDraft((d) => ({ ...d, currency: e.target.value }))}
+                                placeholder="USD"
+                                maxLength={8}
+                                aria-label="Currency"
+                              />
+                            </div>
+                          ) : (
+                            formatRateCell(u.hourlyRate, u.currency)
+                          )}
+                        </td>
+                        <td>
+                          {isEditing && canEditStaffRoster ? (
+                            <textarea
+                              className="input"
+                              rows={3}
+                              value={rosterDraft.employmentNotes}
+                              onChange={(e) => setRosterDraft((d) => ({ ...d, employmentNotes: e.target.value }))}
+                              aria-label="Notes"
+                              style={{ minWidth: 200, resize: 'vertical' }}
+                            />
+                          ) : (
+                            <span style={{ whiteSpace: 'pre-wrap' }}>{u.employmentNotes?.trim() || '—'}</span>
+                          )}
+                        </td>
+                        {canEditStaffRoster ? (
+                          <td>
+                            {isEditing ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  disabled={rosterSaveBusy}
+                                  onClick={() => void saveStaffRosterRow(u.id)}
+                                >
+                                  Save
+                                </button>
+                                <button type="button" className="btn btn-ghost" disabled={rosterSaveBusy} onClick={cancelEditStaffRow}>
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button type="button" className="btn btn-ghost" onClick={() => beginEditStaffRow(u)}>
+                                Edit
+                              </button>
+                            )}
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -265,8 +618,9 @@ export function AdminEmployeeAssignmentsPanel({
             <table className="table">
               <thead>
                 <tr>
-                  <th>Auditor</th>
+                  <th>Employee / contractor</th>
                   <th>Type</th>
+                  <th>Country</th>
                   <th>Assigned Suppliers</th>
                   <th style={{ width: 100 }}>Action</th>
                 </tr>
@@ -274,7 +628,7 @@ export function AdminEmployeeAssignmentsPanel({
               <tbody>
                 {employeeContractors.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="table-empty">
+                    <td colSpan={5} className="table-empty">
                       No employees/contractors found.
                     </td>
                   </tr>
@@ -286,18 +640,24 @@ export function AdminEmployeeAssignmentsPanel({
                         <tr key={a.id}>
                           <td>{a.name?.trim() ? a.name : a.email}</td>
                           <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
+                          <td>{formatCountriesCell(a)}</td>
                           <td colSpan={2} className="table-empty">
                             None
                           </td>
                         </tr>
                       );
                     }
-                    return supplierIds.map((sid) => {
+                    return supplierIds.map((sid, idx) => {
                       const sup = supplierById[sid];
                       return (
                         <tr key={`${a.id}-${sid}`}>
-                          <td>{a.name?.trim() ? a.name : a.email}</td>
-                          <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
+                          {idx === 0 ? (
+                            <>
+                              <td rowSpan={supplierIds.length}>{a.name?.trim() ? a.name : a.email}</td>
+                              <td rowSpan={supplierIds.length}>{a.isContractor ? 'Contractor' : 'Employee'}</td>
+                              <td rowSpan={supplierIds.length}>{formatCountriesCell(a)}</td>
+                            </>
+                          ) : null}
                           <td>{sup ? `${sup.code}: ${sup.name}` : sid}</td>
                           <td>
                             <button type="button" className="btn btn-ghost" onClick={() => void removeEmployeeSupplier(a.id, sid)} disabled={busy}>
