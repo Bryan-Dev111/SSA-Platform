@@ -3,6 +3,7 @@
  */
 import type { ReactNode } from 'react';
 import { useId } from 'react';
+import { getDocumentLocale } from '../i18n/locale';
 
 export type BarChartRow = { label: string; value: number };
 export type TimePointRow = { date: string; count: number };
@@ -10,7 +11,7 @@ export type TimePointRow = { date: string; count: number };
 export function formatDateLabel(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return date;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(getDocumentLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 /** Catmull–Rom–style smooth curve through points (open path, no Z). */
@@ -405,7 +406,7 @@ export function ContinuousLineChart({
                 fontSize="11"
                 fill="var(--color-text-muted)"
               >
-                {new Date(`${point.date}T00:00:00Z`).toLocaleDateString(undefined, {
+                {new Date(`${point.date}T00:00:00Z`).toLocaleDateString(getDocumentLocale(), {
                   month: 'short',
                   day: 'numeric',
                 })}

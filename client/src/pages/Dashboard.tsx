@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { MetricCard } from '../components/MetricCard';
 import { ShipmentMetricAlertIcon } from '../components/ShipmentMetricAlertIcon';
@@ -110,6 +111,7 @@ interface DashboardRiskActionRow {
 
 export function Dashboard() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -180,11 +182,11 @@ export function Dashboard() {
     return (
       <div className="page page-dashboard">
         <header className="page-header">
-          <h1 className="page-title">Dashboard</h1>
+          <h1 className="page-title">{t('nav.dashboard')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading dashboard…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -216,7 +218,7 @@ export function Dashboard() {
   return (
     <div className="page page-dashboard">
       <header className="page-header">
-        <h1 className="page-title">Dashboard</h1>
+        <h1 className="page-title">{t('nav.dashboard')}</h1>
         <p className="page-description">
           {greeting}
           {user?.name?.trim() ? `, ${user.name.trim()}` : user?.email ? `, ${user.email}` : ''}. Here is what is happening with
@@ -299,7 +301,7 @@ export function Dashboard() {
                   <div key={`${e.type}-${e.id}`} className="dashboard-event-row">
                     <span className="dashboard-event-date">
                       {e.date
-                        ? new Date(e.date).toLocaleDateString(undefined, {
+                        ? new Date(e.date).toLocaleDateString(locale, {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -336,7 +338,7 @@ export function Dashboard() {
                     {recentUpdates.map((u) => (
                       <tr key={u.id}>
                         <td>
-                          {new Date(u.date).toLocaleDateString(undefined, {
+                          {new Date(u.date).toLocaleDateString(locale, {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',

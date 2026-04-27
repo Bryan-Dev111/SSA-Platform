@@ -5,6 +5,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { getDocumentLocale } from '../i18n/locale';
 import { apiJson } from '../api/client';
 import { downloadWithAuthProgress } from '../utils/apiHelpers';
 
@@ -51,7 +53,7 @@ function formatAuditRecordDate(isoOrDateStr: string | null | undefined): string 
   const ymd = isoOrDateStr.trim().slice(0, 10);
   const d = new Date(ymd);
   if (Number.isNaN(d.getTime())) return isoOrDateStr;
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(getDocumentLocale(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -73,6 +75,7 @@ function formatRecordStatusLabel(status: AuditRecordRow['status']): string {
 
 export function AuditRecord() {
   const { token, user } = useAuth();
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const auditId = searchParams.get('id');
 
@@ -114,7 +117,7 @@ export function AuditRecord() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Audit Record</h1>
+          <h1 className="page-title">{t('page.auditRecord')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />

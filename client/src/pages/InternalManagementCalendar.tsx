@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '../api/client';
+import { getDocumentLocale } from '../i18n/locale';
 
 interface AuditCalendarRow {
   id: string;
@@ -183,7 +184,7 @@ export function InternalManagementCalendarView({
     return m;
   }, [items, year, monthIndex]);
 
-  const monthLabel = cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const monthLabel = cursor.toLocaleDateString(getDocumentLocale(), { month: 'long', year: 'numeric' });
 
   const prevMonth = () => {
     setCursor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));

@@ -11,6 +11,7 @@ import { ExpandableTableText } from '../../components/ExpandableTableText';
 import { SortableTh } from '../../components/SortableTh';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { type SortDir, cmpNum, cmpStr, toggleSort } from '../../utils/tableSort';
+import { getDocumentLocale } from '../../i18n/locale';
 
 export interface FarmRow {
   id: string;
@@ -101,7 +102,7 @@ function farmRowToExportRow(f: FarmRow): ExportRow {
     f.secondaryHarvestStartMonth && f.secondaryHarvestEndMonth
       ? `${f.secondaryHarvestStartMonth}–${f.secondaryHarvestEndMonth}`
       : '—';
-  const created = new Date(f.createdAt).toLocaleDateString(undefined, {
+  const created = new Date(f.createdAt).toLocaleDateString(getDocumentLocale(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -769,7 +770,7 @@ export function FarmersInformationPage() {
                       <ExpandableTableText value={f.notes} modalTitle={`Notes — ${f.code}`} />
                     </td>
                     <td>
-                      {new Date(f.createdAt).toLocaleDateString(undefined, {
+                      {new Date(f.createdAt).toLocaleDateString(getDocumentLocale(), {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',

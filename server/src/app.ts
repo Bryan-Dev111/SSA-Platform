@@ -57,12 +57,14 @@ import supplyLogisticsRoutes from './routes/supply-logistics';
 import legalRoutes from './routes/legal';
 import employeeProfilesRoutes from './routes/employee-profiles';
 import { errorHandler } from './middleware/errorHandler';
+import { requestLocaleMiddleware } from './middleware/requestLocale';
 
 const app = express();
 
 app.use(cors());
 // Allow larger optional base64 file payloads on uploads.
 app.use(express.json({ limit: '100mb' }));
+app.use(requestLocaleMiddleware);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'sentinel-api' });

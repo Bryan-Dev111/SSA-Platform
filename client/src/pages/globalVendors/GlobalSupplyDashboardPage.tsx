@@ -14,6 +14,7 @@ import {
   filterGlobalVendorsExpenses,
   isPurchaseOrderClosed,
 } from '../../utils/globalSupplyClosedPoMetrics';
+import { getDocumentLocale } from '../../i18n/locale';
 
 type CountryValueRow = { country: string; value: number };
 
@@ -49,7 +50,7 @@ function formatMoney(value: number): string {
 }
 
 function formatKg(value: number): string {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`;
+  return `${value.toLocaleString(getDocumentLocale(), { maximumFractionDigits: 2 })} kg`;
 }
 
 function formatSampleCount(value: number): string {

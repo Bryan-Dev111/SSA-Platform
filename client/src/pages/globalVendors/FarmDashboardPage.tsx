@@ -10,6 +10,7 @@ import { SortableTh } from '../../components/SortableTh';
 import { ChartCard, ContinuousLineChart, VerticalBarChart } from '../../components/DashboardBarCharts';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { type SortDir, cmpNum, cmpStr, toggleSort } from '../../utils/tableSort';
+import { getDocumentLocale } from '../../i18n/locale';
 
 type FarmDashboardPayload = {
   staffRestricted: boolean;
@@ -52,7 +53,7 @@ function formatMoney(value: number): string {
 }
 
 function formatKg(value: number): string {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`;
+  return `${value.toLocaleString(getDocumentLocale(), { maximumFractionDigits: 2 })} kg`;
 }
 
 function formatCount(value: number): string {
@@ -241,7 +242,7 @@ export function FarmDashboardPage() {
         ) : null}
       </header>
 
-      {showCountryDropdown ? (                                                                  
+      {showCountryDropdown ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0, minWidth: 260 }}>
@@ -406,7 +407,7 @@ export function FarmDashboardPage() {
                       <td>{r.farmId}</td>
                       <td>{r.country}</td>
                       <td>{r.region?.trim() ? r.region : '—'}</td>
-                      <td>{r.weightKg.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td>{r.weightKg.toLocaleString(getDocumentLocale(), { maximumFractionDigits: 2 })}</td>
                       <td>{formatMoney(r.revenue)}</td>
                       <td>{formatMoney(r.profit)}</td>
                       <td>{r.samples}</td>

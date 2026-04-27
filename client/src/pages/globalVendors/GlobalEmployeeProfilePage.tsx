@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
@@ -36,6 +37,7 @@ export function GlobalEmployeeProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const { pathname } = useLocation();
   const { token } = useAuth();
+  const { t } = useLanguage();
   const toast = useToast();
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -162,7 +164,7 @@ export function GlobalEmployeeProfilePage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Employee profile</h1>
+          <h1 className="page-title">{t('page.employeeProfile')}</h1>
         </header>
         <div className="alert-error" role="alert">
           {loadError || 'Profile could not be loaded.'}

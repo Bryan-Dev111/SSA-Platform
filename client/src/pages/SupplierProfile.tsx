@@ -4,6 +4,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
@@ -119,6 +120,7 @@ interface WeeklyRiskPoint {
 
 export function SupplierProfile() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const supplierIdFromUrl = searchParams.get('supplierId');
@@ -375,7 +377,7 @@ export function SupplierProfile() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Supplier Profile</h1>
+          <h1 className="page-title">{t('nav.supplierProfile')}</h1>
           <p className="page-description">
             You do not have permission to view supplier profiles from this page.
           </p>
@@ -388,7 +390,7 @@ export function SupplierProfile() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Supplier Profile</h1>
+          <h1 className="page-title">{t('nav.supplierProfile')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -402,7 +404,7 @@ export function SupplierProfile() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Supplier Profile</h1>
+          <h1 className="page-title">{t('nav.supplierProfile')}</h1>
           {canSelectSupplier && (
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <span style={{ fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
@@ -436,7 +438,7 @@ export function SupplierProfile() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Supplier Profile</h1>
+        <h1 className="page-title">{t('nav.supplierProfile')}</h1>
         <p className="page-description">
           {isSupplier
             ? 'Your portal: assigned buyers, quality data, records, and shipment inspection requests.'
@@ -657,7 +659,7 @@ export function SupplierProfile() {
                 <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
                 <td>{formatShipmentCreatedByLabel(s.createdBy)}</td>
                 <td>
-                  {new Date(s.createdAt).toLocaleDateString(undefined, {
+                  {new Date(s.createdAt).toLocaleDateString(locale, {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',

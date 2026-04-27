@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -46,6 +47,7 @@ interface CARsResponse {
 
 export function CorrectiveActions() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
@@ -229,7 +231,7 @@ export function CorrectiveActions() {
       return {
         t: end,
         count,
-        label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+        label: d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }),
       };
     });
   }, [list]);
@@ -297,18 +299,18 @@ export function CorrectiveActions() {
         Summary: c.summary,
         Owner: c.carOwner?.trim() ? c.carOwner : '—',
         'Target Completion Date': c.targetCompletionDate
-          ? new Date(c.targetCompletionDate).toLocaleDateString(undefined, {
+          ? new Date(c.targetCompletionDate).toLocaleDateString(locale, {
               year: 'numeric',
               month: 'short',
               day: 'numeric',
             })
           : '—',
-        Created: new Date(c.createdAt).toLocaleDateString(undefined, {
+        Created: new Date(c.createdAt).toLocaleDateString(locale, {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
         }),
-        Updated: new Date(c.updatedAt).toLocaleDateString(undefined, {
+        Updated: new Date(c.updatedAt).toLocaleDateString(locale, {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
@@ -364,7 +366,7 @@ export function CorrectiveActions() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Corrective Actions</h1>
+          <h1 className="page-title">{t('nav.correctiveActions')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -377,7 +379,7 @@ export function CorrectiveActions() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Corrective Actions</h1>
+        <h1 className="page-title">{t('nav.correctiveActions')}</h1>
       </header>
 
       {error && (
@@ -828,14 +830,14 @@ export function CorrectiveActions() {
                     </td>
                     <td>{c.carOwner?.trim() ? c.carOwner : '—'}</td>
                     <td>
-                      {new Date(c.createdAt).toLocaleDateString(undefined, {
+                      {new Date(c.createdAt).toLocaleDateString(locale, {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
                       })}
                     </td>
                     <td>
-                      {new Date(c.updatedAt).toLocaleDateString(undefined, {
+                      {new Date(c.updatedAt).toLocaleDateString(locale, {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',

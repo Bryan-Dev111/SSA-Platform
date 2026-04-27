@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 
 interface SupplierRow {
@@ -40,6 +41,7 @@ const WORLD_BOUNDS = L.latLngBounds([-85, -180], [85, 180]);
 
 export function SuppliersMap() {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [riskBySupplierId, setRiskBySupplierId] = useState<Record<string, { level: string; score: number }>>({});
   const [geoBySupplierId, setGeoBySupplierId] = useState<Record<string, GeoPoint>>({});
@@ -161,7 +163,7 @@ export function SuppliersMap() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Suppliers Map</h1>
+          <h1 className="page-title">{t('nav.suppliersMap')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -174,7 +176,7 @@ export function SuppliersMap() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Suppliers Map</h1>
+        <h1 className="page-title">{t('nav.suppliersMap')}</h1>
       </header>
 
       {error && <div className="alert-error">{error}</div>}

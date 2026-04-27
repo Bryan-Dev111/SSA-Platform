@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ReferenceCodeSelect, type ReferenceCodeOption } from '../components/ReferenceCodeSelect';
@@ -197,6 +198,7 @@ function formStateFromFinding(f: Finding) {
 
 export function FindingsRecord() {
   const { token, user } = useAuth();
+  const { t } = useLanguage();
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -638,7 +640,7 @@ export function FindingsRecord() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Findings Record</h1>
+          <h1 className="page-title">{t('page.findingsRecord')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -669,7 +671,7 @@ export function FindingsRecord() {
               : null}
         </p>
         <p style={{ marginTop: 4 }}>
-          <Link to="/findings" style={{ textDecoration: 'none' }}>Back to Findings</Link>
+          <Link to="/findings" style={{ textDecoration: 'none' }}>{t('common.backToFindings')}</Link>
         </p>
       </header>
 

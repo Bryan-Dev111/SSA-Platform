@@ -3,6 +3,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
@@ -31,15 +32,16 @@ interface DocumentApiRow {
   createdAt: string;
 }
 
-function formatCommandMediaDate(iso: string | undefined): string {
+function formatCommandMediaDate(iso: string | undefined, locale: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function Documents() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const toast = useToast();
   const [rows, setRows] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +166,7 @@ export function Documents() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Command Media</h1>
+        <h1 className="page-title">{t('admin.tab.commandMedia')}</h1>
       </header>
 
       {error && <div className="alert-error">{error}</div>}
@@ -227,7 +229,7 @@ export function Documents() {
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>
-                      <td>{formatCommandMediaDate(r.createdAt)}</td>
+                      <td>{formatCommandMediaDate(r.createdAt, locale)}</td>
                       <td>
                         {r.filePath ? (
                           <button

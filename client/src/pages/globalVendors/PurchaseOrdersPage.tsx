@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { getDocumentLocale } from '../../i18n/locale';
 
 type PurchaseOrderRow = {
   id: string;
@@ -599,7 +600,7 @@ export function PurchaseOrdersPage({
                       {o.estimatedFarmerDeliveryDate
                         ? new Date(
                             o.estimatedFarmerDeliveryDate
-                          ).toLocaleDateString(undefined, {
+                          ).toLocaleDateString(getDocumentLocale(), {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -610,7 +611,7 @@ export function PurchaseOrdersPage({
                       {o.estimatedArrivalAtBuyer
                         ? new Date(
                             o.estimatedArrivalAtBuyer
-                          ).toLocaleDateString(undefined, {
+                          ).toLocaleDateString(getDocumentLocale(), {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -620,7 +621,7 @@ export function PurchaseOrdersPage({
                     <td>{o.destinationCountry ?? '—'}</td>
                     <td>{o.portOfDischarge ?? '—'}</td>
                     <td>
-                      {new Date(o.createdAt).toLocaleDateString(undefined, {
+                      {new Date(o.createdAt).toLocaleDateString(getDocumentLocale(), {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { downloadWithAuthProgress, parseApiError } from '../utils/apiHelpers';
@@ -36,10 +37,10 @@ interface Audit {
 }
 
 /** Format ISO/YYYY-MM-DD date as locale date string without timezone shift, with short month name */
-function formatCalendarDate(isoOrDateStr: string): string {
+function formatCalendarDate(isoOrDateStr: string, locale: string): string {
   const ymd = isoOrDateStr.trim().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return isoOrDateStr;
-  return new Date(ymd + 'T12:00:00').toLocaleDateString(undefined, {
+  return new Date(ymd + 'T12:00:00').toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -60,6 +61,7 @@ function getAuditStatusSlug(status: string): string {
 export function Audits() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { t, locale } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [audits, setAudits] = useState<Audit[]>([]);
@@ -334,11 +336,11 @@ export function Audits() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Audits</h1>
+          <h1 className="page-title">{t('internal.tab.audits')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading audits…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -347,7 +349,7 @@ export function Audits() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Audits</h1>
+        <h1 className="page-title">{t('internal.tab.audits')}</h1>
       </header>
 
       {error && (
@@ -499,7 +501,7 @@ export function Audits() {
                       </Link>
                     </td>
                     <td>{a.supplier.code}: {a.supplier.name}</td>
-                    <td>{formatCalendarDate(a.auditDate)}</td>
+                    <td>{formatCalendarDate(a.auditDate, locale)}</td>
                     <td>{a.auditType?.name?.trim() ? a.auditType.name : '—'}</td>
                     <td style={{ maxWidth: 280, whiteSpace: 'normal', verticalAlign: 'top' }}>
                       {(a.summary ?? '').length > 120 ? (

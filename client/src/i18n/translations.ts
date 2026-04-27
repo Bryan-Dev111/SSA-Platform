@@ -132,6 +132,12 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'internal.tab.employeeAssignments': 'Employee Assignments',
     'internal.tab.managementAssignments': 'Management Assignments',
     'internal.tab.orgChart': 'Org Chart',
+    'page.findingsRecord': 'Findings Record',
+    'page.auditRecord': 'Audit Record',
+    'page.carRecord': 'CAR Record',
+    'page.employeeProfile': 'Employee Profile',
+    'common.backToFindings': 'Back to Findings',
+    'common.loading': 'Loading…',
   },
   es: {
     'language.english': 'Inglés',
@@ -257,6 +263,12 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'internal.tab.employeeAssignments': 'Asignaciones de empleados',
     'internal.tab.managementAssignments': 'Asignaciones de gestión',
     'internal.tab.orgChart': 'Organigrama',
+    'page.findingsRecord': 'Registro de hallazgos',
+    'page.auditRecord': 'Registro de auditoría',
+    'page.carRecord': 'Registro CAR',
+    'page.employeeProfile': 'Perfil del empleado',
+    'common.backToFindings': 'Volver a Hallazgos',
+    'common.loading': 'Cargando…',
   },
   fr: {
     'language.english': 'Anglais',
@@ -385,6 +397,12 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'internal.tab.employeeAssignments': 'Affectations des employés',
     'internal.tab.managementAssignments': 'Affectations de gestion',
     'internal.tab.orgChart': 'Organigramme',
+    'page.findingsRecord': 'Dossier des constats',
+    'page.auditRecord': 'Dossier d’audit',
+    'page.carRecord': 'Dossier CAR',
+    'page.employeeProfile': 'Profil employé',
+    'common.backToFindings': 'Retour aux constats',
+    'common.loading': 'Chargement…',
   },
 };
 

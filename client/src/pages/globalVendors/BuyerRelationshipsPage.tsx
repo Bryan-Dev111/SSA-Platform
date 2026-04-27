@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { getDocumentLocale } from '../../i18n/locale';
 
 type BuyerRow = {
   id: string;
@@ -143,7 +144,7 @@ export function BuyerRelationshipsPage() {
                     <td>{row.buyerCity ?? '—'}</td>
                     <td>
                       {row.firstPurchaseOrderDate
-                        ? new Date(row.firstPurchaseOrderDate).toLocaleDateString(undefined, {
+                        ? new Date(row.firstPurchaseOrderDate).toLocaleDateString(getDocumentLocale(), {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',

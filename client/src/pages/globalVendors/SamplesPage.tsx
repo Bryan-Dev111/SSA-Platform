@@ -9,6 +9,7 @@ import { SortableTh } from '../../components/SortableTh';
 import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
+import { getDocumentLocale } from '../../i18n/locale';
 import {
   type SortDir,
   cmpNum,
@@ -77,13 +78,13 @@ type SampleSortKey =
 function sampleToExportRow(s: SampleRow): ExportRow {
   const sent =
     s.sentDate != null
-      ? new Date(s.sentDate).toLocaleDateString(undefined, {
+      ? new Date(s.sentDate).toLocaleDateString(getDocumentLocale(), {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
         })
       : '';
-  const created = new Date(s.createdAt).toLocaleString(undefined, {
+  const created = new Date(s.createdAt).toLocaleString(getDocumentLocale(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -600,7 +601,7 @@ export function SamplesPage() {
                     <td>{s.buyerEmail ?? '—'}</td>
                     <td>
                       {s.sentDate
-                        ? new Date(s.sentDate).toLocaleDateString(undefined, {
+                        ? new Date(s.sentDate).toLocaleDateString(getDocumentLocale(), {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',

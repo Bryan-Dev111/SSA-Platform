@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -78,11 +79,11 @@ function onTimeDeliverySubtitle(m: Metrics): string {
   return latePo === 1 ? '1 late PO' : `${latePo} late POs`;
 }
 
-function formatShipmentDate(value: string | null | undefined): string {
+function formatShipmentDate(value: string | null | undefined, locale: string): string {
   if (!value) return '—';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const SHIPMENT_TABLE_STATUS_RANK: Record<string, number> = {
@@ -113,6 +114,7 @@ function onTimeDeliveryAlertProps(m: Metrics):
 export function Shipments() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { t, locale } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [inspectors, setInspectors] = useState<InspectorOption[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
@@ -389,7 +391,7 @@ export function Shipments() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Shipments</h1>
+          <h1 className="page-title">{t('internal.tab.shipments')}</h1>
         </header>
         <p className="table-empty">Sign in to view shipments.</p>
       </div>
@@ -400,7 +402,7 @@ export function Shipments() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Shipments</h1>
+          <h1 className="page-title">{t('internal.tab.shipments')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -412,7 +414,7 @@ export function Shipments() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Shipments</h1>
+        <h1 className="page-title">{t('internal.tab.shipments')}</h1>
       </header>
 
       {!isSupplier && (
@@ -707,7 +709,7 @@ export function Shipments() {
                       <td>{r.partNumber ?? '—'}</td>
                       <td>{r.qty ?? '—'}</td>
                       <td>{r.lot ?? '—'}</td>
-                      <td>{formatShipmentDate(r.inspectionDate)}</td>
+                      <td>{formatShipmentDate(r.inspectionDate, locale)}</td>
 
                       <td>
                         {canEditInspector && r.status === 'WaitingInspection' ? (
@@ -772,7 +774,7 @@ export function Shipments() {
                           '—'
                         )}
                       </td>
-                      <td>{r.status === 'WaitingInspection' ? '—' : formatShipmentDate(r.updatedAt)}</td>
+                      <td>{r.status === 'WaitingInspection' ? '—' : formatShipmentDate(r.updatedAt, locale)}</td>
 
                       <td>
                         <div
@@ -815,7 +817,7 @@ export function Shipments() {
                           )}
                         </div>
                       </td>
-                      <td>{formatShipmentDate(r.createdAt)}</td>
+                      <td>{formatShipmentDate(r.createdAt, locale)}</td>
                       <td>
                         {canReviewShipment(r) && r.status === 'WaitingInspection' ? (
                           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

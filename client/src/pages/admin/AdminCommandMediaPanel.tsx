@@ -7,6 +7,7 @@ import { parseApiError, downloadWithAuthProgress } from '../../utils/apiHelpers'
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { SortableTh } from '../../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../../utils/tableSort';
+import { getDocumentLocale } from '../../i18n/locale';
 import {
   COMMAND_MEDIA_DOCUMENT_TYPES,
   commandMediaDocumentTypeLabel,
@@ -48,7 +49,7 @@ function formatCommandMediaDate(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(getDocumentLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelProps) {

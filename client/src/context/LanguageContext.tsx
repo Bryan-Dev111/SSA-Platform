@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { translations, type AppLanguage } from '../i18n/translations';
+import { localeFromLanguage } from '../i18n/locale';
 
 const STORAGE_KEY = 'sentinel.language';
 
 type LanguageContextValue = {
   language: AppLanguage;
+  locale: string;
   setLanguage: (next: AppLanguage) => void;
   t: (key: string, fallback?: string) => string;
 };
@@ -31,12 +33,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore storage errors
     }
-    document.documentElement.lang = language;
+    document.documentElement.lang = localeFromLanguage(language);
   }, [language]);
 
   const value = useMemo<LanguageContextValue>(
     () => ({
       language,
+      locale: localeFromLanguage(language),
       setLanguage,
       t: (key, fallback) => translations[language][key] ?? translations.en[key] ?? fallback ?? key,
     }),

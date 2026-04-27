@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 
 interface Supplier {
@@ -30,15 +31,16 @@ function supplierStatusLabel(status: string | undefined): string {
   return 'Active';
 }
 
-function formatSupplierCreatedDate(iso: string | undefined): string {
+function formatSupplierCreatedDate(iso: string | undefined, locale: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function SupplierList() {
   const { token } = useAuth();
+  const { t, locale } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function SupplierList() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Supplier List</h1>
+          <h1 className="page-title">{t('nav.approvedSupplierList')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -83,7 +85,7 @@ export function SupplierList() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Supplier List</h1>
+          <h1 className="page-title">{t('nav.approvedSupplierList')}</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -93,7 +95,7 @@ export function SupplierList() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Approved Supplier List</h1>
+        <h1 className="page-title">{t('nav.approvedSupplierList')}</h1>
       </header>
       <div className="card">
         <div className="table-wrap">
@@ -130,7 +132,7 @@ export function SupplierList() {
                         : '—'}
                     </td>
                     <td>{s.commodityType?.name ?? '—'}</td>
-                    <td>{formatSupplierCreatedDate(s.createdAt)}</td>
+                    <td>{formatSupplierCreatedDate(s.createdAt, locale)}</td>
                     <td>
                       <span
                         className={supplierStatusLabel(s.status) === 'Inactive' ? 'audit-status-badge audit-status-badge--cancelled' : 'audit-status-badge audit-status-badge--complete'}

@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
@@ -82,6 +83,7 @@ export type WorkLogsVariant = 'page' | 'embedded' | 'globalSupplyTopRow';
 
 export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   const { token, user } = useAuth();
+  const { t } = useLanguage();
   const toast = useToast();
   const isGlobalSupplyTopRow = variant === 'globalSupplyTopRow';
   const [workLogs, setWorkLogs] = useState<WorkLogRow[]>([]);
@@ -671,7 +673,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Work Logs</h1>
+        <h1 className="page-title">{t('nav.workLogs')}</h1>
       </header>
       {body}
     </div>

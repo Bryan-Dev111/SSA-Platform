@@ -10,6 +10,7 @@ import { ExpandableTableText } from '../../components/ExpandableTableText';
 import { SortableTh } from '../../components/SortableTh';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { formatUsd } from '../../utils/formatUsd';
+import { getDocumentLocale } from '../../i18n/locale';
 import {
   type SortDir,
   cmpNum,
@@ -1200,7 +1201,7 @@ export function AdminExpensesPanel({
                           onChange={(e) => setEditDraft((d) => ({ ...d, expenseDate: e.target.value }))}
                         />
                       ) : row.expenseDate ? (
-                        new Date(row.expenseDate).toLocaleDateString(undefined, {
+                        new Date(row.expenseDate).toLocaleDateString(getDocumentLocale(), {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',

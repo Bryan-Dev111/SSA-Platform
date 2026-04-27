@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getDocumentLocale } from '../i18n/locale';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { Navigate } from 'react-router-dom';
@@ -127,7 +128,7 @@ function formatProjectPopCell(popStart: string | null, popEnd: string | null): s
 }
 
 function formatProfitMoney(value: number): string {
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return value.toLocaleString(getDocumentLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function deductionNumericSuffix(code: string): number {
@@ -152,7 +153,7 @@ function sortDeductionsForDisplay(
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [tab, setTab] = useState<ImTab>('audits');
 
   const [rows, setRows] = useState<InternalRow[]>([]);
@@ -1355,7 +1356,7 @@ export function InternalManagement() {
           <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, marginBottom: '1rem', boxSizing: 'border-box' }}>
             <MetricCard
               title="Total Revenue"
-              value={projectHistoryRevenueTotal.toLocaleString(undefined, {
+              value={projectHistoryRevenueTotal.toLocaleString(locale, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}

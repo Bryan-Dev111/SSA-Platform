@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
@@ -33,11 +34,11 @@ interface Finding {
   correctiveActions?: { id: string; code: string; status: string }[];
 }
 
-function formatFindingCreatedAt(iso: string | undefined): string {
+function formatFindingCreatedAt(iso: string | undefined, locale: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 interface FindingsResponse {
@@ -55,6 +56,7 @@ interface FindingsResponse {
 export function Findings() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { t, locale } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [data, setData] = useState<FindingsResponse | null>(null);
@@ -235,7 +237,7 @@ export function Findings() {
         Summary: f.summary,
         'Defect Code': f.defectCode?.trim() ? f.defectCode : '—',
         CARs: (f.correctiveActions ?? []).map((c) => `${c.code} (${c.status})`).join(', ') || '—',
-        'Date Created': formatFindingCreatedAt(f.createdAt),
+        'Date Created': formatFindingCreatedAt(f.createdAt, locale),
       }));
       if (rows.length === 0) return;
       const supplierSuffix =
@@ -276,11 +278,11 @@ export function Findings() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Findings</h1>
+          <h1 className="page-title">{t('nav.findings')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading findings…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -289,7 +291,7 @@ export function Findings() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Findings</h1>
+        <h1 className="page-title">{t('nav.findings')}</h1>
       </header>
 
       {error && (
@@ -611,7 +613,7 @@ export function Findings() {
                             </div>
                           </td>
                           <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }} title={f.createdAt}>
-                            {formatFindingCreatedAt(f.createdAt)}
+                            {formatFindingCreatedAt(f.createdAt, locale)}
                           </td>
                           {isAdmin && (
                             <td>

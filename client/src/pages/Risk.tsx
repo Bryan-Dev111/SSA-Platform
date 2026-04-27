@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { RiskDistributionCard } from '../components/RiskDistributionCard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -104,10 +105,10 @@ const OPPORTUNITY_STATUS_SORT: Record<string, number> = { Open: 1, Mitigated: 2,
 const ACTION_STATUS_SORT: Record<string, number> = { Open: 1, Closed: 2 };
 
 /** Risk register table / export: alphabetic month (e.g. Jan, Apr). */
-function formatRiskTableDateTime(iso: string): string {
+function formatRiskTableDateTime(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -147,6 +148,7 @@ type RiskActionSortKey =
 
 export function Risk() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const toast = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filterSupplierId, setFilterSupplierId] = useState('');
@@ -487,8 +489,8 @@ export function Risk() {
           'Initial Risk Level': row.riskLevel ?? '—',
           Status: row.status,
           'Current Risk Level': currentLv ?? '—',
-          Created: formatRiskTableDateTime(row.createdAt),
-          Updated: formatRiskTableDateTime(row.currentRiskUpdatedAt ?? row.createdAt),
+          Created: formatRiskTableDateTime(row.createdAt, locale),
+          Updated: formatRiskTableDateTime(row.currentRiskUpdatedAt ?? row.createdAt, locale),
         };
       });
       if (rows.length === 0) return;
@@ -656,11 +658,11 @@ export function Risk() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Risk</h1>
+          <h1 className="page-title">{t('nav.risk')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading Risk data…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -669,7 +671,7 @@ export function Risk() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Risk</h1>
+        <h1 className="page-title">{t('nav.risk')}</h1>
       </header>
 
       {error && <div className="alert-error">{error}</div>}
@@ -933,8 +935,8 @@ export function Risk() {
                       <td>{row.riskLevel ?? '—'}</td>
                       <td>{row.status}</td>
                       <td>{currentRiskLevel ?? '—'}</td>
-                      <td>{formatRiskTableDateTime(row.createdAt)}</td>
-                      <td>{formatRiskTableDateTime(row.currentRiskUpdatedAt ?? row.createdAt)}</td>
+                      <td>{formatRiskTableDateTime(row.createdAt, locale)}</td>
+                      <td>{formatRiskTableDateTime(row.currentRiskUpdatedAt ?? row.createdAt, locale)}</td>
                       {canEditRiskItems ? (
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <button
@@ -1156,7 +1158,7 @@ export function Risk() {
                               }
                             />
                           ) : row.dueDate ? (
-                            new Date(row.dueDate).toLocaleDateString(undefined, {
+                            new Date(row.dueDate).toLocaleDateString(locale, {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
@@ -84,6 +85,7 @@ const RECORD_REVIEW_SORT_RANK: Record<'Pending' | 'Approved' | 'Rejected', numbe
 
 export function Records() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const auditSeed = searchParams.get('auditId');
@@ -432,7 +434,7 @@ export function Records() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Records</h1>
+        <h1 className="page-title">{t('nav.records')}</h1>
       </header>
 
       {!isSupplier && suppliers.length > 0 && (
@@ -778,14 +780,14 @@ export function Records() {
                       <td>
                         {getRecordReviewLabel(r.status) === 'Pending'
                           ? '—'
-                          : new Date(r.updatedAt).toLocaleDateString(undefined, {
+                          : new Date(r.updatedAt).toLocaleDateString(locale, {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
                             })}
                       </td>
                       <td>
-                        {new Date(r.createdAt).toLocaleDateString(undefined, {
+                        {new Date(r.createdAt).toLocaleDateString(locale, {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
