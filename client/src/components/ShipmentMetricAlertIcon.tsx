@@ -88,8 +88,8 @@ export function ShipmentMetricAlertIcon({
             const missing = d.missingQty;
             return `PO: ${po} · Part: ${part} · Quantity missing: ${missing}`;
           })
-        : [`${shortDeliveries} late (quantity short vs planned; details unavailable)`];
-    tooltipBlocks.push({ heading: 'Late (quantity short vs planned)', lines });
+        : [`${shortDeliveries} late (details unavailable)`];
+    tooltipBlocks.push({ heading: 'Late', lines });
   }
 
   if (includeOverdueInspectionInTooltip && overdueInspectionCount > 0) {

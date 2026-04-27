@@ -106,16 +106,6 @@ export function LegalAdminEditor({ token }: { token: string | null }) {
           {docs.map((doc) => (
             <div key={doc.key}>
               <h3 style={{ marginTop: 0, fontSize: 'var(--text-base)' }}>{doc.title}</h3>
-              <p
-                style={{
-                  marginTop: 0,
-                  marginBottom: '0.5rem',
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                This text is shown when users click the link on the login page.
-              </p>
               <textarea
                 className="input"
                 rows={12}

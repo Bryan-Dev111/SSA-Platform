@@ -182,6 +182,46 @@ router.get(
     const openPoCount = openOrders.length;
     const openPoValue = openOrders.reduce((s, o) => s + poRevenue(o), 0);
 
+    const openExpenseBase = {
+      project: GLOBAL_VENDORS_PROJECT,
+      NOT: { status: { equals: 'Closed', mode: 'insensitive' as const } },
+    };
+    let openExpensesTotal = 0;
+    if (selectedCountry === null) {
+      const agg = await prisma.expense.aggregate({
+        where: openExpenseBase,
+        _sum: { amount: true },
+      });
+      openExpensesTotal = agg._sum.amount ?? 0;
+    } else {
+      const agg = await prisma.expense.aggregate({
+        where: {
+          AND: [
+            openExpenseBase,
+            {
+              OR: [
+                { country: { equals: selectedCountry, mode: 'insensitive' } },
+                {
+                  AND: [
+                    { OR: [{ country: null }, { country: '' }] },
+                    {
+                      purchaseOrder: {
+                        is: {
+                          farm: { country: { equals: selectedCountry, mode: 'insensitive' } },
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        _sum: { amount: true },
+      });
+      openExpensesTotal = agg._sum.amount ?? 0;
+    }
+
     let totalEmployees = 0;
     if (selectedCountry !== null) {
       const staff = await prisma.user.findMany({
@@ -300,6 +340,7 @@ router.get(
         totalEmployees,
         openPos: openPoCount,
         openPoValue,
+        openExpenses: openExpensesTotal,
       },
       graphs: {
         farmsByWeight: farmsByWeight,

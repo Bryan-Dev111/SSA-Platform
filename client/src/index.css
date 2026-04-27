@@ -991,6 +991,43 @@ select.input {
   background: var(--color-border-subtle);
 }
 
+/* Farm Information: lock first 2 columns while horizontal scrolling. */
+.farmers-information-table {
+  --farm-sticky-col1-width: 170px;
+  --farm-sticky-col2-width: 220px;
+}
+
+.farmers-information-table th:nth-child(1),
+.farmers-information-table td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  min-width: var(--farm-sticky-col1-width);
+  width: var(--farm-sticky-col1-width);
+  z-index: 2;
+  background: var(--color-surface);
+}
+
+.farmers-information-table th:nth-child(2),
+.farmers-information-table td:nth-child(2) {
+  position: sticky;
+  left: var(--farm-sticky-col1-width);
+  min-width: var(--farm-sticky-col2-width);
+  width: var(--farm-sticky-col2-width);
+  z-index: 2;
+  background: var(--color-surface);
+}
+
+.farmers-information-table thead th:nth-child(1),
+.farmers-information-table thead th:nth-child(2) {
+  z-index: 4;
+  background: var(--color-border-subtle);
+}
+
+.farmers-information-table th:nth-child(2),
+.farmers-information-table td:nth-child(2) {
+  border-right: 1px solid var(--color-border);
+}
+
 /* Global Supply — Purchase Orders: always show a bottom horizontal scrollbar when the
    table is wider than the card (wide columns, zoomed view). Pairs with `table--prevent-shrink`. */
 .purchase-orders-table-scroll {
@@ -1023,6 +1060,95 @@ select.input {
 }
 
 .purchase-orders-table-scroll::-webkit-scrollbar-corner {
+  background: var(--color-border-subtle);
+}
+
+/* Purchase Orders: keep first 4 columns visible while horizontal scrolling. */
+.purchase-orders-table--freeze-first-4 {
+  --po-sticky-col1-width: 110px;
+  --po-sticky-col2-width: 110px;
+  --po-sticky-col3-width: 260px;
+  --po-sticky-col4-width: 240px;
+}
+
+.purchase-orders-table--freeze-first-4 th:nth-child(1),
+.purchase-orders-table--freeze-first-4 td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: var(--po-sticky-col1-width);
+  width: var(--po-sticky-col1-width);
+  background: var(--color-surface);
+}
+
+.purchase-orders-table--freeze-first-4 th:nth-child(2),
+.purchase-orders-table--freeze-first-4 td:nth-child(2) {
+  position: sticky;
+  left: var(--po-sticky-col1-width);
+  z-index: 2;
+  min-width: var(--po-sticky-col2-width);
+  width: var(--po-sticky-col2-width);
+  background: var(--color-surface);
+}
+
+.purchase-orders-table--freeze-first-4 th:nth-child(3),
+.purchase-orders-table--freeze-first-4 td:nth-child(3) {
+  position: sticky;
+  left: calc(var(--po-sticky-col1-width) + var(--po-sticky-col2-width));
+  z-index: 2;
+  min-width: var(--po-sticky-col3-width);
+  width: var(--po-sticky-col3-width);
+  background: var(--color-surface);
+}
+
+.purchase-orders-table--freeze-first-4 th:nth-child(4),
+.purchase-orders-table--freeze-first-4 td:nth-child(4) {
+  position: sticky;
+  left: calc(
+    var(--po-sticky-col1-width) + var(--po-sticky-col2-width) + var(--po-sticky-col3-width)
+  );
+  z-index: 2;
+  min-width: var(--po-sticky-col4-width);
+  width: var(--po-sticky-col4-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.purchase-orders-table--freeze-first-4 thead th:nth-child(-n + 4) {
+  z-index: 4;
+  background: var(--color-border-subtle);
+}
+
+/* Global Supply — Samples: lock first 2 columns while horizontal scrolling. */
+.samples-table--freeze-first-2 {
+  --samples-sticky-col1-width: 140px;
+  --samples-sticky-col2-width: 220px;
+}
+
+.samples-table--freeze-first-2 th:nth-child(1),
+.samples-table--freeze-first-2 td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: var(--samples-sticky-col1-width);
+  width: var(--samples-sticky-col1-width);
+  background: var(--color-surface);
+}
+
+.samples-table--freeze-first-2 th:nth-child(2),
+.samples-table--freeze-first-2 td:nth-child(2) {
+  position: sticky;
+  left: var(--samples-sticky-col1-width);
+  z-index: 2;
+  min-width: var(--samples-sticky-col2-width);
+  width: var(--samples-sticky-col2-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.samples-table--freeze-first-2 thead th:nth-child(1),
+.samples-table--freeze-first-2 thead th:nth-child(2) {
+  z-index: 4;
   background: var(--color-border-subtle);
 }
 

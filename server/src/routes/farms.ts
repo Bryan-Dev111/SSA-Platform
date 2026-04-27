@@ -417,7 +417,7 @@ router.post(
       return;
     }
 
-    const code = await getNextCode('FARM');
+    const code = await getNextCode('FARM', 4);
     const created = await prisma.farm.create({
       data: { code, farmName, farmerName, country, city },
       select: farmSelect,

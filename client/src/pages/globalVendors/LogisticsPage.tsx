@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ExpandableTableText } from '../../components/ExpandableTableText';
+import { MetricCard } from '../../components/MetricCard';
 
 export const LOGISTICS_SITE_TYPES = [
   { value: 'Port', label: 'Port', bg: '#171717', fg: '#fafafa' },
@@ -304,6 +305,23 @@ export function LogisticsPage() {
     });
   }, [rows, countrySortDir]);
 
+  const sitesWithCoordinates = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          typeof r.latitude === 'number' &&
+          Number.isFinite(r.latitude) &&
+          typeof r.longitude === 'number' &&
+          Number.isFinite(r.longitude)
+      ).length,
+    [rows]
+  );
+
+  const sitesWithAttachments = useMemo(
+    () => rows.filter((r) => (r.attachments?.length ?? 0) > 0).length,
+    [rows]
+  );
+
   if (loading && rows.length === 0) {
     return (
       <div className="page">
@@ -325,14 +343,30 @@ export function LogisticsPage() {
 
       {error && rows.length === 0 ? <div className="alert-error">{error}</div> : null}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      <div
+        className="dashboard-metric-grid"
+        style={{
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))',
+          marginBottom: '1rem',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          gap: '0.75rem',
+        }}
+      >
+        <MetricCard title="Total logistics sites" value={rows.length} />
+        <MetricCard title="Sites with coordinates" value={sitesWithCoordinates} />
+        <MetricCard title="Sites with attachments" value={sitesWithAttachments} />
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem', width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <div className="card-body">
           <form onSubmit={submitAdd} className="stack" style={{ gap: 12, marginTop: 16 }}>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: '0.75rem',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))',
+                gap: '0.6rem',
                 alignItems: 'end',
               }}
             >
@@ -423,10 +457,10 @@ export function LogisticsPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <div className="card-body" style={{ padding: 0 }}>
-          <div className="table-wrap">
-            <table className="table">
+          <div className="table-wrap" style={{ overflowX: 'auto' }}>
+            <table className="table table--prevent-shrink">
               <thead>
                 <tr>
                   <th>Code</th>
@@ -459,20 +493,18 @@ export function LogisticsPage() {
                   sortedRows.map((r) => (
                     <tr key={r.id}>
                       <td>
-                        <strong>{logisticsDisplayCode(r.code)}</strong>
+                        <Link
+                          to={`/global-vendors/logistics-profile?logisticsId=${encodeURIComponent(r.id)}`}
+                          className="finding-code-link"
+                          title={`Open Logistics profile — ${r.company}`}
+                        >
+                          <strong>{logisticsDisplayCode(r.code)}</strong>
+                        </Link>
                       </td>
                       <td>
                         <TypeBadge siteType={r.siteType} />
                       </td>
-                      <td>
-                        <Link
-                          to={`/global-vendors/logistics-profile?logisticsId=${encodeURIComponent(r.id)}`}
-                          className="finding-code-link"
-                          title="Open Logistics profile"
-                        >
-                          {r.company}
-                        </Link>
-                      </td>
+                      <td>{r.company}</td>
                       <td>{r.country}</td>
                       <td>{r.city?.trim() ? r.city : '—'}</td>
                       <td>{r.registrationNumber?.trim() ? r.registrationNumber : '—'}</td>

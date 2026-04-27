@@ -13,21 +13,17 @@ import { GlobalSupplyDocumentsPanel } from './GlobalSupplyDocumentsPanel';
 import { InternalManagementCalendarView } from '../InternalManagementCalendar';
 import { GlobalSupplyExpensesSection } from './ExpensesPage';
 import { InternalManagementOrgChart } from '../InternalManagementOrgChart';
-import { WorkLogs } from '../WorkLogs';
 import { AdminEmployeeAssignmentsPanel } from '../admin/AdminEmployeeAssignmentsPanel';
 import { ManagementAssignmentsPanel } from '../ManagementAssignmentsPanel';
 import { GlobalSupplyProfitTab } from './GlobalSupplyProfitTab';
-import { canAccessPath } from '../../config/rolePageAccess';
-import type { InternalManagementTab } from '../internalManagementTabs';
 
 type GlobalInternalTab =
   | 'purchaseOrders'
-  | 'documents'
-  | 'calendar'
   | 'expenses'
   | 'profit'
+  | 'documents'
+  | 'calendar'
   | 'orgChart'
-  | 'workLogs'
   | 'employeeAssignments'
   | 'managementAssignments';
 
@@ -50,22 +46,20 @@ export function GlobalSupplyInternalManagementPage() {
   const isAdmin = !!user?.roleNames?.includes('Admin');
   const roleNames = user?.roleNames ?? [];
   const canStaffHub = roleNames.includes('Admin') || roleNames.includes('QualityManager');
-  const canWorkLogsTab = canAccessPath('/work-logs', roleNames);
 
   const [tab, setTab] = useState<GlobalInternalTab>('purchaseOrders');
   const [openPoCount, setOpenPoCount] = useState<number | null>(null);
   const [openPoValue, setOpenPoValue] = useState<number | null>(null);
-  const [hasOpenExpenseMissingAmount, setHasOpenExpenseMissingAmount] = useState(false);
+  const [openExpenseZeroAmountCount, setOpenExpenseZeroAmountCount] = useState(0);
 
   useEffect(() => {
-    if (tab === 'workLogs' && !canWorkLogsTab) setTab('purchaseOrders');
     if (
       (tab === 'orgChart' || tab === 'employeeAssignments' || tab === 'managementAssignments') &&
       !canStaffHub
     ) {
       setTab('purchaseOrders');
     }
-  }, [tab, canWorkLogsTab, canStaffHub]);
+  }, [tab, canStaffHub]);
 
   useEffect(() => {
     if (!token || tab !== 'purchaseOrders') return;
@@ -92,15 +86,15 @@ export function GlobalSupplyInternalManagementPage() {
     if (!token) return;
     apiJson<{ list: ExpenseStatusRow[] }>('/expenses', { token })
       .then((res) => {
-        const hasMissing = res.list.some((row) => {
+        const count = res.list.filter((row) => {
           if (row.project !== 'Global Vendors') return false;
           const status = (row.status ?? 'Open').trim().toLowerCase();
           return status !== 'closed' && (!Number.isFinite(row.amount) || row.amount <= 0);
-        });
-        setHasOpenExpenseMissingAmount(hasMissing);
+        }).length;
+        setOpenExpenseZeroAmountCount(count);
       })
-      .catch(() => setHasOpenExpenseMissingAmount(false));
-  }, [token]);
+      .catch(() => setOpenExpenseZeroAmountCount(0));
+  }, [token, tab]);
 
   const pageDescription = useMemo(() => {
     if (tab === 'purchaseOrders') return '';
@@ -110,7 +104,6 @@ export function GlobalSupplyInternalManagementPage() {
     if (tab === 'profit') return '';
     if (tab === 'orgChart')
       return '';
-    if (tab === 'workLogs') return '';
     if (tab === 'employeeAssignments')
       return '';
     if (tab === 'managementAssignments')
@@ -121,14 +114,11 @@ export function GlobalSupplyInternalManagementPage() {
   const tabButtons = useMemo(() => {
     const rows: { id: GlobalInternalTab; label: string }[] = [
       { id: 'purchaseOrders', label: 'Purchase Orders' },
-      { id: 'documents', label: 'Documents' },
-      { id: 'calendar', label: 'Calendar' },
       { id: 'expenses', label: 'Expenses' },
       { id: 'profit', label: 'Profit' },
+      { id: 'documents', label: 'Documents' },
+      { id: 'calendar', label: 'Calendar' },
     ];
-    if (canWorkLogsTab) {
-      rows.push({ id: 'workLogs', label: 'Work Logs' });
-    }
     if (canStaffHub) {
       rows.push(
         { id: 'orgChart', label: 'Org Chart' },
@@ -137,11 +127,7 @@ export function GlobalSupplyInternalManagementPage() {
       );
     }
     return rows;
-  }, [canStaffHub, canWorkLogsTab]);
-
-  const onOrgChartGoToTab = (t: InternalManagementTab) => {
-    if (t === 'managementAssignments' && canStaffHub) setTab('managementAssignments');
-  };
+  }, [canStaffHub]);
 
   return (
     <div className="page">
@@ -161,10 +147,10 @@ export function GlobalSupplyInternalManagementPage() {
             onClick={() => setTab(id)}
           >
             {label}
-            {id === 'expenses' && hasOpenExpenseMissingAmount ? (
+            {id === 'expenses' && openExpenseZeroAmountCount > 0 ? (
               <span
-                aria-label="Open expenses missing amount"
-                title="Open expense line has no amount entered"
+                aria-label={`${openExpenseZeroAmountCount} Expenses have zero amount`}
+                title={`${openExpenseZeroAmountCount} Expenses have zero amount`}
                 style={{
                   marginLeft: 8,
                   display: 'inline-flex',
@@ -210,9 +196,8 @@ export function GlobalSupplyInternalManagementPage() {
             }}
           >
             <MetricCard
-              title="Open PO's"
+              title="Open POs"
               value={openPoCount == null ? '—' : openPoCount}
-              subtitle="Purchase orders not closed"
             />
             <MetricCard
               title="Open PO Value"
@@ -226,10 +211,9 @@ export function GlobalSupplyInternalManagementPage() {
                       maximumFractionDigits: 2,
                     }).format(openPoValue)
               }
-              subtitle="Total value of open purchase orders"
             />
           </div>
-          <PurchaseOrdersPage />
+          <PurchaseOrdersPage canCreatePurchaseOrder={isAdmin} />
         </>
       )}
 
@@ -237,7 +221,7 @@ export function GlobalSupplyInternalManagementPage() {
         <GlobalSupplyDocumentsPanel token={token} toast={toast} canDelete={isAdmin} />
       )}
 
-      {tab === 'calendar' && <InternalManagementCalendarView token={token} />}
+      {tab === 'calendar' && <InternalManagementCalendarView token={token} variant="globalSupply" />}
 
       {tab === 'expenses' && <GlobalSupplyExpensesSection />}
 
@@ -247,12 +231,10 @@ export function GlobalSupplyInternalManagementPage() {
         <InternalManagementOrgChart
           token={token}
           viewerDisplayName={user?.name?.trim() || user?.email || 'You'}
-          onGoToTab={onOrgChartGoToTab}
           variant="globalSupply"
+          employeeProfilePathPrefix="/global-vendors/employee-profile"
         />
       )}
-
-      {tab === 'workLogs' && canWorkLogsTab && <WorkLogs variant="embedded" />}
 
       {tab === 'employeeAssignments' && canStaffHub && (
         <div style={{ marginTop: '1rem' }}>

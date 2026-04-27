@@ -4,7 +4,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess } from '../middleware/rbac';
+import { requirePageAccess, requirePageAccessAny } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import { WorkType } from '@prisma/client';
@@ -53,9 +53,16 @@ function canViewAllWorkLogs(user: { roleNames: string[] } | undefined): boolean 
   return user.roleNames.includes('Admin') || user.roleNames.includes('QualityManager');
 }
 
+function isAdminUser(user: { roleNames: string[] } | undefined): boolean {
+  if (!user) return false;
+  return user.roleNames.includes('Admin');
+}
+
+const workLogsPageAccess = requirePageAccessAny(['WorkLogs', 'GlobalSupplyWorkLogs']);
+
 router.get(
   '/preview-rate',
-  requirePageAccess('WorkLogs'),
+  workLogsPageAccess,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -76,7 +83,7 @@ router.get(
 
 router.get(
   '/',
-  requirePageAccess('WorkLogs'),
+  workLogsPageAccess,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -111,7 +118,7 @@ router.get(
 
 router.post(
   '/',
-  requirePageAccess('WorkLogs'),
+  workLogsPageAccess,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -225,6 +232,105 @@ router.post(
     });
 
     res.status(201).json(created);
+  })
+);
+
+router.patch(
+  '/:id',
+  workLogsPageAccess,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (!isAdminUser(req.user)) {
+      res.status(403).json({ error: 'Only Admin can edit work logs' });
+      return;
+    }
+
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'Work log id is required' });
+      return;
+    }
+
+    const patch: {
+      workDate?: Date;
+      workType?: WorkType;
+      description?: string | null;
+    } = {};
+
+    if (typeof req.body?.workDate === 'string') {
+      const workDateRaw = req.body.workDate.trim();
+      if (!workDateRaw) {
+        res.status(400).json({ error: 'workDate cannot be empty' });
+        return;
+      }
+      patch.workDate = new Date(workDateRaw.slice(0, 10) + 'T12:00:00.000Z');
+      if (Number.isNaN(patch.workDate.getTime())) {
+        res.status(400).json({ error: 'workDate must be a valid date (YYYY-MM-DD)' });
+        return;
+      }
+    }
+
+    if (typeof req.body?.workType === 'string') {
+      const workTypeRaw = req.body.workType.trim();
+      if (!['Audit', 'Inspection', 'Travel', 'Admin', 'Other'].includes(workTypeRaw)) {
+        res
+          .status(400)
+          .json({ error: 'workType must be one of: Audit, Inspection, Travel, Admin, Other' });
+        return;
+      }
+      patch.workType = workTypeRaw as WorkType;
+    }
+
+    if (typeof req.body?.description === 'string') {
+      patch.description = req.body.description.trim() || null;
+    } else if (req.body && req.body.description === null) {
+      patch.description = null;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      res.status(400).json({ error: 'No editable fields provided' });
+      return;
+    }
+
+    const existing = await prisma.workLog.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) {
+      res.status(404).json({ error: 'Work log not found' });
+      return;
+    }
+
+    const updated = await prisma.workLog.update({
+      where: { id },
+      data: patch,
+      include: {
+        supplier: { select: { id: true, code: true, name: true } },
+        audit: {
+          select: {
+            id: true,
+            code: true,
+            projectHistoryId: true,
+            projectHistory: { select: { id: true, projectCode: true } },
+          },
+        },
+        shipment: {
+          select: {
+            id: true,
+            code: true,
+            projectHistoryId: true,
+            supplierId: true,
+            purchaseOrder: true,
+            partNumber: true,
+            projectHistory: { select: { id: true, projectCode: true } },
+          },
+        },
+        projectHistory: { select: { id: true, projectCode: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    res.json(updated);
   })
 );
 

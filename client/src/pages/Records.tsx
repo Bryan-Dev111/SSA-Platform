@@ -208,7 +208,7 @@ export function Records() {
     const openRows = rows.filter(isPending);
 
     const pct = (approvedCount: number, base: number): string =>
-      base > 0 ? `${Math.round((approvedCount / base) * 100)}% approved` : '0% approved';
+      base > 0 ? `${Math.round((approvedCount / base) * 100)}% Approved` : '0% Approved';
 
     return {
       total,

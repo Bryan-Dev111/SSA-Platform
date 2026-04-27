@@ -9,7 +9,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
-const READ_ROLES = ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'] as const;
+const READ_ROLES = ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'] as const;
 
 router.use(authMiddleware);
 

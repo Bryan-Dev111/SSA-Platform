@@ -8,7 +8,9 @@ import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ExpandableTableText } from '../../components/ExpandableTableText';
+import { SortableTh } from '../../components/SortableTh';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
+import { type SortDir, cmpNum, cmpStr, toggleSort } from '../../utils/tableSort';
 
 export interface FarmRow {
   id: string;
@@ -79,6 +81,16 @@ type CropOption = {
   id: string;
   name: string;
 };
+
+type FarmInfoSortKey =
+  | 'code'
+  | 'farmName'
+  | 'farmerName'
+  | 'country'
+  | 'region'
+  | 'city'
+  | 'elevationMeters'
+  | 'farmCategory';
 
 function farmRowToExportRow(f: FarmRow): ExportRow {
   const mainHarvest =
@@ -165,7 +177,10 @@ export function FarmersInformationPage() {
   const [imageUploadBusy, setImageUploadBusy] = useState<'Profile' | 'Processing' | null>(null);
   const [deleteImageTarget, setDeleteImageTarget] = useState<FarmProfileImageRow | null>(null);
   const [deletingImage, setDeletingImage] = useState(false);
-  const [countrySortDir, setCountrySortDir] = useState<'asc' | 'desc'>('asc');
+  const [sort, setSort] = useState<{ key: FarmInfoSortKey | null; dir: SortDir }>({
+    key: null,
+    dir: 'asc',
+  });
   const [countryOptions, setCountryOptions] = useState<CountryOption[]>([]);
   const [cropOptions, setCropOptions] = useState<CropOption[]>([]);
 
@@ -466,13 +481,49 @@ export function FarmersInformationPage() {
   }, [farms, toast]);
 
   const sortedFarms = useMemo(() => {
-    return [...farms].sort((a, b) => {
-      const av = (a.country ?? '').trim();
-      const bv = (b.country ?? '').trim();
-      const cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
-      return countrySortDir === 'asc' ? cmp : -cmp;
+    const rows = [...farms];
+    const k = sort.key;
+    if (!k) return rows;
+    const dir = sort.dir;
+    rows.sort((a, b) => {
+      let c = 0;
+      switch (k) {
+        case 'code':
+          c = cmpStr(a.code, b.code, dir);
+          break;
+        case 'farmName':
+          c = cmpStr(a.farmName ?? '', b.farmName ?? '', dir);
+          break;
+        case 'farmerName':
+          c = cmpStr(a.farmerName ?? '', b.farmerName ?? '', dir);
+          break;
+        case 'country':
+          c = cmpStr(a.country ?? '', b.country ?? '', dir);
+          break;
+        case 'region':
+          c = cmpStr(a.region ?? '', b.region ?? '', dir);
+          break;
+        case 'city':
+          c = cmpStr(a.city ?? '', b.city ?? '', dir);
+          break;
+        case 'elevationMeters':
+          c = cmpNum(a.elevationMeters ?? Number.NEGATIVE_INFINITY, b.elevationMeters ?? Number.NEGATIVE_INFINITY, dir);
+          break;
+        case 'farmCategory':
+          c = cmpStr(a.farmCategory ?? '', b.farmCategory ?? '', dir);
+          break;
+        default:
+          break;
+      }
+      if (c !== 0) return c;
+      return cmpStr(a.code, b.code, 'asc');
     });
-  }, [farms, countrySortDir]);
+    return rows;
+  }, [farms, sort]);
+
+  const onSortColumn = (columnKey: string) => {
+    setSort((prev) => toggleSort(prev, columnKey as FarmInfoSortKey));
+  };
 
   if (loading && farms.length === 0) {
     return (
@@ -517,31 +568,75 @@ export function FarmersInformationPage() {
             Export to Excel
           </button>
           <button type="button" className="btn btn-primary" onClick={() => setModalOpen(true)}>
-            Add farm
+            Add Farm
           </button>
         </div>
       </header>
 
       <div className="card">
         <div className="table-wrap farmers-information-table-scroll">
-          <table className="table table--sticky-header table--prevent-shrink">
+          <table className="table table--sticky-header table--prevent-shrink farmers-information-table">
             <thead>
               <tr>
-                <th>Farm ID</th>
-                <th>Farm name</th>
-                <th>Contact name</th>
-                <th
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                  onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                  title="Sort by country"
-                >
-                  Country {countrySortDir === 'asc' ? '↑' : '↓'}
-                </th>
-                <th>Region</th>
-                <th>City</th>
-                <th>Farm category</th>
+                <SortableTh
+                  label="Farm ID"
+                  columnKey="code"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                  style={{ minWidth: 130 }}
+                />
+                <SortableTh
+                  label="Farm name"
+                  columnKey="farmName"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                  style={{ minWidth: 180 }}
+                />
+                <SortableTh
+                  label="Contact name"
+                  columnKey="farmerName"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Country"
+                  columnKey="country"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Region"
+                  columnKey="region"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="City"
+                  columnKey="city"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Elevation (m)"
+                  columnKey="elevationMeters"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Farm category"
+                  columnKey="farmCategory"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
                 <th>Main crop</th>
-                <th>Elevation (m)</th>
                 <th>Production style</th>
                 <th>Total farm size (ha)</th>
                 <th>Main crop area (ha)</th>
@@ -579,7 +674,7 @@ export function FarmersInformationPage() {
               {farms.length === 0 ? (
                 <tr>
                   <td colSpan={40} className="table-empty">
-                    No farms yet. Use <strong>Add farm</strong> to create one.
+                    No farms yet. Use <strong>Add Farm</strong> to create one.
                   </td>
                 </tr>
               ) : (
@@ -599,9 +694,9 @@ export function FarmersInformationPage() {
                     <td>{f.country}</td>
                     <td>{f.region ?? '—'}</td>
                     <td>{f.city ?? '—'}</td>
+                    <td>{typeof f.elevationMeters === 'number' ? f.elevationMeters : '—'}</td>
                     <td>{f.farmCategory ?? '—'}</td>
                     <td>{f.mainCrop ?? '—'}</td>
-                    <td>{typeof f.elevationMeters === 'number' ? f.elevationMeters : '—'}</td>
                     <td>{f.productionStyle ?? '—'}</td>
                     <td>{typeof f.totalFarmSizeHa === 'number' ? f.totalFarmSizeHa : '—'}</td>
                     <td>{typeof f.mainCropAreaHa === 'number' ? f.mainCropAreaHa : '—'}</td>
@@ -718,7 +813,7 @@ export function FarmersInformationPage() {
         >
           <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-farm-title" className="confirm-dialog-title">
-              Add farm
+              Add Farm
             </h3>
             <form onSubmit={submit} className="stack" style={{ gap: 12, marginTop: 16 }}>
               <label className="field">

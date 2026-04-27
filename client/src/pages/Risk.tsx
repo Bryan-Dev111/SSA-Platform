@@ -103,6 +103,23 @@ const RISK_LEVEL_SORT: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
 const OPPORTUNITY_STATUS_SORT: Record<string, number> = { Open: 1, Mitigated: 2, Closed: 3, Realized: 4 };
 const ACTION_STATUS_SORT: Record<string, number> = { Open: 1, Closed: 2 };
 
+/** Risk register table / export: alphabetic month (e.g. Jan, Apr). */
+function formatRiskTableDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function registerTypeLabel(type: 'risk' | 'opportunity'): string {
+  return type === 'risk' ? 'Risk' : 'Opportunity';
+}
+
 type RiskItemSortKey =
   | 'code'
   | 'supplier'
@@ -196,7 +213,7 @@ export function Risk() {
       setActions(allActions.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)));
       if (!newSupplierId && supplierList.length === 1) setNewSupplierId(supplierList[0].id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load risk data');
+      setError(e instanceof Error ? e.message : 'Failed to load Risk data');
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -443,6 +460,7 @@ export function Risk() {
   const riskPinsByCell = useMemo(() => {
     const map = new Map<string, typeof effectiveRisks>();
     for (const row of effectiveRisks) {
+      if (row.status === 'Closed') continue;
       if (!row.effectiveLikelihood || !row.effectiveSeverity) continue;
       const key = `${row.effectiveLikelihood}|${row.effectiveSeverity}`;
       const existing = map.get(key) ?? [];
@@ -462,15 +480,15 @@ export function Risk() {
         return {
           ID: row.code,
           Supplier: `${row.supplier.code} - ${row.supplier.name}`,
-          Type: row.type,
+          Type: registerTypeLabel(row.type),
           Description: row.description,
           Likelihood: row.likelihood ?? '—',
           Severity: row.severity ?? '—',
           'Initial Risk Level': row.riskLevel ?? '—',
           Status: row.status,
           'Current Risk Level': currentLv ?? '—',
-          Created: new Date(row.createdAt).toLocaleString(),
-          Updated: new Date(row.currentRiskUpdatedAt ?? row.createdAt).toLocaleString(),
+          Created: formatRiskTableDateTime(row.createdAt),
+          Updated: formatRiskTableDateTime(row.currentRiskUpdatedAt ?? row.createdAt),
         };
       });
       if (rows.length === 0) return;
@@ -503,7 +521,7 @@ export function Risk() {
       setNewDescription('');
       setNewLikelihood('Possible');
       setNewSeverity('Moderate');
-      toast.success('Risk/opportunity item added');
+      toast.success('Risk/Opportunity item added');
       if (matchesActiveFilters(created)) setItems((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
       else await load(false);
     } catch (err) {
@@ -603,7 +621,7 @@ export function Risk() {
         }),
       });
       setEditingId(null);
-      toast.success('Risk/opportunity item updated');
+      toast.success('Risk/Opportunity item updated');
       if (matchesActiveFilters(updated)) setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       else setItems((prev) => prev.filter((row) => row.id !== updated.id));
     } catch (err) {
@@ -623,7 +641,7 @@ export function Risk() {
     setDeletingItem(true);
     try {
       await apiJson(`/opportunities/${deleteTarget.id}`, { token, method: 'DELETE' });
-      toast.success('Risk/opportunity deleted');
+      toast.success('Risk/Opportunity deleted');
       if (editingId === deleteTarget.id) setEditingId(null);
       setDeleteTarget(null);
       await load(false);
@@ -642,7 +660,7 @@ export function Risk() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading risk data...</p>
+          <p style={{ marginTop: 12 }}>Loading Risk data…</p>
         </div>
       </div>
     );
@@ -711,7 +729,7 @@ export function Risk() {
         <RiskDistributionCard distribution={distribution} />
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Top risk suppliers</h2>
+            <h2 style={{ marginTop: 0 }}>Top Risk Suppliers</h2>
             {topRiskSuppliers.length === 0 ? (
               <p className="table-empty">No data.</p>
             ) : (
@@ -737,7 +755,7 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risk matrix</h2>
+          <h2 style={{ marginTop: 0 }}>Risk Matrix</h2>
           <div className="table-wrap">
             <table className="table" style={{ minWidth: 840 }}>
               <thead>
@@ -803,7 +821,7 @@ export function Risk() {
       {canEditRiskItems && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Add risk/opportunity</h2>
+            <h2 style={{ marginTop: 0 }}>Add Risk/Opportunity</h2>
             <form onSubmit={createItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr auto', gap: '0.75rem' }}>
               <select className="input" value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)} required>
                 <option value="">Supplier</option>
@@ -852,7 +870,7 @@ export function Risk() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <h2 style={{ margin: 0 }}>Risks and opportunities</h2>
+            <h2 style={{ margin: 0 }}>Risks and Opportunities</h2>
             <button type="button" className="btn btn-ghost" onClick={handleExportRiskTable} disabled={items.length === 0}>
               Export to Excel
             </button>
@@ -908,15 +926,15 @@ export function Risk() {
                     <tr key={row.id} style={getRiskRegisterRowStyle(row, currentRiskLevel)}>
                       <td>{row.code}</td>
                       <td>{row.supplier.code} - {row.supplier.name}</td>
-                      <td>{row.type}</td>
+                      <td>{registerTypeLabel(row.type)}</td>
                       <td>{row.description}</td>
                       <td>{row.likelihood ?? '—'}</td>
                       <td>{row.severity ?? '—'}</td>
                       <td>{row.riskLevel ?? '—'}</td>
                       <td>{row.status}</td>
                       <td>{currentRiskLevel ?? '—'}</td>
-                      <td>{new Date(row.createdAt).toLocaleString()}</td>
-                      <td>{new Date(row.currentRiskUpdatedAt ?? row.createdAt).toLocaleString()}</td>
+                      <td>{formatRiskTableDateTime(row.createdAt)}</td>
+                      <td>{formatRiskTableDateTime(row.currentRiskUpdatedAt ?? row.createdAt)}</td>
                       {canEditRiskItems ? (
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <button
@@ -951,7 +969,7 @@ export function Risk() {
       {canEditRiskItems && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Add action</h2>
+            <h2 style={{ marginTop: 0 }}>Add Action</h2>
             <form onSubmit={createAction} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr 1fr 1fr auto', gap: '0.75rem' }}>
               <select
                 className="input"
@@ -1031,7 +1049,7 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Actions table</h2>
+          <h2 style={{ marginTop: 0 }}>Actions Table</h2>
           <div className="table-wrap" style={{ marginBottom: '1rem' }}>
             {actions.length === 0 ? (
               <p className="table-empty">No actions yet.</p>
@@ -1252,12 +1270,12 @@ export function Risk() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete risk/opportunity?"
+        title="Delete Risk/Opportunity?"
         message={
           deleteTarget ? (
             <p style={{ margin: 0 }}>
-              Permanently delete <strong>{deleteTarget.code}</strong> ({deleteTarget.type})? Any linked risk actions are
-              removed as well.
+              Permanently delete <strong>{deleteTarget.code}</strong> ({registerTypeLabel(deleteTarget.type)})? Any linked
+              actions are removed as well.
             </p>
           ) : (
             ''
@@ -1274,7 +1292,7 @@ export function Risk() {
       {editingId && (
         <div className="confirm-dialog-overlay" onClick={closeEditModal} role="dialog" aria-modal="true" aria-labelledby="risk-edit-title">
           <div className="confirm-dialog confirm-dialog--xl" onClick={(e) => e.stopPropagation()}>
-            <h3 id="risk-edit-title" className="confirm-dialog-title">Edit risk/opportunity</h3>
+            <h3 id="risk-edit-title" className="confirm-dialog-title">Edit Risk/Opportunity</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <select className="input" value={editType} onChange={(e) => setEditType(e.target.value as 'risk' | 'opportunity')}>
                 <option value="risk">Risk</option>

@@ -61,7 +61,8 @@ router.get(
     const revenueByCountryMap = new Map<string, number>();
     const coffeeKgByCountryMap = new Map<string, number>();
     const cocoaKgByCountryMap = new Map<string, number>();
-    const openPoCreationOverTimeMap = new Map<string, number>();
+    /** Count of POs created per calendar day (all statuses) — “Purchase Order Creation” on Business Dashboard. */
+    const poCreationOverTimeMap = new Map<string, number>();
     const expenseByCountryMap = new Map<string, number>();
     const sampleCountByCountryMap = new Map<string, number>();
 
@@ -101,9 +102,9 @@ router.get(
       expenseByCountryMap.set(country, (expenseByCountryMap.get(country) ?? 0) + expense.amount);
     }
 
-    for (const order of openOrders) {
+    for (const order of orders) {
       const date = order.createdAt.toISOString().slice(0, 10);
-      openPoCreationOverTimeMap.set(date, (openPoCreationOverTimeMap.get(date) ?? 0) + 1);
+      poCreationOverTimeMap.set(date, (poCreationOverTimeMap.get(date) ?? 0) + 1);
     }
 
     const revenueByCountry: CountryValueRow[] = [...revenueByCountryMap.entries()]
@@ -130,7 +131,7 @@ router.get(
       .map(([country, value]) => ({ country, value }))
       .sort((a, b) => b.value - a.value);
 
-    const poCreationOverTimeOpen: TimePointRow[] = [...openPoCreationOverTimeMap.entries()]
+    const poCreationOverTimeOpen: TimePointRow[] = [...poCreationOverTimeMap.entries()]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([date, count]) => ({ date, count }));
 

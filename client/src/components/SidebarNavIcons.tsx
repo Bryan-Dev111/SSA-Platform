@@ -178,15 +178,13 @@ export function SidebarNavIcon({ path }: { path: string }) {
       );
 
     case '/global-vendors/farmers':
+      /** ID / contact card — Farm Information nav */
       return (
         <Svg>
-          <path
-            d="M17 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M13 7a4 4 0 100-8 4 4 0 000 8M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+          <path d="M7 9h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M7 14h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M13 18h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </Svg>
       );
     case '/global-vendors/farm-profile':

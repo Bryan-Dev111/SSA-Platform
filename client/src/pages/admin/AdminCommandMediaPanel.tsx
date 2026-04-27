@@ -44,6 +44,13 @@ interface AdminCommandMediaPanelProps {
   toast: ToastApi;
 }
 
+function formatCommandMediaDate(iso: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelProps) {
   const [form, setForm] = useState({
     documentNumber: '',
@@ -326,7 +333,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>
-                      <td>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td>{formatCommandMediaDate(r.createdAt)}</td>
                       <td>
                         {r.filePath ? (
                           <button

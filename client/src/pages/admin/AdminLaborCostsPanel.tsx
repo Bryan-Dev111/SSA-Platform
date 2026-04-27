@@ -114,6 +114,14 @@ export function AdminLaborCostsPanel({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [patchingId, setPatchingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    workLogId: '',
+    projectHistoryId: '',
+    fullName: '',
+    hours: '',
+    rate: '',
+  });
   const [employeeRateByName, setEmployeeRateByName] = useState<Record<string, number>>({});
   const [form, setForm] = useState({
     workLogId: '',
@@ -252,6 +260,61 @@ export function AdminLaborCostsPanel({
     }
   };
 
+  const startEdit = (row: LaborCostRow) => {
+    setEditingId(row.id);
+    setEditForm({
+      workLogId: row.workLogId ?? '',
+      projectHistoryId: row.projectHistoryId ?? '',
+      fullName: row.fullName,
+      hours: String(row.hours),
+      rate: String(row.rate),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!token) return;
+    const hours = Number(editForm.hours);
+    const rate = Number(editForm.rate);
+    if (!editForm.fullName.trim()) {
+      setError('Full Name is required');
+      return;
+    }
+    if (!Number.isFinite(hours) || hours < 0) {
+      setError('Hours must be a non-negative number');
+      return;
+    }
+    if (!Number.isFinite(rate) || rate < 0) {
+      setError('Rate must be a non-negative number');
+      return;
+    }
+    setPatchingId(id);
+    setError(null);
+    try {
+      const updated = await apiJson<LaborCostRow>(`/labor-costs/${encodeURIComponent(id)}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          workLogId: editForm.workLogId || null,
+          projectHistoryId: editForm.projectHistoryId || null,
+          fullName: editForm.fullName.trim(),
+          hours,
+          rate,
+        }),
+      });
+      setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
+      setEditingId(null);
+      void refreshOpenSummary();
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setPatchingId(null);
+    }
+  };
+
   return (
     <div className="card">
       <div className="card-body">
@@ -269,12 +332,10 @@ export function AdminLaborCostsPanel({
           <MetricCard
             title="Total Open Costs"
             value={openSummary == null ? '—' : openSummary.openCount}
-            subtitle="Labor cost rows with status Pending"
           />
           <MetricCard
             title="Open Costs ($ value)"
             value={openSummary == null ? '—' : formatUsd(openSummary.openTotalUsd)}
-            subtitle="Sum of total cost (USD) for pending rows"
           />
         </div>
         {error && <div className="alert-error">{error}</div>}
@@ -354,19 +415,84 @@ export function AdminLaborCostsPanel({
                   <th>Total cost (USD)</th>
                   <th>Paid Status</th>
                   <th>Actions</th>
+                  <th>Edit</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>{r.code}</td>
-                    <td>{r.workLog?.code ?? r.workLogId ?? '—'}</td>
-                    <td>{r.projectHistory?.projectCode ?? r.projectHistoryId ?? r.workLog?.projectHistoryId ?? '—'}</td>
-                    <td title={r.workLog?.workDate ? 'Work log date' : 'Created date'}>{formatLaborCostDate(r)}</td>
-                    <td>{r.fullName}</td>
-                    <td>{r.hours}</td>
                     <td>
-                      <LaborCostRateField row={r} disabled={patchingId === r.id} onCommit={patchRate} />
+                      {editingId === r.id ? (
+                        <select
+                          className="input"
+                          value={editForm.workLogId}
+                          onChange={(e) => setEditForm((p) => ({ ...p, workLogId: e.target.value }))}
+                        >
+                          <option value="">None</option>
+                          {workLogs.map((w) => (
+                            <option key={w.id} value={w.id}>{w.code}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        r.workLog?.code ?? r.workLogId ?? '—'
+                      )}
+                    </td>
+                    <td>
+                      {editingId === r.id ? (
+                        <select
+                          className="input"
+                          value={editForm.projectHistoryId}
+                          onChange={(e) => setEditForm((p) => ({ ...p, projectHistoryId: e.target.value }))}
+                        >
+                          <option value="">None</option>
+                          {projects.map((p) => (
+                            <option key={p.id} value={p.id}>{p.projectCode} — {p.companyName}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        r.projectHistory?.projectCode ?? r.projectHistoryId ?? r.workLog?.projectHistoryId ?? '—'
+                      )}
+                    </td>
+                    <td title={r.workLog?.workDate ? 'Work log date' : 'Created date'}>{formatLaborCostDate(r)}</td>
+                    <td>
+                      {editingId === r.id ? (
+                        <input
+                          className="input"
+                          value={editForm.fullName}
+                          onChange={(e) => setEditForm((p) => ({ ...p, fullName: e.target.value }))}
+                        />
+                      ) : (
+                        r.fullName
+                      )}
+                    </td>
+                    <td>
+                      {editingId === r.id ? (
+                        <input
+                          className="input"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={editForm.hours}
+                          onChange={(e) => setEditForm((p) => ({ ...p, hours: e.target.value }))}
+                        />
+                      ) : (
+                        r.hours
+                      )}
+                    </td>
+                    <td>
+                      {editingId === r.id ? (
+                        <input
+                          className="input"
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={editForm.rate}
+                          onChange={(e) => setEditForm((p) => ({ ...p, rate: e.target.value }))}
+                        />
+                      ) : (
+                        <LaborCostRateField row={r} disabled={patchingId === r.id} onCommit={patchRate} />
+                      )}
                     </td>
                     <td>{formatUsd(r.totalCost)}</td>
                     <td>{r.paidStatus}</td>
@@ -390,6 +516,41 @@ export function AdminLaborCostsPanel({
                             Reject
                           </button>
                         </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {r.paidStatus === 'Paid' ? (
+                        editingId === r.id ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              disabled={patchingId === r.id}
+                              onClick={() => void saveEdit(r.id)}
+                            >
+                              {patchingId === r.id ? '…' : 'Save'}
+                            </button>{' '}
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              disabled={patchingId === r.id}
+                              onClick={cancelEdit}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-ghost"
+                            disabled={patchingId !== null}
+                            onClick={() => startEdit(r)}
+                          >
+                            Edit
+                          </button>
+                        )
                       ) : (
                         '—'
                       )}

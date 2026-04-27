@@ -19,9 +19,18 @@ interface ShipmentCalendarRow {
   createdAt: string;
 }
 
+interface PurchaseOrderCalendarRow {
+  id: string;
+  code: string;
+  estimatedFarmerDeliveryDate: string | null;
+  estimatedArrivalAtBuyer: string | null;
+}
+
 type CalendarItem =
   | { kind: 'audit'; id: string; label: string; dateKey: string }
-  | { kind: 'shipment'; id: string; label: string; dateKey: string };
+  | { kind: 'shipment'; id: string; label: string; dateKey: string }
+  | { kind: 'poDelivery'; id: string; label: string; dateKey: string }
+  | { kind: 'poArrival'; id: string; label: string; dateKey: string };
 
 function isoDateKey(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -57,7 +66,10 @@ function padDateKey(year: number, monthIndex: number, day: number): string {
   return `${year}-${m}-${d}`;
 }
 
-function useInternalManagementCalendarItems(token: string | null): {
+function useInternalManagementCalendarItems(
+  token: string | null,
+  variant: 'supplierAssurance' | 'globalSupply'
+): {
   items: CalendarItem[];
   loading: boolean;
   error: string | null;
@@ -74,36 +86,66 @@ function useInternalManagementCalendarItems(token: string | null): {
     }
     setLoading(true);
     setError(null);
-    Promise.all([
-      apiJson<AuditCalendarRow[]>('/audits', { token }),
-      apiJson<ShipmentCalendarRow[]>('/shipments', { token }),
-    ])
-      .then(([auditList, shipmentList]) => {
-        const next: CalendarItem[] = [];
-        for (const a of auditList) {
-          const dk = isoDateKey(a.auditDate);
-          if (dk) next.push({ kind: 'audit', id: a.id, label: a.code, dateKey: dk });
-        }
-        for (const s of shipmentList) {
-          const dk =
-            isoDateKey(s.inspectionDate) ?? isoDateKey(s.createdAt);
-          if (!dk) continue;
-          const label = (s.code && s.code.trim()) || s.id;
-          next.push({ kind: 'shipment', id: s.id, label, dateKey: dk });
-        }
-        next.sort((a, b) => {
+    const loadPromise =
+      variant === 'globalSupply'
+        ? apiJson<PurchaseOrderCalendarRow[]>('/purchase-orders', { token }).then((poList) => {
+            const next: CalendarItem[] = [];
+            for (const po of poList) {
+              const farmDeliveryKey = isoDateKey(po.estimatedFarmerDeliveryDate);
+              if (farmDeliveryKey) {
+                next.push({
+                  kind: 'poDelivery',
+                  id: `${po.id}-delivery`,
+                  label: `${po.code} Farm Delivery`,
+                  dateKey: farmDeliveryKey,
+                });
+              }
+              const buyerArrivalKey = isoDateKey(po.estimatedArrivalAtBuyer);
+              if (buyerArrivalKey) {
+                next.push({
+                  kind: 'poArrival',
+                  id: `${po.id}-arrival`,
+                  label: `${po.code} Arrival at Buyer`,
+                  dateKey: buyerArrivalKey,
+                });
+              }
+            }
+            return next;
+          })
+        : Promise.all([
+            apiJson<AuditCalendarRow[]>('/audits', { token }),
+            apiJson<ShipmentCalendarRow[]>('/shipments', { token }),
+          ]).then(([auditList, shipmentList]) => {
+            const next: CalendarItem[] = [];
+            for (const a of auditList) {
+              const dk = isoDateKey(a.auditDate);
+              if (dk) next.push({ kind: 'audit', id: a.id, label: a.code, dateKey: dk });
+            }
+            for (const s of shipmentList) {
+              const dk =
+                isoDateKey(s.inspectionDate) ?? isoDateKey(s.createdAt);
+              if (!dk) continue;
+              const label = (s.code && s.code.trim()) || s.id;
+              next.push({ kind: 'shipment', id: s.id, label, dateKey: dk });
+            }
+            return next;
+          });
+
+    loadPromise
+      .then((nextItems) => {
+        nextItems.sort((a, b) => {
           const c = a.dateKey.localeCompare(b.dateKey);
           if (c !== 0) return c;
           return a.label.localeCompare(b.label);
         });
-        setItems(next);
+        setItems(nextItems);
       })
       .catch(() => {
         setError('Could not load calendar data');
         setItems([]);
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, variant]);
 
   useEffect(() => {
     load();
@@ -112,8 +154,14 @@ function useInternalManagementCalendarItems(token: string | null): {
   return { items, loading, error, reload: load };
 }
 
-export function InternalManagementCalendarView({ token }: { token: string | null }) {
-  const { items, loading, error, reload } = useInternalManagementCalendarItems(token);
+export function InternalManagementCalendarView({
+  token,
+  variant = 'supplierAssurance',
+}: {
+  token: string | null;
+  variant?: 'supplierAssurance' | 'globalSupply';
+}) {
+  const { items, loading, error, reload } = useInternalManagementCalendarItems(token, variant);
   const [cursor, setCursor] = useState(() => {
     const n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), 1);
@@ -184,38 +232,81 @@ export function InternalManagementCalendarView({ token }: { token: string | null
         {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
         {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 16, fontSize: 'var(--text-sm)' }}>
-          <span>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                background: 'var(--color-info-bg, #dbeafe)',
-                marginRight: 6,
-                verticalAlign: 'middle',
-                border: '1px solid var(--color-border)',
-              }}
-            />
-            Audit
-          </span>
-          <span>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                background: 'var(--color-success-bg, #dbeafe)',
-                marginRight: 6,
-                verticalAlign: 'middle',
-                border: '1px solid var(--color-border)',
-              }}
-            />
-            Shipment
-          </span>
-        </div>
+        {variant === 'globalSupply' ? (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 16,
+              marginBottom: 16,
+              fontSize: 'var(--text-sm)',
+            }}
+          >
+            <span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: 'var(--color-info-bg, #dbeafe)',
+                  marginRight: 6,
+                  verticalAlign: 'middle',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              PO farm delivery
+            </span>
+            <span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: 'var(--color-success-bg, #dcfce7)',
+                  marginRight: 6,
+                  verticalAlign: 'middle',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              PO arrival at buyer
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 16, fontSize: 'var(--text-sm)' }}>
+            <span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: 'var(--color-info-bg, #dbeafe)',
+                  marginRight: 6,
+                  verticalAlign: 'middle',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              Audit
+            </span>
+            <span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: 'var(--color-success-bg, #dbeafe)',
+                  marginRight: 6,
+                  verticalAlign: 'middle',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              Shipment
+            </span>
+          </div>
+        )}
 
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
           <table className="table internal-management-calendar-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -272,7 +363,11 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                             const bg =
                               it.kind === 'audit'
                                 ? 'var(--color-info-bg, #dbeafe)'
-                                : 'var(--color-success-bg, #dbeafe)';
+                                : it.kind === 'shipment'
+                                  ? 'var(--color-success-bg, #dbeafe)'
+                                  : it.kind === 'poDelivery'
+                                    ? 'var(--color-info-bg, #dbeafe)'
+                                    : 'var(--color-success-bg, #dcfce7)';
                             const inner =
                               it.kind === 'audit' ? (
                                 <Link
@@ -288,7 +383,7 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                                 >
                                   {it.label}
                                 </Link>
-                              ) : (
+                              ) : it.kind === 'shipment' ? (
                                 <Link
                                   to="/shipments"
                                   style={{
@@ -303,6 +398,18 @@ export function InternalManagementCalendarView({ token }: { token: string | null
                                 >
                                   {it.label}
                                 </Link>
+                              ) : (
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={it.label}
+                                >
+                                  {it.label}
+                                </span>
                               );
                             return (
                               <span
@@ -336,7 +443,9 @@ export function InternalManagementCalendarView({ token }: { token: string | null
 
         {!loading && items.length === 0 && !error && (
           <p className="table-empty" style={{ marginTop: 16 }}>
-            No audits or shipments with dates in the system yet.
+            {variant === 'globalSupply'
+              ? 'No purchase orders with farm delivery or buyer arrival dates yet.'
+              : 'No audits or shipments with dates in the system yet.'}
           </p>
         )}
       </div>

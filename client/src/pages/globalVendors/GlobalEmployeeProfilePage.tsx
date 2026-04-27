@@ -189,7 +189,7 @@ export function GlobalEmployeeProfilePage() {
         </span>
       </header>
       <p style={{ marginTop: 0, marginBottom: '1rem' }}>
-        <Link to={backHref}>← Back to Internal Management</Link>
+        <Link to={backHref}>Back to Internal Management</Link>
       </p>
 
       {user.assignedCountryNames.length > 0 && (
@@ -201,11 +201,6 @@ export function GlobalEmployeeProfilePage() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Profile content</h2>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginTop: 0 }}>
-            {canEdit
-              ? 'Add notes, biography, or other context. Plain text; line breaks are preserved.'
-              : 'You can view this profile. Only an admin, quality manager, or the employee can change content.'}
-          </p>
           <textarea
             className="input"
             value={bodyDraft}

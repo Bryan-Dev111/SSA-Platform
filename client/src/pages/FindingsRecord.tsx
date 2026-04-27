@@ -669,7 +669,7 @@ export function FindingsRecord() {
               : null}
         </p>
         <p style={{ marginTop: 4 }}>
-          <Link to="/findings" style={{ textDecoration: 'none' }}>← Back to Findings</Link>
+          <Link to="/findings" style={{ textDecoration: 'none' }}>Back to Findings</Link>
         </p>
       </header>
 

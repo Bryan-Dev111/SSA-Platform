@@ -7,7 +7,14 @@ import { AdminEmailAlertsPanel } from '../admin/AdminEmailAlertsPanel';
 import { GlobalSupplyMasterDataPanel } from './GlobalSupplyMasterDataPanel';
 import { GlobalSupplyBuyersPanel } from './GlobalSupplyBuyersPanel';
 
-type Tab = 'users' | 'buyers' | 'permissions' | 'crops' | 'countries' | 'emailAlerts';
+type Tab =
+  | 'users'
+  | 'buyers'
+  | 'permissions'
+  | 'crops'
+  | 'countries'
+  | 'expenseTypes'
+  | 'emailAlerts';
 
 interface GlobalSupplyStats {
   employees: number;
@@ -62,7 +69,8 @@ export function GlobalVendorsAdmin() {
             ['permissions', 'Permissions'],
             ['crops', 'Crops'],
             ['countries', 'Countries'],
-            ['emailAlerts', 'Email alerts'],
+            ['expenseTypes', 'Expense Types'],
+            ['emailAlerts', 'Email Alerts'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -143,6 +151,16 @@ export function GlobalVendorsAdmin() {
           title="Countries"
           noun="Country"
           endpoint="/global-supply-options/countries"
+        />
+      )}
+
+      {tab === 'expenseTypes' && (
+        <GlobalSupplyMasterDataPanel
+          token={token}
+          toast={toast}
+          title="Expense Types"
+          noun="Expense Type"
+          endpoint="/global-supply-options/expense-types"
         />
       )}
 

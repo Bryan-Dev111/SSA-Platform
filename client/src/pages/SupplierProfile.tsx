@@ -138,10 +138,6 @@ export function SupplierProfile() {
   const [shipLot, setShipLot] = useState('');
   const [shipQty, setShipQty] = useState('');
   const [shipDate, setShipDate] = useState('');
-  const [shipProjectId, setShipProjectId] = useState('');
-  const [eligibleShipmentProjects, setEligibleShipmentProjects] = useState<
-    Array<{ id: string; projectCode: string; companyName: string }>
-  >([]);
   const [submitting, setSubmitting] = useState(false);
   const [carSummaryModal, setCarSummaryModal] = useState<{ code: string; summary: string } | null>(null);
 
@@ -213,19 +209,6 @@ export function SupplierProfile() {
       .then((k) => setShipmentKpis(k))
       .catch(() => setShipmentKpis(null));
   }, [token, data?.supplier?.id]);
-
-  useEffect(() => {
-    if (!token || !data?.supplier?.id || !(isSupplier || isAdmin)) {
-      setEligibleShipmentProjects([]);
-      return;
-    }
-    apiJson<Array<{ id: string; projectCode: string; companyName: string }>>(
-      `/shipments/eligible-projects?supplierId=${encodeURIComponent(data.supplier.id)}`,
-      { token }
-    )
-      .then(setEligibleShipmentProjects)
-      .catch(() => setEligibleShipmentProjects([]));
-  }, [token, data?.supplier?.id, isSupplier, isAdmin]);
 
   useEffect(() => {
     if (!(isSupplier || isAdmin) || !data?.supplier?.id || !token) return;
@@ -371,7 +354,6 @@ export function SupplierProfile() {
           lot: shipLot.trim(),
           qty: qtyNum,
           inspectionDate: shipDate.trim(),
-          ...(shipProjectId.trim() ? { projectHistoryId: shipProjectId.trim() } : {}),
         }),
       });
       setShipPo('');
@@ -380,7 +362,6 @@ export function SupplierProfile() {
       setShipLot('');
       setShipQty('');
       setShipDate('');
-      setShipProjectId('');
       toast.success('Inspection request submitted');
       refresh();
     } catch (err) {
@@ -530,7 +511,7 @@ export function SupplierProfile() {
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Monthly trends</h2>
+          <h2 style={{ marginTop: 0 }}>Monthly Trends</h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
             New items by month for this supplier (same view as the main dashboard).
           </p>
@@ -558,11 +539,6 @@ export function SupplierProfile() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Shipment request</h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-            {isAdmin && !isSupplier
-              ? 'Add an inspection request for the supplier selected above. It appears on Shipments and Internal Management.'
-              : 'Request a shipment inspection. Appears on Shipments and Internal Management for your team.'}
-          </p>
           <form onSubmit={submitShipment}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
               <div className="input-group">
@@ -603,19 +579,8 @@ export function SupplierProfile() {
                 <input className="input" value={shipLot} onChange={(e) => setShipLot(e.target.value)} required />
               </div>
               <div className="input-group">
-                <label className="input-label">Requested inspection date *</label>
+                <label className="input-label" style={{ whiteSpace: 'nowrap' }}>Requested Inspection Date *</label>
                 <input className="input" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} required />
-              </div>
-              <div className="input-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="input-label">Project (optional)</label>
-                <select className="input" value={shipProjectId} onChange={(e) => setShipProjectId(e.target.value)}>
-                  <option value="">Auto from PO / part match if set on Project History</option>
-                  {eligibleShipmentProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.projectCode} — {p.companyName}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
             <button type="submit" className="btn btn-primary" style={{ marginTop: '0.75rem' }} disabled={submitting}>

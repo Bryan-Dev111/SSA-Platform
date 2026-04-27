@@ -234,14 +234,10 @@ export function CorrectiveActions() {
     });
   }, [list]);
 
-  /** One row of analytics cards; count drives `repeat(n, …)` so the grid never wraps to a second line. */
-  const carAnalyticsColumnCount = useMemo(() => {
-    let n = 0;
-    if (defectCodeCounts.length > 0) n += 1;
-    if (rootCauseCodeCounts.length > 0) n += 1;
-    if (list.length > 0) n += 4;
-    return Math.max(1, n);
-  }, [defectCodeCounts.length, rootCauseCodeCounts.length, list.length]);
+  const analyticsRow1Cols = Math.max(
+    1,
+    (defectCodeCounts.length > 0 ? 1 : 0) + (rootCauseCodeCounts.length > 0 ? 1 : 0) + (list.length > 0 ? 1 : 0)
+  );
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(list.length / pageSize));
@@ -368,7 +364,7 @@ export function CorrectiveActions() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Corrective Actions (CAR)</h1>
+          <h1 className="page-title">Corrective Actions</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -381,7 +377,7 @@ export function CorrectiveActions() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Corrective Actions (CAR)</h1>
+        <h1 className="page-title">Corrective Actions</h1>
       </header>
 
       {error && (
@@ -390,14 +386,26 @@ export function CorrectiveActions() {
         </div>
       )}
 
-      <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-        {canCreateCAR && (
-          <Link to="/car-record" className="btn btn-primary">
-            CAR RECORDS
-          </Link>
-        )}
-        <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+      <div
+        style={{
+          marginBottom: '1.25rem',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          rowGap: '0.5rem',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
+          {canCreateCAR && (
+            <Link to="/car-record" className="btn btn-primary">
+              CAR RECORDS
+            </Link>
+          )}
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1 1 220px', justifyContent: 'flex-end', minWidth: 0 }}>
+          <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Supplier filter</span>
           <select
             className="input"
             value={supplierFilter}
@@ -406,7 +414,7 @@ export function CorrectiveActions() {
               if (v) setSearchParams({ supplierId: v });
               else setSearchParams({});
             }}
-            style={{ width: 'auto', minWidth: 180 }}
+            style={{ width: 'auto', minWidth: 160, maxWidth: 320, flex: '1 1 auto' }}
           >
             <option value="">All</option>
             {suppliers.map((s) => (
@@ -416,7 +424,7 @@ export function CorrectiveActions() {
         </label>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total CARs</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{list.length}</div>
@@ -437,19 +445,26 @@ export function CorrectiveActions() {
       {(defectCodeCounts.length > 0 || rootCauseCodeCounts.length > 0 || list.length > 0) && (
         <div
           style={{
-            display: 'grid',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            marginBottom: '1.25rem',
             width: '100%',
-            overflowX: 'auto',
-            paddingBottom: 4,
-            gridTemplateColumns: `repeat(${carAnalyticsColumnCount}, minmax(180px, 1fr))`,
-            gap: '1rem',
-            marginBottom: '1.5rem',
+            minWidth: 0,
           }}
         >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${analyticsRow1Cols}, minmax(0, 1fr))`,
+              gap: '0.75rem',
+              alignItems: 'stretch',
+            }}
+          >
           {defectCodeCounts.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Defect codes Pareto (CARs)</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Defect codes — Pareto</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {defectPareto.map(({ code, count, cumulativePercent }) => (
                     <div key={code}>
@@ -477,7 +492,7 @@ export function CorrectiveActions() {
           {rootCauseCodeCounts.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Root cause codes Pareto (CARs)</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Root cause codes — Pareto</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {rootCausePareto.map(({ code, count, cumulativePercent }) => (
                     <div key={code}>
@@ -505,7 +520,7 @@ export function CorrectiveActions() {
           {list.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by severity</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>CARs by severity</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {severityCounts.map(({ severity, count }) => (
                     <div key={severity}>
@@ -543,10 +558,19 @@ export function CorrectiveActions() {
               </div>
             </div>
           )}
+          </div>
           {list.length > 0 && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gap: '0.75rem',
+                alignItems: 'stretch',
+              }}
+            >
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CARs by status</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>CARs by status</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                   <svg
                     aria-label="CAR status distribution donut chart"
@@ -612,11 +636,9 @@ export function CorrectiveActions() {
                 </div>
               </div>
             </div>
-          )}
-          {list.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
                 <div
                   aria-label="CAR age distribution for open CARs only bar chart"
                   style={{
@@ -682,11 +704,12 @@ export function CorrectiveActions() {
                 </div>
               </div>
             </div>
+            </div>
           )}
           {list.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Open CARs over time</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Open CARs over time</h2>
                 <OpenCarsOverTimeChart points={openCarsTimeSeries} />
               </div>
             </div>
@@ -924,10 +947,10 @@ type OpenCarTimePoint = { t: number; count: number; label: string };
 
 /** Red line + shaded area under: count of CARs still open at each sample (Closed ≈ last updated). */
 function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
-  const width = 520;
-  const height = 200;
-  const padL = 40;
-  const padR = 10;
+  const width = 920;
+  const height = 220;
+  const padL = 44;
+  const padR = 14;
   const padT = 14;
   const padB = 30;
   const plotW = width - padL - padR;
@@ -988,8 +1011,7 @@ function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
         </svg>
       </div>
       <p style={{ margin: '0.35rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
-        Count of CARs open at each sample (last 365 days of history in scope; closing time approximated from last
-        update when status is Closed).
+        Open CAR count by sample (last ~365 days; closed time approximated from last update).
       </p>
     </div>
   );

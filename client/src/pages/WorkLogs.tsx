@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
-import { formatDisplayCalendarDate, formatDisplayDateTime } from '../utils/formatDisplayDates';
+import { formatDisplayCalendarDate } from '../utils/formatDisplayDates';
 
 interface WorkLogRow {
   id: string;
@@ -98,8 +98,9 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   const canViewAll = Boolean(
     user?.roleNames.includes('Admin') || user?.roleNames.includes('QualityManager')
   );
+  const canEditWorkLogs = Boolean(user?.roleNames.includes('Admin'));
 
-  /** Global Supply standalone page: no history tables, so scope toggle is hidden and always self scope. */
+  /** Self scope on Global Supply top row; elsewhere, optional all-users scope for Admin/QM. */
   const qs = !isGlobalSupplyTopRow && scopeAll && canViewAll ? '?scope=all' : '';
 
   const selfLabel = useMemo(() => {
@@ -116,6 +117,13 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     shipmentId: '',
     description: '',
   });
+  const [editingWorkLogId, setEditingWorkLogId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    workDate: '',
+    workType: 'Audit' as WorkLogRow['workType'],
+    description: '',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const previewTotalCost = useMemo(() => {
     const raw = form.hoursWorked.trim();
@@ -143,10 +151,17 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     setLoading(true);
     setError(null);
     if (isGlobalSupplyTopRow) {
-      apiJson<EmployeeRatePreview>('/work-logs/preview-rate', { token })
-        .then((ratePreview) => {
-          setWorkLogs([]);
-          setLaborCosts([]);
+      Promise.all([
+        apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
+        apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
+        apiJson<EmployeeRatePreview>('/work-logs/preview-rate', { token }).catch(() => ({
+          hourlyRate: 0,
+          currency: null,
+        })),
+      ])
+        .then(([logs, costs, ratePreview]) => {
+          setWorkLogs(logs);
+          setLaborCosts(costs);
           setSuppliers([]);
           setAudits([]);
           setShipments([]);
@@ -211,7 +226,12 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         const costs = await apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []);
         setLaborCosts(costs);
       } else {
-        void load();
+        const [logs, costs] = await Promise.all([
+          apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
+          apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
+        ]);
+        setWorkLogs(logs);
+        setLaborCosts(costs);
       }
       setForm({
         workDate: '',
@@ -230,11 +250,48 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     }
   };
 
+  const startEditWorkLog = (row: WorkLogRow) => {
+    setEditingWorkLogId(row.id);
+    setEditForm({
+      workDate: row.workDate?.slice(0, 10) ?? '',
+      workType: row.workType,
+      description: row.description ?? '',
+    });
+  };
+
+  const cancelEditWorkLog = () => {
+    setEditingWorkLogId(null);
+    setSavingEdit(false);
+  };
+
+  const saveEditWorkLog = async () => {
+    if (!token || !editingWorkLogId || !editForm.workDate.trim()) return;
+    setSavingEdit(true);
+    try {
+      const updated = await apiJson<WorkLogRow>(`/work-logs/${encodeURIComponent(editingWorkLogId)}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({
+          workDate: editForm.workDate,
+          workType: editForm.workType,
+          description: editForm.description.trim() || null,
+        }),
+      });
+      setWorkLogs((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      setEditingWorkLogId(null);
+      toast.success('Work log updated');
+    } catch (err) {
+      setError(parseApiError(err));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const body = (
     <>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Log time</h2>
+          <h2 style={{ marginTop: 0 }}>Log Time</h2>
           {canViewAll && !isGlobalSupplyTopRow && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: 'var(--text-sm)' }}>
               <input type="checkbox" checked={scopeAll} onChange={(e) => setScopeAll(e.target.checked)} />
@@ -294,7 +351,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                   />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Total cost (estimate)</label>
+                  <label className="input-label">Total Amount</label>
                   <input
                     className="input"
                     readOnly
@@ -308,20 +365,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                     }
                     title="Hours × rate (same calculation as the labor cost row when you save)"
                   />
-                </div>
-                <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Work type</label>
-                  <select
-                    className="input"
-                    value={form.workType}
-                    onChange={(e) => setForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))}
-                  >
-                    <option value="Audit">Audit</option>
-                    <option value="Inspection">Inspection</option>
-                    <option value="Travel">Travel</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Other">Other</option>
-                  </select>
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting || !selfLabel.trim()}>
                   {submitting ? 'Saving…' : 'Save work log'}
@@ -371,7 +414,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Total cost (estimate)</label>
+                <label className="input-label">Total Amount</label>
                 <input
                   className="input"
                   readOnly
@@ -450,11 +493,15 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         </div>
       </div>
 
-      {!isGlobalSupplyTopRow ? (
-        <>
-          <div className="card" style={{ marginBottom: '1rem' }}>
+      <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>{scopeAll && canViewAll ? 'All work logs' : 'My work logs'}</h2>
+          <h2 style={{ marginTop: 0 }}>
+            {isGlobalSupplyTopRow
+              ? 'My work logs'
+              : scopeAll && canViewAll
+                ? 'All work logs'
+                : 'My work logs'}
+          </h2>
           <div className="table-wrap">
             {loading ? (
               <p className="table-empty">Loading…</p>
@@ -472,6 +519,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                     <th>Project</th>
                     <th>Description</th>
                     <th>Created</th>
+                    {canEditWorkLogs ? <th>Edit</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -479,14 +527,84 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                     <tr key={r.id}>
                       <td>{r.code}</td>
                       <td>{r.fullName}</td>
-                      <td>{formatDisplayCalendarDate(r.workDate)}</td>
-                      <td>{r.hoursWorked}</td>
-                      <td>{r.workType}</td>
-                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
-                      <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description ?? ''}>
-                        {r.description?.trim() ? r.description : '—'}
+                      <td>
+                        {editingWorkLogId === r.id ? (
+                          <input
+                            className="input"
+                            type="date"
+                            value={editForm.workDate}
+                            onChange={(e) => setEditForm((p) => ({ ...p, workDate: e.target.value }))}
+                          />
+                        ) : (
+                          formatDisplayCalendarDate(r.workDate)
+                        )}
                       </td>
-                      <td>{formatDisplayDateTime(r.createdAt)}</td>
+                      <td>{r.hoursWorked}</td>
+                      <td>
+                        {editingWorkLogId === r.id ? (
+                          <select
+                            className="input"
+                            value={editForm.workType}
+                            onChange={(e) =>
+                              setEditForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))
+                            }
+                          >
+                            <option value="Audit">Audit</option>
+                            <option value="Inspection">Inspection</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        ) : (
+                          r.workType
+                        )}
+                      </td>
+                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
+                      <td
+                        style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        title={r.description ?? ''}
+                      >
+                        {editingWorkLogId === r.id ? (
+                          <input
+                            className="input"
+                            value={editForm.description}
+                            onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                          />
+                        ) : r.description?.trim() ? (
+                          r.description
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>{formatDisplayCalendarDate(r.createdAt)}</td>
+                      {canEditWorkLogs ? (
+                        <td>
+                          {editingWorkLogId === r.id ? (
+                            <span style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => void saveEditWorkLog()}
+                                disabled={savingEdit}
+                              >
+                                {savingEdit ? 'Saving…' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={cancelEditWorkLog}
+                                disabled={savingEdit}
+                              >
+                                Cancel
+                              </button>
+                            </span>
+                          ) : (
+                            <button type="button" className="btn btn-ghost" onClick={() => startEditWorkLog(r)}>
+                              Edit
+                            </button>
+                          )}
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -498,7 +616,13 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
 
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>{scopeAll && canViewAll ? 'All labor cost lines (from logs)' : 'My labor cost lines'}</h2>
+          <h2 style={{ marginTop: 0 }}>
+            {isGlobalSupplyTopRow
+              ? 'My labor cost lines (from logs)'
+              : scopeAll && canViewAll
+                ? 'All labor cost lines (from logs)'
+                : 'My labor cost lines'}
+          </h2>
           <div className="table-wrap">
             {loading ? (
               <p className="table-empty">Loading…</p>
@@ -537,8 +661,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
           </div>
         </div>
       </div>
-        </>
-      ) : null}
     </>
   );
 

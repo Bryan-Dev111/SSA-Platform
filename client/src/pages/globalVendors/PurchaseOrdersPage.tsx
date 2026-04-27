@@ -1,7 +1,7 @@
 /**
  * Global Vendors — Purchase Orders list and creation modal.
  */
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
@@ -62,7 +62,11 @@ function dateInputFromIso(iso: string | null | undefined): string {
   return iso.slice(0, 10);
 }
 
-export function PurchaseOrdersPage() {
+export function PurchaseOrdersPage({
+  canCreatePurchaseOrder = true,
+}: {
+  canCreatePurchaseOrder?: boolean;
+}) {
   const { token } = useAuth();
   const toast = useToast();
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
@@ -94,6 +98,10 @@ export function PurchaseOrdersPage() {
   const [destinationCountry, setDestinationCountry] = useState('');
   const [portOfDischarge, setPortOfDischarge] = useState('');
   const [closeConfirmOrder, setCloseConfirmOrder] = useState<PurchaseOrderRow | null>(null);
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [topScrollInnerWidth, setTopScrollInnerWidth] = useState(0);
 
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
@@ -133,6 +141,15 @@ export function PurchaseOrdersPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- token-driven refresh
   }, [token]);
+
+  useEffect(() => {
+    const syncTopTrackWidth = () => {
+      setTopScrollInnerWidth(tableRef.current?.scrollWidth ?? 0);
+    };
+    syncTopTrackWidth();
+    window.addEventListener('resize', syncTopTrackWidth);
+    return () => window.removeEventListener('resize', syncTopTrackWidth);
+  }, [orders, loading]);
 
   const buyerNameOptions = useMemo(() => {
     const names = new Set<string>();
@@ -391,6 +408,16 @@ export function PurchaseOrdersPage() {
     }
   };
 
+  const syncScrollFromTop = () => {
+    if (!topScrollRef.current || !tableScrollRef.current) return;
+    tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+  };
+
+  const syncScrollFromTable = () => {
+    if (!topScrollRef.current || !tableScrollRef.current) return;
+    topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+  };
+
   if (loading && orders.length === 0) {
     return (
       <div className="page">
@@ -429,13 +456,15 @@ export function PurchaseOrdersPage() {
         }}
       >
         <h1 className="page-title">Purchase Orders</h1>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => openCreateModal()}
-        >
-          New purchase order
-        </button>
+        {canCreatePurchaseOrder ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => openCreateModal()}
+          >
+            New purchase order
+          </button>
+        ) : null}
       </header>
       {error && orders.length > 0 && (
         <div className="alert-error" style={{ marginBottom: 12 }}>
@@ -443,8 +472,24 @@ export function PurchaseOrdersPage() {
         </div>
       )}
       <div className="card">
-        <div className="table-wrap purchase-orders-table-scroll">
-          <table className="table table--sticky-header table--prevent-shrink">
+        <div
+          ref={topScrollRef}
+          className="purchase-orders-table-scroll"
+          style={{ overflowY: 'hidden', marginBottom: 6 }}
+          onScroll={syncScrollFromTop}
+          aria-label="Horizontal scroll purchase orders"
+        >
+          <div style={{ height: 1, width: topScrollInnerWidth || '100%' }} />
+        </div>
+        <div
+          ref={tableScrollRef}
+          className="table-wrap purchase-orders-table-scroll"
+          onScroll={syncScrollFromTable}
+        >
+          <table
+            ref={tableRef}
+            className="table table--sticky-header table--prevent-shrink purchase-orders-table--freeze-first-4"
+          >
             <thead>
               <tr>
                 <th>Close PO</th>
@@ -474,19 +519,21 @@ export function PurchaseOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                orders.map((o) => (
-                  <tr key={o.id}>
+                orders.map((o) => {
+                  const isClosed = (o.status ?? 'Open').trim().toLowerCase() === 'closed';
+                  return (
+                  <tr
+                    key={o.id}
+                    style={isClosed ? { backgroundColor: 'var(--color-surface-2, #f3f4f6)' } : undefined}
+                  >
                     <td>
                       <button
                         type="button"
                         className="btn btn-xs btn-ghost"
                         onClick={() => setCloseConfirmOrder(o)}
-                        disabled={
-                          closingId === o.id ||
-                          (o.status ?? 'Open').trim().toLowerCase() === 'closed'
-                        }
+                        disabled={closingId === o.id || isClosed}
                       >
-                        {(o.status ?? 'Open').trim().toLowerCase() === 'closed'
+                        {isClosed
                           ? 'Closed'
                           : closingId === o.id
                             ? 'Closing…'
@@ -675,7 +722,8 @@ export function PurchaseOrdersPage() {
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -701,13 +749,14 @@ export function PurchaseOrdersPage() {
               style={{ gap: 12, marginTop: 16 }}
             >
               <label className="field">
-                <span className="field-label">Farm (optional)</span>
+                <span className="field-label">Farm</span>
                 <select
                   className="input"
                   value={farmId}
                   onChange={(e) => setFarmId(e.target.value)}
+                  required
                 >
-                  <option value="">No farm selected</option>
+                  <option value="">Select farm</option>
                   {farms.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.code} — {f.farmName} ({f.country})

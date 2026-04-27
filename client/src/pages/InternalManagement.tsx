@@ -12,6 +12,7 @@ import { getDefaultPath } from '../config/rolePageAccess';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MetricCard } from '../components/MetricCard';
 import { AdminEmployeeAssignmentsPanel } from './admin/AdminEmployeeAssignmentsPanel';
+import { AdminExpensesPanel } from './admin/AdminDay9Panels';
 import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
@@ -108,6 +109,11 @@ interface ProfitRow {
   costs: number;
   profit: number;
   status: string;
+  deductions?: Array<{
+    code: string;
+    amount: number;
+    kind: 'Labor Cost' | 'Expense';
+  }>;
 }
 
 function projectPopToInputDate(iso: string | null | undefined): string {
@@ -119,17 +125,27 @@ function formatProjectPopCell(popStart: string | null, popEnd: string | null): s
   return formatDisplayCalendarRange(popStart, popEnd);
 }
 
-function formatContractProjectCell(r: InternalRow): string {
-  if (r.projectHistory) {
-    return `${r.projectHistory.projectCode} — ${r.projectHistory.companyName}`;
-  }
-  return '—';
+function formatProfitMoney(value: number): string {
+  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatStaffFullName(u: Pick<ProjectHistoryBuyer, 'name' | 'email'> | null | undefined): string {
-  if (!u) return '—';
-  const n = u.name?.trim();
-  return n || u.email;
+function deductionNumericSuffix(code: string): number {
+  const m = /^(?:COST|EXP)-(\d+)$/i.exec(code.trim());
+  return m ? Number(m[1]) : 0;
+}
+
+function sortDeductionsForDisplay(
+  rows: Array<{ code: string; amount: number; kind: 'Labor Cost' | 'Expense' }>
+): Array<{ code: string; amount: number; kind: 'Labor Cost' | 'Expense' }> {
+  return [...rows].sort((a, b) => {
+    const pa = a.code.toUpperCase().startsWith('COST-') ? 0 : 1;
+    const pb = b.code.toUpperCase().startsWith('COST-') ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const na = deductionNumericSuffix(a.code);
+    const nb = deductionNumericSuffix(b.code);
+    if (na !== nb) return nb - na;
+    return b.code.localeCompare(a.code);
+  });
 }
 
 export function InternalManagement() {
@@ -146,10 +162,6 @@ export function InternalManagement() {
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
-  const [contractsProjectId, setContractsProjectId] = useState('');
-  const [contractsBuyerId, setContractsBuyerId] = useState('');
-  const [contractsEmployeeId, setContractsEmployeeId] = useState('');
-  const [contractEmployeeOptions, setContractEmployeeOptions] = useState<ProjectHistoryBuyer[]>([]);
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -204,8 +216,8 @@ export function InternalManagement() {
   const [projectBusyId, setProjectBusyId] = useState<string | null>(null);
   const [profitRows, setProfitRows] = useState<ProfitRow[]>([]);
   const [shipmentSort, setShipmentSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
-  const [contractSort, setContractSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
   const [projectTableSort, setProjectTableSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [projectAttachmentBusyId, setProjectAttachmentBusyId] = useState<string | null>(null);
 
   const filteredProjectHistories = useMemo(() => {
     return projectHistories.filter((r) => {
@@ -247,34 +259,6 @@ export function InternalManagement() {
     });
     return list;
   }, [schedules, shipmentSort]);
-
-  const sortedContractRows = useMemo(() => {
-    const projectLinkedRows = rows.filter((r) => !!r.projectHistoryId || !!r.projectHistory);
-    if (!contractSort.key) return projectLinkedRows;
-    const { key: k, dir } = contractSort;
-    const list = [...projectLinkedRows];
-    list.sort((a, b) => {
-      switch (k) {
-        case 'project':
-          return cmpStr(formatContractProjectCell(a), formatContractProjectCell(b), dir);
-        case 'buyer':
-          return cmpStr(formatStaffFullName(a.buyer), formatStaffFullName(b.buyer), dir);
-        case 'employee':
-          return cmpStr(formatStaffFullName(a.employee), formatStaffFullName(b.employee), dir);
-        case 'name':
-          return cmpStr(a.name, b.name, dir);
-        case 'type':
-          return cmpStr(a.category ?? '', b.category ?? '', dir);
-        case 'note':
-          return cmpStr((a.note ?? '').trim(), (b.note ?? '').trim(), dir);
-        case 'updated':
-          return cmpNum(dateMs(a.updatedAt), dateMs(b.updatedAt), dir);
-        default:
-          return 0;
-      }
-    });
-    return list;
-  }, [rows, contractSort]);
 
   const projectsForNewAudit = useMemo(() => {
     if (!newAudit.supplierId) return projectHistories;
@@ -349,19 +333,21 @@ export function InternalManagement() {
     }, 0);
   }, [filteredProjectHistories]);
 
-  const projectHistoryRevenueNumericCount = useMemo(
-    () =>
-      filteredProjectHistories.filter((r) => typeof r.revenueAmount === 'number' && Number.isFinite(r.revenueAmount))
-        .length,
-    [filteredProjectHistories]
-  );
+  const projectAttachmentCountByProjectId = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const row of rows) {
+      if (!row.projectHistoryId) continue;
+      map[row.projectHistoryId] = (map[row.projectHistoryId] ?? 0) + 1;
+    }
+    return map;
+  }, [rows]);
 
   const profitRowsActive = useMemo(
-    () => profitRows.filter((r) => r.status !== 'Inactive'),
+    () => profitRows.filter((r) => (r.status ?? '').trim().toLowerCase() === 'active'),
     [profitRows]
   );
   const profitRowsInactive = useMemo(
-    () => profitRows.filter((r) => r.status === 'Inactive'),
+    () => profitRows.filter((r) => (r.status ?? '').trim().toLowerCase() === 'inactive'),
     [profitRows]
   );
   const inactiveProjectsProfitTotal = useMemo(
@@ -383,13 +369,6 @@ export function InternalManagement() {
     apiJson<ProjectHistoryBuyer[]>('/project-history/buyers', { token })
       .then(setBuyerOptions)
       .catch(() => setBuyerOptions([]));
-  };
-
-  const loadContractEmployees = () => {
-    if (!token) return;
-    apiJson<ProjectHistoryBuyer[]>('/project-history/employees-contractors', { token })
-      .then(setContractEmployeeOptions)
-      .catch(() => setContractEmployeeOptions([]));
   };
 
   const loadProfit = () => {
@@ -446,7 +425,6 @@ export function InternalManagement() {
     if (tab === 'projectHistory') {
       loadProjectHistories();
       loadProjectHistoryBuyers();
-      loadContractEmployees();
     }
     if (tab === 'profit') loadProfit();
   }, [token, isAdmin, tab]);
@@ -518,11 +496,6 @@ export function InternalManagement() {
       setCategory('');
       setNote('');
       setFile(null);
-      if (options && 'projectHistoryId' in options) {
-        setContractsProjectId('');
-        setContractsBuyerId('');
-        setContractsEmployeeId('');
-      }
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadProgress(null);
       toast.success('Saved');
@@ -779,6 +752,98 @@ export function InternalManagement() {
     }
   };
 
+  const uploadProjectAttachment = async (projectHistoryId: string, fileToUpload: File | null) => {
+    if (!token || !fileToUpload) return;
+    if (fileToUpload.size > 8 * 1024 * 1024) {
+      toast.error('File must be 8MB or smaller');
+      return;
+    }
+    setProjectAttachmentBusyId(projectHistoryId);
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const s = reader.result as string;
+          const i = s.indexOf(',');
+          resolve(i >= 0 ? s.slice(i + 1) : s);
+        };
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(fileToUpload);
+      });
+      await apiJson('/internal-docs', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({
+          name: fileToUpload.name,
+          category: 'Project Attachment',
+          note: null,
+          fileBase64,
+          fileName: fileToUpload.name,
+          projectHistoryId,
+        }),
+      });
+      toast.success('Attachment added');
+      load();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setProjectAttachmentBusyId(null);
+    }
+  };
+
+  const renderProfitTable = (sectionRows: ProfitRow[], emptyText: string) => (
+    <div className="table-wrap" style={{ overflowX: 'auto' }}>
+      {sectionRows.length === 0 ? (
+        <p className="table-empty">{emptyText}</p>
+      ) : (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Company</th>
+              <th>Revenue</th>
+              <th>Deduction</th>
+              <th>Amount</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sectionRows.flatMap((r) => {
+              const deductions = sortDeductionsForDisplay(r.deductions ?? []);
+              const rowsForProject =
+                deductions.length > 0
+                  ? deductions
+                  : [{ code: '—', amount: 0, kind: 'Expense' as const }];
+              const revenue = Number.isFinite(r.revenueAmount) ? r.revenueAmount : 0;
+              const deductionAmounts = rowsForProject.map((d) => d.amount);
+              return rowsForProject.map((d, i) => {
+                const suffixFromI = deductionAmounts.slice(i).reduce((sum, x) => sum + x, 0);
+                const runningProfit = revenue - suffixFromI;
+                const isFirst = i === 0;
+                return (
+                  <tr key={`${r.projectId}-${d.code}-${i}`}>
+                    {isFirst ? (
+                      <>
+                        <td rowSpan={rowsForProject.length}>{r.projectCode}</td>
+                        <td rowSpan={rowsForProject.length}>{r.companyName}</td>
+                        <td rowSpan={rowsForProject.length}>
+                          {r.revenue ?? formatProfitMoney(revenue)}
+                        </td>
+                      </>
+                    ) : null}
+                    <td>{d.code === '—' ? '—' : `${d.code} (${d.kind})`}</td>
+                    <td>{d.code === '—' ? '—' : formatProfitMoney(d.amount)}</td>
+                    <td>{formatProfitMoney(runningProfit)}</td>
+                  </tr>
+                );
+              });
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
   return (
     <div className="page">
       <header className="page-header">
@@ -795,6 +860,7 @@ export function InternalManagement() {
             ['projectHistory', 'Project History'],
             ['profit', 'Profit'],
             ['laborCosts', 'Labor Costs'],
+            ['expenses', 'Expenses'],
             ['employeeAssignments', 'Employee Assignments'],
             ['managementAssignments', 'Management Assignments'],
             ['orgChart', 'Org Chart'],
@@ -817,7 +883,7 @@ export function InternalManagement() {
         <InternalManagementOrgChart
           token={token}
           viewerDisplayName={user?.name?.trim() || user?.email || 'You'}
-          onGoToTab={setTab}
+          employeeProfilePathPrefix="/internal-management/employee-profile"
         />
       )}
 
@@ -1284,9 +1350,19 @@ export function InternalManagement() {
 
       {tab === 'projectHistory' && (
         <>
+          <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, marginBottom: '1rem', boxSizing: 'border-box' }}>
+            <MetricCard
+              title="Total Revenue"
+              value={projectHistoryRevenueTotal.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            />
+          </div>
+
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>{projectEditingId ? 'Edit project' : 'Add project'}</h2>
+              <h2 style={{ marginTop: 0 }}>{projectEditingId ? 'Edit Project' : 'Add Project'}</h2>
               <form onSubmit={submitProjectHistory}>
                 <div
                   style={{
@@ -1395,17 +1471,6 @@ export function InternalManagement() {
                       onChange={(e) => setClientForm((p) => ({ ...p, popEnd: e.target.value }))}
                     />
                   </div>
-                  <p
-                    style={{
-                      gridColumn: '1 / -1',
-                      margin: 0,
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-muted)',
-                    }}
-                  >
-                    Status is computed automatically: Active when today (UTC) falls between start and end;
-                    otherwise Inactive. Leave both dates empty if there is no POP yet.
-                  </p>
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label className="input-label">Revenue</label>
                     <input
@@ -1438,33 +1503,9 @@ export function InternalManagement() {
             </div>
           </div>
 
-          <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, marginBottom: '1rem', boxSizing: 'border-box' }}>
-            <MetricCard
-              title="Total revenue"
-              value={projectHistoryRevenueTotal.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-              subtitle={
-                projectHistories.length === 0
-                  ? 'No projects yet'
-                  : (() => {
-                      const filteredCount = filteredProjectHistories.length;
-                      const base = `${projectHistoryRevenueNumericCount} of ${filteredCount} visible project${
-                        filteredCount === 1 ? '' : 's'
-                      } with numeric revenue`;
-                      if (projectHistoryBuyerFilter || projectHistorySupplierFilter) {
-                        return `${base} (${projectHistories.length} total in list)`;
-                      }
-                      return base;
-                    })()
-              }
-            />
-          </div>
-
           <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Project history</h2>
+              <h2 style={{ marginTop: 0 }}>Project History</h2>
               <div
                 style={{
                   display: 'grid',
@@ -1605,6 +1646,7 @@ export function InternalManagement() {
                           dir={projectTableSort.dir}
                           onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
                         />
+                        <th>Attachments</th>
                         <th />
                       </tr>
                     </thead>
@@ -1624,6 +1666,26 @@ export function InternalManagement() {
                           <td>{formatProjectPopCell(r.popStart, r.popEnd)}</td>
                           <td>{r.revenue ?? '—'}</td>
                           <td>{r.status}</td>
+                          <td>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                                {projectAttachmentCountByProjectId[r.id] ?? 0}
+                              </span>
+                              <label className="btn btn-ghost" style={{ cursor: 'pointer' }}>
+                                {projectAttachmentBusyId === r.id ? 'Adding…' : '+ Add Attachment'}
+                                <input
+                                  type="file"
+                                  style={{ display: 'none' }}
+                                  disabled={projectAttachmentBusyId !== null}
+                                  onChange={(e) => {
+                                    const selectedFile = e.target.files?.[0] ?? null;
+                                    e.currentTarget.value = '';
+                                    void uploadProjectAttachment(r.id, selectedFile);
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </td>
                           <td>
                             <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEditProject(r)}>
                               Edit
@@ -1645,282 +1707,6 @@ export function InternalManagement() {
               </div>
             </div>
           </div>
-
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Project attachments</h2>
-              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Upload files linked to a project (optional buyer / employee). Rows appear in the library below.
-              </p>
-              <form
-                onSubmit={(e) =>
-                  void submit(e, {
-                    projectHistoryId: contractsProjectId.trim() ? contractsProjectId.trim() : null,
-                    buyerId: contractsBuyerId.trim() ? contractsBuyerId.trim() : null,
-                    employeeUserId: contractsEmployeeId.trim() ? contractsEmployeeId.trim() : null,
-                  })
-                }
-              >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    gap: '0.75rem',
-                    alignItems: 'flex-end',
-                    paddingBottom: 22,
-                  }}
-                >
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Project</label>
-                    <select
-                      className="input"
-                      value={contractsProjectId}
-                      onChange={(e) => setContractsProjectId(e.target.value)}
-                    >
-                      <option value="">None</option>
-                      {[...projectHistories]
-                        .sort((a, b) => a.projectCode.localeCompare(b.projectCode))
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.projectCode} — {p.companyName}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Buyer</label>
-                    <select
-                      className="input"
-                      value={contractsBuyerId}
-                      onChange={(e) => setContractsBuyerId(e.target.value)}
-                    >
-                      <option value="">None</option>
-                      {buyerOptions.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {formatStaffFullName(b)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Employee</label>
-                    <select
-                      className="input"
-                      value={contractsEmployeeId}
-                      onChange={(e) => setContractsEmployeeId(e.target.value)}
-                    >
-                      <option value="">None</option>
-                      {contractEmployeeOptions.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {formatStaffFullName(u)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Name *</label>
-                    <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Type</label>
-                    <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0 }}>
-                    <label className="input-label">Note</label>
-                    <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-                  </div>
-                  <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
-                    <label className="input-label">File (optional)</label>
-                    <input
-                      ref={fileInputRef}
-                      className="input"
-                      type="file"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        setFile(e.target.files?.[0] ?? null);
-                        setUploadProgress(null);
-                      }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button
-                        type="button"
-                        className="btn file-picker-btn"
-                        onClick={() => fileInputRef.current?.click()}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        Choose file
-                      </button>
-                      <span
-                        style={{
-                          fontSize: 'var(--text-xs)',
-                          color: 'var(--color-text-muted)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                          maxWidth: 170,
-                        }}
-                        title={file?.name || 'No file chosen'}
-                      >
-                        {file?.name || 'No file chosen'}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        minHeight: 18,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-muted)',
-                      }}
-                    >
-                      <span>
-                        {file
-                          ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${
-                              file.name.includes('.') ? `.${file.name.split('.').pop()}` : '—'
-                            }`
-                          : ''}
-                      </span>
-                      {uploadProgress !== null && file ? (
-                        <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          <progress value={uploadProgress} max={100} style={{ width: 90, height: 8 }} />
-                          <span>{uploadProgress}%</span>
-                        </span>
-                      ) : (
-                        <span />
-                      )}
-                    </div>
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? '…' : 'Add'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Project attachment library</h2>
-              <div className="table-wrap" style={{ overflowX: 'auto' }}>
-                {loading ? (
-                  <p className="table-empty">Loading…</p>
-                ) : rows.length === 0 ? (
-                  <p className="table-empty">No internal documents.</p>
-                ) : (
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <SortableTh
-                          label="Project"
-                          columnKey="project"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Buyer"
-                          columnKey="buyer"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Employee"
-                          columnKey="employee"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Name"
-                          columnKey="name"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Type"
-                          columnKey="type"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <SortableTh
-                          label="Note"
-                          columnKey="note"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <th>View</th>
-                        <SortableTh
-                          label="Updated"
-                          columnKey="updated"
-                          activeKey={contractSort.key}
-                          dir={contractSort.dir}
-                          onSort={(col) => setContractSort((p) => toggleSort(p, col))}
-                        />
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedContractRows.map((r) => (
-                        <tr key={r.id}>
-                          <td>{formatContractProjectCell(r)}</td>
-                          <td>{formatStaffFullName(r.buyer)}</td>
-                          <td>{formatStaffFullName(r.employee)}</td>
-                          <td>{r.name}</td>
-                          <td>{r.category ?? '—'}</td>
-                          <td>{r.note ?? '—'}</td>
-                          <td>
-                            {r.filePath ? (
-                              <button
-                                type="button"
-                                className="btn"
-                                onClick={() => download(r)}
-                                disabled={downloading[r.id] !== undefined}
-                                style={downloading[r.id] !== undefined ? { minWidth: 160 } : undefined}
-                              >
-                                {downloading[r.id] !== undefined ? (
-                                  <span style={{ minWidth: 140, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    <progress value={downloading[r.id]} max={100} style={{ width: 90, height: 8 }} />
-                                    <span>{downloading[r.id]}%</span>
-                                  </span>
-                                ) : (
-                                  'Download'
-                                )}
-                              </button>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td>{formatDisplayDateTime(r.updatedAt)}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              disabled={deletingId === r.id}
-                              onClick={() => setDeleteConfirmId(r.id)}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          </div>
         </>
       )}
 
@@ -1930,52 +1716,16 @@ export function InternalManagement() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Profit by project (Active)</h2>
-              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Active projects only so totals are not mixed with completed or inactive work. Costs include labor tied to each project with status{' '}
-                <strong>Paid</strong> only (pending or rejected labor lines are not deducted).
-              </p>
-              <div className="table-wrap" style={{ overflowX: 'auto' }}>
-                {profitRows.length === 0 ? (
-                  <p className="table-empty">No projects yet.</p>
-                ) : profitRowsActive.length === 0 ? (
-                  <p className="table-empty">No active projects. See inactive projects below.</p>
-                ) : (
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Project</th>
-                        <th>Company</th>
-                        <th>Revenue</th>
-                        <th>Costs</th>
-                        <th>Profit</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {profitRowsActive.map((r) => (
-                        <tr key={r.projectId}>
-                          <td>{r.projectCode}</td>
-                          <td>{r.companyName}</td>
-                          <td>{r.revenue ?? r.revenueAmount.toFixed(2)}</td>
-                          <td>{r.costs.toFixed(2)}</td>
-                          <td>{r.profit.toFixed(2)}</td>
-                          <td>{r.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              <h2 style={{ marginTop: 0 }}>Profit - Active Projects</h2>
+              {profitRows.length === 0
+                ? <p className="table-empty">No projects yet.</p>
+                : renderProfitTable(profitRowsActive, 'No active projects.')}
             </div>
           </div>
 
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Inactive projects</h2>
-              <p style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Same cost rule as above: only <strong>Paid</strong> labor costs reduce profit.
-              </p>
+              <h2 style={{ marginTop: 0 }}>Profit - Inactive Projects</h2>
 
               <div
                 style={{
@@ -1988,10 +1738,7 @@ export function InternalManagement() {
               >
                 <MetricCard
                   title="Total profit (inactive projects)"
-                  value={inactiveProjectsProfitTotal.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  value={formatProfitMoney(inactiveProjectsProfitTotal)}
                   subtitle={
                     profitRowsInactive.length === 0
                       ? 'No inactive projects'
@@ -1999,36 +1746,7 @@ export function InternalManagement() {
                   }
                 />
               </div>
-              <div className="table-wrap" style={{ overflowX: 'auto' }}>
-                {profitRowsInactive.length === 0 ? (
-                  <p className="table-empty">No inactive projects.</p>
-                ) : (
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Project</th>
-                        <th>Company</th>
-                        <th>Revenue</th>
-                        <th>Costs</th>
-                        <th>Profit</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {profitRowsInactive.map((r) => (
-                        <tr key={r.projectId}>
-                          <td>{r.projectCode}</td>
-                          <td>{r.companyName}</td>
-                          <td>{r.revenue ?? r.revenueAmount.toFixed(2)}</td>
-                          <td>{r.costs.toFixed(2)}</td>
-                          <td>{r.profit.toFixed(2)}</td>
-                          <td>{r.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              {renderProfitTable(profitRowsInactive, 'No inactive projects.')}
             </div>
           </div>
         </>
@@ -2039,7 +1757,6 @@ export function InternalManagement() {
           <AdminEmployeeAssignmentsPanel
             token={token}
             toast={toast}
-            employeeProfilePathPrefix="/internal-management/employee-profile"
           />
         </div>
       )}
@@ -2047,6 +1764,12 @@ export function InternalManagement() {
       {tab === 'laborCosts' && (
         <div style={{ marginTop: '1rem' }}>
           <AdminLaborCostsPanel token={token} listScope="all" />
+        </div>
+      )}
+
+      {tab === 'expenses' && (
+        <div style={{ marginTop: '1rem' }}>
+          <AdminExpensesPanel token={token} toast={toast} excludedProjects={['Global Vendors']} showExpenseIdColumn />
         </div>
       )}
 

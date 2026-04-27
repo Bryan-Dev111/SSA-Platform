@@ -25,9 +25,9 @@ const ALERT_EMAIL_MATRIX_CATEGORIES: AlertCategory[] = [
 ];
 
 const ALERT_RECIPIENT_ROLE_NAMES = ['Admin', 'QualityEngineer', 'Buyer', 'QualityManager'] as const;
+const DEPRECATED_ROLE_NAMES = new Set(['Viewer']);
 const ROLE_ALIASES: Record<string, string> = {
   admin: 'Admin',
-  viewer: 'Viewer',
   buyer: 'Buyer',
   supplier: 'Supplier',
   auditor: 'Auditor',
@@ -61,6 +61,10 @@ async function resolveRoleRows(roleNamesInput: string[]): Promise<{ rows: Array<
   for (const roleName of requested) {
     const resolved = exactByName.get(roleName) ?? normalizedByName.get(normalizeRoleName(roleName));
     if (!resolved) {
+      missing.push(roleName);
+      continue;
+    }
+    if (DEPRECATED_ROLE_NAMES.has(resolved.name)) {
       missing.push(roleName);
       continue;
     }
@@ -137,7 +141,11 @@ router.get(
 router.get(
   '/permission-matrix',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-    const roles = await prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } });
+    const roles = await prisma.role.findMany({
+      where: { name: { notIn: [...DEPRECATED_ROLE_NAMES] } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
     const perms = await prisma.rolePagePermission.findMany({
       where: { pageKey: { in: PAGE_DEFINITIONS.map((p) => p.key) } },
       select: { roleId: true, pageKey: true, canAccess: true },

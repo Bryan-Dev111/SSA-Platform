@@ -381,10 +381,10 @@ export function Audits() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total audits</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Audits</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{audits.length}</div>
           <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
-            {passedPercent}% passed
+            {passedPercent}% Passed
           </div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
@@ -403,7 +403,7 @@ export function Audits() {
       >
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Audits by supplier</h2>
+            <h2 style={{ marginTop: 0 }}>Audits by Supplier</h2>
             {auditsBySupplier.length === 0 ? (
               <p className="table-empty">No audits in scope.</p>
             ) : (
@@ -433,7 +433,7 @@ export function Audits() {
 
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Audits by type</h2>
+            <h2 style={{ marginTop: 0 }}>Audit by Type</h2>
             {auditsByType.length === 0 ? (
               <p className="table-empty">No audits in scope.</p>
             ) : (

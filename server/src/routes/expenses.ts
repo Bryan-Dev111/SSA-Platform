@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess } from '../middleware/rbac';
+import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import {
@@ -73,13 +73,22 @@ router.get(
   '/open-purchase-orders',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const rows = await prisma.purchaseOrder.findMany({
-      select: { id: true, code: true, status: true },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        farm: { select: { country: true } },
+      },
       orderBy: { code: 'asc' },
       take: 500,
     });
     const list = rows
       .filter((r) => isPurchaseOrderOpenStatus(r.status))
-      .map(({ id, code }) => ({ id, code }));
+      .map(({ id, code, farm }) => ({
+        id,
+        code,
+        country: farm?.country?.trim() || null,
+      }));
     res.json({ list });
   })
 );
@@ -316,6 +325,26 @@ router.patch(
       },
     });
     res.json(updated);
+  })
+);
+
+/** Permanently remove an expense row. Admin only (in addition to Global Supply Expenses page access). */
+router.delete(
+  '/:id',
+  requireRole(['Admin']),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+    const existing = await prisma.expense.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Expense not found' });
+      return;
+    }
+    await prisma.expense.delete({ where: { id } });
+    res.status(204).send();
   })
 );
 

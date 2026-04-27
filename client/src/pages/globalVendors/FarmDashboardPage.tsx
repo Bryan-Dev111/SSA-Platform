@@ -3,12 +3,13 @@
  * Employees with country assignments see only their countries; multi-country users pick from the dropdown.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { MetricCard } from '../../components/MetricCard';
+import { SortableTh } from '../../components/SortableTh';
 import { ChartCard, ContinuousLineChart, VerticalBarChart } from '../../components/DashboardBarCharts';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
+import { type SortDir, cmpNum, cmpStr, toggleSort } from '../../utils/tableSort';
 
 type FarmDashboardPayload = {
   staffRestricted: boolean;
@@ -19,6 +20,7 @@ type FarmDashboardPayload = {
     totalEmployees: number;
     openPos: number;
     openPoValue: number;
+    openExpenses: number;
   };
   graphs: {
     farmsByWeight: { label: string; value: number }[];
@@ -39,6 +41,8 @@ type FarmDashboardPayload = {
   }[];
 };
 
+type FarmTableSortKey = 'farmId' | 'country' | 'region' | 'weightKg' | 'revenue' | 'profit' | 'samples';
+
 function formatMoney(value: number): string {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
@@ -56,12 +60,24 @@ function formatCount(value: number): string {
 }
 
 export function FarmDashboardPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<FarmDashboardPayload | null>(null);
   /** Empty string = all countries (non–country-assigned users). Otherwise ISO-ish / display country string. */
   const [countrySelection, setCountrySelection] = useState('');
+  const [sort, setSort] = useState<{ key: FarmTableSortKey | null; dir: SortDir }>({
+    key: null,
+    dir: 'asc',
+  });
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+  const displayName = user?.name?.trim() || 'John T.';
 
   const fetchDashboard = useCallback(async () => {
     if (!token) return;
@@ -95,11 +111,54 @@ export function FarmDashboardPage() {
     data && (data.staffRestricted ? data.allowedCountries.length > 1 : data.allowedCountries.length > 0)
   );
 
+  const sortedTableRows = useMemo(() => {
+    if (!data?.tableRows.length) return [];
+    const rows = [...data.tableRows];
+    const k = sort.key;
+    if (!k) return rows;
+    const dir = sort.dir;
+    rows.sort((a, b) => {
+      let c = 0;
+      switch (k) {
+        case 'farmId':
+          c = cmpStr(a.farmId, b.farmId, dir);
+          break;
+        case 'country':
+          c = cmpStr(a.country, b.country, dir);
+          break;
+        case 'region':
+          c = cmpStr(a.region ?? '', b.region ?? '', dir);
+          break;
+        case 'weightKg':
+          c = cmpNum(a.weightKg, b.weightKg, dir);
+          break;
+        case 'revenue':
+          c = cmpNum(a.revenue, b.revenue, dir);
+          break;
+        case 'profit':
+          c = cmpNum(a.profit, b.profit, dir);
+          break;
+        case 'samples':
+          c = cmpNum(a.samples, b.samples, dir);
+          break;
+        default:
+          break;
+      }
+      if (c !== 0) return c;
+      return cmpStr(a.farmId, b.farmId, 'asc');
+    });
+    return rows;
+  }, [data?.tableRows, sort]);
+
+  const onSortColumn = (columnKey: string) => {
+    setSort((prev) => toggleSort(prev, columnKey as FarmTableSortKey));
+  };
+
   const exportTable = () => {
-    if (!data?.tableRows.length) return;
+    if (!sortedTableRows.length || !data) return;
     const stamp = new Date().toISOString().slice(0, 10);
     const scope = data.selectedCountry ? `_${data.selectedCountry.replace(/\s+/g, '_')}` : '_all';
-    const rows: ExportRow[] = data.tableRows.map((r) => ({
+    const rows: ExportRow[] = sortedTableRows.map((r) => ({
       'Farm ID': r.farmId,
       Country: r.country,
       Region: r.region || '—',
@@ -111,20 +170,14 @@ export function FarmDashboardPage() {
     downloadTableXlsx(`Farm_Dashboard${scope}_${stamp}`, 'Farms', rows);
   };
 
-  const quickLinks: { to: string; label: string; hint: string }[] = [
-    { to: '/global-vendors/farmers', label: 'Farm Information', hint: 'Full register, add farms, export' },
-    { to: '/global-vendors/farm-profile', label: 'Farm profile', hint: 'Photos, processing, narrative' },
-    { to: '/global-vendors/map', label: 'Farms map', hint: 'Geocoded locations' },
-    { to: '/global-vendors/approved', label: 'Approved farms list', hint: 'Approved view' },
-    { to: '/global-vendors/relationship', label: 'Relationship & trust', hint: 'Visits and relationship status' },
-    { to: '/global-vendors/dashboard', label: 'Business dashboard', hint: 'PO, revenue, and samples KPIs' },
-  ];
-
   if (loading && !data) {
     return (
       <div className="page page-dashboard">
         <header className="page-header">
           <h1 className="page-title">Farm Dashboard</h1>
+          <p className="page-description" style={{ marginTop: '0.35rem' }}>
+            {greeting}, {displayName}. Here is what is happening with your farms today.
+          </p>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -139,6 +192,9 @@ export function FarmDashboardPage() {
       <div className="page page-dashboard">
         <header className="page-header">
           <h1 className="page-title">Farm Dashboard</h1>
+          <p className="page-description" style={{ marginTop: '0.35rem' }}>
+            {greeting}, {displayName}. Here is what is happening with your farms today.
+          </p>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -150,6 +206,9 @@ export function FarmDashboardPage() {
       <div className="page page-dashboard">
         <header className="page-header">
           <h1 className="page-title">Farm Dashboard</h1>
+          <p className="page-description" style={{ marginTop: '0.35rem' }}>
+            {greeting}, {displayName}. Here is what is happening with your farms today.
+          </p>
         </header>
         <p className="table-empty">No data.</p>
       </div>
@@ -159,18 +218,22 @@ export function FarmDashboardPage() {
   const g = data.graphs;
   const scopeLabel =
     !data.staffRestricted && !data.selectedCountry ? 'All countries' : (data.selectedCountry ?? '');
+  const openExpenses = typeof data.kpis.openExpenses === 'number' ? data.kpis.openExpenses : 0;
 
   return (
     <div className="page page-dashboard">
       <header className="page-header">
         <h1 className="page-title">Farm Dashboard</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          {data.staffRestricted
-            ? data.allowedCountries.length > 1
-              ? 'Farms are limited to your assigned countries. Use the menu below to switch between them.'
-              : 'Farms are limited to your assigned country.'
-            : 'Use the country filter to focus one country, or leave “All countries” for the full register.'}
+          {greeting}, {displayName}. Here is what is happening with your farms today.
         </p>
+        {data.staffRestricted ? (
+          <p className="page-description" style={{ marginTop: '0.35rem' }}>
+            {data.allowedCountries.length > 1
+              ? 'Farms are limited to your assigned countries. Use the menu below to switch between them.'
+              : 'Farms are limited to your assigned country.'}
+          </p>
+        ) : null}
         {data.staffRestricted && data.allowedCountries.length === 1 ? (
           <p className="page-description" style={{ marginTop: '0.25rem' }}>
             Assigned country: <strong>{data.allowedCountries[0]}</strong>
@@ -178,7 +241,7 @@ export function FarmDashboardPage() {
         ) : null}
       </header>
 
-      {showCountryDropdown ? (
+      {showCountryDropdown ? (                                                                  
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0, minWidth: 260 }}>
@@ -221,22 +284,11 @@ export function FarmDashboardPage() {
           minWidth: 0,
         }}
       >
-        <MetricCard title="Total Farms" value={data.kpis.totalFarms} subtitle="Farms in current scope" />
-        <MetricCard
-          title="Total Employees"
-          value={data.kpis.totalEmployees}
-          subtitle={
-            data.selectedCountry
-              ? `Staff assigned to ${data.selectedCountry}`
-              : 'Employees & contractors (all regions)'
-          }
-        />
-        <MetricCard title="Open POs" value={data.kpis.openPos} subtitle="Purchase orders not closed" />
-        <MetricCard
-          title="Open PO Value"
-          value={formatMoney(data.kpis.openPoValue)}
-          subtitle="Sum of open PO amounts (est.)"
-        />
+        <MetricCard title="Total Farms" value={data.kpis.totalFarms} />
+        <MetricCard title="Total Employees" value={data.kpis.totalEmployees} />
+        <MetricCard title="Open POs" value={data.kpis.openPos} />
+        <MetricCard title="Open PO Value" value={formatMoney(data.kpis.openPoValue)} />
+        <MetricCard title="Open Expenses" value={formatMoney(openExpenses)} />
       </div>
 
       <div
@@ -247,20 +299,28 @@ export function FarmDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard title="Farms by Weight" subtitle="Total kg on purchase orders per farm (all statuses)">
-          <VerticalBarChart rows={g.farmsByWeight} valueFormatter={formatKg} />
+        <ChartCard
+          title="Farms by Weight"
+          subtitle="Total kg on purchase orders per farm (all statuses)"
+          allowContentOverflow
+        >
+          <VerticalBarChart rows={g.farmsByWeight} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Revenue" subtitle="Closed purchase orders only">
-          <VerticalBarChart rows={g.farmsByRevenue} valueFormatter={formatMoney} />
+        <ChartCard title="Farms by Revenue" subtitle="Closed purchase orders only" allowContentOverflow>
+          <VerticalBarChart rows={g.farmsByRevenue} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Profit" subtitle="Closed PO revenue − linked Global Vendors expenses">
-          <VerticalBarChart rows={g.farmsByProfit} valueFormatter={formatMoney} />
+        <ChartCard
+          title="Farms by Profit"
+          subtitle="Closed PO revenue − linked Global Vendors expenses"
+          allowContentOverflow
+        >
+          <VerticalBarChart rows={g.farmsByProfit} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by PO" subtitle="Number of purchase orders per farm">
-          <VerticalBarChart rows={g.farmsByPoCount} valueFormatter={formatCount} />
+        <ChartCard title="Farms by PO" subtitle="Number of purchase orders per farm" allowContentOverflow>
+          <VerticalBarChart rows={g.farmsByPoCount} valueFormatter={formatCount} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Sample" subtitle="Sample records linked to each farm">
-          <VerticalBarChart rows={g.farmsBySample} valueFormatter={formatCount} />
+        <ChartCard title="Farms by Sample" subtitle="Sample records linked to each farm" allowContentOverflow>
+          <VerticalBarChart rows={g.farmsBySample} valueFormatter={formatCount} slantedValueLabels />
         </ChartCard>
         <ChartCard title="PO Placement" subtitle="Purchase orders placed over time (count per day)">
           <ContinuousLineChart
@@ -278,7 +338,7 @@ export function FarmDashboardPage() {
             <h2 className="dashboard-section-heading" style={{ margin: 0 }}>
               Farm summary
             </h2>
-            <button type="button" className="btn btn-primary" onClick={exportTable} disabled={!data.tableRows.length}>
+            <button type="button" className="btn btn-primary" onClick={exportTable} disabled={!sortedTableRows.length}>
               Export to Excel
             </button>
           </div>
@@ -289,17 +349,59 @@ export function FarmDashboardPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Farm ID</th>
-                    <th>Country</th>
-                    <th>Region</th>
-                    <th>Weight (kg)</th>
-                    <th>Revenue</th>
-                    <th>Profit</th>
-                    <th>Samples</th>
+                    <SortableTh
+                      label="Farm ID"
+                      columnKey="farmId"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
+                    <SortableTh
+                      label="Country"
+                      columnKey="country"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
+                    <SortableTh
+                      label="Region"
+                      columnKey="region"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
+                    <SortableTh
+                      label="Weight (kg)"
+                      columnKey="weightKg"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
+                    <SortableTh
+                      label="Revenue"
+                      columnKey="revenue"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
+                    <SortableTh
+                      label="Profit"
+                      columnKey="profit"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
+                    <SortableTh
+                      label="Samples"
+                      columnKey="samples"
+                      activeKey={sort.key}
+                      dir={sort.dir}
+                      onSort={onSortColumn}
+                    />
                   </tr>
                 </thead>
                 <tbody>
-                  {data.tableRows.map((r) => (
+                  {sortedTableRows.map((r) => (
                     <tr key={r.farmId}>
                       <td>{r.farmId}</td>
                       <td>{r.country}</td>
@@ -314,26 +416,6 @@ export function FarmDashboardPage() {
               </table>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="card dashboard-section-card">
-        <div className="card-body">
-          <h2 className="dashboard-section-heading" style={{ marginBottom: 12 }}>
-            Quick links
-          </h2>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-            {quickLinks.map((item) => (
-              <li key={item.to}>
-                <Link to={item.to} className="link" style={{ fontWeight: 600 }}>
-                  {item.label}
-                </Link>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 2 }}>
-                  {item.hint}
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
       </div>
     </div>

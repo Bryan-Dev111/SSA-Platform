@@ -261,16 +261,14 @@ export function Dashboard() {
           value={metrics.openFindingsTotal || metrics.openFindingsMajorCritical}
           subtitle={`${metrics.openFindingsMajorCritical} Major/Critical open`}
         />
-        {/* Open inspection count in subtitle; red triangle + tooltip only for late PO (qty short), never for open requests. */}
+        {/* Subtitle: late PO only; alert icon + tooltip still detail qty short vs schedule (not inspection requests). */}
         <MetricCard
           title="Shipments"
           value={metrics.shipmentRequests}
           subtitle={(() => {
             const late = metrics.shipmentLate ?? 0;
-            const open = metrics.shipmentRequests ?? 0;
-            const openLabel =
-              open === 1 ? '1 Open Inspection Request' : `${open} Open Inspection Requests`;
-            return `${late} Late PO * ${openLabel}`;
+            if (late <= 0) return 'No late POs';
+            return late === 1 ? '1 Late PO' : `${late} Late POs`;
           })()}
           customAlert={
             (metrics.shipmentLate ?? 0) > 0 ? (
@@ -292,7 +290,7 @@ export function Dashboard() {
 
         <div className="card dashboard-section-card">
           <div className="card-body">
-            <h2 className="dashboard-section-heading">Upcoming events</h2>
+            <h2 className="dashboard-section-heading">Upcoming Events</h2>
             {upcoming.length === 0 ? (
               <p className="table-empty">No upcoming audits or shipment inspections.</p>
             ) : (
@@ -363,7 +361,7 @@ export function Dashboard() {
 
       <div className="card dashboard-section-card dashboard-trends-card">
         <div className="card-body">
-          <h2 className="dashboard-section-heading">Monthly trends</h2>
+          <h2 className="dashboard-section-heading">Monthly Trends</h2>
           {monthly.length === 0 ? (
             <p className="table-empty">No trend data yet.</p>
           ) : (

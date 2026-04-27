@@ -9,7 +9,6 @@ const prisma = new PrismaClient();
 
 const ROLES = [
   'Admin',
-  'Viewer',
   'QualityEngineer',
   'Auditor',
   'Buyer',
@@ -24,6 +23,15 @@ async function main() {
       update: {},
       create: { name },
     });
+  }
+  // Remove deprecated Viewer role if it still exists from older seeds.
+  const deprecatedViewerRole = await prisma.role.findUnique({ where: { name: 'Viewer' } });
+  if (deprecatedViewerRole) {
+    await prisma.userRole.deleteMany({ where: { roleId: deprecatedViewerRole.id } });
+    await prisma.rolePagePermission.deleteMany({ where: { roleId: deprecatedViewerRole.id } });
+    await prisma.role.delete({ where: { id: deprecatedViewerRole.id } });
+    await prisma.user.deleteMany({ where: { email: 'viewer@sentinel.local' } });
+    console.log('Deprecated Viewer role removed.');
   }
   console.log('Roles seeded.');
 
@@ -64,7 +72,6 @@ async function main() {
   // Day 4 test users (one per role) — password: Test123!
   const testPassword = await bcrypt.hash('Test123!', 10);
   const testUsers = [
-    { email: 'viewer@sentinel.local', name: 'Viewer User', role: 'Viewer' },
     { email: 'qe@sentinel.local', name: 'QE User', role: 'QualityEngineer' },
     { email: 'auditor@sentinel.local', name: 'Auditor User', role: 'Auditor' },
     { email: 'buyer@sentinel.local', name: 'Buyer User', role: 'Buyer' },
@@ -124,6 +131,22 @@ async function main() {
     });
   }
   console.log('Mock suppliers seeded (3): SUP-TEST01, SUP-TEST02, SUP-TEST03.');
+
+  for (const row of [
+    'Freight',
+    'Payroll',
+    'Labor',
+    'Samples',
+    'Travel',
+    'Other',
+  ]) {
+    await prisma.globalSupplyExpenseType.upsert({
+      where: { name: row },
+      update: {},
+      create: { name: row },
+    });
+  }
+  console.log('Global Supply expense types seeded.');
 
   // Day 8: Commodity types, defect codes, disposition codes (Admin reference data)
   const ctElectronics = await prisma.commodityType.upsert({

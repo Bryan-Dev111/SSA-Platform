@@ -180,7 +180,7 @@ router.get(
 router.get(
   '/profit-summary',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-    const [projects, laborGrouped] = await Promise.all([
+    const [projects, laborCosts, expenses] = await Promise.all([
       prisma.clientHistory.findMany({
         orderBy: { updatedAt: 'desc' },
         select: {
@@ -194,94 +194,126 @@ router.get(
           popEnd: true,
         },
       }),
-      prisma.laborCost.groupBy({
-        by: ['projectHistoryId'],
-        _sum: { totalCost: true },
-        /** Profit deducts only labor costs approved in Labor Costs (Paid). Pending/Rejected excluded. */
+      prisma.laborCost.findMany({
         where: { projectHistoryId: { not: null }, paidStatus: 'Paid' },
+        select: { code: true, totalCost: true, projectHistoryId: true },
+      }),
+      prisma.expense.findMany({
+        select: { code: true, amount: true, project: true },
       }),
     ]);
-    const costByProjectId = new Map(
-      laborGrouped.filter((r) => r.projectHistoryId).map((r) => [r.projectHistoryId as string, r._sum.totalCost ?? 0])
-    );
-    const rows = projects
-      .filter((p) => computeClientHistoryStatus(p.popStart, p.popEnd) === 'Active')
-      .map((p) => {
-        const costs = costByProjectId.get(p.id) ?? 0;
-        const revenue = p.revenueAmount ?? 0;
-        return {
-          projectId: p.id,
-          projectCode: p.projectCode,
-          companyName: p.companyName,
-          revenue: p.revenue,
-          revenueAmount: revenue,
-          costs,
-          profit: revenue - costs,
-          status: computeClientHistoryStatus(p.popStart, p.popEnd),
-        };
+
+    const laborByProjectId = new Map<string, Array<{ code: string; amount: number }>>();
+    for (const row of laborCosts) {
+      if (!row.projectHistoryId) continue;
+      if (!laborByProjectId.has(row.projectHistoryId)) laborByProjectId.set(row.projectHistoryId, []);
+      laborByProjectId.get(row.projectHistoryId)!.push({
+        code: row.code,
+        amount: Number.isFinite(row.totalCost) ? row.totalCost : 0,
       });
+    }
+
+    const normalize = (v: string | null | undefined) => (v ?? '').trim().toLowerCase();
+    const rows = projects.map((p) => {
+      const laborItems = laborByProjectId.get(p.id) ?? [];
+      const expenseItems = expenses
+        .filter((e) => {
+          const expenseProject = normalize(e.project);
+          if (!expenseProject) return false;
+          return expenseProject === normalize(p.projectCode) || expenseProject === normalize(p.companyName);
+        })
+        .map((e) => ({ code: e.code, amount: Number.isFinite(e.amount) ? e.amount : 0 }));
+      const allDeductions = [
+        ...laborItems.map((d) => ({ ...d, kind: 'Labor Cost' as const })),
+        ...expenseItems.map((d) => ({ ...d, kind: 'Expense' as const })),
+      ];
+      const costs = allDeductions.reduce((sum, d) => sum + d.amount, 0);
+      const revenue = p.revenueAmount ?? 0;
+      return {
+        projectId: p.id,
+        projectCode: p.projectCode,
+        companyName: p.companyName,
+        revenue: p.revenue,
+        revenueAmount: revenue,
+        costs,
+        profit: revenue - costs,
+        status: computeClientHistoryStatus(p.popStart, p.popEnd),
+        deductions: allDeductions,
+      };
+    });
     res.json(rows);
   })
 );
 
-/** One row per supplier (or one "unassigned" row) with all POP-active projects for that supplier. */
+/** Active project management table: Project, Buyer, Supplier, assigned QE, assigned QM. */
 router.get(
   '/management-assignments',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const list = await prisma.clientHistory.findMany({
-      orderBy: [{ supplierId: 'asc' }, { projectCode: 'asc' }],
+      orderBy: [{ projectCode: 'asc' }],
       include: {
+        buyer: { select: { id: true, name: true, email: true } },
         supplier: { select: { id: true, code: true, name: true } },
       },
     });
     const active = list.filter((p) => computeClientHistoryStatus(p.popStart, p.popEnd) === 'Active');
-    const byKey = new Map<string, typeof active>();
-    for (const p of active) {
-      const key = p.supplierId ?? '__unassigned__';
-      if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key)!.push(p);
-    }
-    const OUT: {
-      supplier: { id: string; code: string; name: string } | null;
-      activeProjects: Array<{
-        id: string;
-        projectCode: string;
-        companyName: string;
-        clientName: string;
-        popStart: string | null;
-        popEnd: string | null;
-        status: 'Active';
-      }>;
-    }[] = [];
-    for (const [, projects] of byKey) {
-      projects.sort((a, b) => a.projectCode.localeCompare(b.projectCode));
-      const first = projects[0];
-      const supplier =
-        first.supplierId && first.supplier
-          ? { id: first.supplier.id, code: first.supplier.code, name: first.supplier.name }
-          : null;
-      OUT.push({
-        supplier,
-        activeProjects: projects.map((p) => ({
-          id: p.id,
-          projectCode: p.projectCode,
-          companyName: p.companyName,
-          clientName: p.clientName,
-          popStart: p.popStart ? p.popStart.toISOString() : null,
-          popEnd: p.popEnd ? p.popEnd.toISOString() : null,
-          status: 'Active' as const,
-        })),
+    const buyerIds = [...new Set(active.map((p) => p.buyerId).filter((id): id is string => Boolean(id)))];
+    const qeBuyerLinks =
+      buyerIds.length === 0
+        ? []
+        : await prisma.qeBuyer.findMany({
+            where: { buyerId: { in: buyerIds } },
+            select: { buyerId: true, qualityEngineerId: true },
+          });
+    const qeIds = [...new Set(qeBuyerLinks.map((r) => r.qualityEngineerId))];
+    const qmQeLinks =
+      qeIds.length === 0
+        ? []
+        : await prisma.qualityManagerQe.findMany({
+            where: { qualityEngineerId: { in: qeIds } },
+            select: { qualityEngineerId: true, qualityManagerId: true },
+          });
+    const userIds = [...new Set([...qeIds, ...qmQeLinks.map((r) => r.qualityManagerId)])];
+    const usersById = new Map<string, { name: string | null; email: string }>();
+    if (userIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
       });
+      for (const u of users) usersById.set(u.id, { name: u.name, email: u.email });
     }
-    OUT.sort((a, b) => {
-      if (!a.supplier && !b.supplier) return 0;
-      if (!a.supplier) return 1;
-      if (!b.supplier) return -1;
-      const ca = `${a.supplier.code}\t${a.supplier.name}`;
-      const cb = `${b.supplier.code}\t${b.supplier.name}`;
-      return ca.localeCompare(cb);
+    const displayUser = (userId: string): string => {
+      const u = usersById.get(userId);
+      if (!u) return userId;
+      return u.name?.trim() || u.email;
+    };
+    const qeIdsByBuyerId = new Map<string, string[]>();
+    for (const row of qeBuyerLinks) {
+      const arr = qeIdsByBuyerId.get(row.buyerId) ?? [];
+      arr.push(row.qualityEngineerId);
+      qeIdsByBuyerId.set(row.buyerId, arr);
+    }
+    const qmIdsByQeId = new Map<string, string[]>();
+    for (const row of qmQeLinks) {
+      const arr = qmIdsByQeId.get(row.qualityEngineerId) ?? [];
+      arr.push(row.qualityManagerId);
+      qmIdsByQeId.set(row.qualityEngineerId, arr);
+    }
+    const rows = active.map((p) => {
+      const qeIdsForProject = p.buyerId ? qeIdsByBuyerId.get(p.buyerId) ?? [] : [];
+      const qeNames = [...new Set(qeIdsForProject.map(displayUser))].sort((a, b) => a.localeCompare(b));
+      const qmIdsForProject = qeIdsForProject.flatMap((id) => qmIdsByQeId.get(id) ?? []);
+      const qmNames = [...new Set(qmIdsForProject.map(displayUser))].sort((a, b) => a.localeCompare(b));
+      return {
+        id: p.id,
+        projectCode: p.projectCode,
+        buyerName: p.buyer ? p.buyer.name?.trim() || p.buyer.email : '—',
+        supplierName: p.supplier ? `${p.supplier.code}: ${p.supplier.name}` : '—',
+        qualityEngineers: qeNames,
+        qualityManagers: qmNames,
+      };
     });
-    res.json(OUT);
+    res.json(rows);
   })
 );
 

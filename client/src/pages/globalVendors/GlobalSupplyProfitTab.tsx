@@ -28,9 +28,18 @@ type ExpenseRow = {
   code: string;
   amount: number;
   project: string;
+  type?: string;
+  description?: string;
   status?: string | null;
   purchaseOrderId?: string | null;
 };
+
+function expenseHoverTitle(e: ExpenseRow): string {
+  const type = (e.type ?? '').trim() || '—';
+  const desc = (e.description ?? '').trim() || '—';
+  // Single line: many browsers ignore newlines in native `title` tooltips.
+  return `Type: ${type} — Description: ${desc}`;
+}
 
 function expNumericSuffix(code: string): number {
   const m = /^EXP-(\d+)$/i.exec(code.trim());
@@ -239,8 +248,12 @@ export function GlobalSupplyProfitTab({ token }: { token: string | null }) {
                       const revBase = group.po ? group.revenue : 0;
                       const profitVal = revBase - suffixFromI;
                       const isFirst = i === 0;
+                      const isClosedPo = (group.po?.status ?? 'Open').trim().toLowerCase() === 'closed';
                       return (
-                        <tr key={`${group.key}-${row.kind === 'placeholder' ? 'ph' : row.expense!.id}`}>
+                        <tr
+                          key={`${group.key}-${row.kind === 'placeholder' ? 'ph' : row.expense!.id}`}
+                          style={isClosedPo ? { backgroundColor: 'var(--color-surface-2, #f3f4f6)' } : undefined}
+                        >
                           {isFirst ? (
                             <>
                               <td rowSpan={rowCount} style={{ ...cellBorder, fontWeight: 600 }}>
@@ -251,7 +264,15 @@ export function GlobalSupplyProfitTab({ token }: { token: string | null }) {
                               </td>
                             </>
                           ) : null}
-                          <td style={cellBorder}>{row.expense ? row.expense.code : '—'}</td>
+                          <td
+                            style={{
+                              ...cellBorder,
+                              ...(row.expense ? { cursor: 'help' as const } : {}),
+                            }}
+                            title={row.expense ? expenseHoverTitle(row.expense) : undefined}
+                          >
+                            {row.expense ? row.expense.code : '—'}
+                          </td>
                           <td style={cellBorder}>{row.expense ? formatUsd(row.expense.amount) : '—'}</td>
                           <td style={{ ...cellBorder, fontWeight: isFirst ? 700 : 400 }}>{formatUsd(profitVal)}</td>
                         </tr>

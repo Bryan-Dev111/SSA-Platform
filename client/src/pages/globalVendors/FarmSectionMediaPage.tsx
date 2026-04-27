@@ -2,8 +2,8 @@
  * Global Supply — Farm profile photos manager.
  * Processing & quality is accessible from this page via row actions.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
@@ -14,6 +14,7 @@ type Section = 'Profile' | 'Processing';
 
 type ProcessingBlock = {
   id: string;
+  title: string;
   text: string;
   imageIds: string[];
 };
@@ -21,6 +22,7 @@ type ProcessingBlock = {
 function newProcessingBlock(): ProcessingBlock {
   return {
     id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: '',
     text: '',
     imageIds: [],
   };
@@ -30,12 +32,15 @@ function parseProcessingBlocks(raw: string): ProcessingBlock[] {
   const text = raw.trim();
   if (!text) return [newProcessingBlock()];
   try {
-    const parsed = JSON.parse(text) as { blocks?: Array<{ id?: string; text?: string; imageIds?: string[] }> };
+    const parsed = JSON.parse(text) as {
+      blocks?: Array<{ id?: string; title?: string; text?: string; imageIds?: string[] }>;
+    };
     if (!Array.isArray(parsed.blocks) || parsed.blocks.length === 0) {
       return [newProcessingBlock()];
     }
     const blocks = parsed.blocks.map((b, idx) => ({
       id: typeof b.id === 'string' && b.id.trim() ? b.id : `block-${idx + 1}`,
+      title: typeof b.title === 'string' ? b.title : '',
       text: typeof b.text === 'string' ? b.text : '',
       imageIds: Array.isArray(b.imageIds) ? b.imageIds.filter((id): id is string => typeof id === 'string') : [],
     }));
@@ -46,9 +51,212 @@ function parseProcessingBlocks(raw: string): ProcessingBlock[] {
   }
 }
 
+const farmProfileMatrixLabelCell: CSSProperties = {
+  background: 'var(--color-border-subtle)',
+  fontWeight: 600,
+  textAlign: 'left',
+  verticalAlign: 'middle',
+};
+
+const farmProfileMatrixHeaderCell: CSSProperties = {
+  background: 'var(--color-border-subtle)',
+  fontWeight: 600,
+  textAlign: 'center',
+  verticalAlign: 'middle',
+};
+
+const farmProfileMatrixDataCell: CSSProperties = {
+  background: 'var(--color-surface)',
+  verticalAlign: 'middle',
+};
+
+function fmtFarmHa(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '—';
+}
+
+function fmtFarmKg(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '—';
+}
+
+function fmtFarmNum(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '—';
+}
+
+/** Three-column crop matrix (label | main crop | secondary crop), Excel-style. */
+function FarmProfileCropTable({ farm }: { farm: FarmRow }) {
+  const hasSecondary = Boolean(farm.secondaryCrop?.trim());
+  const mainHeader = farm.mainCrop?.trim() || '—';
+  const secondaryHeader = hasSecondary ? farm.secondaryCrop!.trim() : '-';
+
+  const mainHarvest =
+    farm.harvestStartMonth && farm.harvestEndMonth
+      ? `${farm.harvestStartMonth} - ${farm.harvestEndMonth}`
+      : '—';
+  const secondaryHarvest =
+    farm.secondaryHarvestStartMonth && farm.secondaryHarvestEndMonth
+      ? `${farm.secondaryHarvestStartMonth} - ${farm.secondaryHarvestEndMonth}`
+      : '—';
+
+  const secondaryOrDash = (value: string) => (hasSecondary ? value : '-');
+
+  return (
+    <table
+      className="table"
+      style={{
+        width: '100%',
+        maxWidth: '100%',
+        tableLayout: 'fixed',
+      }}
+    >
+      <thead>
+        <tr>
+          <th style={{ ...farmProfileMatrixHeaderCell, width: '38%' }} aria-label="Metric" />
+          <th style={farmProfileMatrixHeaderCell}>{mainHeader}</th>
+          <th style={farmProfileMatrixHeaderCell}>{secondaryHeader}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Total Farm Size (ha)
+          </th>
+          <td colSpan={2} style={{ ...farmProfileMatrixDataCell, textAlign: 'center' }}>
+            {fmtFarmHa(farm.totalFarmSizeHa)}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Production Area (ha)
+          </th>
+          <td style={farmProfileMatrixDataCell}>{fmtFarmHa(farm.mainCropAreaHa)}</td>
+          <td style={farmProfileMatrixDataCell}>{secondaryOrDash(fmtFarmHa(farm.secondaryCropAreaHa))}</td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Annual Output (Kg)
+          </th>
+          <td style={farmProfileMatrixDataCell}>{fmtFarmKg(farm.mainCropAnnualOutputKg)}</td>
+          <td style={farmProfileMatrixDataCell}>{secondaryOrDash(fmtFarmKg(farm.secondaryCropAnnualOutputKg))}</td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Production Style
+          </th>
+          <td style={farmProfileMatrixDataCell}>{farm.productionStyle?.trim() || '—'}</td>
+          <td style={farmProfileMatrixDataCell}>{hasSecondary ? '—' : '-'}</td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Varieties
+          </th>
+          <td style={farmProfileMatrixDataCell}>{farm.mainVarieties?.trim() || '—'}</td>
+          <td style={farmProfileMatrixDataCell}>
+            {secondaryOrDash(farm.secondaryVarieties?.trim() || '—')}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Harvest Window
+          </th>
+          <td style={farmProfileMatrixDataCell}>{mainHarvest}</td>
+          <td style={farmProfileMatrixDataCell}>-</td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Second Harvest Window
+          </th>
+          <td style={farmProfileMatrixDataCell}>-</td>
+          <td style={farmProfileMatrixDataCell}>{hasSecondary ? secondaryHarvest : '-'}</td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Soil
+          </th>
+          <td style={farmProfileMatrixDataCell}>—</td>
+          <td style={farmProfileMatrixDataCell}>{hasSecondary ? '—' : '-'}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+/** Three-column processing matrix (label | main crop | secondary crop), aligned with Farm Profile table style. */
+function ProcessingQualityCropTable({ farm }: { farm: FarmRow }) {
+  const hasSecondary = Boolean(farm.secondaryCrop?.trim());
+  const mainHeader = farm.mainCrop?.trim() || '—';
+  const secondaryHeader = hasSecondary ? farm.secondaryCrop!.trim() : '-';
+
+  return (
+    <table
+      className="table"
+      style={{
+        width: '100%',
+        maxWidth: '100%',
+        tableLayout: 'fixed',
+      }}
+    >
+      <thead>
+        <tr>
+          <th style={{ ...farmProfileMatrixHeaderCell, width: '38%' }} aria-label="Metric" />
+          <th style={farmProfileMatrixHeaderCell}>{mainHeader}</th>
+          <th style={farmProfileMatrixHeaderCell}>{secondaryHeader}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Processing Method
+          </th>
+          <td style={farmProfileMatrixDataCell}>{farm.mainProcessingMethods?.trim() || '—'}</td>
+          <td style={farmProfileMatrixDataCell}>
+            {hasSecondary ? farm.secondaryProcessingMethods?.trim() || '—' : '-'}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Fermentation Days
+          </th>
+          <td style={farmProfileMatrixDataCell}>{fmtFarmNum(farm.mainFermentationDays)}</td>
+          <td style={farmProfileMatrixDataCell}>
+            {hasSecondary ? fmtFarmNum(farm.secondaryFermentationDays) : '-'}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Drying Method
+          </th>
+          <td style={farmProfileMatrixDataCell}>{farm.mainDryingMethod?.trim() || '—'}</td>
+          <td style={farmProfileMatrixDataCell}>
+            {hasSecondary ? farm.secondaryDryingMethod?.trim() || '—' : '-'}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Bean Size
+          </th>
+          <td style={farmProfileMatrixDataCell}>{farm.mainBeanSize?.trim() || '—'}</td>
+          <td style={farmProfileMatrixDataCell}>
+            {hasSecondary ? farm.secondaryBeanSize?.trim() || '—' : '-'}
+          </td>
+        </tr>
+        <tr>
+          <th scope="row" style={farmProfileMatrixLabelCell}>
+            Quality Score
+          </th>
+          <td style={farmProfileMatrixDataCell}>{fmtFarmNum(farm.mainQualityScore)}</td>
+          <td style={farmProfileMatrixDataCell}>
+            {hasSecondary ? fmtFarmNum(farm.secondaryQualityScore) : '-'}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
 export function GlobalFarmProfilePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFarmId = searchParams.get('farmId');
   const [farms, setFarms] = useState<FarmRow[]>([]);
@@ -60,10 +268,21 @@ export function GlobalFarmProfilePage() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FarmProfileImageRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [blockDeleteTargetId, setBlockDeleteTargetId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
   const [content, setContent] = useState('');
   const [processingBlocks, setProcessingBlocks] = useState<ProcessingBlock[]>([newProcessingBlock()]);
   const [contentLoading, setContentLoading] = useState(false);
   const [savingContent, setSavingContent] = useState(false);
+  const isAdmin = useMemo(() => Boolean(user?.roleNames?.includes('Admin')), [user?.roleNames]);
+  const canManageProfileMedia = useMemo(
+    () =>
+      Boolean(
+        user?.roleNames?.includes('Admin') ||
+          user?.roleNames?.includes('SourcingDirector')
+      ),
+    [user?.roleNames]
+  );
 
   const selectedFarm = useMemo(() => farms.find((f) => f.id === farmId) || null, [farms, farmId]);
 
@@ -155,19 +374,20 @@ export function GlobalFarmProfilePage() {
     };
   }, [token, farmId, section]);
 
-  const openManager = (id: string, nextSection: Section) => {
-    setFarmId(id);
-    setSection(nextSection);
-    setSearchParams({ farmId: id }, { replace: true });
-  };
-
   const saveContent = async () => {
     if (!token || !farmId || savingContent) return;
     setSavingContent(true);
     try {
       const bodyToSave =
         section === 'Processing'
-          ? JSON.stringify({ blocks: processingBlocks.map((b) => ({ id: b.id, text: b.text, imageIds: b.imageIds })) })
+          ? JSON.stringify({
+              blocks: processingBlocks.map((b) => ({
+                id: b.id,
+                title: b.title,
+                text: b.text,
+                imageIds: b.imageIds,
+              })),
+            })
           : content;
       await apiJson(`/farms/${farmId}/profile-content`, {
         token,
@@ -189,6 +409,11 @@ export function GlobalFarmProfilePage() {
     } finally {
       setSavingContent(false);
     }
+  };
+
+  const openImagePreview = (url: string | null | undefined, alt: string) => {
+    if (!url) return;
+    setPreviewImage({ url, alt });
   };
 
   const uploadFiles = async (files: FileList | File[], blockId?: string) => {
@@ -285,11 +510,26 @@ export function GlobalFarmProfilePage() {
     }
   };
 
+  const confirmRemoveProcessingBlock = () => {
+    if (!blockDeleteTargetId) return;
+    setProcessingBlocks((prev) =>
+      prev.length <= 1
+        ? [{ ...prev[0], title: '', text: '', imageIds: [] }]
+        : prev.filter((b) => b.id !== blockDeleteTargetId)
+    );
+    setBlockDeleteTargetId(null);
+  };
+
   if (loading && farms.length === 0) {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Farm profile</h1>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', marginBottom: 6 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
+              Back
+            </button>
+          </div>
+          <h1 className="page-title">Farm Profile</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -304,11 +544,12 @@ export function GlobalFarmProfilePage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Farm profile</h1>
-        <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          Manage profile and processing photos by farm. You can also open this page from{' '}
-          <Link to="/global-vendors/farmers">Farm Information</Link>.
-        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', marginBottom: 6 }}>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
+            Back
+          </button>
+        </div>
+        <h1 className="page-title">Farm Profile</h1>
       </header>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
@@ -335,62 +576,10 @@ export function GlobalFarmProfilePage() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Farms</h2>
-          <div className="table-wrap">
-            {farms.length === 0 ? (
-              <p className="table-empty">No farms yet.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Farm ID</th>
-                    <th>Farm name</th>
-                    <th>Country</th>
-                    <th>Farm profile</th>
-                    <th>Processing &amp; quality</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {farms.map((f) => (
-                    <tr key={f.id}>
-                      <td>{f.code}</td>
-                      <td>{f.farmName}</td>
-                      <td>{f.country}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className={farmId === f.id && section === 'Profile' ? 'btn btn-primary btn-sm' : 'btn btn-sm btn-ghost'}
-                          onClick={() => openManager(f.id, 'Profile')}
-                        >
-                          Open
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className={farmId === f.id && section === 'Processing' ? 'btn btn-primary btn-sm' : 'btn btn-sm btn-ghost'}
-                          onClick={() => openManager(f.id, 'Processing')}
-                        >
-                          Open
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-
       {selectedFarm ? (
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>
-              {selectedFarm.code} — {selectedFarm.farmName}
-            </h2>
+            <h2 style={{ marginTop: 0 }}>{selectedFarm.code}</h2>
             <div
               style={{
                 display: 'grid',
@@ -399,16 +588,20 @@ export function GlobalFarmProfilePage() {
                 marginBottom: 14,
               }}
             >
-              <div><strong>Farm ID:</strong> {selectedFarm.code}</div>
-              <div><strong>Farm Name:</strong> {selectedFarm.farmName}</div>
-              <div><strong>Main/Secondary Crop:</strong> {selectedFarm.mainCrop || '—'} / {selectedFarm.secondaryCrop || '—'}</div>
-              <div><strong>Country:</strong> {selectedFarm.country}</div>
-              <div><strong>Region:</strong> {selectedFarm.region || '—'}</div>
-              <div><strong>Elevation:</strong> {typeof selectedFarm.elevationMeters === 'number' ? `${selectedFarm.elevationMeters} m` : '—'}</div>
+              <div>
+                <strong>Crops:</strong> {selectedFarm.mainCrop || '—'} / {selectedFarm.secondaryCrop || '—'}
+              </div>
+              <div>
+                <strong>Country:</strong> {selectedFarm.country}
+              </div>
+              <div>
+                <strong>Region:</strong> {selectedFarm.region || '—'}
+              </div>
+              <div>
+                <strong>Elevation:</strong>{' '}
+                {typeof selectedFarm.elevationMeters === 'number' ? `${selectedFarm.elevationMeters} m` : '—'}
+              </div>
             </div>
-            <p className="field-label" style={{ marginBottom: 10 }}>
-              {section === 'Profile' ? 'Farm profile photos' : 'Processing & quality photos'}
-            </p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <button
                 type="button"
@@ -427,74 +620,11 @@ export function GlobalFarmProfilePage() {
             </div>
 
             <div className="table-wrap" style={{ marginBottom: 12 }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    {section === 'Profile' ? (
-                      <>
-                        <th>Total Farm Size (ha)</th>
-                        <th>Production Area (ha) Main/Secondary</th>
-                        <th>Annual Output (Kg) Main/Secondary</th>
-                        <th>Production Style</th>
-                        <th>Varieties</th>
-                        <th>Harvest Window (Main)</th>
-                        <th>Harvest Window (Secondary)</th>
-                      </>
-                    ) : (
-                      <>
-                        <th>Main Processing Methods</th>
-                        <th>Main Fermentation Days</th>
-                        <th>Main Drying Method</th>
-                        <th>Main Bean Size</th>
-                        <th>Main Quality Score</th>
-                        <th>Secondary Processing Details</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {section === 'Profile' ? (
-                      <>
-                        <td>{typeof selectedFarm.totalFarmSizeHa === 'number' ? selectedFarm.totalFarmSizeHa : '—'}</td>
-                        <td>
-                          {typeof selectedFarm.mainCropAreaHa === 'number' ? selectedFarm.mainCropAreaHa : '—'} /{' '}
-                          {typeof selectedFarm.secondaryCropAreaHa === 'number' ? selectedFarm.secondaryCropAreaHa : '—'}
-                        </td>
-                        <td>
-                          {typeof selectedFarm.mainCropAnnualOutputKg === 'number' ? selectedFarm.mainCropAnnualOutputKg.toLocaleString() : '—'} /{' '}
-                          {typeof selectedFarm.secondaryCropAnnualOutputKg === 'number' ? selectedFarm.secondaryCropAnnualOutputKg.toLocaleString() : '—'}
-                        </td>
-                        <td>{selectedFarm.productionStyle || '—'}</td>
-                        <td>{selectedFarm.mainVarieties || '—'}{selectedFarm.secondaryVarieties ? ` / ${selectedFarm.secondaryVarieties}` : ''}</td>
-                        <td>
-                          {selectedFarm.harvestStartMonth && selectedFarm.harvestEndMonth
-                            ? `${selectedFarm.harvestStartMonth} - ${selectedFarm.harvestEndMonth}`
-                            : '—'}
-                        </td>
-                        <td>
-                          {selectedFarm.secondaryHarvestStartMonth && selectedFarm.secondaryHarvestEndMonth
-                            ? `${selectedFarm.secondaryHarvestStartMonth} - ${selectedFarm.secondaryHarvestEndMonth}`
-                            : '—'}
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{selectedFarm.mainProcessingMethods || '—'}</td>
-                        <td>{typeof selectedFarm.mainFermentationDays === 'number' ? selectedFarm.mainFermentationDays : '—'}</td>
-                        <td>{selectedFarm.mainDryingMethod || '—'}</td>
-                        <td>{selectedFarm.mainBeanSize || '—'}</td>
-                        <td>{typeof selectedFarm.mainQualityScore === 'number' ? selectedFarm.mainQualityScore : '—'}</td>
-                        <td>
-                          {selectedFarm.secondaryProcessingMethods || selectedFarm.secondaryFermentationDays || selectedFarm.secondaryDryingMethod || selectedFarm.secondaryBeanSize || selectedFarm.secondaryQualityScore
-                            ? `${selectedFarm.secondaryProcessingMethods || 'Method: —'} | Fermentation: ${typeof selectedFarm.secondaryFermentationDays === 'number' ? selectedFarm.secondaryFermentationDays : '—'} | Drying: ${selectedFarm.secondaryDryingMethod || '—'} | Bean Size: ${selectedFarm.secondaryBeanSize || '—'} | Quality: ${typeof selectedFarm.secondaryQualityScore === 'number' ? selectedFarm.secondaryQualityScore : '—'}`
-                            : 'No secondary processing data'}
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                </tbody>
-              </table>
+              {section === 'Profile' ? (
+                <FarmProfileCropTable farm={selectedFarm} />
+              ) : (
+                <ProcessingQualityCropTable farm={selectedFarm} />
+              )}
             </div>
 
             <label className="field" style={{ display: 'block', marginBottom: 12 }}>
@@ -516,13 +646,10 @@ export function GlobalFarmProfilePage() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
+                      justifyContent: 'flex-end',
                       marginBottom: 8,
                     }}
                   >
-                    <span className="field-label" style={{ marginBottom: 0 }}>
-                      Processing &amp; quality blocks
-                    </span>
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
@@ -551,20 +678,32 @@ export function GlobalFarmProfilePage() {
                             marginBottom: 8,
                           }}
                         >
-                          <strong>Block {idx + 1}</strong>
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-ghost"
-                            onClick={() =>
-                              setProcessingBlocks((prev) =>
-                                prev.length <= 1
-                                  ? [{ ...prev[0], text: '', imageIds: [] }]
-                                  : prev.filter((b) => b.id !== block.id)
-                              )
-                            }
-                          >
-                            Remove block
-                          </button>
+                          {isAdmin ? (
+                            <input
+                              className="input"
+                              value={block.title || `Block ${idx + 1}`}
+                              onChange={(e) =>
+                                setProcessingBlocks((prev) =>
+                                  prev.map((b) =>
+                                    b.id === block.id ? { ...b, title: e.target.value } : b
+                                  )
+                                )
+                              }
+                              placeholder={`Block ${idx + 1}`}
+                              style={{ maxWidth: 260 }}
+                            />
+                          ) : (
+                            <strong>{block.title.trim() || `Block ${idx + 1}`}</strong>
+                          )}
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              onClick={() => setBlockDeleteTargetId(block.id)}
+                            >
+                              Remove block
+                            </button>
+                          ) : null}
                         </div>
                         <textarea
                           className="input"
@@ -580,32 +719,34 @@ export function GlobalFarmProfilePage() {
                           placeholder="Add processing and quality narrative for this block..."
                           disabled={contentLoading}
                         />
-                        <div style={{ marginTop: 8 }}>
-                          <input
-                            id={`processing-block-upload-${block.id}`}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                            multiple
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                              const list = e.target.files;
-                              if (list?.length) void uploadFiles(list, block.id);
-                              e.target.value = '';
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-ghost"
-                            disabled={uploadBusy}
-                            onClick={() =>
-                              document
-                                .getElementById(`processing-block-upload-${block.id}`)
-                                ?.click()
-                            }
-                          >
-                            Add photo to block
-                          </button>
-                        </div>
+                        {canManageProfileMedia ? (
+                          <div style={{ marginTop: 8 }}>
+                            <input
+                              id={`processing-block-upload-${block.id}`}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              multiple
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                const list = e.target.files;
+                                if (list?.length) void uploadFiles(list, block.id);
+                                e.target.value = '';
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              disabled={uploadBusy}
+                              onClick={() =>
+                                document
+                                  .getElementById(`processing-block-upload-${block.id}`)
+                                  ?.click()
+                              }
+                            >
+                              Add photo to block
+                            </button>
+                          </div>
+                        ) : null}
                         {block.imageIds.length > 0 ? (
                           <div
                             style={{
@@ -624,17 +765,31 @@ export function GlobalFarmProfilePage() {
                                   style={{ width: 90, display: 'flex', flexDirection: 'column', gap: 4 }}
                                 >
                                   {image.url ? (
-                                    <img
-                                      src={image.url}
-                                      alt={image.fileName || 'Block image'}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        openImagePreview(image.url, image.fileName || 'Block image')
+                                      }
+                                      title="Open image"
                                       style={{
-                                        width: '100%',
-                                        height: 70,
-                                        objectFit: 'cover',
-                                        borderRadius: 6,
-                                        border: '1px solid var(--color-border)',
+                                        padding: 0,
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'zoom-in',
                                       }}
-                                    />
+                                    >
+                                      <img
+                                        src={image.url}
+                                        alt={image.fileName || 'Block image'}
+                                        style={{
+                                          width: '100%',
+                                          height: 70,
+                                          objectFit: 'cover',
+                                          borderRadius: 6,
+                                          border: '1px solid var(--color-border)',
+                                        }}
+                                      />
+                                    </button>
                                   ) : null}
                                   <button
                                     type="button"
@@ -665,37 +820,41 @@ export function GlobalFarmProfilePage() {
                 </>
               )}
             </label>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => void saveContent()}
-              disabled={savingContent || contentLoading}
-              style={{ marginBottom: 12 }}
-            >
-              {savingContent ? 'Saving…' : 'Save text'}
-            </button>
+            {canManageProfileMedia ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void saveContent()}
+                  disabled={savingContent || contentLoading}
+                  style={{ marginBottom: 12 }}
+                >
+                  {savingContent ? 'Saving…' : 'Save text'}
+                </button>
 
-            <input
-              id={uploadInputId}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const list = e.target.files;
-                if (list?.length) void uploadFiles(list);
-                e.target.value = '';
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost"
-              disabled={uploadBusy}
-              onClick={() => document.getElementById(uploadInputId)?.click()}
-              style={{ marginBottom: 12 }}
-            >
-              {uploadBusy ? 'Uploading…' : 'Add photo'}
-            </button>
+                <input
+                  id={uploadInputId}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const list = e.target.files;
+                    if (list?.length) void uploadFiles(list);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  disabled={uploadBusy}
+                  onClick={() => document.getElementById(uploadInputId)?.click()}
+                  style={{ marginBottom: 12 }}
+                >
+                  {uploadBusy ? 'Uploading…' : 'Add photo'}
+                </button>
+              </>
+            ) : null}
 
             {imagesLoading ? (
               <p className="table-empty">Loading photos…</p>
@@ -709,17 +868,32 @@ export function GlobalFarmProfilePage() {
                 {images.map((img) => (
                   <div key={img.id} style={{ width: 128 }}>
                     {img.url ? (
-                      <img
-                        src={img.url}
-                        alt={img.fileName || selectedFarm.farmName}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openImagePreview(img.url, img.fileName || selectedFarm.farmName)
+                        }
+                        title="Open image"
                         style={{
+                          padding: 0,
+                          border: 'none',
+                          background: 'transparent',
                           width: '100%',
-                          height: 96,
-                          objectFit: 'cover',
-                          borderRadius: 6,
-                          border: '1px solid var(--color-border)',
+                          cursor: 'zoom-in',
                         }}
-                      />
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.fileName || selectedFarm.farmName}
+                          style={{
+                            width: '100%',
+                            height: 96,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            border: '1px solid var(--color-border)',
+                          }}
+                        />
+                      </button>
                     ) : (
                       <div
                         style={{
@@ -772,6 +946,69 @@ export function GlobalFarmProfilePage() {
         onConfirm={() => void confirmDelete()}
         onCancel={() => !deleting && setDeleteTarget(null)}
       />
+      <ConfirmDialog
+        open={blockDeleteTargetId !== null}
+        title="Are you sure you want to delete?"
+        message="This processing block will be removed."
+        confirmLabel="Delete block"
+        variant="danger"
+        onConfirm={confirmRemoveProcessingBlock}
+        onCancel={() => setBlockDeleteTargetId(null)}
+      />
+      {previewImage ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.78)',
+            zIndex: 1200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.25rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '95vw',
+              maxHeight: '92vh',
+              width: 'fit-content',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 10,
+              boxShadow: 'var(--shadow-lg)',
+              padding: 12,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setPreviewImage(null)}
+              >
+                Close
+              </button>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.alt}
+              style={{
+                maxWidth: '92vw',
+                maxHeight: '80vh',
+                width: 'auto',
+                height: 'auto',
+                display: 'block',
+                borderRadius: 8,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

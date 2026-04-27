@@ -3,7 +3,7 @@
  * Opens from Logistics table to show one company's details, content, and images.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
@@ -22,6 +22,7 @@ type LogisticsProfileRow = {
   siteType: string;
   company: string;
   country: string;
+  city: string | null;
   registrationNumber: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -44,6 +45,7 @@ function isImageAttachment(a: LogisticsAttachment): boolean {
 export function LogisticsProfilePage() {
   const { token } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlLogisticsId = searchParams.get('logisticsId');
 
@@ -239,7 +241,7 @@ export function LogisticsProfilePage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Logistics profile</h1>
+          <h1 className="page-title">Logistics Profile</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -251,11 +253,25 @@ export function LogisticsProfilePage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1 className="page-title">Logistics profile</h1>
+      <header
+        className="page-header"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Logistics Profile
+        </h1>
+        <button type="button" className="btn btn-ghost" onClick={() => navigate('/global-vendors/logistics')}>
+          Back
+        </button>
       </header>
 
-      <div className="card" style={{ marginBottom: 12 }}>
+      <div className="card" style={{ marginBottom: 12, width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <div className="card-body">
           <label className="field" style={{ marginBottom: 0, display: 'block' }}>
             <span className="field-label">Logistics company</span>
@@ -267,7 +283,7 @@ export function LogisticsProfilePage() {
                 setRowId(id);
                 setSearchParams(id ? { logisticsId: id } : {}, { replace: true });
               }}
-              style={{ maxWidth: 460 }}
+              style={{ maxWidth: '100%', width: '100%' }}
             >
               {rows.length === 0 ? (
                 <option value="">No logistics companies yet</option>
@@ -285,14 +301,14 @@ export function LogisticsProfilePage() {
 
       {selected ? (
         <>
-          <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card" style={{ marginBottom: 12, width: '100%', maxWidth: '100%', minWidth: 0 }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Company information</h2>
+              <h2 style={{ marginTop: 0 }}>Company Information</h2>
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 10,
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))',
+                  gap: '0.65rem',
                 }}
               >
                 <div>
@@ -308,6 +324,9 @@ export function LogisticsProfilePage() {
                   <strong>Country:</strong> {selected.country}
                 </div>
                 <div>
+                  <strong>City:</strong> {selected.city?.trim() ? selected.city : '—'}
+                </div>
+                <div>
                   <strong>Registration #:</strong> {selected.registrationNumber || '—'}
                 </div>
                 <div>
@@ -320,9 +339,9 @@ export function LogisticsProfilePage() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Content and images</h2>
+              <h2 style={{ marginTop: 0 }}>Content and Images</h2>
 
               <label className="field">
                 <span className="field-label">Content</span>

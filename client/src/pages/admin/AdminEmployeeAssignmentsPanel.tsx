@@ -4,7 +4,6 @@
  * B) Quality Engineer → Buyer (QE derives suppliers from Buyer → Suppliers)
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
 
@@ -41,8 +40,8 @@ interface UserRow {
   employeeAssignedSupplierIds?: string[];
   // QE → Buyers
   qeAssignedBuyerIds?: string[];
-  // Quality Manager → Quality Engineers
-  qmAssignedQeIds?: string[];
+  // Sourcing Director → staff
+  sourcingDirectorAssignedStaffIds?: string[];
 }
 
 function formatRoleLabel(role: string): string {
@@ -100,7 +99,6 @@ export function AdminEmployeeAssignmentsPanel({
   toast,
   globalSupplyEmployeeRosterMode = false,
   canEditStaffRoster = false,
-  employeeProfilePathPrefix = '/global-vendors/employee-profile',
 }: {
   token: string | null;
   toast: ToastApi;
@@ -108,8 +106,6 @@ export function AdminEmployeeAssignmentsPanel({
   globalSupplyEmployeeRosterMode?: boolean;
   /** Only Admin may edit Country, Responsibilities, Rate, Notes (server enforces Admin on PATCH). */
   canEditStaffRoster?: boolean;
-  /** Base path without trailing slash; name links go to `${prefix}/${userId}`. */
-  employeeProfilePathPrefix?: string;
 }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -130,8 +126,6 @@ export function AdminEmployeeAssignmentsPanel({
 
   const [qeId, setQeId] = useState('');
   const [qeBuyerId, setQeBuyerId] = useState('');
-  const [qmId, setQmId] = useState('');
-  const [qmQeId, setQmQeId] = useState('');
 
   const loadDefaultPanel = useCallback(async () => {
     if (!token) return;
@@ -186,8 +180,19 @@ export function AdminEmployeeAssignmentsPanel({
 
   const employeeContractors = useMemo(() => {
     const pool = globalSupplyEmployeeRosterMode ? rosterUsers : users;
+    const sourcingDirectorStaffIds = new Set<string>();
+    for (const u of pool) {
+      if (!u.roleNames.includes('SourcingDirector')) continue;
+      for (const sid of u.sourcingDirectorAssignedStaffIds ?? []) sourcingDirectorStaffIds.add(sid);
+    }
     return pool
       .filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
+      .filter((u) => {
+        const hasGlobalSupplyRole = u.roleNames.includes('SourcingDirector') || u.roleNames.includes('CommodityBuyer');
+        const inGlobalSupplyAssignments = sourcingDirectorStaffIds.has(u.id);
+        if (globalSupplyEmployeeRosterMode) return hasGlobalSupplyRole || inGlobalSupplyAssignments;
+        return !hasGlobalSupplyRole && !inGlobalSupplyAssignments;
+      })
       .sort((a, b) => {
         const na = (a.name?.trim() || a.email).toLocaleLowerCase();
         const nb = (b.name?.trim() || b.email).toLocaleLowerCase();
@@ -196,7 +201,6 @@ export function AdminEmployeeAssignmentsPanel({
   }, [globalSupplyEmployeeRosterMode, rosterUsers, users]);
   const buyers = useMemo(() => users.filter((u) => u.roleNames.includes('Buyer')), [users]);
   const qes = useMemo(() => users.filter((u) => u.roleNames.includes('QualityEngineer')), [users]);
-  const qualityManagers = useMemo(() => users.filter((u) => u.roleNames.includes('QualityManager')), [users]);
 
   const buyerSupplierIdsByBuyerId = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -270,39 +274,6 @@ export function AdminEmployeeAssignmentsPanel({
     try {
       await apiJson(`/qe-buyers/${qId}/${bId}`, { token, method: 'DELETE' });
       toast.info('QE → Buyer assignment removed');
-      await loadDefaultPanel();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Remove failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const assignQmQe = async () => {
-    if (!token || !qmId || !qmQeId) return;
-    setBusy(true);
-    try {
-      await apiJson('/qm-qes', {
-        token,
-        method: 'POST',
-        body: JSON.stringify({ qualityManagerId: qmId, qualityEngineerId: qmQeId }),
-      });
-      toast.success('Quality Manager → Quality Engineer assignment created');
-      setQmQeId('');
-      await loadDefaultPanel();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Assignment failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeQmQe = async (managerId: string, engineerId: string) => {
-    if (!token) return;
-    setBusy(true);
-    try {
-      await apiJson(`/qm-qes/${managerId}/${engineerId}`, { token, method: 'DELETE' });
-      toast.info('Quality Manager → Quality Engineer assignment removed');
       await loadDefaultPanel();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Remove failed');
@@ -393,7 +364,7 @@ export function AdminEmployeeAssignmentsPanel({
     return (
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Employees & contractors</h2>
+          <h2 style={{ marginTop: 0 }}>Employees & Contractors</h2>
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
@@ -421,7 +392,7 @@ export function AdminEmployeeAssignmentsPanel({
                       <tr key={u.id}>
                         <td>
                           <div style={{ fontWeight: 600 }}>
-                            <Link to={`${employeeProfilePathPrefix}/${u.id}`}>{u.name?.trim() || u.email}</Link>
+                            {u.name?.trim() || u.email}
                           </div>
                           {u.name?.trim() ? (
                             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{u.email}</div>
@@ -647,7 +618,7 @@ export function AdminEmployeeAssignmentsPanel({
                       return (
                         <tr key={a.id}>
                           <td>
-                            <Link to={`${employeeProfilePathPrefix}/${a.id}`}>{a.name?.trim() ? a.name : a.email}</Link>
+                            {a.name?.trim() ? a.name : a.email}
                           </td>
                           <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
                           <td>{formatCountriesCell(a)}</td>
@@ -664,7 +635,7 @@ export function AdminEmployeeAssignmentsPanel({
                           {idx === 0 ? (
                             <>
                               <td rowSpan={supplierIds.length}>
-                                <Link to={`${employeeProfilePathPrefix}/${a.id}`}>{a.name?.trim() ? a.name : a.email}</Link>
+                                {a.name?.trim() ? a.name : a.email}
                               </td>
                               <td rowSpan={supplierIds.length}>{a.isContractor ? 'Contractor' : 'Employee'}</td>
                               <td rowSpan={supplierIds.length}>{formatCountriesCell(a)}</td>
@@ -770,88 +741,6 @@ export function AdminEmployeeAssignmentsPanel({
                           </td>
                           <td>
                             <button type="button" className="btn btn-ghost" onClick={() => void removeQeBuyer(q.id, bid)} disabled={busy}>
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Quality Manager → Quality Engineer</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Quality Manager</label>
-              <select className="input" value={qmId} onChange={(e) => setQmId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select Quality Manager</option>
-                {qualityManagers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name?.trim() ? `${m.name} (${m.email})` : m.email}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Quality Engineer</label>
-              <select className="input" value={qmQeId} onChange={(e) => setQmQeId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select Quality Engineer</option>
-                {qes.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.name?.trim() ? `${q.name} (${q.email})` : q.email}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="button" className="btn btn-primary" onClick={() => void assignQmQe()} disabled={busy || !qmId || !qmQeId}>
-              Assign
-            </button>
-          </div>
-
-          <div className="table-wrap" style={{ marginTop: '1rem' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Quality Manager</th>
-                  <th>Assigned Quality Engineers</th>
-                  <th style={{ width: 100 }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {qualityManagers.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="table-empty">
-                      No Quality Managers. Create a user with Quality Manager role.
-                    </td>
-                  </tr>
-                ) : (
-                  qualityManagers.flatMap((m) => {
-                    const qeIds = m.qmAssignedQeIds ?? [];
-                    if (qeIds.length === 0) {
-                      return (
-                        <tr key={m.id}>
-                          <td>{m.name?.trim() ? m.name : m.email}</td>
-                          <td colSpan={2} className="table-empty">
-                            None
-                          </td>
-                        </tr>
-                      );
-                    }
-                    return qeIds.map((qid) => {
-                      const qe = qes.find((x) => x.id === qid);
-                      return (
-                        <tr key={`${m.id}-${qid}`}>
-                          <td>{m.name?.trim() ? m.name : m.email}</td>
-                          <td>{qe?.name?.trim() ? `${qe.name} (${qe.email})` : qe?.email ?? qid}</td>
-                          <td>
-                            <button type="button" className="btn btn-ghost" onClick={() => void removeQmQe(m.id, qid)} disabled={busy}>
                               Remove
                             </button>
                           </td>

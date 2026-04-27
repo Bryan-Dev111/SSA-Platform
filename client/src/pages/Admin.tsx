@@ -9,13 +9,13 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   AdminAuditTypesPanel,
   AdminBuyersSuppliersPanel,
-  AdminExpensesPanel,
   // (Employee assignments lives in separate file)
   AdminPermissionsPanel,
 } from './admin/AdminDay9Panels';
 import { AdminAlertPreferencesPanel } from './admin/AdminAlertPreferencesPanel';
 import { LegalAdminEditor } from './admin/LegalAdminEditor';
 import { AdminCommandMediaPanel } from './admin/AdminCommandMediaPanel';
+import { GlobalSupplyMasterDataPanel } from './globalVendors/GlobalSupplyMasterDataPanel';
 
 type Tab =
   | 'commodity'
@@ -23,7 +23,7 @@ type Tab =
   | 'carRootCause'
   | 'disposition'
   | 'auditTypes'
-  | 'expenses'
+  | 'expenseTypes'
   | 'commandMedia'
   | 'users'
   | 'employees'
@@ -389,14 +389,14 @@ export function Admin() {
             ['users', 'Users'],
             ['employees', 'Employees'],
             ['buyersSuppliers', 'Buyers & Suppliers'],
-            ['commodity', 'Commodity types'],
-            ['defect', 'Defect codes'],
-            ['carRootCause', 'CAR root cause codes'],
-            ['disposition', 'Disposition codes'],
-            ['auditTypes', 'Audit types'],
-            ['expenses', 'Expenses'],
+            ['commodity', 'Commodity Types'],
+            ['defect', 'Defect Codes'],
+            ['carRootCause', 'CAR Root Cause Codes'],
+            ['disposition', 'Disposition Codes'],
+            ['auditTypes', 'Audit Types'],
+            ['expenseTypes', 'Expense Types'],
             ['commandMedia', 'Command Media'],
-            ['alertPreferences', 'Email alerts'],
+            ['alertPreferences', 'Email Alerts'],
             ['permissions', 'Permissions'],
             ['legal', 'Legal (Terms & Privacy)'],
           ] as const
@@ -413,7 +413,15 @@ export function Admin() {
       </div>
 
       {tab === 'auditTypes' && <AdminAuditTypesPanel token={token} toast={toast} />}
-      {tab === 'expenses' && <AdminExpensesPanel token={token} toast={toast} />}
+      {tab === 'expenseTypes' && (
+        <GlobalSupplyMasterDataPanel
+          token={token}
+          toast={toast}
+          title="Expense types"
+          noun="Expense Type"
+          endpoint="/global-supply-options/expense-types"
+        />
+      )}
       {tab === 'commandMedia' && <AdminCommandMediaPanel token={token} toast={toast} />}
       {tab === 'users' && (
         <AdminBuyersSuppliersPanel
@@ -451,10 +459,7 @@ export function Admin() {
       {tab === 'legal' && (
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Legal content</h2>
-            <p style={{ marginTop: 0, marginBottom: '0.75rem', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-              Update the Terms and Conditions and Privacy Policy shown on the login page.
-            </p>
+            <h2 style={{ marginTop: 0 }}>Legal Content</h2>
             <LegalAdminEditor token={token} />
           </div>
         </div>

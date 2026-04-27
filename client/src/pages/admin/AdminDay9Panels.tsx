@@ -216,11 +216,24 @@ interface ExpenseRow {
 interface ExpenseOpenPoOption {
   id: string;
   code: string;
+  country: string | null;
 }
 
 interface ExpenseCountryOption {
   id: string;
   name: string;
+}
+
+interface ExpenseTypeOption {
+  id: string;
+  name: string;
+}
+
+interface ExpenseProjectOption {
+  id: string;
+  projectCode: string;
+  companyName: string;
+  status: string;
 }
 
 function expenseDateInputValue(iso: string | undefined): string {
@@ -253,12 +266,15 @@ export function AdminExpensesPanel({
   projectFilter = null,
   fixedTypeProject = null,
   fixedProject = null,
+  excludedProjects = [],
   countryOptionsEndpoint = null,
   hideProject = false,
   openExpenseTracking = false,
+  showExpenseIdColumn = openExpenseTracking,
   showPurchaseOrderPicker = false,
   canCloseExpense = false,
   canEditExpense = true,
+  canDeleteExpense = false,
 }: {
   token: string | null;
   toast: ToastApi;
@@ -268,18 +284,24 @@ export function AdminExpensesPanel({
   fixedTypeProject?: { type: string; project: string } | null;
   /** When set, add form locks Project only, but Type remains editable. */
   fixedProject?: string | null;
+  /** Exclude rows with these project names (case-insensitive). */
+  excludedProjects?: string[];
   /** Optional endpoint that provides country options as { list: { id, name }[] }. */
   countryOptionsEndpoint?: string | null;
   /** Hide project field/column in contexts where project is fixed and should not be shown. */
   hideProject?: boolean;
   /** Global Supply: show Open expense total, Expense ID column, and Close (Admin-only). */
   openExpenseTracking?: boolean;
+  /** Show Expense ID (`EXP-00000`) column even when open-expense tracking is hidden. */
+  showExpenseIdColumn?: boolean;
   /** Global Supply: PO dropdown (None + open POs only) on add/edit and table column. */
   showPurchaseOrderPicker?: boolean;
   /** Whether the current user may close expenses (typically Admin). */
   canCloseExpense?: boolean;
   /** Whether the current user may add/edit expense rows and manage expense attachments. */
   canEditExpense?: boolean;
+  /** Permanently delete a row (Admin only); shows a confirmation dialog. */
+  canDeleteExpense?: boolean;
 }) {
   const [list, setList] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -291,11 +313,16 @@ export function AdminExpensesPanel({
   const [paymentMethod, setPaymentMethod] = useState('');
   const [country, setCountry] = useState('');
   const [countryOptions, setCountryOptions] = useState<ExpenseCountryOption[]>([]);
+  const [expenseTypeOptions, setExpenseTypeOptions] = useState<string[]>([]);
+  const [projectOptions, setProjectOptions] = useState<ExpenseProjectOption[]>([]);
   const [openPurchaseOrders, setOpenPurchaseOrders] = useState<ExpenseOpenPoOption[]>([]);
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [addAttachmentFile, setAddAttachmentFile] = useState<File | null>(null);
   const [attachmentBusyId, setAttachmentBusyId] = useState<string | null>(null);
   const [closeBusyId, setCloseBusyId] = useState<string | null>(null);
+  const [closeConfirmExpense, setCloseConfirmExpense] = useState<ExpenseRow | null>(null);
+  const [deleteConfirmExpense, setDeleteConfirmExpense] = useState<ExpenseRow | null>(null);
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     type: string;
@@ -316,10 +343,15 @@ export function AdminExpensesPanel({
     country: '',
     purchaseOrderId: '',
   });
-  const displayedList = useMemo(
-    () => (projectFilter ? list.filter((r) => r.project === projectFilter) : list),
-    [list, projectFilter]
+  const normalizedExcludedProjects = useMemo(
+    () => excludedProjects.map((p) => p.trim().toLowerCase()).filter(Boolean),
+    [excludedProjects]
   );
+  const displayedList = useMemo(() => {
+    const filteredByProject = projectFilter ? list.filter((r) => r.project === projectFilter) : list;
+    if (normalizedExcludedProjects.length === 0) return filteredByProject;
+    return filteredByProject.filter((r) => !normalizedExcludedProjects.includes((r.project ?? '').trim().toLowerCase()));
+  }, [list, projectFilter, normalizedExcludedProjects]);
   const [sort, setSort] = useState<{ key: ExpenseSortKey | null; dir: SortDir }>({
     key: null,
     dir: 'asc',
@@ -334,10 +366,20 @@ export function AdminExpensesPanel({
       base.unshift({
         id: row.purchaseOrderId,
         code: `${row.purchaseOrder?.code ?? 'PO'} (closed)`,
+        country: row.country ?? null,
       });
     }
     return base;
   }, [showPurchaseOrderPicker, openPurchaseOrders, editId, list]);
+
+  const openPoCountryById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const o of openPurchaseOrders) map.set(o.id, o.country ?? null);
+    for (const o of editPurchaseOrderSelectOptions) {
+      if (!map.has(o.id)) map.set(o.id, o.country ?? null);
+    }
+    return map;
+  }, [openPurchaseOrders, editPurchaseOrderSelectOptions]);
 
   const sortedDisplayedList = useMemo(() => {
     const rows = [...displayedList];
@@ -401,7 +443,31 @@ export function AdminExpensesPanel({
     [displayedList, openExpenseTracking]
   );
 
-  const expenseTableColSpan = (hideProject ? 8 : 9) + (openExpenseTracking ? 2 : 0) + (showPurchaseOrderPicker ? 1 : 0);
+  const projectSelectOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    projectOptions
+      .filter((p) => (p.status ?? '').trim().toLowerCase() === 'active')
+      .forEach((p) => {
+        const key = p.projectCode.trim();
+        if (!key) return;
+        options.set(key, `${p.projectCode} — ${p.companyName}`);
+      });
+    list.forEach((row) => {
+      const key = row.project.trim();
+      if (!key || options.has(key)) return;
+      options.set(key, key);
+    });
+    const next = [...options.entries()].map(([value, label]) => ({ value, label }));
+    next.sort((a, b) => a.label.localeCompare(b.label));
+    return next;
+  }, [projectOptions, list]);
+
+  const expenseTableColSpan =
+    (hideProject ? 8 : 9) +
+    (showExpenseIdColumn ? 1 : 0) +
+    (openExpenseTracking ? 1 : 0) +
+    (showPurchaseOrderPicker ? 1 : 0) +
+    (canDeleteExpense ? 1 : 0);
 
   useEffect(() => {
     if (fixedTypeProject) {
@@ -429,8 +495,18 @@ export function AdminExpensesPanel({
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const r = await apiJson<{ list: ExpenseRow[] }>('/expenses', { token });
+      const [r, typeRes, projectRes] = await Promise.all([
+        apiJson<{ list: ExpenseRow[] }>('/expenses', { token }),
+        apiJson<{ list: ExpenseTypeOption[] }>('/global-supply-options/expense-types', { token }).catch(() => ({
+          list: [] as ExpenseTypeOption[],
+        })),
+        apiJson<ExpenseProjectOption[]>('/project-history', { token }).catch(() => [] as ExpenseProjectOption[]),
+      ]);
       setList(r.list);
+      setExpenseTypeOptions(
+        typeRes.list.map((row) => row.name.trim()).filter((name) => name.length > 0)
+      );
+      setProjectOptions(projectRes);
       if (showPurchaseOrderPicker) {
         try {
           const po = await apiJson<{ list: ExpenseOpenPoOption[] }>('/expenses/open-purchase-orders', { token });
@@ -441,6 +517,7 @@ export function AdminExpensesPanel({
       }
     } catch {
       setList([]);
+      setProjectOptions([]);
       toast.error('Failed to load expenses');
     }
   }, [token, toast, showPurchaseOrderPicker]);
@@ -457,6 +534,31 @@ export function AdminExpensesPanel({
     });
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [countryOptions, list]);
+
+  const countrySelectOptions = useMemo(() => {
+    const names = new Set<string>();
+    countryNameOptions.forEach((n) => names.add(n));
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [countryNameOptions]);
+
+  const expenseTypeSelectOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const n of ['Freight', 'Payroll', 'Labor', 'Samples', 'Travel', 'Other']) {
+      names.add(n);
+    }
+    for (const n of expenseTypeOptions) {
+      const trimmed = n.trim();
+      if (trimmed) names.add(trimmed);
+    }
+    for (const row of list) {
+      const trimmed = row.type.trim();
+      if (trimmed) names.add(trimmed);
+    }
+    if (type.trim()) names.add(type.trim());
+    if (editDraft.type.trim()) names.add(editDraft.type.trim());
+    if (fixedTypeProject?.type?.trim()) names.add(fixedTypeProject.type.trim());
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [expenseTypeOptions, list, type, editDraft.type, fixedTypeProject?.type]);
 
   useEffect(() => {
     load();
@@ -532,6 +634,21 @@ export function AdminExpensesPanel({
       toast.error(e instanceof Error ? e.message : 'Could not close expense');
     } finally {
       setCloseBusyId(null);
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    if (!token || !canDeleteExpense) return;
+    setDeleteBusyId(id);
+    try {
+      await apiJson(`/expenses/${id}`, { token, method: 'DELETE' });
+      toast.success('Expense deleted');
+      if (editId === id) setEditId(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not delete expense');
+    } finally {
+      setDeleteBusyId(null);
     }
   };
 
@@ -684,12 +801,8 @@ export function AdminExpensesPanel({
       return;
     }
     const rows: ExportRow[] = sortedDisplayedList.map((r) => ({
-      ...(openExpenseTracking
-        ? {
-            'Expense ID': r.code ?? '',
-            Status: r.status ?? 'Open',
-          }
-        : {}),
+      ...(showExpenseIdColumn ? { 'Expense ID': r.code ?? '' } : {}),
+      ...(openExpenseTracking ? { Status: r.status ?? 'Open' } : {}),
       Type: r.type,
       Description: r.description,
       Project: r.project,
@@ -737,12 +850,19 @@ export function AdminExpensesPanel({
         >
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Type</label>
-            <input
+            <select
               className="input"
               value={type}
               onChange={(e) => setType(e.target.value)}
               disabled={!!fixedTypeProject || !canEditExpense}
-            />
+            >
+              <option value="">Select type</option>
+              {expenseTypeSelectOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Description</label>
@@ -751,12 +871,19 @@ export function AdminExpensesPanel({
           {!hideProject && (
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">Project</label>
-              <input
+              <select
                 className="input"
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
                 disabled={!!fixedTypeProject || !!fixedProject || !canEditExpense}
-              />
+              >
+                <option value="">Select project</option>
+                {projectSelectOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
           <div className="input-group" style={{ marginBottom: 0 }}>
@@ -785,21 +912,28 @@ export function AdminExpensesPanel({
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
             <label className="input-label">Country</label>
-            <input
-              className="input"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              list={countryOptionsEndpoint ? 'expense-country-options' : undefined}
-              placeholder={countryOptionsEndpoint ? 'Select or type country' : undefined}
-              disabled={!canEditExpense}
-            />
             {countryOptionsEndpoint ? (
-              <datalist id="expense-country-options">
-                {countryNameOptions.map((name) => (
-                  <option key={name} value={name} />
+              <select
+                className="input"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                disabled={!canEditExpense}
+              >
+                <option value="">Select country</option>
+                {countrySelectOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
                 ))}
-              </datalist>
-            ) : null}
+              </select>
+            ) : (
+              <input
+                className="input"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                disabled={!canEditExpense}
+              />
+            )}
           </div>
           {showPurchaseOrderPicker && (
             <div className="input-group" style={{ marginBottom: 0 }}>
@@ -807,7 +941,14 @@ export function AdminExpensesPanel({
               <select
                 className="input"
                 value={purchaseOrderId}
-                onChange={(e) => setPurchaseOrderId(e.target.value)}
+                onChange={(e) => {
+                  const nextPoId = e.target.value;
+                  setPurchaseOrderId(nextPoId);
+                  const poCountry = openPoCountryById.get(nextPoId);
+                  if (nextPoId) {
+                    setCountry(poCountry ?? '');
+                  }
+                }}
                 disabled={!canEditExpense}
               >
                 <option value="">None</option>
@@ -857,7 +998,7 @@ export function AdminExpensesPanel({
           <table className="table">
             <thead>
               <tr>
-                {openExpenseTracking && (
+                {showExpenseIdColumn && (
                   <SortableTh
                     label="Expense ID"
                     columnKey="code"
@@ -928,6 +1069,7 @@ export function AdminExpensesPanel({
                 />
                 <th style={{ minWidth: 200 }}>Attachment</th>
                 {openExpenseTracking && <th style={{ width: 120 }}>Close</th>}
+                {canDeleteExpense && <th style={{ width: 100 }}>Delete</th>}
                 <th style={{ width: 170 }}>Actions</th>
               </tr>
             </thead>
@@ -939,19 +1081,31 @@ export function AdminExpensesPanel({
                   </td>
                 </tr>
               ) : (
-                sortedDisplayedList.map((row) => (
-                  <tr key={row.id}>
-                    {openExpenseTracking && (
+                sortedDisplayedList.map((row) => {
+                  const isClosedExpense = (row.status ?? 'Open').trim().toLowerCase() === 'closed';
+                  return (
+                  <tr
+                    key={row.id}
+                    style={isClosedExpense ? { backgroundColor: 'var(--color-surface-2, #f3f4f6)' } : undefined}
+                  >
+                    {showExpenseIdColumn && (
                       <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{row.code ?? '—'}</td>
                     )}
                     <td>
                       {editId === row.id ? (
-                        <input
+                        <select
                           className="input"
                           value={editDraft.type}
                           onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
-                          disabled={!!fixedTypeProject}
-                        />
+                          disabled={!!fixedTypeProject || !canEditExpense}
+                        >
+                          <option value="">Select type</option>
+                          {expenseTypeSelectOptions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         row.type
                       )}
@@ -977,12 +1131,19 @@ export function AdminExpensesPanel({
                     {!hideProject && (
                       <td>
                         {editId === row.id ? (
-                          <input
+                          <select
                             className="input"
                             value={editDraft.project}
                             onChange={(e) => setEditDraft((d) => ({ ...d, project: e.target.value }))}
                             disabled={!!fixedTypeProject || !!fixedProject}
-                          />
+                          >
+                            <option value="">Select project</option>
+                            {projectSelectOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           row.project
                         )}
@@ -994,7 +1155,15 @@ export function AdminExpensesPanel({
                           <select
                             className="input"
                             value={editDraft.purchaseOrderId}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, purchaseOrderId: e.target.value }))}
+                            onChange={(e) => {
+                              const nextPoId = e.target.value;
+                              const poCountry = openPoCountryById.get(nextPoId) ?? '';
+                              setEditDraft((d) => ({
+                                ...d,
+                                purchaseOrderId: nextPoId,
+                                country: nextPoId ? poCountry : d.country,
+                              }));
+                            }}
                             disabled={!canEditExpense}
                           >
                             <option value="">None</option>
@@ -1054,13 +1223,26 @@ export function AdminExpensesPanel({
                     </td>
                     <td>
                       {editId === row.id ? (
-                        <input
-                          className="input"
-                          value={editDraft.country}
-                          onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
-                          list={countryOptionsEndpoint ? 'expense-country-options' : undefined}
-                          placeholder={countryOptionsEndpoint ? 'Select or type country' : undefined}
-                        />
+                        countryOptionsEndpoint ? (
+                          <select
+                            className="input"
+                            value={editDraft.country}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          >
+                            <option value="">Select country</option>
+                            {countrySelectOptions.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            className="input"
+                            value={editDraft.country}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          />
+                        )
                       ) : (
                         row.country || '—'
                       )}
@@ -1117,11 +1299,31 @@ export function AdminExpensesPanel({
                               !canCloseExpense || closeBusyId === row.id || editId === row.id || busy || attachmentBusyId === row.id
                             }
                             title={!canCloseExpense ? 'Only administrators can close expenses' : undefined}
-                            onClick={() => void closeExpense(row.id)}
+                            onClick={() => setCloseConfirmExpense(row)}
                           >
                             {closeBusyId === row.id ? '…' : 'Close'}
                           </button>
                         )}
+                      </td>
+                    )}
+                    {canDeleteExpense && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-ghost"
+                          style={{ color: 'var(--color-danger, #b91c1c)' }}
+                          disabled={
+                            deleteBusyId === row.id ||
+                            closeBusyId === row.id ||
+                            editId === row.id ||
+                            busy ||
+                            attachmentBusyId === row.id
+                          }
+                          title="Permanently remove this expense (admin only)"
+                          onClick={() => setDeleteConfirmExpense(row)}
+                        >
+                          {deleteBusyId === row.id ? '…' : 'Delete'}
+                        </button>
                       </td>
                     )}
                     <td>
@@ -1141,12 +1343,50 @@ export function AdminExpensesPanel({
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(closeConfirmExpense)}
+        title="Close expense?"
+        message={
+          closeConfirmExpense?.code
+            ? `Are you sure you want to close ${closeConfirmExpense.code}?`
+            : 'Are you sure you want to close this expense?'
+        }
+        confirmLabel={closeBusyId ? 'Closing…' : 'Close expense'}
+        onCancel={() => {
+          if (!closeBusyId) setCloseConfirmExpense(null);
+        }}
+        onConfirm={async () => {
+          if (!closeConfirmExpense) return;
+          await closeExpense(closeConfirmExpense.id);
+          setCloseConfirmExpense(null);
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteConfirmExpense)}
+        title="Delete expense?"
+        message={
+          deleteConfirmExpense?.code
+            ? `Are you sure you want to permanently delete ${deleteConfirmExpense.code}? This cannot be undone.`
+            : 'Are you sure you want to permanently delete this expense? This cannot be undone.'
+        }
+        confirmLabel={deleteBusyId ? 'Deleting…' : 'Delete expense'}
+        variant="danger"
+        onCancel={() => {
+          if (!deleteBusyId) setDeleteConfirmExpense(null);
+        }}
+        onConfirm={async () => {
+          if (!deleteConfirmExpense) return;
+          await deleteExpense(deleteConfirmExpense.id);
+          setDeleteConfirmExpense(null);
+        }}
+      />
     </div>
   );
 }
@@ -1193,7 +1433,6 @@ const USER_ROLE_OPTIONS = [
   'Admin',
   'Buyer',
   'Supplier',
-  'Viewer',
   'QualityEngineer',
   'QualityManager',
   'Auditor',
@@ -1232,11 +1471,12 @@ const ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN = new Set([
 
 /** Role rows omitted from Global Supply Admin → Permissions matrix (main SSA roles + Buyer; GS uses CommodityBuyer). */
 const PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES = new Set([
+  'Auditor',
   'Buyer',
+  'Inspector',
   'QualityEngineer',
   'QualityManager',
   'Supplier',
-  'Viewer',
 ]);
 
 /** Role rows omitted from main Admin → Permissions matrix (Global Supply product roles). */
@@ -1303,7 +1543,7 @@ export function AdminBuyersSuppliersPanel({
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
-  const [newUserRole, setNewUserRole] = useState<string>('Viewer');
+  const [newUserRole, setNewUserRole] = useState<string>('Buyer');
   const [newUserIsEmployee, setNewUserIsEmployee] = useState<'Yes' | 'No' | 'Contractor'>('No');
   const [newUserEmploymentStatus, setNewUserEmploymentStatus] = useState<'Active' | 'Inactive'>('Active');
   const [newUserHourlyRate, setNewUserHourlyRate] = useState('');
@@ -1436,6 +1676,24 @@ export function AdminBuyersSuppliersPanel({
     if (usersOnlyEmployees) return 9;
     return 6;
   }, [globalSupplyUsersMode, usersOnlyEmployees]);
+  const [userSort, setUserSort] = useState<{ key: 'name' | 'email' | 'employee' | 'role' | null; dir: SortDir }>({
+    key: null,
+    dir: 'asc',
+  });
+  const sortedVisibleUsers = useMemo(() => {
+    const rows = [...visibleUsers];
+    const key = userSort.key;
+    if (!key) return rows;
+    const employeeLabel = (u: UserRow) => (u.isContractor ? 'Contractor' : u.isEmployee ? 'Yes' : 'No');
+    const roleLabel = (u: UserRow) => u.roleNames.map(formatUserRoleLabel).join(', ');
+    rows.sort((a, b) => {
+      if (key === 'name') return cmpStr(a.name?.trim() || '', b.name?.trim() || '', userSort.dir);
+      if (key === 'email') return cmpStr(a.email, b.email, userSort.dir);
+      if (key === 'employee') return cmpStr(employeeLabel(a), employeeLabel(b), userSort.dir);
+      return cmpStr(roleLabel(a), roleLabel(b), userSort.dir);
+    });
+    return rows;
+  }, [visibleUsers, userSort]);
 
   const assign = async () => {
     if (!token || !buyerId || !supplierId) return;
@@ -1541,7 +1799,7 @@ export function AdminBuyersSuppliersPanel({
       setNewUserPassword('');
       setNewUserFirstName('');
       setNewUserLastName('');
-      setNewUserRole('Viewer');
+      setNewUserRole('Buyer');
       setNewUserIsEmployee('No');
       setNewUserEmploymentStatus('Active');
       setNewUserHourlyRate('');
@@ -1715,7 +1973,7 @@ export function AdminBuyersSuppliersPanel({
       {showCreateUser && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Create user</h2>
+            <h2 style={{ marginTop: 0 }}>Create User</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
               <div className="input-group">
                 <label className="input-label">First Name</label>
@@ -1803,7 +2061,7 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Create supplier</h2>
+            <h2 style={{ marginTop: 0 }}>Create Supplier</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
             <div className="input-group">
               <label className="input-label">Name *</label>
@@ -1879,7 +2137,7 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Suppliers (edit / delete)</h2>
+            <h2 style={{ marginTop: 0 }}>Suppliers</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -2079,13 +2337,37 @@ export function AdminBuyersSuppliersPanel({
               <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Employee</th>
+                  <SortableTh
+                    label="Name"
+                    columnKey="name"
+                    activeKey={userSort.key}
+                    dir={userSort.dir}
+                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                  />
+                  <SortableTh
+                    label="Email"
+                    columnKey="email"
+                    activeKey={userSort.key}
+                    dir={userSort.dir}
+                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                  />
+                  <SortableTh
+                    label="Employee"
+                    columnKey="employee"
+                    activeKey={userSort.key}
+                    dir={userSort.dir}
+                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                  />
                   {globalSupplyUsersMode ? (
                     <>
                       <th>Country</th>
-                      <th>Role</th>
+                      <SortableTh
+                        label="Role"
+                        columnKey="role"
+                        activeKey={userSort.key}
+                        dir={userSort.dir}
+                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                      />
                       <th>Password</th>
                     </>
                   ) : (
@@ -2094,21 +2376,27 @@ export function AdminBuyersSuppliersPanel({
                       {usersOnlyEmployees && <th>Hourly rate (USD)</th>}
                       {usersOnlyEmployees && <th>Country</th>}
                       <th>Password</th>
-                      <th>Role</th>
+                      <SortableTh
+                        label="Role"
+                        columnKey="role"
+                        activeKey={userSort.key}
+                        dir={userSort.dir}
+                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                      />
                     </>
                   )}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.length === 0 ? (
+                {sortedVisibleUsers.length === 0 ? (
                   <tr>
                     <td colSpan={userTableColSpan} className="table-empty">
                       No users yet.
                     </td>
                   </tr>
                 ) : (
-                  visibleUsers.map((u) => (
+                  sortedVisibleUsers.map((u) => (
                     <tr key={u.id}>
                       <td>
                         {editUser?.id === u.id ? (
@@ -2169,7 +2457,7 @@ export function AdminBuyersSuppliersPanel({
                                 className="input"
                                 value={
                                   editUser.roleNames[0] ??
-                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Viewer')
+                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Buyer')
                                 }
                                 onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
                               >
@@ -2280,7 +2568,7 @@ export function AdminBuyersSuppliersPanel({
                                 className="input"
                                 value={
                                   editUser.roleNames[0] ??
-                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Viewer')
+                                  (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Buyer')
                                 }
                                 onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
                               >
@@ -2325,7 +2613,7 @@ export function AdminBuyersSuppliersPanel({
                                   ...u,
                                   roleNames: u.roleNames.length
                                     ? [...u.roleNames]
-                                    : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Viewer'],
+                                    : [globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Buyer'],
                                 });
                                 setEditUserPassword('');
                               }}
@@ -2358,7 +2646,7 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Assign supplier → buyer</h2>
+            <h2 style={{ marginTop: 0 }}>Assign Supplier → Buyer</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">Buyer</label>
@@ -2393,7 +2681,7 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Buyer assignments</h2>
+            <h2 style={{ marginTop: 0 }}>Buyer Assignments</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -2453,7 +2741,7 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Link supplier user account</h2>
+            <h2 style={{ marginTop: 0 }}>Link Supplier User Account</h2>
             <p style={{ marginTop: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
               Linking replaces any existing supplier-user link automatically. Disconnect only removes the link; it does not delete users or suppliers.
             </p>

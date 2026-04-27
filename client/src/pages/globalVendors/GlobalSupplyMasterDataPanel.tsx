@@ -18,7 +18,10 @@ interface GlobalSupplyMasterDataPanelProps {
   toast: ToastApi;
   title: string;
   noun: string;
-  endpoint: '/global-supply-options/crops' | '/global-supply-options/countries';
+  endpoint:
+    | '/global-supply-options/crops'
+    | '/global-supply-options/countries'
+    | '/global-supply-options/expense-types';
 }
 
 export function GlobalSupplyMasterDataPanel({

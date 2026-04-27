@@ -78,33 +78,10 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Email alerts (Global Supply POs)</h2>
-        <p style={{ color: 'var(--color-text-muted)' }}>
-          Users with the Sourcing Director role receive an email when a purchase order in Global Supply is opened or
-          closed, if the PO&apos;s country matches their Employee Assignments (assigned countries plus legacy profile
-          country). Country on the PO is taken from the linked farm when present; otherwise from the PO destination
-          country field.
-        </p>
+        <h2 style={{ marginTop: 0 }}>Email Alerts</h2>
         {error && (
           <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
             {error}
-          </div>
-        )}
-        {data && (
-          <div
-            role="status"
-            style={{
-              marginBottom: '0.75rem',
-              padding: '0.75rem 1rem',
-              borderRadius: 8,
-              border: '1px solid var(--color-border)',
-              background: data.smtpConfigured ? 'var(--color-bg-subtle, #f4f4f5)' : undefined,
-            }}
-            className={data.smtpConfigured ? undefined : 'alert-error'}
-          >
-            {data.smtpConfigured
-              ? 'SMTP is configured; delivery depends on server mail settings.'
-              : 'SMTP is not fully configured on the server. Emails may not send until mail environment variables are set.'}
           </div>
         )}
         <div style={{ marginBottom: '0.75rem' }}>

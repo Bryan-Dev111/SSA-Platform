@@ -1,7 +1,7 @@
 /**
  * CAR Record: form (CAR #, Supplier, Audit #, Finding #, Status; then Severity, CAR Owner, Target Completion Date,
  * Summary, Defect Code, Discrepancy, Containment, Root Cause Code, Occurrence/Escape Root Cause, Corrective Action,
- * VOE, Closing Comments); status history; workflow Save (DRAFT → RCCA), Process, Reverse, Approve, Reject.
+ * VOE, Disposition Comments); status history; workflow Save (DRAFT → RCCA), Process, Reverse, Approve, Reject.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
@@ -737,7 +737,7 @@ export function CARRecord() {
   const createLocked = isNew && !createEnabled;
 
   if (!loading && isNew && !canCreateNew) {
-    // Viewer/Auditor cannot create CARs, so redirect to the list page.
+    // Read-only roles cannot create CARs, so redirect to the list page.
     return <Navigate to="/corrective-actions" replace />;
   }
 
@@ -745,13 +745,14 @@ export function CARRecord() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">
-          {car ? `${car.code} — CAR` : 'CAR Record'}
+          {car
+            ? `${car.code} — CAR · ${formatCarStatusForDisplay(car.status)}`
+            : 'CAR Record'}
         </h1>
-        <p className="page-description">
-          {car ? `Status: ${formatCarStatusForDisplay(car.status)}` : isNew ? '' : 'CAR not found.'}
-        </p>
-        <p style={{ marginTop: 4 }}>
-          <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>← Back to Corrective Actions (CAR)</Link>
+        <p style={{ marginTop: 8 }}>
+          <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>
+            ← Back to Corrective Actions
+          </Link>
         </p>
       </header>
 
@@ -1069,7 +1070,7 @@ export function CARRecord() {
                 <textarea className="input" rows={2} value={form.verificationOfEffectiveness} onChange={(e) => setForm((p) => ({ ...p, verificationOfEffectiveness: e.target.value }))} disabled={!canEdit} />
               </div>
               <div className="input-group">
-                <label className="input-label">Closing Comments</label>
+                <label className="input-label">Disposition Comments</label>
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
               </div>
               <div style={{ marginTop: '1rem' }}>
@@ -1199,8 +1200,7 @@ export function CARRecord() {
 
       {!car && !isNew && (
         <div className="placeholder-empty">
-          <strong>CAR not found</strong>
-          Use a valid id or code from the Corrective Actions (CAR) list.
+          <strong>CAR not found.</strong>
         </div>
       )}
     </div>

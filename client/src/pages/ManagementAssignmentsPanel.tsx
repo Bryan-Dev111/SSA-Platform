@@ -5,28 +5,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
-import { SortableTh } from '../components/SortableTh';
-import { cmpStr, toggleSort, type SortDir } from '../utils/tableSort';
-
-interface ProjectHistorySupplier {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface ManagementAssignmentActiveProject {
-  id: string;
-  projectCode: string;
-  companyName: string;
-  clientName: string;
-  popStart: string | null;
-  popEnd: string | null;
-  status: string;
-}
 
 interface ManagementAssignmentRow {
-  supplier: ProjectHistorySupplier | null;
-  activeProjects: ManagementAssignmentActiveProject[];
+  id: string;
+  projectCode: string;
+  buyerName: string;
+  supplierName: string;
+  qualityEngineers: string[];
+  qualityManagers: string[];
 }
 
 interface ManagementUserRow {
@@ -51,11 +37,6 @@ interface ToastApi {
   info: (message: string) => void;
 }
 
-function formatProjectPopCell(popStart: string | null, popEnd: string | null): string {
-  if (!popStart || !popEnd) return '—';
-  return `${popStart.slice(0, 10)} – ${popEnd.slice(0, 10)}`;
-}
-
 export function ManagementAssignmentsPanel({
   token,
   toast,
@@ -67,7 +48,6 @@ export function ManagementAssignmentsPanel({
   showSourcingDirectorStaff?: boolean;
 }) {
   const [managementAssignments, setManagementAssignments] = useState<ManagementAssignmentRow[]>([]);
-  const [mgmtAssignSort, setMgmtAssignSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
   const [managementUsers, setManagementUsers] = useState<ManagementUserRow[]>([]);
   const [selectedQmId, setSelectedQmId] = useState('');
   const [selectedQeId, setSelectedQeId] = useState('');
@@ -95,22 +75,6 @@ export function ManagementAssignmentsPanel({
     loadManagementAssignments();
     loadManagementUsers();
   }, [token, loadManagementAssignments, loadManagementUsers]);
-
-  const sortedManagementAssignments = useMemo(() => {
-    if (!mgmtAssignSort.key) return managementAssignments;
-    const { key: k, dir } = mgmtAssignSort;
-    const list = [...managementAssignments];
-    const supplierLabel = (row: ManagementAssignmentRow) =>
-      row.supplier ? `${row.supplier.code} ${row.supplier.name}` : 'No supplier assigned';
-    const projectsKey = (row: ManagementAssignmentRow) =>
-      [...row.activeProjects].map((p) => p.projectCode).sort().join('\u0001');
-    list.sort((a, b) => {
-      if (k === 'supplier') return cmpStr(supplierLabel(a), supplierLabel(b), dir);
-      if (k === 'projects') return cmpStr(projectsKey(a), projectsKey(b), dir);
-      return 0;
-    });
-    return list;
-  }, [managementAssignments, mgmtAssignSort]);
 
   const managementQualityManagers = useMemo(
     () => managementUsers.filter((u) => u.roleNames.includes('QualityManager')),
@@ -319,9 +283,10 @@ export function ManagementAssignmentsPanel({
         </div>
       ) : null}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>QM to QE assignments</h2>
+      {!showSourcingDirectorStaff ? (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>QM to QE Assignments</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
               <label className="input-label">Quality Manager</label>
@@ -419,59 +384,35 @@ export function ManagementAssignmentsPanel({
             </table>
           </div>
         </div>
-      </div>
+        </div>
+      ) : null}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Supplier active projects</h2>
-          <p
-            style={{
-              marginTop: 0,
-              marginBottom: '0.75rem',
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-muted)',
-            }}
-          >
-            Every row is one supplier. Each list entry is an active project (Period of Performance includes today, UTC).
-            Assign a supplier on each record in Project History.
-          </p>
+      {!showSourcingDirectorStaff ? (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Management Assignments</h2>
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             {managementAssignments.length === 0 ? (
-              <p className="table-empty">No suppliers with active projects.</p>
+              <p className="table-empty">No active projects found.</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
-                    <SortableTh
-                      label="Supplier"
-                      columnKey="supplier"
-                      activeKey={mgmtAssignSort.key}
-                      dir={mgmtAssignSort.dir}
-                      onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
-                      style={{ minWidth: 200 }}
-                    />
-                    <SortableTh
-                      label="Active projects"
-                      columnKey="projects"
-                      activeKey={mgmtAssignSort.key}
-                      dir={mgmtAssignSort.dir}
-                      onSort={(col) => setMgmtAssignSort((p) => toggleSort(p, col))}
-                    />
+                    <th>Project</th>
+                    <th>Buyer</th>
+                    <th>Supplier</th>
+                    <th>Quality Engineer</th>
+                    <th>Quality Manager</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedManagementAssignments.map((row) => (
-                    <tr key={row.supplier?.id ?? '__unassigned__'}>
-                      <td>{row.supplier ? `${row.supplier.code}: ${row.supplier.name}` : 'No supplier assigned'}</td>
-                      <td>
-                        <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                          {row.activeProjects.map((p) => (
-                            <li key={p.id} style={{ marginBottom: '0.35rem' }}>
-                              {p.projectCode} — {p.companyName} · {p.clientName} · POP {formatProjectPopCell(p.popStart, p.popEnd)}
-                            </li>
-                          ))}
-                        </ul>
-                      </td>
+                  {managementAssignments.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.projectCode}</td>
+                      <td>{row.buyerName || '—'}</td>
+                      <td>{row.supplierName || '—'}</td>
+                      <td>{row.qualityEngineers.length > 0 ? row.qualityEngineers.join(', ') : '—'}</td>
+                      <td>{row.qualityManagers.length > 0 ? row.qualityManagers.join(', ') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -479,7 +420,8 @@ export function ManagementAssignmentsPanel({
             )}
           </div>
         </div>
-      </div>
+        </div>
+      ) : null}
     </>
   );
 }

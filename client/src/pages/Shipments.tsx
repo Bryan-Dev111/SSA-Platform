@@ -68,19 +68,21 @@ interface Metrics {
 function openShipmentRequestsSubtitle(m: Metrics): string {
   const overdue = m.overdueWaiting ?? 0;
   const waiting = m.waitingInspection ?? 0;
-  if (waiting === 0) return 'No open requests';
-  if (overdue === 0) return 'Waiting inspection';
-  const notOverdue = waiting - overdue;
-  // Align with Dashboard: same overdue count as `shipmentOverdue` (inspection past requested date).
-  const waitingLabel =
-    notOverdue === 1 ? '1 waiting inspection' : `${notOverdue} waiting inspections`;
-  return `${waitingLabel} · ${overdue} overdue`;
+  const notOverdue = Math.max(0, waiting - overdue);
+  return `${notOverdue} Waiting Inspection*${overdue} Overdue`;
 }
 
 function onTimeDeliverySubtitle(m: Metrics): string {
   const latePo = m.shortDeliveries ?? 0;
   if (latePo <= 0) return 'No late POs';
   return latePo === 1 ? '1 late PO' : `${latePo} late POs`;
+}
+
+function formatShipmentDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const SHIPMENT_TABLE_STATUS_RANK: Record<string, number> = {
@@ -641,7 +643,7 @@ export function Shipments() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Shipment inspection requests</h2>
+          <h2 style={{ marginTop: 0 }}>Shipment Inspection Requests</h2>
           <div className="table-wrap">
             {shipments.length === 0 ? (
               <p className="table-empty">No inspection requests.</p>
@@ -705,7 +707,7 @@ export function Shipments() {
                       <td>{r.partNumber ?? '—'}</td>
                       <td>{r.qty ?? '—'}</td>
                       <td>{r.lot ?? '—'}</td>
-                      <td>{r.inspectionDate?.slice(0, 10) ?? '—'}</td>
+                      <td>{formatShipmentDate(r.inspectionDate)}</td>
 
                       <td>
                         {canEditInspector && r.status === 'WaitingInspection' ? (
@@ -770,7 +772,7 @@ export function Shipments() {
                           '—'
                         )}
                       </td>
-                      <td>{r.status === 'WaitingInspection' ? '—' : r.updatedAt?.slice(0, 10) ?? '—'}</td>
+                      <td>{r.status === 'WaitingInspection' ? '—' : formatShipmentDate(r.updatedAt)}</td>
 
                       <td>
                         <div
@@ -813,7 +815,7 @@ export function Shipments() {
                           )}
                         </div>
                       </td>
-                      <td>{r.createdAt?.slice(0, 10) ?? '—'}</td>
+                      <td>{formatShipmentDate(r.createdAt)}</td>
                       <td>
                         {canReviewShipment(r) && r.status === 'WaitingInspection' ? (
                           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

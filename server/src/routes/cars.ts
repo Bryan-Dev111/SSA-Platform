@@ -320,7 +320,7 @@ router.patch(
     }
     const canEdit = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canEdit) {
-      res.status(403).json({ error: 'Viewer and other roles cannot edit CARs' });
+      res.status(403).json({ error: 'Read-only roles cannot edit CARs' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -381,7 +381,7 @@ router.post(
     }
     const canSave = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canSave) {
-      res.status(403).json({ error: 'Viewer and other roles cannot save CARs' });
+      res.status(403).json({ error: 'Read-only roles cannot save CARs' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -422,7 +422,7 @@ router.post(
     }
     const canProcess = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canProcess) {
-      res.status(403).json({ error: 'Viewer and other roles cannot process CARs' });
+      res.status(403).json({ error: 'Read-only roles cannot process CARs' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -492,7 +492,7 @@ router.post(
     }
     const canReverse = req.user.roleNames.some((r) => ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'].includes(r));
     if (!canReverse) {
-      res.status(403).json({ error: 'Viewer and other roles cannot reverse CARs' });
+      res.status(403).json({ error: 'Read-only roles cannot reverse CARs' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);

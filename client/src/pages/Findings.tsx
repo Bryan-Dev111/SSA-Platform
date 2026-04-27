@@ -100,6 +100,7 @@ export function Findings() {
   const defectCodeCounts = data?.defectCodeCounts ?? [];
   const topDefectCodes = defectCodeCounts.slice(0, 10);
   const maxDefectCount = Math.max(1, ...defectCodeCounts.map((d) => d.count));
+  const [activeDefectCode, setActiveDefectCode] = useState<string | null>(null);
   const auditFindingsCount = list.filter((f) => !!f.audit).length;
   const shipmentFindingsCount = list.filter((f) => !f.audit && !!f.shipment).length;
   const noneFindingsCount = Math.max(0, list.length - auditFindingsCount - shipmentFindingsCount);
@@ -325,17 +326,17 @@ export function Findings() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 260px))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total findings</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Findings</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalAll}</div>
           <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.4 }}>
             {stats.criticalMajor} Critical/Major
           </div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open findings</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open Findings</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
           <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.4 }}>
-            {stats.openCriticalMajor} Critical/Major open
+            {stats.openCriticalMajor} Critical/Major
           </div>
         </div>
       </div>
@@ -350,7 +351,7 @@ export function Findings() {
       >
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Audit vs Shipment findings</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Audit vs Shipment Findings</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <svg
                 aria-label="Audit versus shipment findings donut chart"
@@ -385,14 +386,14 @@ export function Findings() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
-                    Audit findings
+                    Audit Findings
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{auditFindingsCount}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#8b5cf6', display: 'inline-block' }} />
-                    Shipment findings
+                    Shipment Findings
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{shipmentFindingsCount}</span>
                 </div>
@@ -410,7 +411,17 @@ export function Findings() {
 
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Top defect codes</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: 'var(--text-lg)' }}>Top Defect Codes</h2>
+            <div
+              style={{
+                marginBottom: '0.5rem',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-text-muted)',
+                minHeight: '1.1rem',
+              }}
+            >
+              {activeDefectCode ? `Selected code: ${activeDefectCode}` : 'Hover or click a code label to read the full value.'}
+            </div>
             {topDefectCodes.length === 0 ? (
               <p className="table-empty">No defect-code data.</p>
             ) : (
@@ -441,10 +452,30 @@ export function Findings() {
                         transition: 'height 0.2s ease',
                       }}
                       title={`${code}: ${count}`}
+                      onClick={() => setActiveDefectCode(code)}
                     />
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDefectCode(code)}
+                      title={code}
+                      aria-label={`Defect code ${code}`}
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-muted)',
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        textDecoration: activeDefectCode === code ? 'underline' : 'none',
+                      }}
+                    >
                       {code}
-                    </span>
+                    </button>
                   </div>
                 ))}
               </div>

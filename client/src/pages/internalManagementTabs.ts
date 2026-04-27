@@ -9,4 +9,5 @@ export type InternalManagementTab =
   | 'managementAssignments'
   | 'profit'
   | 'employeeAssignments'
-  | 'laborCosts';
+  | 'laborCosts'
+  | 'expenses';

@@ -285,42 +285,6 @@ export function SuppliersMap() {
               Map pins need at least a city or country on each supplier record.
             </p>
           )}
-          <p style={{ marginTop: '0.75rem', marginBottom: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-            Real map tiles with supplier markers. Pins are color-coded by supplier Quality Score: High (red), Medium (yellow), Low (green), or gray when no risk snapshot.
-          </p>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Supplier</th>
-                <th>City</th>
-                <th>Country</th>
-                <th>Risk level</th>
-                <th>Quality Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mapPins.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="table-empty">No suppliers in scope.</td>
-                </tr>
-              ) : (
-                mapPins.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.code}: {s.name}</td>
-                    <td>{s.city ?? '—'}</td>
-                    <td>{s.country ?? '—'}</td>
-                    <td>{s.risk?.level ?? 'N/A'}</td>
-                    <td>{s.risk?.score ?? 'N/A'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

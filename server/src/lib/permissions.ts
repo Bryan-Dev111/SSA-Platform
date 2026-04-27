@@ -49,34 +49,34 @@ export const PAGE_DEFINITIONS = [
 ] as const;
 
 export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
-  Dashboard: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
-  Risk: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
-  CorrectiveActions: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
-  CARRecord: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
-  Findings: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
-  FindingsRecord: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
-  Audits: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
-  SupplierProfile: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
-  SupplierList: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
-  SuppliersMap: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer'],
-  GlobalSupplyDashboard: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyFarmDashboard: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyFarmers: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyFarmProfile: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyProcessingQuality: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyApproved: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyMap: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyRelationship: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyBuyerRelationships: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyPurchaseOrders: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplySamples: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyLogistics: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyExpenses: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyWorkLogs: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor', 'CommodityBuyer', 'SourcingDirector'],
-  Records: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
-  Shipments: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor', 'Inspector'],
-  Documents: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Auditor'],
-  WorkLogs: ['Admin', 'Viewer', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
+  Dashboard: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  Risk: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  CorrectiveActions: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
+  CARRecord: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
+  Findings: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
+  FindingsRecord: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
+  Audits: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer'],
+  SupplierProfile: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
+  SupplierList: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  SuppliersMap: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'],
+  GlobalSupplyDashboard: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyFarmDashboard: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyFarmers: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyFarmProfile: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyProcessingQuality: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyApproved: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyMap: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyRelationship: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyBuyerRelationships: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyPurchaseOrders: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplySamples: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyLogistics: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyExpenses: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyWorkLogs: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor', 'CommodityBuyer', 'SourcingDirector'],
+  Records: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
+  Shipments: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor', 'Inspector'],
+  Documents: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'],
+  WorkLogs: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor'],
   InternalManagement: ['Admin', 'QualityManager'],
   Admin: ['Admin'],
   Login: [],
@@ -85,7 +85,6 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
 /** All roles that may authenticate; used for product hub routes (not in PAGE_DEFINITIONS matrix). */
 const ALL_APP_ROLES_HUB = [
   'Admin',
-  'Viewer',
   'QualityEngineer',
   'QualityManager',
   'Buyer',
@@ -131,8 +130,13 @@ export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/admin': DEFAULT_API_PAGE_ROLES.Admin,
 };
 
+const DEPRECATED_ROLE_NAMES = new Set(['Viewer']);
+
 export async function getPathRolesMatrix(): Promise<Record<string, string[]>> {
-  const roles = await prisma.role.findMany({ select: { id: true, name: true } });
+  const roles = await prisma.role.findMany({
+    where: { name: { notIn: [...DEPRECATED_ROLE_NAMES] } },
+    select: { id: true, name: true },
+  });
   const permissions = await prisma.rolePagePermission.findMany({
     where: { pageKey: { in: PAGE_DEFINITIONS.map((p) => p.key) } },
     select: { roleId: true, pageKey: true, canAccess: true },

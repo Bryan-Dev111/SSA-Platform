@@ -12,6 +12,7 @@ import {
 import {
   computeClosedPurchaseOrderFinancials,
   filterGlobalVendorsExpenses,
+  isPurchaseOrderClosed,
 } from '../../utils/globalSupplyClosedPoMetrics';
 
 type CountryValueRow = { country: string; value: number };
@@ -105,6 +106,14 @@ export function GlobalSupplyDashboardPage() {
     [poOrdersKpi, poExpensesKpi]
   );
 
+  const { totalPoCount, openPoCount } = useMemo(() => {
+    let open = 0;
+    for (const o of poOrdersKpi) {
+      if (!isPurchaseOrderClosed(o.status)) open += 1;
+    }
+    return { totalPoCount: poOrdersKpi.length, openPoCount: open };
+  }, [poOrdersKpi]);
+
   const topRevenue = useMemo(() => countryRowsToBar((data?.revenueByCountry ?? []).slice(0, 12)), [data]);
   const topProfit = useMemo(() => countryRowsToBar((data?.profitByCountry ?? []).slice(0, 12)), [data]);
   const coffeeKg = useMemo(() => countryRowsToBar((data?.kgCountryCoffee ?? []).slice(0, 12)), [data]);
@@ -124,7 +133,7 @@ export function GlobalSupplyDashboardPage() {
       <header className="page-header">
         <h1 className="page-title">Business Dashboard</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          {greeting}, {displayName}. Here is what is happening with your farms today.
+          {greeting}, {displayName}. Here is what is happening with your business today.
         </p>
       </header>
 
@@ -147,9 +156,13 @@ export function GlobalSupplyDashboardPage() {
         }}
       >
         <MetricCard
-          title="Total Closed POs"
-          value={poKpiLoading ? '—' : closedPoKpis.closedCount}
-          subtitle="Purchase orders with status Closed"
+          title="Total POs"
+          value={poKpiLoading ? '—' : totalPoCount}
+          subtitle={
+            poKpiLoading
+              ? undefined
+              : `${openPoCount} Open PO${openPoCount === 1 ? '' : 's'}`
+          }
         />
         <MetricCard
           title="Average Revenue per PO"
@@ -158,7 +171,6 @@ export function GlobalSupplyDashboardPage() {
               ? '—'
               : formatMoney(closedPoKpis.averageRevenuePerClosedPo)
           }
-          subtitle="Mean revenue among closed purchase orders only"
         />
         <MetricCard
           title="Average Profit per PO"
@@ -167,7 +179,6 @@ export function GlobalSupplyDashboardPage() {
               ? '—'
               : formatMoney(closedPoKpis.averageProfitPerClosedPo)
           }
-          subtitle="Mean (revenue − linked Global Vendors expenses) for closed POs"
         />
       </div>
 
@@ -179,12 +190,12 @@ export function GlobalSupplyDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard title="Revenue by Country">
-          <VerticalBarChart rows={topRevenue} valueFormatter={formatMoney} />
+        <ChartCard title="Revenue by Country" allowContentOverflow>
+          <VerticalBarChart rows={topRevenue} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
 
-        <ChartCard title="Profit by Country">
-          <VerticalBarChart rows={topProfit} valueFormatter={formatMoney} />
+        <ChartCard title="Profit by Country" allowContentOverflow>
+          <VerticalBarChart rows={topProfit} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
       </div>
 
@@ -196,12 +207,12 @@ export function GlobalSupplyDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard title="Weight by Country (Coffee)">
-          <VerticalBarChart rows={coffeeKg} valueFormatter={formatKg} />
+        <ChartCard title="Weight by Country (Coffee)" allowContentOverflow>
+          <VerticalBarChart rows={coffeeKg} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
 
-        <ChartCard title="Weight by Country (Cocoa)">
-          <VerticalBarChart rows={cocoaKg} valueFormatter={formatKg} />
+        <ChartCard title="Weight by Country (Cocoa)" allowContentOverflow>
+          <VerticalBarChart rows={cocoaKg} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
       </div>
 
@@ -212,15 +223,15 @@ export function GlobalSupplyDashboardPage() {
           gap: '0.9rem',
         }}
       >
-        <ChartCard title="Sample Count by Country">
-          <VerticalBarChart rows={sampleByCountry} valueFormatter={formatSampleCount} />
+        <ChartCard title="Sample Count by Country" allowContentOverflow>
+          <VerticalBarChart rows={sampleByCountry} valueFormatter={formatSampleCount} slantedValueLabels />
         </ChartCard>
 
-        <ChartCard title="Purchase Order Creation">
+        <ChartCard title="Purchase Order Creation" allowContentOverflow>
           <ContinuousLineChart
             rows={openPoTrend}
-            ariaLabel="Open PO creation over time"
-            valueLabel="open PO(s)"
+            ariaLabel="Purchase orders created over time by date"
+            valueLabel="PO(s) created"
           />
         </ChartCard>
       </div>

@@ -30,6 +30,13 @@ function supplierStatusLabel(status: string | undefined): string {
   return 'Active';
 }
 
+function formatSupplierCreatedDate(iso: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export function SupplierList() {
   const { token } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -123,7 +130,7 @@ export function SupplierList() {
                         : '—'}
                     </td>
                     <td>{s.commodityType?.name ?? '—'}</td>
-                    <td>{s.createdAt ? s.createdAt.slice(0, 10) : '—'}</td>
+                    <td>{formatSupplierCreatedDate(s.createdAt)}</td>
                     <td>
                       <span
                         className={supplierStatusLabel(s.status) === 'Inactive' ? 'audit-status-badge audit-status-badge--cancelled' : 'audit-status-badge audit-status-badge--complete'}

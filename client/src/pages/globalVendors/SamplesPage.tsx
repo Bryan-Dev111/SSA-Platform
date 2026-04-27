@@ -1,7 +1,7 @@
 /**
  * Global Vendors — Samples list, creation modal, edit, Excel export.
  */
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { ExpandableTableText } from '../../components/ExpandableTableText';
@@ -136,6 +136,11 @@ export function SamplesPage() {
     dir: 'asc',
   });
 
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [topScrollInnerWidth, setTopScrollInnerWidth] = useState(0);
+
   const sortedSamples = useMemo(() => {
     const rows = [...samples];
     const k = sort.key;
@@ -218,6 +223,25 @@ export function SamplesPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- token-driven refresh
   }, [token]);
+
+  useEffect(() => {
+    const syncTopTrackWidth = () => {
+      setTopScrollInnerWidth(tableRef.current?.scrollWidth ?? 0);
+    };
+    syncTopTrackWidth();
+    window.addEventListener('resize', syncTopTrackWidth);
+    return () => window.removeEventListener('resize', syncTopTrackWidth);
+  }, [samples, sort, loading]);
+
+  const syncScrollFromTop = () => {
+    if (!topScrollRef.current || !tableScrollRef.current) return;
+    tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+  };
+
+  const syncScrollFromTable = () => {
+    if (!topScrollRef.current || !tableScrollRef.current) return;
+    topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+  };
 
   const closeModal = () => {
     setModalOpen(false);
@@ -456,8 +480,24 @@ export function SamplesPage() {
         </div>
       )}
       <div className="card">
-        <div className="table-wrap">
-          <table className="table table--sticky-header">
+        <div
+          ref={topScrollRef}
+          className="purchase-orders-table-scroll"
+          style={{ overflowY: 'hidden', marginBottom: 6 }}
+          onScroll={syncScrollFromTop}
+          aria-label="Horizontal scroll samples table (top)"
+        >
+          <div style={{ height: 1, width: topScrollInnerWidth || '100%' }} />
+        </div>
+        <div
+          ref={tableScrollRef}
+          className="table-wrap purchase-orders-table-scroll"
+          onScroll={syncScrollFromTable}
+        >
+          <table
+            ref={tableRef}
+            className="table table--sticky-header table--prevent-shrink samples-table--freeze-first-2"
+          >
             <thead>
               <tr>
                 <SortableTh
@@ -466,6 +506,7 @@ export function SamplesPage() {
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
+                  style={{ minWidth: 140 }}
                 />
                 <SortableTh
                   label="Buyer"
@@ -473,6 +514,7 @@ export function SamplesPage() {
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
+                  style={{ minWidth: 220 }}
                 />
                 <SortableTh
                   label="Buyer email"

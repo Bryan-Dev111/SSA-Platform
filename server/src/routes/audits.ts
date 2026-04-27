@@ -192,7 +192,7 @@ router.post(
       req.user.roleNames.includes('QualityEngineer') ||
       req.user.roleNames.includes('QualityManager');
     if (!canCreateOrEdit) {
-      res.status(403).json({ error: 'Viewer and other roles are read-only for audits' });
+      res.status(403).json({ error: 'Read-only roles cannot edit audits' });
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
@@ -304,7 +304,7 @@ router.patch(
         auditor !== undefined ||
         projectHistoryId !== undefined;
       if (triesToEditOtherFields) {
-        res.status(403).json({ error: 'Viewer and other roles are read-only for audits' });
+        res.status(403).json({ error: 'Read-only roles cannot edit audits' });
         return;
       }
     }

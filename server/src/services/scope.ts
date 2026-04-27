@@ -123,5 +123,5 @@ export async function getAllowedSupplierIds(user: {
     return [...new Set([...roleSupplierIds, ...employeeSupplierIds])];
   }
 
-  return null; // Admin, Viewer (no employee supplier rows): unrestricted supplier list
+  return null; // Admin (and no employee supplier rows): unrestricted supplier list
 }

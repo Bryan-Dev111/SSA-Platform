@@ -25,6 +25,7 @@ export function GlobalSupplyExpensesSection() {
       showPurchaseOrderPicker
       canCloseExpense={isAdmin}
       canEditExpense={isAdmin}
+      canDeleteExpense={isAdmin}
     />
   );
 }
