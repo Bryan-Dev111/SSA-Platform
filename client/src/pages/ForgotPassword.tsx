@@ -4,11 +4,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LoginBrandedShell } from '../components/LoginBrandedShell';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 
 const contactEmail = import.meta.env.VITE_CONTACT_EMAIL as string | undefined;
 
 export function ForgotPassword() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +28,7 @@ export function ForgotPassword() {
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       if (res.message) setDoneMessage(res.message);
-      else setDoneMessage('If an account exists for that email, you will receive reset instructions shortly.');
+      else setDoneMessage(t('forgot.defaultDone'));
     } catch (err) {
       let msg = err instanceof Error ? err.message : 'Request failed';
       try {
@@ -48,8 +50,8 @@ export function ForgotPassword() {
           <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
         </div>
         <div className="login-header">
-          <h1 className="login-title">Forgot password</h1>
-          <p className="login-subtitle">Enter your email and we will send you a link to set a new password.</p>
+          <h1 className="login-title">{t('forgot.title')}</h1>
+          <p className="login-subtitle">{t('forgot.subtitle')}</p>
         </div>
 
         {error ? <div className="alert-error" style={{ marginBottom: '1rem' }}>{error}</div> : null}
@@ -73,7 +75,7 @@ export function ForgotPassword() {
           <form onSubmit={handleSubmit} className="login-form">
             <div className="input-group">
               <label htmlFor="forgot-email" className="input-label">
-                Email
+                {t('auth.email')}
               </label>
               <input
                 id="forgot-email"
@@ -88,18 +90,18 @@ export function ForgotPassword() {
               />
             </div>
             <button type="submit" className="btn login-submit login-submit-brand" disabled={submitting}>
-              {submitting ? 'Sending…' : 'Send reset link'}
+              {submitting ? t('forgot.sending') : t('forgot.sendResetLink')}
             </button>
           </form>
         ) : null}
 
         <div className="login-help-body" style={{ marginTop: doneMessage ? '0.5rem' : '1rem' }}>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
-            The link expires in one hour. If you do not see the email, check your spam folder.
+            {t('forgot.linkExpiry')}
           </p>
           {contactEmail ? (
             <p style={{ fontSize: 'var(--text-sm)' }}>
-              Need help?{' '}
+              {t('forgot.needHelp')}{' '}
               <a className="login-footer-link" href={`mailto:${contactEmail}?subject=Sentinel%20password%20help`}>
                 {contactEmail}
               </a>
@@ -109,7 +111,7 @@ export function ForgotPassword() {
 
         <p className="login-help-back">
           <Link to="/login" className="login-footer-link">
-            Back to sign in
+            {t('request.backToSignIn')}
           </Link>
         </p>
       </div>

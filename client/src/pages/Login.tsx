@@ -5,12 +5,15 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { LoginBrandedShell } from '../components/LoginBrandedShell';
+import { LanguageFlagSelector } from '../components/LanguageFlagSelector';
 import { apiJson } from '../api/client';
 
 export function Login() {
   const { user, token, login, loading } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +30,7 @@ export function Login() {
         <div className="login-card">
           <div className="loading-message login-loading">
             <div className="loading-spinner" />
-            Loading…
+            {t('auth.loading')}
           </div>
         </div>
       </LoginBrandedShell>
@@ -45,9 +48,9 @@ export function Login() {
     setSubmitting(true);
     try {
       await login(email.trim().toLowerCase(), password);
-      toast.success('Login successfully');
+      toast.success(t('auth.loginSuccess'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : t('auth.loginFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -79,12 +82,12 @@ export function Login() {
           <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
         </div>
         <div className="login-header">
-          <h1 className="login-title">Sign in</h1>
+          <h1 className="login-title">{t('auth.signIn')}</h1>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">
             <label htmlFor="email" className="input-label">
-              Email
+              {t('auth.email')}
             </label>
             <input
               id="email"
@@ -94,12 +97,12 @@ export function Login() {
               required
               autoComplete="email"
               className="input login-input-soft"
-              placeholder="Enter your email"
+              placeholder={t('auth.enterEmail')}
             />
           </div>
           <div className="input-group">
             <label htmlFor="password" className="input-label">
-              Password
+              {t('auth.password')}
             </label>
             <div className="login-password-wrap">
               <input
@@ -110,13 +113,13 @@ export function Login() {
                 required
                 autoComplete="current-password"
                 className="input login-input-soft"
-                placeholder="Enter your password"
+                placeholder={t('auth.enterPassword')}
               />
               <button
                 type="button"
                 className="login-password-toggle"
                 onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
               >
                 {showPassword ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -142,16 +145,16 @@ export function Login() {
           </div>
           {error && <div className="alert-error">{error}</div>}
           <button type="submit" disabled={submitting} className="btn login-submit login-submit-brand">
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting ? t('auth.signingIn') : t('auth.signIn')}
           </button>
         </form>
         <div className="login-form-footer" aria-label="Account help">
           <Link to="/request-access" className="login-footer-link">
-            Request access
+            {t('auth.requestAccess')}
           </Link>
           <span className="login-footer-divider" aria-hidden="true" />
           <Link to="/forgot-password" className="login-footer-link">
-            Forgot password?
+            {t('auth.forgotPassword')}
           </Link>
         </div>
         <div
@@ -163,23 +166,26 @@ export function Login() {
             textAlign: 'center',
           }}
         >
-          By signing in, you agree to our{' '}
+          {t('auth.bySigningIn')}{' '}
           <button
             type="button"
             className="link-button"
             onClick={() => void openLegal('terms')}
           >
-            Terms and Conditions
+            {t('auth.termsAndConditions')}
           </button>{' '}
-          and{' '}
+          {t('auth.and')}{' '}
           <button
             type="button"
             className="link-button"
             onClick={() => void openLegal('privacy')}
           >
-            Privacy Policy
+            {t('auth.privacyPolicy')}
           </button>
           .
+        </div>
+        <div className="login-language-row">
+          <LanguageFlagSelector className="login-language-selector" />
         </div>
         {legalKey && (
           <div
@@ -192,7 +198,7 @@ export function Login() {
               <div className="modal-header">
                 <h2 id="legal-modal-title" className="modal-title">
                   {legalContent?.title ??
-                    (legalKey === 'terms' ? 'Terms and Conditions' : 'Privacy Policy')}
+                    (legalKey === 'terms' ? t('auth.termsAndConditions') : t('auth.privacyPolicy'))}
                 </h2>
                 <button
                   type="button"
@@ -204,7 +210,7 @@ export function Login() {
                 </button>
               </div>
               <div className="modal-body" style={{ maxHeight: '60vh', overflow: 'auto' }}>
-                {legalLoading && <p>Loading…</p>}
+                {legalLoading && <p>{t('auth.loading')}</p>}
                 {legalError && (
                   <p className="alert-error" style={{ marginTop: 0 }}>
                     {legalError}
@@ -228,7 +234,7 @@ export function Login() {
                   className="btn"
                   onClick={() => setLegalKey(null)}
                 >
-                  Close
+                  {t('auth.close')}
                 </button>
               </div>
             </div>

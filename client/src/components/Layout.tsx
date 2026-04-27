@@ -6,8 +6,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { ConfirmDialog } from './ConfirmDialog';
 import { SidebarNavIcon } from './SidebarNavIcons';
+import { LanguageFlagSelector } from './LanguageFlagSelector';
 import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
 
 const STORAGE_SIDEBAR_COLLAPSED = 'sentinel.sidebarCollapsed';
@@ -44,36 +46,36 @@ function desktopMatches(): boolean {
   return window.matchMedia('(min-width: 769px)').matches;
 }
 
-const MENU_ITEMS: { path: string; label: string }[] = [
-  { path: '/dashboard', label: 'Dashboard' },
-  { path: '/risk', label: 'Risk' },
-  { path: '/corrective-actions', label: 'Corrective Actions' },
-  { path: '/findings', label: 'Findings' },
-  { path: '/audits', label: 'Audits' },
-  { path: '/shipments', label: 'Shipments' },
-  { path: '/records', label: 'Records' },
-  { path: '/supplier-profile', label: 'Supplier Profile' },
-  { path: '/supplier-list', label: 'Approved Supplier List' },
-  { path: '/suppliers-map', label: 'Suppliers Map' },
-  { path: '/documents', label: 'Command Media' },
-  { path: '/work-logs', label: 'Work Logs' },
-  { path: '/internal-management', label: 'Internal Management' },
-  { path: '/admin', label: 'Admin' },
+const MENU_ITEMS: { path: string; labelKey: string; fallback: string }[] = [
+  { path: '/dashboard', labelKey: 'nav.dashboard', fallback: 'Dashboard' },
+  { path: '/risk', labelKey: 'nav.risk', fallback: 'Risk' },
+  { path: '/corrective-actions', labelKey: 'nav.correctiveActions', fallback: 'Corrective Actions' },
+  { path: '/findings', labelKey: 'nav.findings', fallback: 'Findings' },
+  { path: '/audits', labelKey: 'nav.audits', fallback: 'Audits' },
+  { path: '/shipments', labelKey: 'nav.shipments', fallback: 'Shipments' },
+  { path: '/records', labelKey: 'nav.records', fallback: 'Records' },
+  { path: '/supplier-profile', labelKey: 'nav.supplierProfile', fallback: 'Supplier Profile' },
+  { path: '/supplier-list', labelKey: 'nav.approvedSupplierList', fallback: 'Approved Supplier List' },
+  { path: '/suppliers-map', labelKey: 'nav.suppliersMap', fallback: 'Suppliers Map' },
+  { path: '/documents', labelKey: 'nav.commandMedia', fallback: 'Command Media' },
+  { path: '/work-logs', labelKey: 'nav.workLogs', fallback: 'Work Logs' },
+  { path: '/internal-management', labelKey: 'nav.internalManagement', fallback: 'Internal Management' },
+  { path: '/admin', labelKey: 'nav.admin', fallback: 'Admin' },
 ];
 
-const GLOBAL_VENDOR_ITEMS: { path: string; label: string }[] = [
-  { path: '/global-vendors/dashboard', label: 'Business Dashboard' },
-  { path: '/global-vendors/farm-dashboard', label: 'Farm Dashboard' },
-  { path: '/global-vendors/farmers', label: 'Farm Information' },
-  { path: '/global-vendors/approved', label: 'Approved Farms List' },
-  { path: '/global-vendors/map', label: 'Farms Map' },
-  { path: '/global-vendors/relationship', label: 'Relationship & Trust' },
-  { path: '/global-vendors/buyer-relationships', label: 'Buyer Relationships' },
-  { path: '/global-vendors/samples', label: 'Samples' },
-  { path: '/global-vendors/logistics', label: 'Logistics' },
-  { path: '/global-vendors/work-logs', label: 'Work Logs' },
-  { path: '/global-vendors/internal-management', label: 'Internal Management' },
-  { path: '/global-vendors/admin', label: 'Admin' },
+const GLOBAL_VENDOR_ITEMS: { path: string; labelKey: string; fallback: string }[] = [
+  { path: '/global-vendors/dashboard', labelKey: 'nav.businessDashboard', fallback: 'Business Dashboard' },
+  { path: '/global-vendors/farm-dashboard', labelKey: 'nav.farmDashboard', fallback: 'Farm Dashboard' },
+  { path: '/global-vendors/farmers', labelKey: 'nav.farmInformation', fallback: 'Farm Information' },
+  { path: '/global-vendors/approved', labelKey: 'nav.approvedFarmsList', fallback: 'Approved Farms List' },
+  { path: '/global-vendors/map', labelKey: 'nav.farmsMap', fallback: 'Farms Map' },
+  { path: '/global-vendors/relationship', labelKey: 'nav.relationshipTrust', fallback: 'Relationship & Trust' },
+  { path: '/global-vendors/buyer-relationships', labelKey: 'nav.buyerRelationships', fallback: 'Buyer Relationships' },
+  { path: '/global-vendors/samples', labelKey: 'nav.samples', fallback: 'Samples' },
+  { path: '/global-vendors/logistics', labelKey: 'nav.logistics', fallback: 'Logistics' },
+  { path: '/global-vendors/work-logs', labelKey: 'nav.workLogs', fallback: 'Work Logs' },
+  { path: '/global-vendors/internal-management', labelKey: 'nav.internalManagement', fallback: 'Internal Management' },
+  { path: '/global-vendors/admin', labelKey: 'nav.admin', fallback: 'Admin' },
 ];
 
 /** Routes under this prefix use the Global Vendors shell only (sidebar + header). */
@@ -104,22 +106,25 @@ function CloseIcon() {
 function SidebarNavLink({
   item,
   railMode,
+  translate,
 }: {
-  item: { path: string; label: string };
+  item: { path: string; labelKey: string; fallback: string };
   /** Desktop collapsed sidebar: icon only + native tooltip */
   railMode?: boolean;
+  translate: (key: string, fallback?: string) => string;
 }) {
+  const label = translate(item.labelKey, item.fallback);
   return (
     <NavLink
       to={item.path}
-      title={railMode ? item.label : undefined}
-      aria-label={railMode ? item.label : undefined}
+      title={railMode ? label : undefined}
+      aria-label={railMode ? label : undefined}
       className={({ isActive }) => `sidebar-nav-link${isActive ? ' active' : ''}`}
     >
       <span className="sidebar-nav-link-icon" aria-hidden>
         <SidebarNavIcon path={item.path} />
       </span>
-      <span className="sidebar-nav-link-label">{item.label}</span>
+      <span className="sidebar-nav-link-label">{label}</span>
     </NavLink>
   );
 }
@@ -168,7 +173,7 @@ function headerUserDisplayName(user: { name?: string | null; email?: string | nu
     const local = em.split('@')[0];
     return local || em;
   }
-  return 'User';
+  return '';
 }
 
 function headerUserInitials(user: { name?: string | null; email?: string | null } | null | undefined): string {
@@ -191,6 +196,7 @@ function formatRoleSummary(roleNames: string[]): string {
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -273,7 +279,7 @@ export function Layout() {
 
   const closeMenu = () => setMenuOpen(false);
 
-  const headerDisplayName = useMemo(() => headerUserDisplayName(user), [user]);
+  const headerDisplayName = useMemo(() => headerUserDisplayName(user) || t('layout.user'), [user, t]);
   const headerInitials = useMemo(() => headerUserInitials(user), [user]);
   const headerRoleSummary = useMemo(() => formatRoleSummary(roleNames), [roleNames]);
   const headerUserTitle = useMemo(() => {
@@ -320,7 +326,7 @@ export function Layout() {
             type="button"
             className="sidebar-close-btn"
             onClick={closeMenu}
-            aria-label="Close menu"
+            aria-label={t('layout.closeMenu')}
           >
             <CloseIcon />
           </button>
@@ -331,40 +337,40 @@ export function Layout() {
             globalVendorsShell ? (
               <>
                 {showGlobalSupplySectionAdmin ? (
-                  <div className="sidebar-nav-section" title={sidebarRailMode ? 'Global supply' : undefined}>
-                    Global supply
+                  <div className="sidebar-nav-section" title={sidebarRailMode ? t('layout.globalSupplySection') : undefined}>
+                    {t('layout.globalSupplySection')}
                   </div>
                 ) : null}
                 {visibleGlobalVendor.map((item) => (
-                  <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
+                  <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} translate={t} />
                 ))}
               </>
             ) : (
               visibleItems.map((item) => (
-                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
+                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} translate={t} />
               ))
             )
           ) : (
             // Non-admin: unified sidebar showing Sentinel + Global Vendors together.
             <>
               {showDualNavSections ? (
-                <div className="sidebar-nav-section" title={sidebarRailMode ? 'Supplier assurance' : undefined}>
-                  Supplier assurance
+                <div className="sidebar-nav-section" title={sidebarRailMode ? t('layout.supplierAssuranceSection') : undefined}>
+                  {t('layout.supplierAssuranceSection')}
                 </div>
               ) : null}
               {visibleItems.map((item) => (
-                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
+                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} translate={t} />
               ))}
               {showDualNavSections ? (
                 <div
                   className="sidebar-nav-section sidebar-nav-section--spaced"
-                  title={sidebarRailMode ? 'Global supply' : undefined}
+                  title={sidebarRailMode ? t('layout.globalSupplySection') : undefined}
                 >
-                  Global supply
+                  {t('layout.globalSupplySection')}
                 </div>
               ) : null}
               {visibleGlobalVendor.map((item) => (
-                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} />
+                <SidebarNavLink key={item.path} item={item} railMode={sidebarRailMode} translate={t} />
               ))}
             </>
           )}
@@ -404,7 +410,7 @@ export function Layout() {
               type="button"
               className="header-menu-btn"
               onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
+              aria-label={t('layout.openMenu')}
             >
               <MenuIcon />
             </button>
@@ -415,13 +421,18 @@ export function Layout() {
               </div>
               <span
                 className={`app-header-context${globalVendorsShell ? ' app-header-context--supply' : ''}`}
-                title={globalVendorsShell ? 'Global supply workspace' : 'Supplier assurance workspace'}
+                title={
+                  globalVendorsShell
+                    ? `${t('layout.globalSupply')} workspace`
+                    : `${t('layout.supplierAssurance')} workspace`
+                }
               >
-                {globalVendorsShell ? 'Global supply' : 'Supplier assurance'}
+                {globalVendorsShell ? t('layout.globalSupply') : t('layout.supplierAssurance')}
               </span>
             </div>
           </div>
           <div className="app-header-end">
+            <LanguageFlagSelector className="app-header-language-selector" />
             {roleNames.includes('Admin') && (
               <button
                 type="button"
@@ -429,7 +440,7 @@ export function Layout() {
                 onClick={() => navigate('/product-hub')}
               >
                 <LayoutIcon />
-                Product hub
+                {t('layout.productHub')}
               </button>
             )}
             <div
@@ -457,7 +468,7 @@ export function Layout() {
               className="app-header-btn app-header-btn--logout"
             >
               <LogOutIcon />
-              Log out
+              {t('auth.logOut')}
             </button>
           </div>
         </header>
@@ -467,10 +478,10 @@ export function Layout() {
       </div>
       <ConfirmDialog
         open={showLogoutConfirm}
-        title="Log out"
-        message="Are you sure you want to log out?"
-        confirmLabel="Log out"
-        cancelLabel="Cancel"
+        title={t('auth.logOut')}
+        message={t('auth.logOutQuestion')}
+        confirmLabel={t('auth.logOut')}
+        cancelLabel={t('auth.cancel')}
         onConfirm={() => {
           setShowLogoutConfirm(false);
           logout();

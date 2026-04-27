@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiJson } from '../../api/client';
 import { MetricCard } from '../../components/MetricCard';
 import { PurchaseOrdersPage } from './PurchaseOrdersPage';
@@ -43,6 +44,7 @@ type ExpenseStatusRow = {
 export function GlobalSupplyInternalManagementPage() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const isAdmin = !!user?.roleNames?.includes('Admin');
   const roleNames = user?.roleNames ?? [];
   const canStaffHub = roleNames.includes('Admin') || roleNames.includes('QualityManager');
@@ -114,25 +116,25 @@ export function GlobalSupplyInternalManagementPage() {
   const tabButtons = useMemo(() => {
     const rows: { id: GlobalInternalTab; label: string }[] = [
       { id: 'purchaseOrders', label: 'Purchase Orders' },
-      { id: 'expenses', label: 'Expenses' },
-      { id: 'profit', label: 'Profit' },
-      { id: 'documents', label: 'Documents' },
-      { id: 'calendar', label: 'Calendar' },
+      { id: 'expenses', label: t('internal.tab.expenses') },
+      { id: 'profit', label: t('internal.tab.profit') },
+      { id: 'documents', label: t('internal.tab.documents') },
+      { id: 'calendar', label: t('internal.tab.calendar') },
     ];
     if (canStaffHub) {
       rows.push(
-        { id: 'orgChart', label: 'Org Chart' },
-        { id: 'employeeAssignments', label: 'Employee Assignments' },
-        { id: 'managementAssignments', label: 'Management Assignments' }
+        { id: 'orgChart', label: t('internal.tab.orgChart') },
+        { id: 'employeeAssignments', label: t('internal.tab.employeeAssignments') },
+        { id: 'managementAssignments', label: t('internal.tab.managementAssignments') }
       );
     }
     return rows;
-  }, [canStaffHub]);
+  }, [canStaffHub, t]);
 
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Internal Management</h1>
+        <h1 className="page-title">{t('internal.title')}</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
           {pageDescription}
         </p>

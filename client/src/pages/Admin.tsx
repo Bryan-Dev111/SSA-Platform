@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
@@ -47,6 +48,7 @@ interface CodeRow {
 export function Admin() {
   const { token } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>('users');
 
   const [commodities, setCommodities] = useState<CommodityType[]>([]);
@@ -380,32 +382,32 @@ export function Admin() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Admin</h1>
+        <h1 className="page-title">{t('admin.title')}</h1>
       </header>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         {(
           [
-            ['users', 'Users'],
-            ['employees', 'Employees'],
-            ['buyersSuppliers', 'Buyers & Suppliers'],
-            ['commodity', 'Commodity Types'],
-            ['defect', 'Defect Codes'],
-            ['carRootCause', 'CAR Root Cause Codes'],
-            ['disposition', 'Disposition Codes'],
-            ['auditTypes', 'Audit Types'],
-            ['expenseTypes', 'Expense Types'],
-            ['commandMedia', 'Command Media'],
-            ['alertPreferences', 'Email Alerts'],
-            ['permissions', 'Permissions'],
-            ['legal', 'Legal (Terms & Privacy)'],
+            ['users', t('admin.tab.users')],
+            ['employees', t('admin.tab.employees')],
+            ['buyersSuppliers', t('admin.tab.buyersSuppliers')],
+            ['commodity', t('admin.tab.commodityTypes')],
+            ['defect', t('admin.tab.defectCodes')],
+            ['carRootCause', t('admin.tab.carRootCauseCodes')],
+            ['disposition', t('admin.tab.dispositionCodes')],
+            ['auditTypes', t('admin.tab.auditTypes')],
+            ['expenseTypes', t('admin.tab.expenseTypes')],
+            ['commandMedia', t('admin.tab.commandMedia')],
+            ['alertPreferences', t('admin.tab.emailAlerts')],
+            ['permissions', t('admin.tab.permissions')],
+            ['legal', t('admin.tab.legal')],
           ] as const
-        ).map(([t, label]) => (
+        ).map(([tabId, label]) => (
           <button
-            key={t}
+            key={tabId}
             type="button"
-            className={tab === t ? 'btn btn-primary' : 'btn btn-ghost'}
-            onClick={() => setTab(t)}
+            className={tab === tabId ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={() => setTab(tabId)}
           >
             {label}
           </button>

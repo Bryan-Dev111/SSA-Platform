@@ -3,11 +3,13 @@
  */
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getDefaultPath } from '../config/rolePageAccess';
 
 export function ProductHub() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const goCurrent = () => {
     if (!user) return;
@@ -26,17 +28,17 @@ export function ProductHub() {
           type="button"
           className="product-hub-panel product-hub-panel--current"
           onClick={goCurrent}
-          aria-label="Sentinel Supplier Assurance. Open supplier assurance, audits, risk, and related tools."
+          aria-label={`${t('productHub.current')}.`}
         >
-          <span className="product-hub-panel-title">Sentinel Supplier Assurance</span>
+          <span className="product-hub-panel-title">{t('productHub.current')}</span>
         </button>
         <button
           type="button"
           className="product-hub-panel product-hub-panel--global"
           onClick={goGlobal}
-          aria-label="Sentinel Global Supply. Open global supply workflows."
+          aria-label={`${t('productHub.global')}.`}
         >
-          <span className="product-hub-panel-title">Sentinel Global Supply</span>
+          <span className="product-hub-panel-title">{t('productHub.global')}</span>
         </button>
       </div>
     </div>

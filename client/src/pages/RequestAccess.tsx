@@ -4,11 +4,13 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LoginBrandedShell } from '../components/LoginBrandedShell';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 
 const contactEmail = import.meta.env.VITE_CONTACT_EMAIL as string | undefined;
 
 export function RequestAccess() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [organization, setOrganization] = useState('');
@@ -37,9 +39,7 @@ export function RequestAccess() {
       );
       if (res.message) setDoneMessage(res.message);
       else
-        setDoneMessage(
-          'Thank you. Your request has been submitted. An administrator will contact you if your access is approved.'
-        );
+        setDoneMessage(t('request.thankYou'));
     } catch (err) {
       let msg = err instanceof Error ? err.message : 'Request failed';
       try {
@@ -61,9 +61,9 @@ export function RequestAccess() {
           <img src="/logo.png" alt="Sentinel" className="login-logo-mark" />
         </div>
         <div className="login-header">
-          <h1 className="login-title">Request access</h1>
+          <h1 className="login-title">{t('request.title')}</h1>
           <p className="login-subtitle">
-            Tell us who you are. An administrator will review and create your account if approved.
+            {t('request.subtitle')}
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export function RequestAccess() {
           <form onSubmit={handleSubmit} className="login-form">
             <div className="input-group">
               <label htmlFor="req-email" className="input-label">
-                Email <span style={{ color: 'var(--color-danger, #b91c1c)' }}>*</span>
+                {t('auth.email')} <span style={{ color: 'var(--color-danger, #b91c1c)' }}>*</span>
               </label>
               <input
                 id="req-email"
@@ -105,7 +105,7 @@ export function RequestAccess() {
             </div>
             <div className="input-group">
               <label htmlFor="req-name" className="input-label">
-                Full name <span style={{ color: 'var(--color-danger, #b91c1c)' }}>*</span>
+                {t('request.fullName')} <span style={{ color: 'var(--color-danger, #b91c1c)' }}>*</span>
               </label>
               <input
                 id="req-name"
@@ -122,7 +122,7 @@ export function RequestAccess() {
             </div>
             <div className="input-group">
               <label htmlFor="req-org" className="input-label">
-                Organization
+                {t('request.organization')}
               </label>
               <input
                 id="req-org"
@@ -138,7 +138,8 @@ export function RequestAccess() {
             </div>
             <div className="input-group">
               <label htmlFor="req-message" className="input-label">
-                Message <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>(optional)</span>
+                {t('request.message')}{' '}
+                <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>{t('request.optional')}</span>
               </label>
               <textarea
                 id="req-message"
@@ -153,18 +154,18 @@ export function RequestAccess() {
               />
             </div>
             <button type="submit" className="btn login-submit login-submit-brand" disabled={submitting}>
-              {submitting ? 'Submitting…' : 'Submit request'}
+              {submitting ? t('request.submitting') : t('request.submit')}
             </button>
           </form>
         ) : null}
 
         <div className="login-help-body" style={{ marginTop: doneMessage ? '0.5rem' : '1rem' }}>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
-            Accounts are not self-activated. You will hear from your Sentinel administrator after review.
+            {t('request.accountsNotSelfActivated')}
           </p>
           {contactEmail ? (
             <p style={{ fontSize: 'var(--text-sm)' }}>
-              Questions?{' '}
+              {t('request.questions')}{' '}
               <a className="login-footer-link" href={`mailto:${contactEmail}?subject=Sentinel%20access%20request`}>
                 {contactEmail}
               </a>
@@ -174,7 +175,7 @@ export function RequestAccess() {
 
         <p className="login-help-back">
           <Link to="/login" className="login-footer-link">
-            Back to sign in
+            {t('request.backToSignIn')}
           </Link>
         </p>
       </div>

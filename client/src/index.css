@@ -516,6 +516,12 @@ body {
   min-width: 0;
 }
 
+.app-header-language-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .app-header-btn {
   display: inline-flex;
   align-items: center;
@@ -2076,6 +2082,48 @@ select.input {
 
 .login-card .link-button:focus-visible {
   outline-color: var(--login-brand-mid);
+}
+
+.login-language-row {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.login-language-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.language-flag-btn {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  border-radius: 8px;
+  width: 36px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.language-flag-btn:hover {
+  border-color: var(--login-brand-mid);
+}
+
+.language-flag-btn.active {
+  border-color: var(--login-brand-deep);
+  box-shadow: 0 0 0 1px var(--login-brand-mid) inset;
+}
+
+.language-flag-image {
+  width: 30px;
+  height: 22px;
+  border-radius: 3px;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.18) inset;
 }
 
 /* Login: legal links styled as subtle inline buttons */

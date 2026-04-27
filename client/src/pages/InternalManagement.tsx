@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { Navigate } from 'react-router-dom';
@@ -151,6 +152,7 @@ function sortDeductionsForDisplay(
 export function InternalManagement() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<ImTab>('audits');
 
   const [rows, setRows] = useState<InternalRow[]>([]);
@@ -847,30 +849,30 @@ export function InternalManagement() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Internal Management</h1>
+        <h1 className="page-title">{t('internal.title')}</h1>
       </header>
 
       <div className="page-tab-rail">
         {(
           [
-            ['audits', 'Audits'],
-            ['shipments', 'Shipments'],
-            ['calendar', 'Calendar'],
-            ['documents', 'Documents'],
-            ['projectHistory', 'Project History'],
-            ['profit', 'Profit'],
-            ['laborCosts', 'Labor Costs'],
-            ['expenses', 'Expenses'],
-            ['employeeAssignments', 'Employee Assignments'],
-            ['managementAssignments', 'Management Assignments'],
-            ['orgChart', 'Org Chart'],
+            ['audits', t('internal.tab.audits')],
+            ['shipments', t('internal.tab.shipments')],
+            ['calendar', t('internal.tab.calendar')],
+            ['documents', t('internal.tab.documents')],
+            ['projectHistory', t('internal.tab.projectHistory')],
+            ['profit', t('internal.tab.profit')],
+            ['laborCosts', t('internal.tab.laborCosts')],
+            ['expenses', t('internal.tab.expenses')],
+            ['employeeAssignments', t('internal.tab.employeeAssignments')],
+            ['managementAssignments', t('internal.tab.managementAssignments')],
+            ['orgChart', t('internal.tab.orgChart')],
           ] as const
-        ).map(([t, label]) => (
+        ).map(([tabId, label]) => (
           <button
-            key={t}
+            key={tabId}
             type="button"
-            className={tab === t ? 'btn btn-primary' : 'btn btn-ghost'}
-            onClick={() => setTab(t)}
+            className={tab === tabId ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={() => setTab(tabId)}
           >
             {label}
           </button>

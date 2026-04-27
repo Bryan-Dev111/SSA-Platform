@@ -4,9 +4,11 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { LoginBrandedShell } from '../components/LoginBrandedShell';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 
 export function ResetPassword() {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const tokenFromUrl = searchParams.get('token') ?? '';
 
@@ -21,15 +23,15 @@ export function ResetPassword() {
     e.preventDefault();
     setError('');
     if (!tokenFromUrl.trim()) {
-      setError('Missing reset token. Open the link from your email or request a new reset.');
+      setError(t('reset.missingToken'));
       return;
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError(t('reset.minLength'));
       return;
     }
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(t('reset.passwordMismatch'));
       return;
     }
     setSubmitting(true);
@@ -40,7 +42,7 @@ export function ResetPassword() {
       });
       setSuccess(true);
     } catch (err) {
-      let msg = err instanceof Error ? err.message : 'Reset failed';
+      let msg = err instanceof Error ? err.message : t('reset.resetFailed');
       try {
         const parsed = JSON.parse(msg) as { error?: string };
         if (parsed?.error) msg = parsed.error;
@@ -61,15 +63,15 @@ export function ResetPassword() {
           <span className="login-wordmark">Sentinel</span>
         </div>
         <div className="login-header">
-          <h1 className="login-title">Set new password</h1>
-          <p className="login-subtitle">Choose a strong password for your account.</p>
+          <h1 className="login-title">{t('reset.title')}</h1>
+          <p className="login-subtitle">{t('reset.subtitle')}</p>
         </div>
 
         {success ? (
           <>
-            <p style={{ marginBottom: '1rem' }}>Your password has been updated.</p>
+            <p style={{ marginBottom: '1rem' }}>{t('reset.updated')}</p>
             <Link to="/login" className="btn login-submit login-submit-brand" style={{ textAlign: 'center', textDecoration: 'none' }}>
-              Sign in
+              {t('auth.signIn')}
             </Link>
           </>
         ) : (
@@ -78,14 +80,14 @@ export function ResetPassword() {
               <div className="alert-error" style={{ marginBottom: '1rem' }}>
                 This page needs a valid link from your reset email.{' '}
                 <Link to="/forgot-password" className="login-footer-link">
-                  Request a new link
+                  {t('reset.requestNewLink')}
                 </Link>
               </div>
             ) : null}
             {error ? <div className="alert-error" style={{ marginBottom: '1rem' }}>{error}</div> : null}
             <div className="input-group">
               <label htmlFor="reset-password" className="input-label">
-                New password
+                {t('reset.newPassword')}
               </label>
               <input
                 id="reset-password"
@@ -101,7 +103,7 @@ export function ResetPassword() {
             </div>
             <div className="input-group">
               <label htmlFor="reset-confirm" className="input-label">
-                Confirm password
+                {t('reset.confirmPassword')}
               </label>
               <input
                 id="reset-confirm"
@@ -117,21 +119,21 @@ export function ResetPassword() {
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.75rem', fontSize: 'var(--text-sm)' }}>
               <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />
-              Show passwords
+              {t('reset.showPasswords')}
             </label>
             <button
               type="submit"
               className="btn login-submit login-submit-brand"
               disabled={submitting || !tokenFromUrl}
             >
-              {submitting ? 'Saving…' : 'Update password'}
+              {submitting ? t('reset.saving') : t('reset.updatePassword')}
             </button>
           </form>
         )}
 
         <p className="login-help-back">
           <Link to="/login" className="login-footer-link">
-            Back to sign in
+            {t('request.backToSignIn')}
           </Link>
         </p>
       </div>
