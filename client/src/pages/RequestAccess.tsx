@@ -88,7 +88,7 @@ export function RequestAccess() {
           <form onSubmit={handleSubmit} className="login-form">
             <div className="input-group">
               <label htmlFor="req-email" className="input-label">
-                Work email <span style={{ color: 'var(--color-danger, #b91c1c)' }}>*</span>
+                Email <span style={{ color: 'var(--color-danger, #b91c1c)' }}>*</span>
               </label>
               <input
                 id="req-email"
