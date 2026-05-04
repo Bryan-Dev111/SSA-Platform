@@ -14,6 +14,7 @@ export const PATH_ROLES: Record<string, string[]> = {
   '/global-vendors/farm-profile': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/approved': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/map': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  '/global-vendors/risk-intelligence': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/relationship': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/buyer-relationships': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/internal-management': [
@@ -82,6 +83,7 @@ const SIDEBAR_PATH_ORDER = [
   '/global-vendors/farmers',
   '/global-vendors/approved',
   '/global-vendors/map',
+  '/global-vendors/risk-intelligence',
   '/global-vendors/relationship',
   '/global-vendors/buyer-relationships',
   '/global-vendors/samples',

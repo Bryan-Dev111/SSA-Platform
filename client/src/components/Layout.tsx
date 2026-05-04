@@ -69,6 +69,7 @@ const GLOBAL_VENDOR_ITEMS: { path: string; labelKey: string; fallback: string }[
   { path: '/global-vendors/farmers', labelKey: 'nav.farmInformation', fallback: 'Farm Information' },
   { path: '/global-vendors/approved', labelKey: 'nav.approvedFarmsList', fallback: 'Approved Farms List' },
   { path: '/global-vendors/map', labelKey: 'nav.farmsMap', fallback: 'Farms Map' },
+  { path: '/global-vendors/risk-intelligence', labelKey: 'nav.riskIntelligence', fallback: 'Risk Intelligence' },
   { path: '/global-vendors/relationship', labelKey: 'nav.relationshipTrust', fallback: 'Relationship & Trust' },
   { path: '/global-vendors/buyer-relationships', labelKey: 'nav.buyerRelationships', fallback: 'Buyer Relationships' },
   { path: '/global-vendors/samples', labelKey: 'nav.samples', fallback: 'Samples' },

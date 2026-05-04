@@ -102,6 +102,26 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'nav.farmInformation': 'Farm Information',
     'nav.approvedFarmsList': 'Approved Farms List',
     'nav.farmsMap': 'Farms Map',
+    'nav.riskIntelligence': 'Risk Intelligence',
+    'globalRisk.pageTitle': 'Risk Intelligence',
+    'globalRisk.lead':
+      'A single place to orient sourcing and operations teams on external risks. Use the pillars below as a checklist; links open official reference sources in a new tab.',
+    'globalRisk.pillar.environment.title': 'Environmental & weather',
+    'globalRisk.pillar.environment.body':
+      'Track seasonal rainfall and temperature stress, drought or flood advisories, pest pressure, and harvest windows that can shift origin availability or quality. Pair satellite and ground reports with your crop calendar.',
+    'globalRisk.pillar.politics.title': 'Politics & policy',
+    'globalRisk.pillar.politics.body':
+      'Monitor elections, civil unrest, sanctions, export bans, and trade-rule changes that can block shipments or re-price origins overnight. Flag jurisdictions where contract enforcement may weaken.',
+    'globalRisk.pillar.logistics.title': 'Logistics & infrastructure',
+    'globalRisk.pillar.logistics.body':
+      'Watch port congestion, rail and road disruptions, fuel or power shortages, cold-chain breaks, and last-mile risk. Correlate carrier delays with origin and destination hubs you use most.',
+    'globalRisk.pillar.financial.title': 'Financial & market signals',
+    'globalRisk.pillar.financial.body':
+      'Follow FX against your settlement currencies, benchmark futures for your commodities, credit spreads for key counterparties, and inflation or interest-rate paths that move working-capital cost.',
+    'globalRisk.howTitle': 'How teams use this page',
+    'globalRisk.how1': 'Commodity buyers: align bids and coverage with weather and policy shocks in origins.',
+    'globalRisk.how2': 'Sourcing directors: prioritize country reviews when multiple pillars flash red.',
+    'globalRisk.how3': 'Logistics: escalate reroutes when infrastructure and market stress overlap.',
     'nav.relationshipTrust': 'Relationship & Trust',
     'nav.buyerRelationships': 'Buyer Relationships',
     'nav.samples': 'Samples',
@@ -255,6 +275,26 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'nav.farmInformation': 'Información de Finca',
     'nav.approvedFarmsList': 'Lista de Fincas Aprobadas',
     'nav.farmsMap': 'Mapa de Fincas',
+    'nav.riskIntelligence': 'Inteligencia de riesgos',
+    'globalRisk.pageTitle': 'Inteligencia de riesgos',
+    'globalRisk.lead':
+      'Un punto único para orientar a abastecimiento y operaciones sobre riesgos externos. Use los pilares como lista de verificación; los enlaces abren fuentes de referencia oficiales en una pestaña nueva.',
+    'globalRisk.pillar.environment.title': 'Medio ambiente y clima',
+    'globalRisk.pillar.environment.body':
+      'Siga lluvias y estrés térmico estacional, sequías o inundaciones, plagas y ventanas de cosecha que cambian disponibilidad o calidad en origen. Combine reportes satelitales y de campo con su calendario de cultivo.',
+    'globalRisk.pillar.politics.title': 'Política y normativa',
+    'globalRisk.pillar.politics.body':
+      'Vigile elecciones, disturbios, sanciones, prohibiciones de exportación y cambios comerciales que bloqueen embarques o re-pricing. Marque jurisdicciones con debilidad en cumplimiento contractual.',
+    'globalRisk.pillar.logistics.title': 'Logística e infraestructura',
+    'globalRisk.pillar.logistics.body':
+      'Supervise congestión portuaria, cortes de ferrocarril o carretera, escasez de combustible o energía, rupturas de cadena de frío y riesgo de última milla. Relacionen retrasos con hubs de origen y destino.',
+    'globalRisk.pillar.financial.title': 'Señales financieras y de mercado',
+    'globalRisk.pillar.financial.body':
+      'Siga el tipo de cambio frente a sus monedas de liquidación, futuros de referencia, spreads de crédito de contrapartes clave e inflación o tasas que muevan el capital de trabajo.',
+    'globalRisk.howTitle': 'Cómo usan esta página los equipos',
+    'globalRisk.how1': 'Compradores de commodities: alineen ofertas y cobertura con choques climáticos y de política en orígenes.',
+    'globalRisk.how2': 'Directores de abastecimiento: prioricen revisiones por país cuando varios pilares se encienden.',
+    'globalRisk.how3': 'Logística: escalen desvíos cuando coincidan tensión de infraestructura y de mercado.',
     'nav.relationshipTrust': 'Relación y Confianza',
     'nav.buyerRelationships': 'Relaciones con Compradores',
     'nav.samples': 'Muestras',
@@ -411,6 +451,26 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'nav.farmInformation': 'Informations Ferme',
     'nav.approvedFarmsList': 'Liste des Fermes Approuvées',
     'nav.farmsMap': 'Carte des Fermes',
+    'nav.riskIntelligence': 'Renseignements sur les risques',
+    'globalRisk.pageTitle': 'Renseignements sur les risques',
+    'globalRisk.lead':
+      'Un lieu unique pour orienter les équipes sourcing et opérations sur les risques externes. Utilisez les piliers comme liste de contrôle ; les liens ouvrent des sources officielles dans un nouvel onglet.',
+    'globalRisk.pillar.environment.title': 'Environnement et météo',
+    'globalRisk.pillar.environment.body':
+      'Suivez pluviométrie saisonnière et stress thermique, sécheresses ou crues, pression parasitaire et fenêtres de récolte qui déplacent disponibilité ou qualité à l’origine. Croisez données satellite et terrain avec votre calendrier agricole.',
+    'globalRisk.pillar.politics.title': 'Politique et réglementation',
+    'globalRisk.pillar.politics.body':
+      'Surveillez élections, troubles, sanctions, embargos export et évolutions du commerce international qui bloquent les expéditions ou re-pricent les origines. Repérez les juridictions à exécution contractuelle fragile.',
+    'globalRisk.pillar.logistics.title': 'Logistique et infrastructures',
+    'globalRisk.pillar.logistics.body':
+      'Contrôlez congestion portuaire, ruptures rail/route, pénuries d’énergie ou de carburant, ruptures de chaîne du froid et risque dernier kilomètre. Corrélez les retards transporteurs avec vos hubs origine/destination.',
+    'globalRisk.pillar.financial.title': 'Signaux financiers et de marché',
+    'globalRisk.pillar.financial.body':
+      'Suivez le FX vs vos devises de règlement, les contrats à terme de référence, les spreads de crédit des contreparties clés et l’inflation ou les taux qui bougent le besoin en fonds de roulement.',
+    'globalRisk.howTitle': 'Comment les équipes utilisent cette page',
+    'globalRisk.how1': 'Acheteurs matières : alignez offres et couverture sur les chocs météo et politiques aux origines.',
+    'globalRisk.how2': 'Directeurs sourcing : priorisez les revues pays lorsque plusieurs piliers passent au rouge.',
+    'globalRisk.how3': 'Logistique : escaladez les reroutages lorsque stress infrastructure et marché se cumulent.',
     'nav.relationshipTrust': 'Relation & Confiance',
     'nav.buyerRelationships': 'Relations Acheteurs',
     'nav.samples': 'Échantillons',

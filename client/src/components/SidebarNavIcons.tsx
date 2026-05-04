@@ -229,6 +229,13 @@ export function SidebarNavIcon({ path }: { path: string }) {
           <path d="M9 3v15M15 6v15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
+    case '/global-vendors/risk-intelligence':
+      return (
+        <Svg>
+          <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          <path d="M12 12v9M12 12l6-3M12 12L6 9" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        </Svg>
+      );
     case '/global-vendors/relationship':
       return (
         <Svg>

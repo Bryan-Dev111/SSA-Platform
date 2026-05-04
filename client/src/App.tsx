@@ -36,6 +36,7 @@ import { FarmersInformationPage } from './pages/globalVendors/FarmersInformation
 import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
 import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
 import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
+import { GlobalSupplyRiskIntelligencePage } from './pages/globalVendors/GlobalSupplyRiskIntelligencePage';
 import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
 import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
@@ -161,6 +162,14 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/map">
                     <FarmsMapPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="risk-intelligence"
+                element={
+                  <ProtectedRoute path="/global-vendors/risk-intelligence">
+                    <GlobalSupplyRiskIntelligencePage />
                   </ProtectedRoute>
                 }
               />
