@@ -276,6 +276,7 @@ export function AdminExpensesPanel({
   canCloseExpense = false,
   canEditExpense = true,
   canDeleteExpense = false,
+  expenseTypesEndpoint = '/supplier-assurance-options/expense-types',
 }: {
   token: string | null;
   toast: ToastApi;
@@ -303,6 +304,8 @@ export function AdminExpensesPanel({
   canEditExpense?: boolean;
   /** Permanently delete a row (Admin only); shows a confirmation dialog. */
   canDeleteExpense?: boolean;
+  /** Expense type dropdown source: SSA Internal Management vs Global Supply. */
+  expenseTypesEndpoint?: string;
 }) {
   const [list, setList] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -498,7 +501,7 @@ export function AdminExpensesPanel({
     try {
       const [r, typeRes, projectRes] = await Promise.all([
         apiJson<{ list: ExpenseRow[] }>('/expenses', { token }),
-        apiJson<{ list: ExpenseTypeOption[] }>('/global-supply-options/expense-types', { token }).catch(() => ({
+        apiJson<{ list: ExpenseTypeOption[] }>(expenseTypesEndpoint, { token }).catch(() => ({
           list: [] as ExpenseTypeOption[],
         })),
         apiJson<ExpenseProjectOption[]>('/project-history', { token }).catch(() => [] as ExpenseProjectOption[]),
@@ -521,7 +524,7 @@ export function AdminExpensesPanel({
       setProjectOptions([]);
       toast.error('Failed to load expenses');
     }
-  }, [token, toast, showPurchaseOrderPicker]);
+  }, [token, toast, showPurchaseOrderPicker, expenseTypesEndpoint]);
 
   const countryNameOptions = useMemo(() => {
     const names = new Set<string>();
@@ -1514,19 +1517,6 @@ const ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN = new Set([
   'QualityManager',
 ]);
 
-/** Role rows omitted from Global Supply Admin → Permissions matrix (main SSA roles + Buyer; GS uses CommodityBuyer). */
-const PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES = new Set([
-  'Auditor',
-  'Buyer',
-  'Inspector',
-  'QualityEngineer',
-  'QualityManager',
-  'Supplier',
-]);
-
-/** Role rows omitted from main Admin → Permissions matrix (Global Supply product roles). */
-const PERMISSION_MATRIX_SENTINEL_HIDE_ROLES = new Set(['Farmer', 'CommodityBuyer', 'SourcingDirector']);
-
 function formatUserRoleLabel(roleName: string): string {
   if (roleName === 'QualityEngineer') return 'Quality Engineer';
   if (roleName === 'QualityManager') return 'Quality Manager';
@@ -2185,13 +2175,24 @@ export function AdminBuyersSuppliersPanel({
                 <option value="Inactive">Inactive</option>
               </select>
             </div>
-            <div className="input-group">
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              alignItems: 'flex-end',
+              width: '100%',
+              marginTop: '0.5rem',
+            }}
+          >
+            <div className="input-group" style={{ flex: '0 1 220px', minWidth: 200, marginBottom: 0 }}>
               <label className="input-label">Commodity</label>
               <select
                 className="input"
                 value={newSupCommodityTypeId}
                 onChange={(e) => setNewSupCommodityTypeId(e.target.value)}
-                style={{ minWidth: 180 }}
+                style={{ width: '100%', minWidth: 0 }}
               >
                 <option value="">— None —</option>
                 {commodityTypes.map((c) => (
@@ -2201,9 +2202,14 @@ export function AdminBuyersSuppliersPanel({
                 ))}
               </select>
             </div>
-            <div className="input-group">
+            <div className="input-group" style={{ flex: '1 1 320px', minWidth: 220, marginBottom: 0 }}>
               <label className="input-label">Notes</label>
-              <input className="input" value={newSupNotes} onChange={(e) => setNewSupNotes(e.target.value)} />
+              <input
+                className="input"
+                value={newSupNotes}
+                onChange={(e) => setNewSupNotes(e.target.value)}
+                style={{ width: '100%', minWidth: 0 }}
+              />
             </div>
           </div>
             <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
@@ -2970,7 +2976,11 @@ export function AdminPermissionsPanel({
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const d = await apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token });
+      const q =
+        scope === 'sentinel' || scope === 'globalVendors'
+          ? `?scope=${encodeURIComponent(scope)}`
+          : '';
+      const d = await apiJson<PermissionMatrixResponse>(`/users/permission-matrix${q}`, { token });
       const roleRows =
         Array.isArray(d.roleRows) && d.roleRows.length > 0
           ? d.roleRows
@@ -2981,7 +2991,7 @@ export function AdminPermissionsPanel({
       setServerData(null);
       setMatrixError(e instanceof Error ? e.message : 'Failed to load server permission matrix');
     }
-  }, [token]);
+  }, [token, scope]);
 
   useEffect(() => {
     load();
@@ -3065,28 +3075,8 @@ export function AdminPermissionsPanel({
     }
   };
 
-  const filteredPages = useMemo(() => {
-    if (!serverData) return [];
-    if (scope === 'globalVendors') {
-      return serverData.pages.filter((p) => p.path.startsWith('/global-vendors'));
-    }
-    if (scope === 'sentinel') {
-      return serverData.pages.filter((p) => !p.path.startsWith('/global-vendors'));
-    }
-    return serverData.pages;
-  }, [serverData, scope]);
-
-  const filteredRoleRows = useMemo(() => {
-    if (!serverData) return [];
-    const rows = serverData.roleRows ?? [];
-    if (scope === 'globalVendors') {
-      return rows.filter((r) => !PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES.has(r.name));
-    }
-    if (scope === 'sentinel') {
-      return rows.filter((r) => !PERMISSION_MATRIX_SENTINEL_HIDE_ROLES.has(r.name));
-    }
-    return rows;
-  }, [serverData, scope]);
+  const matrixPages = serverData?.pages ?? [];
+  const matrixRoleRows = serverData?.roleRows ?? [];
 
   return (
     <div className="card">
@@ -3116,14 +3106,14 @@ export function AdminPermissionsPanel({
               <thead>
                 <tr>
                   <th style={{ minWidth: 200 }}>Role</th>
-                  {filteredPages.map((p) => (
+                  {matrixPages.map((p) => (
                     <th key={p.key}>{p.label}</th>
                   ))}
                   <th style={{ width: 100 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRoleRows.map((roleRow) => {
+                {matrixRoleRows.map((roleRow) => {
                   const roleName = roleRow.name;
                   const canDelete =
                     Boolean(roleRow.id) &&
@@ -3155,7 +3145,7 @@ export function AdminPermissionsPanel({
                           ) : null}
                         </div>
                       </td>
-                      {filteredPages.map((p) => (
+                      {matrixPages.map((p) => (
                         <td key={`${roleName}-${p.key}`}>
                           <input
                             type="checkbox"

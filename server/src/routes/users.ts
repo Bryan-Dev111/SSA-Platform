@@ -9,7 +9,13 @@ import { encryptPassword, decryptPassword } from '../lib/passwordCrypto';
 import { authMiddleware } from '../middleware/auth';
 import { API_PAGE_ROLES, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { DEFAULT_PATH_ROLES, PAGE_DEFINITIONS } from '../lib/permissions';
+import {
+  DEFAULT_PATH_ROLES,
+  PAGE_DEFINITIONS,
+  canonicalRoleNameForPermissionMatrix,
+  SENTINEL_ADMIN_PERMISSIONS_EXCLUDED_ROLES,
+  GLOBAL_VENDORS_ADMIN_PERMISSIONS_EXCLUDED_ROLES,
+} from '../lib/permissions';
 import { isSmtpConfigured } from '../lib/mail';
 
 const router = Router();
@@ -163,14 +169,33 @@ router.get(
 /** Canonical server permission matrix (for Admin UI; Day 9.4) */
 router.get(
   '/permission-matrix',
-  asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-    const roles = await prisma.role.findMany({
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const scopeRaw = typeof req.query.scope === 'string' ? req.query.scope.trim() : '';
+    const scope = scopeRaw === 'sentinel' || scopeRaw === 'globalVendors' ? scopeRaw : 'all';
+
+    const rolesAll = await prisma.role.findMany({
       where: { name: { notIn: [...DEPRECATED_ROLE_NAMES] } },
       select: { id: true, name: true, _count: { select: { userRoles: true } } },
       orderBy: { name: 'asc' },
     });
+    const pagesAll = [...PAGE_DEFINITIONS];
+    let pages = pagesAll;
+    let roles = rolesAll;
+    if (scope === 'sentinel') {
+      pages = pagesAll.filter((p) => !p.path.startsWith('/global-vendors'));
+      roles = rolesAll.filter(
+        (r) => !SENTINEL_ADMIN_PERMISSIONS_EXCLUDED_ROLES.has(canonicalRoleNameForPermissionMatrix(r.name))
+      );
+    } else if (scope === 'globalVendors') {
+      pages = pagesAll.filter((p) => p.path.startsWith('/global-vendors'));
+      roles = rolesAll.filter(
+        (r) => !GLOBAL_VENDORS_ADMIN_PERMISSIONS_EXCLUDED_ROLES.has(canonicalRoleNameForPermissionMatrix(r.name))
+      );
+    }
+
+    const pageKeys = pages.map((p) => p.key);
     const perms = await prisma.rolePagePermission.findMany({
-      where: { pageKey: { in: PAGE_DEFINITIONS.map((p) => p.key) } },
+      where: { pageKey: { in: pageKeys } },
       select: { roleId: true, pageKey: true, canAccess: true },
     });
     const matrix: Record<string, Record<string, boolean>> = {};
@@ -181,7 +206,7 @@ router.get(
     }));
     for (const role of roles) {
       matrix[role.name] = {};
-      for (const page of PAGE_DEFINITIONS) {
+      for (const page of pages) {
         const row = perms.find((p) => p.roleId === role.id && p.pageKey === page.key);
         if (perms.length === 0) {
           matrix[role.name][page.key] = (DEFAULT_PATH_ROLES[page.path] ?? []).includes(role.name);
@@ -190,9 +215,17 @@ router.get(
         }
       }
     }
+    const apiPageRolesPayload: Record<string, string[]> =
+      scope === 'all'
+        ? { ...API_PAGE_ROLES }
+        : Object.fromEntries(
+            pageKeys
+              .map((key) => [key, API_PAGE_ROLES[key]] as const)
+              .filter(([, arr]) => Array.isArray(arr))
+          );
     res.json({
-      apiPageRoles: API_PAGE_ROLES,
-      pages: PAGE_DEFINITIONS,
+      apiPageRoles: apiPageRolesPayload,
+      pages,
       roles: roles.map((r) => r.name),
       roleRows,
       matrix,
@@ -457,6 +490,7 @@ router.put(
       if (!roleId) continue;
       const row = matrixRaw[roleName] ?? {};
       for (const page of PAGE_DEFINITIONS) {
+        if (!Object.prototype.hasOwnProperty.call(row, page.key)) continue;
         const canAccess = Boolean(row[page.key]);
         ops.push(
           prismaBase.rolePagePermission.upsert({

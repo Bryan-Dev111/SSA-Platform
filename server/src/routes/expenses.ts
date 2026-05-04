@@ -30,6 +30,36 @@ function isPurchaseOrderOpenStatus(status: string | null | undefined): boolean {
   return (status ?? 'Open').trim().toLowerCase() !== 'closed';
 }
 
+const GLOBAL_VENDORS_EXPENSE_PROJECT = 'Global Vendors';
+
+/** Expense `type` must exist in the catalog for the business (SSA vs Global Supply). */
+async function assertExpenseTypeMatchesProjectCatalog(
+  project: string,
+  type: string,
+  res: Response
+): Promise<boolean> {
+  const p = project.trim();
+  const t = type.trim();
+  if (!t) {
+    res.status(400).json({ error: 'type is required' });
+    return false;
+  }
+  if (p === GLOBAL_VENDORS_EXPENSE_PROJECT) {
+    const row = await prisma.globalSupplyExpenseType.findUnique({ where: { name: t } });
+    if (!row) {
+      res.status(400).json({ error: 'Expense type is not valid for Global Supply expenses' });
+      return false;
+    }
+  } else {
+    const row = await prisma.supplierAssuranceExpenseType.findUnique({ where: { name: t } });
+    if (!row) {
+      res.status(400).json({ error: 'Expense type is not valid for Supplier Assurance expenses' });
+      return false;
+    }
+  }
+  return true;
+}
+
 /** For create/update: null clears link; id must exist and be open (not Closed). */
 async function resolvePurchaseOrderIdForWrite(
   raw: unknown,
@@ -213,6 +243,8 @@ router.post(
       return;
     }
 
+    if (!(await assertExpenseTypeMatchesProjectCatalog(project, type, res))) return;
+
     let purchaseOrderId: string | null | undefined;
     if (req.body?.purchaseOrderId !== undefined) {
       const resolved = await resolvePurchaseOrderIdForWrite(req.body.purchaseOrderId, res);
@@ -319,6 +351,12 @@ router.patch(
     if (Object.keys(data).length === 0) {
       res.status(400).json({ error: 'No valid fields to update' });
       return;
+    }
+
+    if (data.type !== undefined || data.project !== undefined) {
+      const mergedProject = (data.project ?? existing.project).trim();
+      const mergedType = (data.type ?? existing.type).trim();
+      if (!(await assertExpenseTypeMatchesProjectCatalog(mergedProject, mergedType, res))) return;
     }
 
     const updated = await prisma.expense.update({

@@ -98,16 +98,24 @@ export function SidebarNavIcon({ path }: { path: string }) {
         </Svg>
       );
     case '/shipments':
+      /** Small boat / ship — hull + mast + sail (stroke icon, matches nav set). */
       return (
         <Svg>
           <path
-            d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"
+            d="M4.5 13h15l2.5 5H2l2.5-5z"
             stroke="currentColor"
             strokeWidth="2"
-            strokeLinecap="round"
             strokeLinejoin="round"
+            strokeLinecap="round"
           />
-          <path d="M12 22V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M12 6v7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M12 7.5L8.5 13h7L12 7.5z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
         </Svg>
       );
     case '/records':

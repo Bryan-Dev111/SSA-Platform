@@ -1,5 +1,5 @@
 /**
- * Supplier List: GET /suppliers (scope: Admin all; Buyer assigned; Supplier own).
+ * Approved Suppliers List: GET /suppliers (scope: Admin all; Buyer assigned; Supplier own).
  * Commodity type is read-only here; Admin sets it when creating a supplier (Admin → Buyers & Suppliers).
  */
 import { useEffect, useState } from 'react';

@@ -62,6 +62,13 @@ interface AuditTypeOption {
   name: string | null;
 }
 
+/** Sentinel employees/contractors for audit assignment (matches GET /audits/auditors). */
+interface AuditAuditorOption {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface ScheduleRow {
   id: string;
   supplierId: string | null;
@@ -111,6 +118,9 @@ interface ProfitRow {
   costs: number;
   profit: number;
   status: string;
+  /** POP bounds for inactive past vs future row styling (from profit-summary). */
+  popStart?: string | null;
+  popEnd?: string | null;
   deductions?: Array<{
     code: string;
     amount: number;
@@ -125,6 +135,76 @@ function projectPopToInputDate(iso: string | null | undefined): string {
 
 function formatProjectPopCell(popStart: string | null, popEnd: string | null): string {
   return formatDisplayCalendarRange(popStart, popEnd);
+}
+
+/** UTC calendar-day boundary (ms), aligned with server `client-history` POP / Active logic. */
+function utcDayMsFromPopField(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const datePart = iso.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null;
+  const [y, m, d] = datePart.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
+  if (Number.isNaN(dt.getTime())) return null;
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return Date.UTC(y, m - 1, d);
+}
+
+type ProjectHistoryVisualTone = 'active' | 'inactivePast' | 'inactiveFuture';
+
+/** POP window vs today (UTC calendar) — shared by Project History and Profit rows. */
+function popWindowTone(
+  popStart: string | null | undefined,
+  popEnd: string | null | undefined
+): ProjectHistoryVisualTone {
+  const s = utcDayMsFromPopField(popStart);
+  const e = utcDayMsFromPopField(popEnd);
+  const now = new Date();
+  const t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  if (s != null && e != null) {
+    if (s > e) return 'inactivePast';
+    if (t >= s && t <= e) return 'active';
+    if (t < s) return 'inactiveFuture';
+    return 'inactivePast';
+  }
+  return 'inactivePast';
+}
+
+function projectHistoryRowTone(r: ProjectHistoryRow): ProjectHistoryVisualTone {
+  return popWindowTone(r.popStart, r.popEnd);
+}
+
+function profitRowStyle(r: ProfitRow): Record<string, string> {
+  return projectHistoryRowStyle(popWindowTone(r.popStart, r.popEnd));
+}
+
+function profitRowTitle(r: ProfitRow): string | undefined {
+  return projectHistoryRowTitle(popWindowTone(r.popStart, r.popEnd));
+}
+
+function projectHistoryRowStyle(tone: ProjectHistoryVisualTone): Record<string, string> {
+  switch (tone) {
+    case 'active':
+      return { backgroundColor: 'var(--color-surface, #ffffff)' };
+    case 'inactiveFuture':
+      return { backgroundColor: '#e8edf2' };
+    case 'inactivePast':
+      return { backgroundColor: '#8d98a8' };
+    default:
+      return {};
+  }
+}
+
+function projectHistoryRowTitle(tone: ProjectHistoryVisualTone): string | undefined {
+  switch (tone) {
+    case 'active':
+      return undefined;
+    case 'inactiveFuture':
+      return 'Inactive — period of performance has not started yet';
+    case 'inactivePast':
+      return 'Inactive — period ended, incomplete dates, or invalid range';
+    default:
+      return undefined;
+  }
 }
 
 function formatProfitMoney(value: number): string {
@@ -159,6 +239,7 @@ export function InternalManagement() {
   const [rows, setRows] = useState<InternalRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [auditTypes, setAuditTypes] = useState<AuditTypeOption[]>([]);
+  const [auditAuditors, setAuditAuditors] = useState<AuditAuditorOption[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -345,18 +426,35 @@ export function InternalManagement() {
     return map;
   }, [rows]);
 
-  const profitRowsActive = useMemo(
-    () => profitRows.filter((r) => (r.status ?? '').trim().toLowerCase() === 'active'),
+  /** Inactive projects whose POP is in the past (or missing / invalid) — “closed”; excludes future POP. */
+  const profitRowsClosedPast = useMemo(
+    () => profitRows.filter((r) => popWindowTone(r.popStart, r.popEnd) === 'inactivePast'),
     [profitRows]
   );
-  const profitRowsInactive = useMemo(
-    () => profitRows.filter((r) => (r.status ?? '').trim().toLowerCase() === 'inactive'),
-    [profitRows]
+
+  const closedProjectsProfitTotal = useMemo(
+    () => profitRowsClosedPast.reduce((sum, r) => sum + r.profit, 0),
+    [profitRowsClosedPast]
   );
-  const inactiveProjectsProfitTotal = useMemo(
-    () => profitRowsInactive.reduce((sum, r) => sum + r.profit, 0),
-    [profitRowsInactive]
-  );
+
+  const closedProjectCount = profitRowsClosedPast.length;
+
+  const profitRowsDisplaySorted = useMemo(() => {
+    const list = [...profitRows];
+    const rank = (r: ProfitRow) => {
+      const tone = popWindowTone(r.popStart, r.popEnd);
+      if (tone === 'active') return 0;
+      if (tone === 'inactivePast') return 1;
+      return 2;
+    };
+    list.sort((a, b) => {
+      const ra = rank(a);
+      const rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      return a.projectCode.localeCompare(b.projectCode, undefined, { sensitivity: 'base' });
+    });
+    return list;
+  }, [profitRows]);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
 
@@ -421,6 +519,16 @@ export function InternalManagement() {
   useEffect(() => {
     if (!token || !isAdmin || tab !== 'audits') return;
     loadProjectHistories();
+  }, [token, isAdmin, tab]);
+
+  useEffect(() => {
+    if (!token || !isAdmin || tab !== 'audits') {
+      setAuditAuditors([]);
+      return;
+    }
+    apiJson<{ list: AuditAuditorOption[] }>('/audits/auditors', { token })
+      .then((r) => setAuditAuditors(r.list ?? []))
+      .catch(() => setAuditAuditors([]));
   }, [token, isAdmin, tab]);
 
   useEffect(() => {
@@ -812,6 +920,8 @@ export function InternalManagement() {
           </thead>
           <tbody>
             {sectionRows.flatMap((r) => {
+              const rowStyle = profitRowStyle(r);
+              const rowTitle = profitRowTitle(r);
               const deductions = sortDeductionsForDisplay(r.deductions ?? []);
               const rowsForProject =
                 deductions.length > 0
@@ -823,20 +933,31 @@ export function InternalManagement() {
                 const suffixFromI = deductionAmounts.slice(i).reduce((sum, x) => sum + x, 0);
                 const runningProfit = revenue - suffixFromI;
                 const isFirst = i === 0;
+                const isFinalProfitRow = i === rowsForProject.length - 1;
+                const tdStyle = (extra?: Record<string, string | number>): Record<string, string | number> => ({
+                  ...rowStyle,
+                  ...(extra ?? {}),
+                });
                 return (
-                  <tr key={`${r.projectId}-${d.code}-${i}`}>
+                  <tr key={`${r.projectId}-${d.code}-${i}`} title={rowTitle}>
                     {isFirst ? (
                       <>
-                        <td rowSpan={rowsForProject.length}>{r.projectCode}</td>
-                        <td rowSpan={rowsForProject.length}>{r.companyName}</td>
-                        <td rowSpan={rowsForProject.length}>
+                        <td rowSpan={rowsForProject.length} style={tdStyle()}>
+                          {r.projectCode}
+                        </td>
+                        <td rowSpan={rowsForProject.length} style={tdStyle()}>
+                          {r.companyName}
+                        </td>
+                        <td rowSpan={rowsForProject.length} style={tdStyle()}>
                           {r.revenue ?? formatProfitMoney(revenue)}
                         </td>
                       </>
                     ) : null}
-                    <td>{d.code === '—' ? '—' : `${d.code} (${d.kind})`}</td>
-                    <td>{d.code === '—' ? '—' : formatProfitMoney(d.amount)}</td>
-                    <td>{formatProfitMoney(runningProfit)}</td>
+                    <td style={tdStyle()}>{d.code === '—' ? '—' : `${d.code} (${d.kind})`}</td>
+                    <td style={tdStyle()}>{d.code === '—' ? '—' : formatProfitMoney(d.amount)}</td>
+                    <td style={tdStyle(isFinalProfitRow ? { fontWeight: 700 } : undefined)}>
+                      {formatProfitMoney(runningProfit)}
+                    </td>
                   </tr>
                 );
               });
@@ -970,11 +1091,18 @@ export function InternalManagement() {
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
                   <label className="input-label">Auditor</label>
-                  <input
+                  <select
                     className="input"
                     value={newAudit.auditor}
                     onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
-                  />
+                  >
+                    <option value="">—</option>
+                    {auditAuditors.map((a) => (
+                      <option key={a.id} value={a.name}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="input-group" style={{ marginBottom: '0.75rem' }}>
@@ -1654,8 +1782,14 @@ export function InternalManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedFilteredProjectHistories.map((r) => (
-                        <tr key={r.id}>
+                      {sortedFilteredProjectHistories.map((r) => {
+                        const tone = projectHistoryRowTone(r);
+                        return (
+                        <tr
+                          key={r.id}
+                          style={projectHistoryRowStyle(tone)}
+                          title={projectHistoryRowTitle(tone)}
+                        >
                           <td>{r.projectCode}</td>
                           <td>{r.clientName}</td>
                           <td>{r.companyName}</td>
@@ -1703,7 +1837,8 @@ export function InternalManagement() {
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -1716,43 +1851,39 @@ export function InternalManagement() {
       {tab === 'managementAssignments' && <ManagementAssignmentsPanel token={token} toast={toast} />}
 
       {tab === 'profit' && (
-        <>
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Profit - Active Projects</h2>
-              {profitRows.length === 0
-                ? <p className="table-empty">No projects yet.</p>
-                : renderProfitTable(profitRowsActive, 'No active projects.')}
-            </div>
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0 }}>Profit</h2>
+            {profitRows.length === 0 ? (
+              <p className="table-empty">No projects yet.</p>
+            ) : (
+              <>
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    minWidth: 0,
+                    marginBottom: '1rem',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <MetricCard
+                    title="Total profit (closed projects)"
+                    value={formatProfitMoney(closedProjectsProfitTotal)}
+                    subtitle={
+                      closedProjectCount === 0
+                        ? 'No closed projects'
+                        : closedProjectCount === 1
+                          ? '1 Closed Project'
+                          : `${closedProjectCount} Closed Projects`
+                    }
+                  />
+                </div>
+                {renderProfitTable(profitRowsDisplaySorted, 'No projects yet.')}
+              </>
+            )}
           </div>
-
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Profit - Inactive Projects</h2>
-
-              <div
-                style={{
-                  width: '100%',
-                  maxWidth: '100%',
-                  minWidth: 0,
-                  marginBottom: '1rem',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <MetricCard
-                  title="Total profit (inactive projects)"
-                  value={formatProfitMoney(inactiveProjectsProfitTotal)}
-                  subtitle={
-                    profitRowsInactive.length === 0
-                      ? 'No inactive projects'
-                      : `${profitRowsInactive.length} inactive project${profitRowsInactive.length === 1 ? '' : 's'}`
-                  }
-                />
-              </div>
-              {renderProfitTable(profitRowsInactive, 'No inactive projects.')}
-            </div>
-          </div>
-        </>
+        </div>
       )}
 
       {tab === 'employeeAssignments' && (

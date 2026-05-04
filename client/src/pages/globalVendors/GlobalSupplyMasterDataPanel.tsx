@@ -21,7 +21,8 @@ interface GlobalSupplyMasterDataPanelProps {
   endpoint:
     | '/global-supply-options/crops'
     | '/global-supply-options/countries'
-    | '/global-supply-options/expense-types';
+    | '/global-supply-options/expense-types'
+    | '/supplier-assurance-options/expense-types';
 }
 
 export function GlobalSupplyMasterDataPanel({

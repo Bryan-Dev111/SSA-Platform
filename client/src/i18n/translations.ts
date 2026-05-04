@@ -91,7 +91,7 @@ export const translations: Record<AppLanguage, TranslationDict> = {
     'nav.shipments': 'Shipments',
     'nav.records': 'Records',
     'nav.supplierProfile': 'Supplier Profile',
-    'nav.approvedSupplierList': 'Approved Supplier List',
+    'nav.approvedSupplierList': 'Approved Suppliers List',
     'nav.suppliersMap': 'Suppliers Map',
     'nav.commandMedia': 'Command Media',
     'nav.workLogs': 'Work Logs',

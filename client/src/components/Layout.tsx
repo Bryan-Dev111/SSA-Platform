@@ -55,7 +55,7 @@ const MENU_ITEMS: { path: string; labelKey: string; fallback: string }[] = [
   { path: '/shipments', labelKey: 'nav.shipments', fallback: 'Shipments' },
   { path: '/records', labelKey: 'nav.records', fallback: 'Records' },
   { path: '/supplier-profile', labelKey: 'nav.supplierProfile', fallback: 'Supplier Profile' },
-  { path: '/supplier-list', labelKey: 'nav.approvedSupplierList', fallback: 'Approved Supplier List' },
+  { path: '/supplier-list', labelKey: 'nav.approvedSupplierList', fallback: 'Approved Suppliers List' },
   { path: '/suppliers-map', labelKey: 'nav.suppliersMap', fallback: 'Suppliers Map' },
   { path: '/documents', labelKey: 'nav.commandMedia', fallback: 'Command Media' },
   { path: '/work-logs', labelKey: 'nav.workLogs', fallback: 'Work Logs' },

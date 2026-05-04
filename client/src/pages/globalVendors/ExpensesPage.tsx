@@ -17,6 +17,7 @@ export function GlobalSupplyExpensesSection() {
     <AdminExpensesPanel
       token={token}
       toast={toast}
+      expenseTypesEndpoint="/global-supply-options/expense-types"
       projectFilter={GLOBAL_VENDORS_PROJECT}
       fixedProject={GLOBAL_VENDORS_PROJECT}
       countryOptionsEndpoint="/global-supply-options/countries"

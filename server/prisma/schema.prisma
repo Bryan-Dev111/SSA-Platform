@@ -84,6 +84,7 @@ model User {
   workLogsCreated   WorkLog[]   @relation("WorkLogCreatedBy")
   laborCostsCreated LaborCost[] @relation("LaborCostCreatedBy")
   globalSupplyCalendarEventsCreated GlobalSupplyCalendarEvent[]
+  internalManagementCalendarEventsCreated InternalManagementCalendarEvent[]
 
   /// Global Supply / Internal Management — optional rich text + gallery (Employee Profile page).
   employeeProfile       EmployeeProfile?
@@ -951,6 +952,18 @@ model GlobalSupplyCalendarEvent {
   @@index([eventDate])
 }
 
+/// Sentinel Supplier Assurance — Internal Management calendar: user-added events (subject + date).
+model InternalManagementCalendarEvent {
+  id          String   @id @default(cuid())
+  subject     String
+  eventDate   DateTime @db.Date
+  createdAt   DateTime @default(now())
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([eventDate])
+}
+
 /// Global Supply — logistics sites (port, exporter, mill, trucking, warehouse).
 model SupplyLogistics {
   id                 String   @id @default(cuid())
@@ -998,6 +1011,14 @@ model GlobalSupplyCountry {
 }
 
 model GlobalSupplyExpenseType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Admin-managed expense type list for Internal Management → Expenses (Sentinel Supplier Assurance only).
+model SupplierAssuranceExpenseType {
   id        String   @id @default(cuid())
   name      String   @unique
   createdAt DateTime @default(now())

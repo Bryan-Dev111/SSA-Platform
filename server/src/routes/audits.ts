@@ -10,6 +10,10 @@ import { requirePageAccess } from '../middleware/rbac';
 import { getAllowedSupplierIds } from '../services/scope';
 import { getNextCode } from '../services/idGenerator';
 import { asyncHandler } from '../middleware/asyncHandler';
+import {
+  listSentinelEmployeeContractorsForPicker,
+  sentinelEmployeeContractorDisplayLabelsMatch,
+} from '../lib/sentinelRoster';
 
 const router = Router();
 
@@ -56,6 +60,27 @@ router.get(
       select: { id: true, code: true, name: true },
     });
     res.json(types);
+  })
+);
+
+/** Admin / QE / QM: pickers for audit auditor (Sentinel employees & contractors). */
+router.get(
+  '/auditors',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const canPick =
+      req.user.roleNames.includes('Admin') ||
+      req.user.roleNames.includes('QualityEngineer') ||
+      req.user.roleNames.includes('QualityManager');
+    if (!canPick) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    const list = await listSentinelEmployeeContractorsForPicker();
+    res.json({ list });
   })
 );
 
@@ -231,6 +256,15 @@ router.post(
       }
       projectHistoryIdCreate = pid;
     }
+    const auditorTrimmed = auditor ? String(auditor).trim() : null;
+    const auditorAllowed = await sentinelEmployeeContractorDisplayLabelsMatch(auditorTrimmed);
+    if (!auditorAllowed) {
+      res.status(400).json({
+        error:
+          'Auditor must be an active employee or contractor on the Sentinel Supplier Assurance roster.',
+      });
+      return;
+    }
     const code = await getNextCode('AUD');
     // Parse as calendar date (YYYY-MM-DD) using UTC noon so timezone does not shift the day
     const dateOnly = new Date(auditDate.trim().slice(0, 10) + 'T12:00:00.000Z');
@@ -241,7 +275,7 @@ router.post(
         projectHistoryId: projectHistoryIdCreate,
         auditTypeId: auditTypeId || null,
         auditDate: dateOnly,
-        auditor: auditor ? String(auditor).trim() : null,
+        auditor: auditorTrimmed,
         summary: summary ? String(summary).trim() : null,
         scope: scope ? String(scope).trim() : null,
         notes: notes || null,
@@ -329,7 +363,23 @@ router.patch(
     if (notes !== undefined) update.notes = notes;
     if (summary !== undefined) update.summary = summary ? String(summary).trim() : null;
     if (scope !== undefined) update.scope = scope ? String(scope).trim() : null;
-    if (auditor !== undefined) update.auditor = auditor ? String(auditor).trim() : null;
+    if (auditor !== undefined) {
+      const nextAuditor = auditor ? String(auditor).trim() : null;
+      const sameAsExisting =
+        nextAuditor != null &&
+        existing.auditor != null &&
+        normalizeIdentity(nextAuditor) === normalizeIdentity(existing.auditor);
+      const auditorAllowed =
+        sameAsExisting || (await sentinelEmployeeContractorDisplayLabelsMatch(nextAuditor));
+      if (!auditorAllowed) {
+        res.status(400).json({
+          error:
+            'Auditor must be an active employee or contractor on the Sentinel Supplier Assurance roster.',
+        });
+        return;
+      }
+      update.auditor = nextAuditor;
+    }
     if (result !== undefined) {
       if (!canSetResult) {
         res.status(403).json({ error: 'Only assigned Auditor, Admin, or Quality Engineer can set audit result' });

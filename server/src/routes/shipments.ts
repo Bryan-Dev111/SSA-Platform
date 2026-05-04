@@ -15,6 +15,10 @@ import {
   batchResolvedProjectHistoryForShipments,
   resolveProjectHistoryIdFromShipmentFields,
 } from '../lib/shipmentProjectResolve';
+import {
+  sentinelEmployeeContractorWhere,
+  sentinelEmployeeContractorDisplayLabelsMatch,
+} from '../lib/sentinelRoster';
 
 const router = Router();
 
@@ -205,9 +209,7 @@ router.get(
       return;
     }
     const users = await prisma.user.findMany({
-      where: {
-        employmentStatus: 'Active',
-      },
+      where: sentinelEmployeeContractorWhere(),
       select: {
         id: true,
         name: true,
@@ -440,6 +442,18 @@ router.patch(
       }
 
       const inspector = typeof inspectorRaw === 'string' ? inspectorRaw.trim() || null : null;
+      const sameAsExisting =
+        inspector != null &&
+        existing.inspector != null &&
+        normalizePersonText(inspector) === normalizePersonText(existing.inspector);
+      const allowed =
+        sameAsExisting || (await sentinelEmployeeContractorDisplayLabelsMatch(inspector));
+      if (!allowed) {
+        res.status(400).json({
+          error: 'Inspector must be an active employee or contractor on the Sentinel Supplier Assurance roster.',
+        });
+        return;
+      }
       const updated = await prisma.shipment.update({
         where: { id },
         data: { inspector },

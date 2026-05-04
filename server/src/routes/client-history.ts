@@ -238,6 +238,8 @@ router.get(
         costs,
         profit: revenue - costs,
         status: computeClientHistoryStatus(p.popStart, p.popEnd),
+        popStart: p.popStart ? p.popStart.toISOString() : null,
+        popEnd: p.popEnd ? p.popEnd.toISOString() : null,
         deductions: allDeductions,
       };
     });

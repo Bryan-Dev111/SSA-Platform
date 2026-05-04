@@ -304,6 +304,27 @@ export function Shipments() {
       .catch(() => setInspectors([]));
   }, [token, canEditInspector]);
 
+  /** Align draft values with roster option labels (name casing); keep non-roster assignments as-is until replaced. */
+  useEffect(() => {
+    if (!canEditInspector) return;
+    setInspectorDrafts((d) => {
+      let changed = false;
+      const next = { ...d };
+      for (const s of shipments) {
+        const draftVal = next[s.id];
+        const raw = (draftVal !== undefined ? draftVal : s.inspector ?? '').trim();
+        if (!raw) continue;
+        const norm = normalizePersonText(raw);
+        const match = inspectors.find((o) => normalizePersonText(o.name) === norm);
+        if (match && raw !== match.name) {
+          next[s.id] = match.name;
+          changed = true;
+        }
+      }
+      return changed ? next : d;
+    });
+  }, [shipments, inspectors, canEditInspector]);
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
@@ -746,6 +767,19 @@ export function Shipments() {
                             style={{ width: 180 }}
                           >
                             <option value="">Select inspector</option>
+                            {(() => {
+                              const stored = (r.inspector ?? '').trim();
+                              const onRoster =
+                                !!stored &&
+                                inspectors.some(
+                                  (o) => normalizePersonText(o.name) === normalizePersonText(stored)
+                                );
+                              return stored && !onRoster ? (
+                                <option key={`__current-not-on-roster-${r.id}`} value={stored}>
+                                  {stored}
+                                </option>
+                              ) : null;
+                            })()}
                             {inspectors.map((opt) => (
                               <option key={opt.id} value={opt.name}>
                                 {opt.name}

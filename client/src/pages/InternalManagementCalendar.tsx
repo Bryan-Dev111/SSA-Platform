@@ -1,7 +1,7 @@
 /**
  * Calendar view for Internal Management: audits (codes), shipments (SHIP codes),
- * and planned shipment schedule rows on their scheduled dates.
- * Global Supply variant also shows PO delivery/arrival dates and user-added events (subject + date).
+ * and user-added events (subject + date) for Sentinel Supplier Assurance.
+ * Global Supply variant shows PO delivery/arrival dates and user-added events (subject + date).
  */
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -29,7 +29,8 @@ interface PurchaseOrderCalendarRow {
   estimatedArrivalAtBuyer: string | null;
 }
 
-interface GlobalSupplyCalendarEventRow {
+/** User-created calendar row (SSA Internal Management or Global Supply). */
+interface ManualCalendarEventRow {
   id: string;
   subject: string;
   eventDate: string;
@@ -108,8 +109,8 @@ function useInternalManagementCalendarItems(
       variant === 'globalSupply'
         ? Promise.all([
             apiJson<PurchaseOrderCalendarRow[]>('/purchase-orders', { token }).catch(() => []),
-            apiJson<GlobalSupplyCalendarEventRow[]>('/global-supply-calendar-events', { token }).catch(
-              () => [] as GlobalSupplyCalendarEventRow[]
+            apiJson<ManualCalendarEventRow[]>('/global-supply-calendar-events', { token }).catch(
+              () => [] as ManualCalendarEventRow[]
             ),
           ]).then(([poList, eventRows]) => {
             const next: CalendarItem[] = [];
@@ -146,9 +147,12 @@ function useInternalManagementCalendarItems(
             return next;
           })
         : Promise.all([
-            apiJson<AuditCalendarRow[]>('/audits', { token }),
-            apiJson<ShipmentCalendarRow[]>('/shipments', { token }),
-          ]).then(([auditList, shipmentList]) => {
+            apiJson<AuditCalendarRow[]>('/audits', { token }).catch(() => [] as AuditCalendarRow[]),
+            apiJson<ShipmentCalendarRow[]>('/shipments', { token }).catch(() => [] as ShipmentCalendarRow[]),
+            apiJson<ManualCalendarEventRow[]>('/internal-management-calendar-events', { token }).catch(
+              () => [] as ManualCalendarEventRow[]
+            ),
+          ]).then(([auditList, shipmentList, eventRows]) => {
             const next: CalendarItem[] = [];
             for (const a of auditList) {
               const dk = isoDateKey(a.auditDate);
@@ -160,6 +164,16 @@ function useInternalManagementCalendarItems(
               if (!dk) continue;
               const label = (s.code && s.code.trim()) || s.id;
               next.push({ kind: 'shipment', id: s.id, label, dateKey: dk });
+            }
+            for (const ev of eventRows) {
+              const dk = isoDateKey(ev.eventDate);
+              if (!dk) continue;
+              next.push({
+                kind: 'customEvent',
+                id: ev.id,
+                label: ev.subject,
+                dateKey: dk,
+              });
             }
             return next;
           });
@@ -233,9 +247,9 @@ export function InternalManagementCalendarView({
     setCursor(new Date(n.getFullYear(), n.getMonth(), 1));
   };
 
-  const submitGlobalSupplyEvent = async (e: FormEvent) => {
+  const submitCalendarEvent = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token || variant !== 'globalSupply') return;
+    if (!token) return;
     const subject = newEventSubject.trim();
     if (!subject) {
       toast.error('Enter a subject');
@@ -245,9 +259,13 @@ export function InternalManagementCalendarView({
       toast.error('Choose a date');
       return;
     }
+    const path =
+      variant === 'globalSupply'
+        ? '/global-supply-calendar-events'
+        : '/internal-management-calendar-events';
     setSavingEvent(true);
     try {
-      await apiJson('/global-supply-calendar-events', {
+      await apiJson(path, {
         token,
         method: 'POST',
         body: JSON.stringify({ subject, eventDate: newEventDate }),
@@ -308,9 +326,9 @@ export function InternalManagementCalendarView({
         {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
         {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
 
-        {variant === 'globalSupply' && token ? (
+        {token ? (
           <form
-            onSubmit={(ev) => void submitGlobalSupplyEvent(ev)}
+            onSubmit={(ev) => void submitCalendarEvent(ev)}
             className="stack"
             style={{
               gap: 10,
@@ -448,6 +466,21 @@ export function InternalManagementCalendarView({
                 }}
               />
               Shipment
+            </span>
+            <span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: 'var(--color-warning-bg, #fef3c7)',
+                  marginRight: 6,
+                  verticalAlign: 'middle',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              Event
             </span>
           </div>
         )}
@@ -609,7 +642,7 @@ export function InternalManagementCalendarView({
           <p className="table-empty" style={{ marginTop: 16 }}>
             {variant === 'globalSupply'
               ? 'Nothing scheduled yet. Add an event above, or set farm delivery / buyer arrival dates on purchase orders.'
-              : 'No audits or shipments with dates in the system yet.'}
+              : 'Nothing scheduled yet. Add an event above, or create audits / shipments with dates.'}
           </p>
         )}
       </div>

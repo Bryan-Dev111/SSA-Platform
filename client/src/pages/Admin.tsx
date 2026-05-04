@@ -416,13 +416,22 @@ export function Admin() {
 
       {tab === 'auditTypes' && <AdminAuditTypesPanel token={token} toast={toast} />}
       {tab === 'expenseTypes' && (
-        <GlobalSupplyMasterDataPanel
-          token={token}
-          toast={toast}
-          title="Expense types"
-          noun="Expense Type"
-          endpoint="/global-supply-options/expense-types"
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <GlobalSupplyMasterDataPanel
+            token={token}
+            toast={toast}
+            title="Expense types (Sentinel Supplier Assurance)"
+            noun="Expense Type"
+            endpoint="/supplier-assurance-options/expense-types"
+          />
+          <GlobalSupplyMasterDataPanel
+            token={token}
+            toast={toast}
+            title="Expense types (Global Supply)"
+            noun="Expense Type"
+            endpoint="/global-supply-options/expense-types"
+          />
+        </div>
       )}
       {tab === 'commandMedia' && <AdminCommandMediaPanel token={token} toast={toast} />}
       {tab === 'users' && (

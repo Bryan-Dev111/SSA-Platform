@@ -18,7 +18,7 @@ export const PAGE_DEFINITIONS = [
   { key: 'Shipments', label: 'Shipments', path: '/shipments' },
   { key: 'Records', label: 'Records', path: '/records' },
   { key: 'SupplierProfile', label: 'Supplier Profile', path: '/supplier-profile' },
-  { key: 'SupplierList', label: 'Suppliers', path: '/supplier-list' },
+  { key: 'SupplierList', label: 'Approved Suppliers List', path: '/supplier-list' },
   { key: 'SuppliersMap', label: 'Suppliers Map', path: '/suppliers-map' },
   { key: 'GlobalSupplyDashboard', label: 'Business Dashboard', path: '/global-vendors/dashboard' },
   { key: 'GlobalSupplyFarmDashboard', label: 'Farm Dashboard', path: '/global-vendors/farm-dashboard' },
@@ -52,6 +52,16 @@ export const PAGE_DEFINITIONS = [
   { key: 'InternalManagement', label: 'Internal Management', path: '/internal-management' },
   { key: 'Admin', label: 'Admin', path: '/admin' },
 ] as const;
+
+/** Role rows omitted from Global Vendors Admin → Permissions (main SSA roles). */
+export const GLOBAL_VENDORS_ADMIN_PERMISSIONS_EXCLUDED_ROLES = new Set([
+  'Auditor',
+  'Buyer',
+  'Inspector',
+  'QualityEngineer',
+  'QualityManager',
+  'Supplier',
+]);
 
 export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   Dashboard: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'],
@@ -94,6 +104,50 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   Admin: ['Admin'],
   Login: [],
 };
+
+/** Roles that appear on Global Supply pages but never on Sentinel (non–Global Supply) matrix pages. */
+function computeSentinelAdminPermissionsExcludedRoles(): Set<string> {
+  const onSentinelPages = new Set<string>();
+  for (const def of PAGE_DEFINITIONS) {
+    if (def.path.startsWith('/global-vendors')) continue;
+    const arr = DEFAULT_API_PAGE_ROLES[def.key as keyof typeof DEFAULT_API_PAGE_ROLES];
+    if (Array.isArray(arr)) for (const r of arr) onSentinelPages.add(r);
+  }
+  const gvOnly = new Set<string>();
+  for (const def of PAGE_DEFINITIONS) {
+    if (!def.path.startsWith('/global-vendors')) continue;
+    const arr = DEFAULT_API_PAGE_ROLES[def.key as keyof typeof DEFAULT_API_PAGE_ROLES];
+    if (!Array.isArray(arr)) continue;
+    for (const r of arr) {
+      if (!onSentinelPages.has(r)) gvOnly.add(r);
+    }
+  }
+  // Farm login role exists in auth but has no SSA matrix rows (GV farm UI).
+  gvOnly.add('Farmer');
+  // Global Supply logistics–oriented role (often created with spaced display name in DB).
+  gvOnly.add('LogisticsCoordinator');
+  return gvOnly;
+}
+
+/**
+ * Map stored / display role names to the canonical names used in DEFAULT_API_PAGE_ROLES.
+ * Admin UI may show "Commodity Buyer" while the DB stores that string or `CommodityBuyer`; exclusions use canonical keys.
+ */
+const ROLE_NAME_TO_CANONICAL: Record<string, string> = {
+  'Commodity Buyer': 'CommodityBuyer',
+  'Sourcing Director': 'SourcingDirector',
+  'Quality Engineer': 'QualityEngineer',
+  'Quality Manager': 'QualityManager',
+  'Logistics Coordinator': 'LogisticsCoordinator',
+};
+
+export function canonicalRoleNameForPermissionMatrix(roleName: string): string {
+  const t = roleName.trim();
+  return ROLE_NAME_TO_CANONICAL[t] ?? t;
+}
+
+/** Role rows omitted from Sentinel Admin → Permissions (Global Supply–only accounts). */
+export const SENTINEL_ADMIN_PERMISSIONS_EXCLUDED_ROLES = computeSentinelAdminPermissionsExcludedRoles();
 
 /** All roles that may authenticate; used for product hub routes (not in PAGE_DEFINITIONS matrix). */
 const ALL_APP_ROLES_HUB = [

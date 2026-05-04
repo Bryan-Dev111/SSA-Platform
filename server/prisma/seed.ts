@@ -103,6 +103,11 @@ async function main() {
       create: { userId: user.id, roleId: role.id },
     });
     if (tu.role === 'Supplier') {
+      // userId is unique on Supplier; clear any row already using this login before linking SUP-TEST01.
+      await prisma.supplier.updateMany({
+        where: { userId: user.id },
+        data: { userId: null },
+      });
       const sup = await prisma.supplier.upsert({
         where: { code: 'SUP-TEST01' },
         update: { userId: user.id },
@@ -147,6 +152,26 @@ async function main() {
     });
   }
   console.log('Global Supply expense types seeded.');
+
+  for (const row of [
+    'Freight',
+    'Payroll',
+    'Labor',
+    'Samples',
+    'Travel',
+    'Other',
+    'Training',
+    'Equipment',
+    'Audit support',
+    'Professional services',
+  ]) {
+    await prisma.supplierAssuranceExpenseType.upsert({
+      where: { name: row },
+      update: {},
+      create: { name: row },
+    });
+  }
+  console.log('Supplier Assurance expense types seeded.');
 
   // Day 8: Commodity types, defect codes, disposition codes (Admin reference data)
   const ctElectronics = await prisma.commodityType.upsert({
