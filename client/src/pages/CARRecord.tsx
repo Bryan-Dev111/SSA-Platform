@@ -753,7 +753,7 @@ export function CARRecord() {
         </h1>
         <p style={{ marginTop: 8 }}>
           <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>
-            ← Back to Corrective Actions
+             Back to Corrective Actions
           </Link>
         </p>
       </header>
