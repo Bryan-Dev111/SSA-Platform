@@ -22,6 +22,11 @@ export const PAGE_DEFINITIONS = [
   { key: 'SuppliersMap', label: 'Suppliers Map', path: '/suppliers-map' },
   { key: 'GlobalSupplyDashboard', label: 'Business Dashboard', path: '/global-vendors/dashboard' },
   { key: 'GlobalSupplyFarmDashboard', label: 'Farm Dashboard', path: '/global-vendors/farm-dashboard' },
+  {
+    key: 'GlobalSupplyRiskIntelligence',
+    label: 'Risk Intelligence',
+    path: '/global-vendors/risk-intelligence',
+  },
   { key: 'GlobalSupplyFarmers', label: 'Farmer Information', path: '/global-vendors/farmers' },
   { key: 'GlobalSupplyFarmProfile', label: 'Farm profile', path: '/global-vendors/farm-profile' },
   {
@@ -31,11 +36,6 @@ export const PAGE_DEFINITIONS = [
   },
   { key: 'GlobalSupplyApproved', label: 'Approved Farms List', path: '/global-vendors/approved' },
   { key: 'GlobalSupplyMap', label: 'Farms Map', path: '/global-vendors/map' },
-  {
-    key: 'GlobalSupplyRiskIntelligence',
-    label: 'Risk Intelligence',
-    path: '/global-vendors/risk-intelligence',
-  },
   { key: 'GlobalSupplyRelationship', label: 'Relationship & Trust', path: '/global-vendors/relationship' },
   {
     key: 'GlobalSupplyBuyerRelationships',
@@ -191,13 +191,13 @@ export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/suppliers-map': DEFAULT_API_PAGE_ROLES.SuppliersMap,
   '/global-vendors/dashboard': DEFAULT_API_PAGE_ROLES.GlobalSupplyDashboard,
   '/global-vendors/farm-dashboard': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmDashboard,
+  '/global-vendors/risk-intelligence': DEFAULT_API_PAGE_ROLES.GlobalSupplyRiskIntelligence,
   '/global-vendors': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
   '/global-vendors/farmers': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
   '/global-vendors/farm-profile': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmProfile,
   '/global-vendors/processing-quality': DEFAULT_API_PAGE_ROLES.GlobalSupplyProcessingQuality,
   '/global-vendors/approved': DEFAULT_API_PAGE_ROLES.GlobalSupplyApproved,
   '/global-vendors/map': DEFAULT_API_PAGE_ROLES.GlobalSupplyMap,
-  '/global-vendors/risk-intelligence': DEFAULT_API_PAGE_ROLES.GlobalSupplyRiskIntelligence,
   '/global-vendors/relationship': DEFAULT_API_PAGE_ROLES.GlobalSupplyRelationship,
   '/global-vendors/buyer-relationships': DEFAULT_API_PAGE_ROLES.GlobalSupplyBuyerRelationships,
   '/global-vendors/purchase-orders': DEFAULT_API_PAGE_ROLES.GlobalSupplyPurchaseOrders,

@@ -448,23 +448,32 @@ export function AdminExpensesPanel({
   );
 
   const projectSelectOptions = useMemo(() => {
+    const excludeSet = normalizedExcludedProjects;
+    const filterKey = (projectFilter ?? '').trim();
     const options = new Map<string, string>();
+    const allowProjectKey = (key: string) => {
+      const k = key.trim();
+      if (!k) return false;
+      if (excludeSet.length && excludeSet.includes(k.toLowerCase())) return false;
+      if (filterKey && k !== filterKey) return false;
+      return true;
+    };
     projectOptions
       .filter((p) => (p.status ?? '').trim().toLowerCase() === 'active')
       .forEach((p) => {
         const key = p.projectCode.trim();
-        if (!key) return;
+        if (!key || !allowProjectKey(key)) return;
         options.set(key, `${p.projectCode} — ${p.companyName}`);
       });
-    list.forEach((row) => {
+    displayedList.forEach((row) => {
       const key = row.project.trim();
-      if (!key || options.has(key)) return;
+      if (!key || options.has(key) || !allowProjectKey(key)) return;
       options.set(key, key);
     });
     const next = [...options.entries()].map(([value, label]) => ({ value, label }));
     next.sort((a, b) => a.label.localeCompare(b.label));
     return next;
-  }, [projectOptions, list]);
+  }, [projectOptions, displayedList, normalizedExcludedProjects, projectFilter]);
 
   const expenseTableColSpan =
     (hideProject ? 8 : 9) +
@@ -547,14 +556,11 @@ export function AdminExpensesPanel({
 
   const expenseTypeSelectOptions = useMemo(() => {
     const names = new Set<string>();
-    for (const n of ['Freight', 'Payroll', 'Labor', 'Samples', 'Travel', 'Other']) {
-      names.add(n);
-    }
     for (const n of expenseTypeOptions) {
       const trimmed = n.trim();
       if (trimmed) names.add(trimmed);
     }
-    for (const row of list) {
+    for (const row of displayedList) {
       const trimmed = row.type.trim();
       if (trimmed) names.add(trimmed);
     }
@@ -562,7 +568,7 @@ export function AdminExpensesPanel({
     if (editDraft.type.trim()) names.add(editDraft.type.trim());
     if (fixedTypeProject?.type?.trim()) names.add(fixedTypeProject.type.trim());
     return [...names].sort((a, b) => a.localeCompare(b));
-  }, [expenseTypeOptions, list, type, editDraft.type, fixedTypeProject?.type]);
+  }, [expenseTypeOptions, displayedList, type, editDraft.type, fixedTypeProject?.type]);
 
   useEffect(() => {
     load();
@@ -3152,30 +3158,7 @@ export function AdminPermissionsPanel({
                     roleRow.userCount === 0;
                   return (
                     <tr key={roleRow.id || roleName}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{formatUserRoleLabel(roleName)}</div>
-                        <div
-                          style={{
-                            marginTop: 4,
-                            fontSize: 'var(--text-xs)',
-                            color: 'var(--color-text-muted)',
-                            lineHeight: 1.35,
-                          }}
-                        >
-                          <span title="Stored role name (unique in database)">Key: </span>
-                          <code style={{ fontSize: 'inherit' }}>{roleName}</code>
-                          <span>
-                            {' '}
-                            · {roleRow.userCount} user{roleRow.userCount === 1 ? '' : 's'}
-                          </span>
-                          {roleRow.id ? (
-                            <span title="Use this id if you need to tell roles apart in support tickets">
-                              {' '}
-                              · id {roleRow.id.slice(0, 8)}…
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
+                      <td style={{ fontWeight: 600 }}>{formatUserRoleLabel(roleName)}</td>
                       {matrixPages.map((p) => (
                         <td key={`${roleName}-${p.key}`}>
                           <input

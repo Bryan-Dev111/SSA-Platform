@@ -1,11 +1,11 @@
 /**
- * Internal Management — Banking: org-level API keys for bank / treasury integrations.
+ * Sentinel Global Supply — Internal Management → Banking: org-level API keys for bank / treasury integrations.
  * Secrets encrypted with PASSWORD_ENCRYPTION_KEY (same helper as user password storage).
  */
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess, requireRole } from '../middleware/rbac';
+import { requirePageAccessAny, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { encryptPassword, decryptPassword } from '../lib/passwordCrypto';
 
@@ -13,8 +13,8 @@ const router = Router();
 const SINGLETON_ID = 'singleton';
 
 router.use(authMiddleware);
-router.use(requirePageAccess('InternalManagement'));
-/** Bank credentials: Admin only (same gate as most Internal Management mutations). */
+router.use(requirePageAccessAny(['InternalManagement', 'GlobalSupplyInternalManagement']));
+/** Bank credentials: Admin only. */
 router.use(requireRole(['Admin']));
 
 function maskHint(plain: string | null): string | null {

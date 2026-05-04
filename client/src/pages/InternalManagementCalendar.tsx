@@ -43,6 +43,11 @@ type CalendarItem =
   | { kind: 'poArrival'; id: string; label: string; dateKey: string }
   | { kind: 'customEvent'; id: string; label: string; dateKey: string };
 
+/** Real greens for SSA shipment chips; app `--color-success-*` tokens are blue for general UI (see index.css). */
+const SSA_CALENDAR_SHIPMENT_BG = '#dcfce7';
+const SSA_CALENDAR_SHIPMENT_BORDER = '#86efac';
+const SSA_CALENDAR_SHIPMENT_TEXT = '#14532d';
+
 function isoDateKey(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const t = iso.trim();
@@ -459,10 +464,10 @@ export function InternalManagementCalendarView({
                   width: 10,
                   height: 10,
                   borderRadius: 2,
-                  background: 'var(--color-success-bg, #dbeafe)',
+                  background: SSA_CALENDAR_SHIPMENT_BG,
                   marginRight: 6,
                   verticalAlign: 'middle',
-                  border: '1px solid var(--color-border)',
+                  border: `1px solid ${SSA_CALENDAR_SHIPMENT_BORDER}`,
                 }}
               />
               Shipment
@@ -547,12 +552,17 @@ export function InternalManagementCalendarView({
                               it.kind === 'audit'
                                 ? 'var(--color-info-bg, #dbeafe)'
                                 : it.kind === 'shipment'
-                                  ? 'var(--color-success-bg, #dbeafe)'
+                                  ? SSA_CALENDAR_SHIPMENT_BG
                                   : it.kind === 'poDelivery'
                                     ? 'var(--color-info-bg, #dbeafe)'
                                     : it.kind === 'poArrival'
                                       ? 'var(--color-success-bg, #dcfce7)'
                                       : 'var(--color-warning-bg, #fef3c7)';
+                            const chipBorder =
+                              it.kind === 'shipment'
+                                ? `1px solid ${SSA_CALENDAR_SHIPMENT_BORDER}`
+                                : '1px solid var(--color-border)';
+                            const chipColor = it.kind === 'shipment' ? SSA_CALENDAR_SHIPMENT_TEXT : 'inherit';
                             const inner =
                               it.kind === 'audit' ? (
                                 <Link
@@ -616,7 +626,8 @@ export function InternalManagementCalendarView({
                                   padding: '2px 6px',
                                   borderRadius: 4,
                                   background: bg,
-                                  border: '1px solid var(--color-border)',
+                                  border: chipBorder,
+                                  color: chipColor,
                                   fontSize: '11px',
                                   lineHeight: 1.25,
                                 }}

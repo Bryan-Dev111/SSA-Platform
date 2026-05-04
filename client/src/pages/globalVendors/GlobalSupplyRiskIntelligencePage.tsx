@@ -1,7 +1,9 @@
 /**
  * Sentinel Global Supply — Risk Intelligence hub for external risk lenses.
  */
+import { useMemo } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { VerticalBarChart } from '../../components/DashboardBarCharts';
 
 type SignalPillar = {
   titleKey: string;
@@ -58,8 +60,41 @@ const PILLARS: SignalPillar[] = [
   },
 ];
 
+const RISK_NEWS_LINKS: { href: string; titleKey: string; titleFallback: string }[] = [
+  {
+    href: 'https://www.wto.org/english/news_e/news_e.htm',
+    titleKey: 'globalRisk.news.i1',
+    titleFallback: 'WTO — Trade monitoring and press',
+  },
+  {
+    href: 'https://www.fao.org/news/en/',
+    titleKey: 'globalRisk.news.i2',
+    titleFallback: 'FAO — News on food and agriculture',
+  },
+  {
+    href: 'https://news.un.org/en/climate-change',
+    titleKey: 'globalRisk.news.i3',
+    titleFallback: 'UN News — Climate change',
+  },
+  {
+    href: 'https://www.imf.org/en/News',
+    titleKey: 'globalRisk.news.i4',
+    titleFallback: 'IMF — Press center',
+  },
+];
+
 export function GlobalSupplyRiskIntelligencePage() {
   const { t } = useLanguage();
+
+  const chartRows = useMemo(
+    () => [
+      { label: t('globalRisk.chartBar.environment', 'Environment'), value: 68 },
+      { label: t('globalRisk.chartBar.politics', 'Politics & policy'), value: 55 },
+      { label: t('globalRisk.chartBar.logistics', 'Logistics'), value: 48 },
+      { label: t('globalRisk.chartBar.financial', 'Markets'), value: 62 },
+    ],
+    [t]
+  );
 
   return (
     <div className="global-vendors-main">
@@ -70,6 +105,52 @@ export function GlobalSupplyRiskIntelligencePage() {
           'A single place to orient sourcing and operations teams on external risks. Use the pillars below as a checklist; links open official reference sources in a new tab.'
         )}
       </p>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+          gap: '1rem',
+          marginTop: '1.25rem',
+        }}
+      >
+        <div className="card" style={{ margin: 0 }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0, fontSize: 'var(--text-lg)' }}>
+              {t('globalRisk.chartTitle', 'Pillar emphasis (illustrative)')}
+            </h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
+              {t(
+                'globalRisk.chartCaption',
+                'Sample scores for layout only — swap in your own indices, scores, or geospatial layers when you connect data.'
+              )}
+            </p>
+            <VerticalBarChart rows={chartRows} valueFormatter={(v) => String(Math.round(v))} />
+          </div>
+        </div>
+        <div className="card" style={{ margin: 0 }}>
+          <div className="card-body">
+            <h2 style={{ marginTop: 0, fontSize: 'var(--text-lg)' }}>
+              {t('globalRisk.newsTitle', 'News & signals')}
+            </h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
+              {t(
+                'globalRisk.newsLead',
+                'Curated entry points to public sources. RSS, APIs, or paid feeds can be wired here when you are ready to discuss integrations.'
+              )}
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 'var(--text-sm)', lineHeight: 1.55 }}>
+              {RISK_NEWS_LINKS.map((item) => (
+                <li key={item.href} style={{ marginBottom: '0.4rem' }}>
+                  <a href={item.href} target="_blank" rel="noopener noreferrer">
+                    {t(item.titleKey, item.titleFallback)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
 
       <div
         className="dashboard-metric-grid"

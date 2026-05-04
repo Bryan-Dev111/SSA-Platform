@@ -19,11 +19,9 @@ import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
 import { InternalManagementOrgChart } from './InternalManagementOrgChart';
-import { InternalManagementBankingPanel } from './InternalManagementBankingPanel';
 import { InternalManagementCalendarView } from './InternalManagementCalendar';
 import type { InternalManagementTab as ImTab } from './internalManagementTabs';
 import { ManagementAssignmentsPanel } from './ManagementAssignmentsPanel';
-import { WorkLogs } from './WorkLogs';
 import {
   formatDisplayCalendarDate,
   formatDisplayCalendarRange,
@@ -924,6 +922,9 @@ export function InternalManagement() {
             {sectionRows.flatMap((r) => {
               const rowStyle = profitRowStyle(r);
               const rowTitle = profitRowTitle(r);
+              const popTone = popWindowTone(r.popStart, r.popEnd);
+              /** Same cohort as “Total profit (closed projects)” — only those final profit cells are emphasized. */
+              const isClosedForProfitSummary = popTone === 'inactivePast';
               const deductions = sortDeductionsForDisplay(r.deductions ?? []);
               const rowsForProject =
                 deductions.length > 0
@@ -932,10 +933,11 @@ export function InternalManagement() {
               const revenue = Number.isFinite(r.revenueAmount) ? r.revenueAmount : 0;
               const deductionAmounts = rowsForProject.map((d) => d.amount);
               return rowsForProject.map((d, i) => {
-                const suffixFromI = deductionAmounts.slice(i).reduce((sum, x) => sum + x, 0);
-                const runningProfit = revenue - suffixFromI;
+                const deductionsThroughThisRow = deductionAmounts.slice(0, i + 1).reduce((sum, x) => sum + x, 0);
+                const runningProfit = revenue - deductionsThroughThisRow;
                 const isFirst = i === 0;
                 const isFinalProfitRow = i === rowsForProject.length - 1;
+                const emphasizeFinalProfit = isFinalProfitRow && isClosedForProfitSummary;
                 const tdStyle = (extra?: Record<string, string | number>): Record<string, string | number> => ({
                   ...rowStyle,
                   ...(extra ?? {}),
@@ -957,7 +959,7 @@ export function InternalManagement() {
                     ) : null}
                     <td style={tdStyle()}>{d.code === '—' ? '—' : `${d.code} (${d.kind})`}</td>
                     <td style={tdStyle()}>{d.code === '—' ? '—' : formatProfitMoney(d.amount)}</td>
-                    <td style={tdStyle(isFinalProfitRow ? { fontWeight: 700 } : undefined)}>
+                    <td style={tdStyle(emphasizeFinalProfit ? { fontWeight: 700 } : undefined)}>
                       {formatProfitMoney(runningProfit)}
                     </td>
                   </tr>
@@ -986,9 +988,7 @@ export function InternalManagement() {
             ['projectHistory', t('internal.tab.projectHistory')],
             ['profit', t('internal.tab.profit')],
             ['laborCosts', t('internal.tab.laborCosts')],
-            ['workLogs', t('internal.tab.workLogs')],
             ['expenses', t('internal.tab.expenses')],
-            ['banking', t('internal.tab.banking')],
             ['employeeAssignments', t('internal.tab.employeeAssignments')],
             ['managementAssignments', t('internal.tab.managementAssignments')],
             ['orgChart', t('internal.tab.orgChart')],
@@ -1905,21 +1905,9 @@ export function InternalManagement() {
         </div>
       )}
 
-      {tab === 'workLogs' && (
-        <div style={{ marginTop: '1rem' }}>
-          <WorkLogs variant="embedded" />
-        </div>
-      )}
-
       {tab === 'expenses' && (
         <div style={{ marginTop: '1rem' }}>
           <AdminExpensesPanel token={token} toast={toast} excludedProjects={['Global Vendors']} showExpenseIdColumn />
-        </div>
-      )}
-
-      {tab === 'banking' && (
-        <div style={{ marginTop: '1rem' }}>
-          <InternalManagementBankingPanel token={token} />
         </div>
       )}
 

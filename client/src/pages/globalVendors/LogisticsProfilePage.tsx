@@ -241,8 +241,16 @@ export function LogisticsProfilePage() {
   if (loading && rows.length === 0) {
     return (
       <div className="page">
-        <header className="page-header">
-          <h1 className="page-title">Logistics Profile</h1>
+        <header
+          className="page-header"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}
+        >
+          <button type="button" className="btn btn-ghost" onClick={() => navigate('/global-vendors/logistics')}>
+            Back
+          </button>
+          <h1 className="page-title" style={{ marginBottom: 0 }}>
+            Logistics Profile
+          </h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -256,29 +264,16 @@ export function LogisticsProfilePage() {
     <div className="page">
       <header
         className="page-header"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}
       >
-        <h1 className="page-title" style={{ marginBottom: 0 }}>
-          Logistics Profile
-        </h1>
         <button type="button" className="btn btn-ghost" onClick={() => navigate('/global-vendors/logistics')}>
           Back
         </button>
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Logistics Profile
+        </h1>
       </header>
-      {!isAdmin ? (
-        <p
-          className="table-empty"
-          style={{ marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}
-        >
-          View only. Only administrators can edit profile content or photos.
-        </p>
-      ) : null}
+      {!isAdmin ? null : null}
 
       <div className="card" style={{ marginBottom: 12, width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <div className="card-body">

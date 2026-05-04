@@ -17,10 +17,12 @@ import { InternalManagementOrgChart } from '../InternalManagementOrgChart';
 import { AdminEmployeeAssignmentsPanel } from '../admin/AdminEmployeeAssignmentsPanel';
 import { ManagementAssignmentsPanel } from '../ManagementAssignmentsPanel';
 import { GlobalSupplyProfitTab } from './GlobalSupplyProfitTab';
+import { InternalManagementBankingPanel } from '../InternalManagementBankingPanel';
 
 type GlobalInternalTab =
   | 'purchaseOrders'
   | 'expenses'
+  | 'banking'
   | 'profit'
   | 'documents'
   | 'calendar'
@@ -64,6 +66,12 @@ export function GlobalSupplyInternalManagementPage() {
   }, [tab, canStaffHub]);
 
   useEffect(() => {
+    if (tab === 'banking' && !isAdmin) {
+      setTab('purchaseOrders');
+    }
+  }, [tab, isAdmin]);
+
+  useEffect(() => {
     if (!token || tab !== 'purchaseOrders') return;
     apiJson<PurchaseOrderStatusRow[]>('/purchase-orders', { token })
       .then((rows) => {
@@ -103,6 +111,7 @@ export function GlobalSupplyInternalManagementPage() {
     if (tab === 'documents') return '';
     if (tab === 'calendar') return '';
     if (tab === 'expenses') return '';
+    if (tab === 'banking') return '';
     if (tab === 'profit') return '';
     if (tab === 'orgChart')
       return '';
@@ -117,10 +126,15 @@ export function GlobalSupplyInternalManagementPage() {
     const rows: { id: GlobalInternalTab; label: string }[] = [
       { id: 'purchaseOrders', label: 'Purchase Orders' },
       { id: 'expenses', label: t('internal.tab.expenses') },
+    ];
+    if (isAdmin) {
+      rows.push({ id: 'banking', label: t('internal.tab.banking') });
+    }
+    rows.push(
       { id: 'profit', label: t('internal.tab.profit') },
       { id: 'documents', label: t('internal.tab.documents') },
-      { id: 'calendar', label: t('internal.tab.calendar') },
-    ];
+      { id: 'calendar', label: t('internal.tab.calendar') }
+    );
     if (canStaffHub) {
       rows.push(
         { id: 'orgChart', label: t('internal.tab.orgChart') },
@@ -129,7 +143,7 @@ export function GlobalSupplyInternalManagementPage() {
       );
     }
     return rows;
-  }, [canStaffHub, t]);
+  }, [canStaffHub, isAdmin, t]);
 
   return (
     <div className="page">
@@ -226,6 +240,12 @@ export function GlobalSupplyInternalManagementPage() {
       {tab === 'calendar' && <InternalManagementCalendarView token={token} variant="globalSupply" />}
 
       {tab === 'expenses' && <GlobalSupplyExpensesSection />}
+
+      {tab === 'banking' && isAdmin && (
+        <div style={{ marginTop: '1rem' }}>
+          <InternalManagementBankingPanel token={token} />
+        </div>
+      )}
 
       {tab === 'profit' && <GlobalSupplyProfitTab token={token} />}
 

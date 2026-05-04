@@ -134,6 +134,14 @@ function App() {
                 }
               />
               <Route
+                path="risk-intelligence"
+                element={
+                  <ProtectedRoute path="/global-vendors/risk-intelligence">
+                    <GlobalSupplyRiskIntelligencePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="farmers"
                 element={
                   <ProtectedRoute path="/global-vendors/farmers">
@@ -162,14 +170,6 @@ function App() {
                 element={
                   <ProtectedRoute path="/global-vendors/map">
                     <FarmsMapPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="risk-intelligence"
-                element={
-                  <ProtectedRoute path="/global-vendors/risk-intelligence">
-                    <GlobalSupplyRiskIntelligencePage />
                   </ProtectedRoute>
                 }
               />

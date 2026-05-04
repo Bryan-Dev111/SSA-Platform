@@ -1,3 +1,4 @@
+/** Banking settings UI for Sentinel Global Supply Internal Management (Admin). */
 import { useCallback, useEffect, useState } from 'react';
 import { apiJson } from '../api/client';
 import { useLanguage } from '../context/LanguageContext';

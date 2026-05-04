@@ -56,6 +56,11 @@ function normalizeRoleNames(roleNames: string[]): string[] {
   return [...new Set(roleNames.map(normalizeRoleName).filter(Boolean))];
 }
 
+/** Lowercase slug for matching role names regardless of spaces/underscores (e.g. `Commodity Buyer` vs `CommodityBuyer`). */
+function roleNameSlug(name: string): string {
+  return name.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
 async function resolveRoleRows(roleNamesInput: string[]): Promise<{ rows: Array<{ id: string; name: string }>; missing: string[] }> {
   const requested = normalizeRoleNames(roleNamesInput.map((r) => r.trim()).filter(Boolean));
   if (requested.length === 0) return { rows: [], missing: [] };
@@ -137,26 +142,25 @@ router.get(
       prisma.role.findMany({ select: { id: true, name: true } }),
       prisma.farm.count(),
     ]);
-    const idByName = new Map(roles.map((r) => [r.name, r.id] as const));
-    const commodityBuyerId = idByName.get('CommodityBuyer');
-    const farmerRoleId = idByName.get('Farmer');
+    const commodityBuyerRoleIds = roles.filter((r) => roleNameSlug(r.name) === 'commoditybuyer').map((r) => r.id);
+    const farmerRoleIds = roles.filter((r) => roleNameSlug(r.name) === 'farmer').map((r) => r.id);
     const [commodityBuyers, farmerAccounts] = await Promise.all([
-      commodityBuyerId
-        ? prisma.userRole.count({
+      commodityBuyerRoleIds.length === 0
+        ? 0
+        : prisma.user.count({
             where: {
-              roleId: commodityBuyerId,
-              user: notSupplierAssuranceDemoUser,
+              userRoles: { some: { roleId: { in: commodityBuyerRoleIds } } },
+              ...notSupplierAssuranceDemoUser,
             },
-          })
-        : 0,
-      farmerRoleId
-        ? prisma.userRole.count({
+          }),
+      farmerRoleIds.length === 0
+        ? 0
+        : prisma.user.count({
             where: {
-              roleId: farmerRoleId,
-              user: notSupplierAssuranceDemoUser,
+              userRoles: { some: { roleId: { in: farmerRoleIds } } },
+              ...notSupplierAssuranceDemoUser,
             },
-          })
-        : 0,
+          }),
     ]);
     res.json({
       employees,

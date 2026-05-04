@@ -144,6 +144,7 @@ export function Shipments() {
 
   const [approveConfirmId, setApproveConfirmId] = useState<string | null>(null);
   const [rejectDialog, setRejectDialog] = useState<{ id: string; note: string } | null>(null);
+  const [reopenConfirmId, setReopenConfirmId] = useState<string | null>(null);
 
   const isAdmin = user?.roleNames?.includes('Admin') ?? false;
   const isQE = user?.roleNames?.includes('QualityEngineer') ?? false;
@@ -401,6 +402,26 @@ export function Shipments() {
       });
       toast.success('Rejected (Failed)');
       setRejectDialog(null);
+      loadData();
+    } catch (e) {
+      toast.error(parseApiError(e));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const recordReopen = async () => {
+    if (!token || !reopenConfirmId) return;
+    const targetId = reopenConfirmId;
+    setReopenConfirmId(null);
+    setSavingId(targetId);
+    try {
+      await apiJson(`/shipments/${targetId}`, {
+        token,
+        method: 'PATCH',
+        body: JSON.stringify({ reopen: true }),
+      });
+      toast.success('Inspection request reopened (waiting review)');
       loadData();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -716,7 +737,7 @@ export function Shipments() {
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>
                       Created {sortIndicator('created')}
                     </th>
-                    <th>Approve/Reject Button</th>
+                    <th>Approve / Reject / Reopen</th>
                     <th>Create Finding</th>
                   </tr>
                 </thead>
@@ -882,6 +903,16 @@ export function Shipments() {
                               Reject
                             </button>
                           </span>
+                        ) : isAdmin && (r.status === 'Passed' || r.status === 'Failed') ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.65rem' }}
+                            disabled={savingId === r.id}
+                            onClick={() => setReopenConfirmId(r.id)}
+                          >
+                            Reopen request
+                          </button>
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
                         )}
@@ -915,6 +946,15 @@ export function Shipments() {
         confirmLabel="Approve"
         onConfirm={recordApprove}
         onCancel={() => setApproveConfirmId(null)}
+      />
+
+      <ConfirmDialog
+        open={reopenConfirmId !== null}
+        title="Reopen inspection request"
+        message="Return this request to Waiting inspection so reviewers can approve or reject again? Only administrators can do this."
+        confirmLabel="Reopen"
+        onConfirm={recordReopen}
+        onCancel={() => setReopenConfirmId(null)}
       />
 
       <ConfirmDialog

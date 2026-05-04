@@ -746,11 +746,6 @@ export function CARRecord() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">
-          {car
-            ? `${car.code} — CAR · ${formatCarStatusForDisplay(car.status)}`
-            : 'CAR Record'}
-        </h1>
         <p style={{ marginTop: 8 }}>
           <Link to="/corrective-actions" style={{ textDecoration: 'none' }}>
              Back to Corrective Actions

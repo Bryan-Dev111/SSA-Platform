@@ -189,7 +189,6 @@ export function FarmsMapPage() {
 
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Map view</h2>
           <div
             className="suppliers-map-frame"
             style={{ border: '1px solid var(--color-border)', borderRadius: 10 }}

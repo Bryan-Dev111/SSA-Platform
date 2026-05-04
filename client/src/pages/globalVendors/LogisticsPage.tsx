@@ -20,6 +20,7 @@ export const LOGISTICS_SITE_TYPES = [
   { value: 'Trucking', label: 'Trucking', bg: '#eab308', fg: '#422006' },
   { value: 'Warehouse', label: 'Warehouse', bg: '#ea580c', fg: '#ffffff' },
   { value: 'Inspection', label: 'Inspection', bg: '#8b5a2b', fg: '#ffffff' },
+  { value: 'Shipping', label: 'Shipping', bg: '#808080', fg: '#ffffff' },
 ] as const;
 
 const TYPE_STYLE = Object.fromEntries(LOGISTICS_SITE_TYPES.map((t) => [t.value, t])) as Record<

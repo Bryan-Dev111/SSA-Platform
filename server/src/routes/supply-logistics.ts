@@ -16,7 +16,15 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(authMiddleware);
 
-const ALLOWED_TYPES = new Set(['Port', 'Exporter', 'Mill', 'Trucking', 'Warehouse', 'Inspection']);
+const ALLOWED_TYPES = new Set([
+  'Port',
+  'Exporter',
+  'Mill',
+  'Trucking',
+  'Warehouse',
+  'Inspection',
+  'Shipping',
+]);
 
 const selectFields = {
   id: true,
@@ -105,7 +113,9 @@ router.post(
     }
 
     if (!siteType || !ALLOWED_TYPES.has(siteType)) {
-      res.status(400).json({ error: 'siteType must be one of: Port, Exporter, Mill, Trucking, Warehouse, Inspection' });
+      res.status(400).json({
+        error: 'siteType must be one of: Port, Exporter, Mill, Trucking, Warehouse, Inspection, Shipping',
+      });
       return;
     }
     if (!company) {

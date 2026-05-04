@@ -661,15 +661,8 @@ export function FindingsRecord() {
     <div className="page">
       <header className="page-header">
         <h1 className="page-title">
-          {finding ? `${finding.code} — Finding` : 'Finding Record'}
+          {finding ? `` : 'Finding Record'}
         </h1>
-        <p className="page-description">
-          {finding
-            ? `Status: ${formatFindingStatus(finding.status)}`
-            : !isNew
-              ? 'Finding not found.'
-              : null}
-        </p>
         <p style={{ marginTop: 4 }}>
           <Link to="/findings" style={{ textDecoration: 'none' }}>{t('common.backToFindings')}</Link>
         </p>

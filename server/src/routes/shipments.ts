@@ -406,6 +406,8 @@ router.patch(
     const id = req.params.id;
     const resultRaw = req.body?.result;
     const inspectorRaw = req.body?.inspector;
+    const reopenRaw = req.body?.reopen;
+    const wantsReopen = reopenRaw === true || reopenRaw === 'true';
     const existing = await prisma.shipment.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ error: 'Not found' });
@@ -420,8 +422,33 @@ router.patch(
     const hasResultUpdate = resultRaw === 'Passed' || resultRaw === 'Failed';
     const hasInspectorUpdate = typeof inspectorRaw === 'string' || inspectorRaw === null;
 
+    if (wantsReopen) {
+      if (hasResultUpdate || hasInspectorUpdate) {
+        res.status(400).json({ error: 'Cannot combine reopen with result or inspector updates' });
+        return;
+      }
+      if (!req.user.roleNames.includes('Admin')) {
+        res.status(403).json({ error: 'Only Admin can reopen a reviewed inspection request' });
+        return;
+      }
+      if (existing.status !== 'Passed' && existing.status !== 'Failed') {
+        res.status(400).json({ error: 'Only approved or rejected requests can be reopened' });
+        return;
+      }
+      const reopened = await prisma.shipment.update({
+        where: { id },
+        data: {
+          status: ShipmentStatus.WaitingInspection,
+          result: null,
+        },
+        include: { supplier: { select: { id: true, code: true, name: true } } },
+      });
+      res.json(reopened);
+      return;
+    }
+
     if (!hasResultUpdate && !hasInspectorUpdate) {
-      res.status(400).json({ error: 'Provide either result (Passed/Failed) or inspector' });
+      res.status(400).json({ error: 'Provide either result (Passed/Failed), inspector, or reopen: true' });
       return;
     }
 
