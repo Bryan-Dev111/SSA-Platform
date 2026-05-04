@@ -19,6 +19,7 @@ import { AdminLaborCostsPanel } from './admin/AdminLaborCostsPanel';
 import { SortableTh } from '../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../utils/tableSort';
 import { InternalManagementOrgChart } from './InternalManagementOrgChart';
+import { InternalManagementBankingPanel } from './InternalManagementBankingPanel';
 import { InternalManagementCalendarView } from './InternalManagementCalendar';
 import type { InternalManagementTab as ImTab } from './internalManagementTabs';
 import { ManagementAssignmentsPanel } from './ManagementAssignmentsPanel';
@@ -987,6 +988,7 @@ export function InternalManagement() {
             ['laborCosts', t('internal.tab.laborCosts')],
             ['workLogs', t('internal.tab.workLogs')],
             ['expenses', t('internal.tab.expenses')],
+            ['banking', t('internal.tab.banking')],
             ['employeeAssignments', t('internal.tab.employeeAssignments')],
             ['managementAssignments', t('internal.tab.managementAssignments')],
             ['orgChart', t('internal.tab.orgChart')],
@@ -1912,6 +1914,12 @@ export function InternalManagement() {
       {tab === 'expenses' && (
         <div style={{ marginTop: '1rem' }}>
           <AdminExpensesPanel token={token} toast={toast} excludedProjects={['Global Vendors']} showExpenseIdColumn />
+        </div>
+      )}
+
+      {tab === 'banking' && (
+        <div style={{ marginTop: '1rem' }}>
+          <InternalManagementBankingPanel token={token} />
         </div>
       )}
 

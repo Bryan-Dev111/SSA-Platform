@@ -11,4 +11,5 @@ export type InternalManagementTab =
   | 'employeeAssignments'
   | 'laborCosts'
   | 'workLogs'
-  | 'expenses';
+  | 'expenses'
+  | 'banking';

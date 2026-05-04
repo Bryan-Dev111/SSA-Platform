@@ -1093,6 +1093,17 @@ model Expense {
   @@index([purchaseOrderId])
 }
 
+/// Singleton row: org-level bank / treasury API credentials (Internal Management → Banking). Encrypted at rest.
+model BankingSettings {
+  id                 String   @id @default("singleton")
+  provider           String   @default("custom")
+  institutionLabel String?
+  apiKeyEncrypted    String?
+  apiSecretEncrypted String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 // For application-level code generation (SUP-00001, AUD-00001, etc.)
 model IdSequence {
   prefix    String @id // SUP, AUD, TYP, FIN, CAR, RISK, OPP, ACT, FARM, PO, SAMP, EXP, LOG

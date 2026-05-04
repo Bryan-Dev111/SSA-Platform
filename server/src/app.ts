@@ -59,6 +59,7 @@ import legalRoutes from './routes/legal';
 import employeeProfilesRoutes from './routes/employee-profiles';
 import globalSupplyCalendarEventsRoutes from './routes/global-supply-calendar-events';
 import internalManagementCalendarEventsRoutes from './routes/internal-management-calendar-events';
+import bankingSettingsRoutes from './routes/banking-settings';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLocaleMiddleware } from './middleware/requestLocale';
 
@@ -122,6 +123,7 @@ app.use('/legal', legalRoutes);
 app.use('/employee-profiles', employeeProfilesRoutes);
 app.use('/global-supply-calendar-events', globalSupplyCalendarEventsRoutes);
 app.use('/internal-management-calendar-events', internalManagementCalendarEventsRoutes);
+app.use('/banking-settings', bankingSettingsRoutes);
 /** Same router: supports clients whose VITE_API_URL includes /api while hitting Express directly (no Vercel strip). */
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/farms', farmsRoutes);
