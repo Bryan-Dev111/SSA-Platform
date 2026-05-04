@@ -1,6 +1,9 @@
 /**
  * Suppliers API: list, get, create (Admin), partial update (Admin), delete (Admin).
  * Scope: Admin all; Buyer assigned; Supplier own.
+ *
+ * GET / lists Active suppliers only by default. Admins may pass ?includeInactive=true for the full roster
+ * (e.g. Admin → Buyers & Suppliers). Non-admins cannot expand the list.
  */
 import { Router, Request, Response } from 'express';
 import { prisma, prismaBase } from '../lib/prisma';
@@ -24,7 +27,14 @@ router.get(
       return;
     }
     const allowedIds = await getAllowedSupplierIds(req.user);
-    const where = allowedIds === null ? {} : { id: { in: allowedIds } };
+    const includeInactiveRaw = req.query.includeInactive;
+    const wantsIncludeInactive =
+      typeof includeInactiveRaw === 'string' &&
+      ['1', 'true', 'yes'].includes(includeInactiveRaw.trim().toLowerCase());
+    /** Full list (incl. Inactive) is for Admin → Buyers & Suppliers only; dropdowns use default active-only. */
+    const includeInactive = wantsIncludeInactive && req.user.roleNames.includes('Admin');
+    const scopeWhere = allowedIds === null ? {} : { id: { in: allowedIds } };
+    const where = includeInactive ? scopeWhere : { ...scopeWhere, status: 'Active' };
     const suppliers = await prisma.supplier.findMany({
       where,
       select: {

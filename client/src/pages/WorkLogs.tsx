@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
 import { formatDisplayCalendarDate } from '../utils/formatDisplayDates';
+import { formatUsd } from '../utils/formatUsd';
 
 interface WorkLogRow {
   id: string;
@@ -50,6 +51,7 @@ interface SupplierOption {
 interface AuditOption {
   id: string;
   code: string;
+  supplierId?: string;
   projectHistoryId?: string | null;
   projectHistory?: { id: string; projectCode: string } | null;
 }
@@ -57,6 +59,7 @@ interface AuditOption {
 interface ShipmentOption {
   id: string;
   code: string | null;
+  supplierId?: string | null;
   projectHistory?: { id: string; projectCode: string } | null;
   resolvedProjectHistory?: { id: string; projectCode: string } | null;
 }
@@ -68,8 +71,17 @@ interface EmployeeRatePreview {
 
 function formatWorkLogTotalAmount(r: WorkLogRow): string {
   const raw = r.laborCosts?.[0]?.totalCost;
-  if (raw == null || !Number.isFinite(Number(raw))) return '—';
-  return Number(raw).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatUsd(raw, '—');
+}
+
+function workLogsTableTitle(scopeAll: boolean, canViewAll: boolean): string {
+  const raw = scopeAll && canViewAll ? 'all work logs' : 'my work logs';
+  return raw.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatWorkLogSupplierCell(s: WorkLogRow['supplier']): string {
+  if (!s) return '—';
+  return `${s.code}: ${s.name}`;
 }
 
 export type WorkLogsVariant = 'page' | 'embedded' | 'globalSupplyTopRow';
@@ -109,13 +121,11 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     supplierId: '',
     auditId: '',
     shipmentId: '',
-    description: '',
   });
   const [editingWorkLogId, setEditingWorkLogId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     workDate: '',
     workType: 'Audit' as WorkLogRow['workType'],
-    description: '',
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -126,19 +136,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     if (!Number.isFinite(hoursNum) || hoursNum < 0) return null;
     return hoursNum * employeeRatePreview.hourlyRate;
   }, [form.hoursWorked, employeeRatePreview]);
-
-  const derivedProjectLabel = useMemo(() => {
-    if (form.auditId) {
-      const a = audits.find((x) => x.id === form.auditId);
-      return a?.projectHistory?.projectCode ?? '—';
-    }
-    if (form.shipmentId) {
-      const s = shipments.find((x) => x.id === form.shipmentId);
-      const ph = s?.projectHistory ?? s?.resolvedProjectHistory;
-      return ph?.projectCode ?? '—';
-    }
-    return '—';
-  }, [form.auditId, form.shipmentId, audits, shipments]);
 
   const load = useCallback(() => {
     if (!token) return;
@@ -166,18 +163,14 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     Promise.all([
       apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
       apiJson<SupplierOption[]>('/suppliers', { token }).catch(() => []),
-      apiJson<AuditOption[]>('/audits', { token }).catch(() => []),
-      apiJson<ShipmentOption[]>('/shipments', { token }).catch(() => []),
       apiJson<EmployeeRatePreview>('/work-logs/preview-rate', { token }).catch(() => ({
         hourlyRate: 0,
         currency: null,
       })),
     ])
-      .then(([logs, supplierRows, auditRows, shipmentRows, ratePreview]) => {
+      .then(([logs, supplierRows, ratePreview]) => {
         setWorkLogs(logs);
         setSuppliers(supplierRows);
-        setAudits(auditRows);
-        setShipments(shipmentRows);
         setEmployeeRatePreview(ratePreview);
       })
       .catch((e) => setError(parseApiError(e)))
@@ -187,6 +180,25 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token || isGlobalSupplyTopRow) return;
+    const sid = form.supplierId.trim();
+    const q = sid ? `?supplierId=${encodeURIComponent(sid)}` : '';
+    let cancelled = false;
+    Promise.all([
+      apiJson<AuditOption[]>(`/audits${q}`, { token }).catch(() => []),
+      apiJson<ShipmentOption[]>(`/shipments${q}`, { token }).catch(() => []),
+    ]).then(([a, s]) => {
+      if (!cancelled) {
+        setAudits(a);
+        setShipments(s);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, form.supplierId, isGlobalSupplyTopRow]);
 
   const createWorkLog = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,7 +220,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
           supplierId: form.supplierId || null,
           auditId: form.auditId || null,
           shipmentId: form.shipmentId || null,
-          description: form.description.trim() || null,
         }),
       });
       if (!isGlobalSupplyTopRow) {
@@ -224,7 +235,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         supplierId: '',
         auditId: '',
         shipmentId: '',
-        description: '',
       });
       toast.success('Work log saved — a labor cost line was added automatically.');
     } catch (err) {
@@ -239,7 +249,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     setEditForm({
       workDate: row.workDate?.slice(0, 10) ?? '',
       workType: row.workType,
-      description: row.description ?? '',
     });
   };
 
@@ -257,7 +266,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         : {
             workDate: editForm.workDate,
             workType: editForm.workType,
-            description: editForm.description.trim() || null,
           };
       const updated = await apiJson<WorkLogRow>(`/work-logs/${encodeURIComponent(editingWorkLogId)}`, {
         token,
@@ -431,12 +439,15 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Project</label>
-                <input className="input" readOnly value={derivedProjectLabel} title="Filled when you select an audit or shipment" />
-              </div>
-              <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Supplier</label>
-                <select className="input" value={form.supplierId} onChange={(e) => setForm((p) => ({ ...p, supplierId: e.target.value }))}>
+                <select
+                  className="input"
+                  value={form.supplierId}
+                  onChange={(e) => {
+                    const supplierId = e.target.value;
+                    setForm((p) => ({ ...p, supplierId, auditId: '', shipmentId: '' }));
+                  }}
+                >
                   <option value="">None</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -447,7 +458,12 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Audit</label>
-                <select className="input" value={form.auditId} onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}>
+                <select
+                  className="input"
+                  value={form.auditId}
+                  onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}
+                  title={form.supplierId.trim() ? 'Audits for the selected supplier' : 'Select a supplier to narrow audits'}
+                >
                   <option value="">None</option>
                   {audits.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -458,7 +474,12 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
                 <label className="input-label">Shipment</label>
-                <select className="input" value={form.shipmentId} onChange={(e) => setForm((p) => ({ ...p, shipmentId: e.target.value }))}>
+                <select
+                  className="input"
+                  value={form.shipmentId}
+                  onChange={(e) => setForm((p) => ({ ...p, shipmentId: e.target.value }))}
+                  title={form.supplierId.trim() ? 'Shipments for the selected supplier' : 'Select a supplier to narrow shipments'}
+                >
                   <option value="">None</option>
                   {shipments.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -466,10 +487,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="input-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
-                <label className="input-label">Description</label>
-                <input className="input" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
               </div>
               <button type="submit" className="btn btn-primary" disabled={submitting || !selfLabel.trim()}>
                 {submitting ? 'Saving…' : 'Save work log'}
@@ -483,11 +500,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>
-            {isGlobalSupplyTopRow
-              ? 'My Work Logs'
-              : scopeAll && canViewAll
-                ? 'All Work Logs'
-                : 'My Work Logs'}
+            {isGlobalSupplyTopRow ? 'My Work Logs' : workLogsTableTitle(scopeAll, canViewAll)}
           </h2>
           <div className="table-wrap">
             {loading ? (
@@ -499,13 +512,16 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 <thead>
                   <tr>
                     <th>Log ID</th>
-                    <th>Full name</th>
+                    <th>Full Name</th>
                     <th>Date</th>
                     <th>Hours</th>
                     {!isGlobalSupplyTopRow ? (
                       <>
                         <th>Type</th>
-                        <th>Description</th>
+                        <th>Total Amount</th>
+                        <th>Supplier</th>
+                        <th>Audit ID</th>
+                        <th>Shipment ID</th>
                       </>
                     ) : (
                       <th>Total Amount</th>
@@ -553,27 +569,10 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                               r.workType
                             )}
                           </td>
-                          <td
-                            style={{
-                              maxWidth: 220,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={r.description ?? ''}
-                          >
-                            {editingWorkLogId === r.id ? (
-                              <input
-                                className="input"
-                                value={editForm.description}
-                                onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
-                              />
-                            ) : r.description?.trim() ? (
-                              r.description
-                            ) : (
-                              '—'
-                            )}
-                          </td>
+                          <td title="From linked labor cost (hours × rate at save time)">{formatWorkLogTotalAmount(r)}</td>
+                          <td>{formatWorkLogSupplierCell(r.supplier)}</td>
+                          <td>{r.audit?.code ?? r.auditId ?? '—'}</td>
+                          <td>{r.shipment?.code ?? r.shipmentId ?? '—'}</td>
                         </>
                       ) : (
                         <td title="From linked labor cost (hours × rate at save time)">{formatWorkLogTotalAmount(r)}</td>

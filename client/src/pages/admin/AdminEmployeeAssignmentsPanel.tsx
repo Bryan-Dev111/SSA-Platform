@@ -132,7 +132,10 @@ export function AdminEmployeeAssignmentsPanel({
     setLoading(true);
     setError(null);
     try {
-      const [u, s] = await Promise.all([apiJson<UserRow[]>('/users', { token }), apiJson<SupplierRow[]>('/suppliers', { token })]);
+      const [u, s] = await Promise.all([
+        apiJson<UserRow[]>('/users?scope=sentinel', { token }),
+        apiJson<SupplierRow[]>('/suppliers', { token }),
+      ]);
       setUsers(u);
       setSuppliers(s);
     } catch (e) {

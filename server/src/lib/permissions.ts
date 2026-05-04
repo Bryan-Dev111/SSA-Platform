@@ -149,6 +149,16 @@ export function canonicalRoleNameForPermissionMatrix(roleName: string): string {
 /** Role rows omitted from Sentinel Admin → Permissions (Global Supply–only accounts). */
 export const SENTINEL_ADMIN_PERMISSIONS_EXCLUDED_ROLES = computeSentinelAdminPermissionsExcludedRoles();
 
+/** User accounts that should not appear on Supplier Assurance Admin → Users (only Global Supply roles). */
+export function isGlobalSupplyOnlyUserRoleNames(roleNames: string[]): boolean {
+  if (!roleNames.length) return false;
+  const unique = new Set(roleNames.map((n) => canonicalRoleNameForPermissionMatrix(n)));
+  for (const r of unique) {
+    if (!SENTINEL_ADMIN_PERMISSIONS_EXCLUDED_ROLES.has(r)) return false;
+  }
+  return true;
+}
+
 /** All roles that may authenticate; used for product hub routes (not in PAGE_DEFINITIONS matrix). */
 const ALL_APP_ROLES_HUB = [
   'Admin',

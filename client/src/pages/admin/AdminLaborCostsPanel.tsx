@@ -153,7 +153,7 @@ export function AdminLaborCostsPanel({
       apiJson<LaborCostOpenSummary>(`/labor-costs/open-summary${qs}`, { token }).catch(() => null),
       apiJson<WorkLogOption[]>(`/work-logs${qs}`, { token }).catch(() => []),
       apiJson<ProjectOption[]>('/project-history', { token }).catch(() => []),
-      apiJson<UserOption[]>('/users', { token }).catch(() => []),
+      apiJson<UserOption[]>('/users?scope=sentinel', { token }).catch(() => []),
     ])
       .then(([costs, summary, logs, proj, users]) => {
         setRows(costs);

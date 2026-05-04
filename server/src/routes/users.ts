@@ -15,6 +15,7 @@ import {
   canonicalRoleNameForPermissionMatrix,
   SENTINEL_ADMIN_PERMISSIONS_EXCLUDED_ROLES,
   GLOBAL_VENDORS_ADMIN_PERMISSIONS_EXCLUDED_ROLES,
+  isGlobalSupplyOnlyUserRoleNames,
 } from '../lib/permissions';
 import { isSmtpConfigured } from '../lib/mail';
 
@@ -511,6 +512,9 @@ router.put(
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const scopeRaw = typeof req.query.scope === 'string' ? req.query.scope.trim() : '';
+    const sentinelUserList = scopeRaw === 'sentinel';
+
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -539,33 +543,35 @@ router.get(
       },
       orderBy: { email: 'asc' },
     });
-    res.json(
-      users.map((u) => ({
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        isEmployee: u.isEmployee,
-        isContractor: u.isContractor,
-        employmentStatus: u.employmentStatus,
-        hourlyRate: u.hourlyRate,
-        currency: u.currency,
-        country: u.country,
-        assignedCountryNames: assignedCountryNamesFromUser(u),
-        employmentResponsibilities: u.employmentResponsibilities,
-        employmentNotes: u.employmentNotes,
-        createdAt: u.createdAt,
-        passwordPlain: decryptPassword(u.passwordEncrypted),
-        roleNames: u.userRoles.map((ur) => ur.role.name),
-        supplier: u.supplier ?? undefined,
-        assignedSupplierIds: u.buyerSuppliers.map((b) => b.supplierId),
-        qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId), // legacy direct mapping
-        auditorAssignedSupplierIds: u.auditorSuppliers.map((a) => a.supplierId),
-        employeeAssignedSupplierIds: u.employeeSuppliers.map((a) => a.supplierId),
-        qeAssignedBuyerIds: u.qeBuyers.map((qb) => qb.buyerId),
-        qmAssignedQeIds: u.qmQes.map((qq) => qq.qualityEngineerId),
-        sourcingDirectorAssignedStaffIds: u.sourcingDirectorStaffAsDirector.map((r) => r.staffUserId),
-      }))
-    );
+    const mapped = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      isEmployee: u.isEmployee,
+      isContractor: u.isContractor,
+      employmentStatus: u.employmentStatus,
+      hourlyRate: u.hourlyRate,
+      currency: u.currency,
+      country: u.country,
+      assignedCountryNames: assignedCountryNamesFromUser(u),
+      employmentResponsibilities: u.employmentResponsibilities,
+      employmentNotes: u.employmentNotes,
+      createdAt: u.createdAt,
+      passwordPlain: decryptPassword(u.passwordEncrypted),
+      roleNames: u.userRoles.map((ur) => ur.role.name),
+      supplier: u.supplier ?? undefined,
+      assignedSupplierIds: u.buyerSuppliers.map((b) => b.supplierId),
+      qeAssignedSupplierIds: u.qeSuppliers.map((q) => q.supplierId), // legacy direct mapping
+      auditorAssignedSupplierIds: u.auditorSuppliers.map((a) => a.supplierId),
+      employeeAssignedSupplierIds: u.employeeSuppliers.map((a) => a.supplierId),
+      qeAssignedBuyerIds: u.qeBuyers.map((qb) => qb.buyerId),
+      qmAssignedQeIds: u.qmQes.map((qq) => qq.qualityEngineerId),
+      sourcingDirectorAssignedStaffIds: u.sourcingDirectorStaffAsDirector.map((r) => r.staffUserId),
+    }));
+    const payload = sentinelUserList
+      ? mapped.filter((u) => !isGlobalSupplyOnlyUserRoleNames(u.roleNames))
+      : mapped;
+    res.json(payload);
   })
 );
 

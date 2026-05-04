@@ -839,7 +839,7 @@ export function AdminExpensesPanel({
         >
           <MetricCard
             title="Total Expenses"
-            value={openExpenseTracking ? formatUsd(totalExpenses) : totalExpenses.toFixed(2)}
+            value={formatUsd(totalExpenses)}
           />
           {openExpenseTracking ? <MetricCard title="Open Expenses" value={formatUsd(openExpenseTotal)} /> : null}
           {openExpenseTracking ? <MetricCard title="Open Expense Count" value={openExpenseCount} /> : null}
@@ -1613,9 +1613,11 @@ export function AdminBuyersSuppliersPanel({
   const load = useCallback(async () => {
     if (!token) return;
     try {
+      const usersUrl = globalSupplyUsersMode ? '/users' : '/users?scope=sentinel';
+      const matrixUrl = globalSupplyUsersMode ? '/users/permission-matrix' : '/users/permission-matrix?scope=sentinel';
       const [u, pm] = await Promise.all([
-        apiJson<UserRow[]>('/users', { token }),
-        apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token }).catch(() => null),
+        apiJson<UserRow[]>(usersUrl, { token }),
+        apiJson<PermissionMatrixResponse>(matrixUrl, { token }).catch(() => null),
       ]);
       setUsers(u);
       if (pm) {
@@ -1625,7 +1627,7 @@ export function AdminBuyersSuppliersPanel({
       }
       if (showBuyerSupplierSections) {
         const [s, ct] = await Promise.all([
-          apiJson<SupplierRow[]>('/suppliers', { token }),
+          apiJson<SupplierRow[]>('/suppliers?includeInactive=true', { token }),
           apiJson<{ list: CommodityTypeRow[] }>('/commodity-types', { token }).catch(() => ({ list: [] as CommodityTypeRow[] })),
         ]);
         setSuppliers(s);
@@ -1637,7 +1639,7 @@ export function AdminBuyersSuppliersPanel({
     } catch {
       toast.error('Failed to load users/suppliers');
     }
-  }, [token, toast, showBuyerSupplierSections]);
+  }, [token, toast, showBuyerSupplierSections, globalSupplyUsersMode]);
 
   useEffect(() => {
     load();
@@ -1731,7 +1733,7 @@ export function AdminBuyersSuppliersPanel({
 
   const userTableColSpan = useMemo(() => {
     if (globalSupplyUsersMode) return 7;
-    if (usersOnlyEmployees) return 9;
+    if (usersOnlyEmployees) return 8;
     return 6;
   }, [globalSupplyUsersMode, usersOnlyEmployees]);
   const [userSort, setUserSort] = useState<{ key: UserTableSortKey | null; dir: SortDir }>({
@@ -2429,6 +2431,15 @@ export function AdminBuyersSuppliersPanel({
                     dir={userSort.dir}
                     onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                   />
+                  {!globalSupplyUsersMode && usersOnlyEmployees ? (
+                    <SortableTh
+                      label="Role"
+                      columnKey="role"
+                      activeKey={userSort.key}
+                      dir={userSort.dir}
+                      onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
+                    />
+                  ) : null}
                   <SortableTh
                     label="Email"
                     columnKey="email"
@@ -2461,19 +2472,20 @@ export function AdminBuyersSuppliersPanel({
                       />
                       <th>Password</th>
                     </>
+                  ) : usersOnlyEmployees ? (
+                    <>
+                      <th>Status</th>
+                      <th>Hourly rate (USD)</th>
+                      <SortableTh
+                        label="Country"
+                        columnKey="country"
+                        activeKey={userSort.key}
+                        dir={userSort.dir}
+                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
+                      />
+                    </>
                   ) : (
                     <>
-                      {usersOnlyEmployees && <th>Status</th>}
-                      {usersOnlyEmployees && <th>Hourly rate (USD)</th>}
-                      {usersOnlyEmployees && (
-                        <SortableTh
-                          label="Country"
-                          columnKey="country"
-                          activeKey={userSort.key}
-                          dir={userSort.dir}
-                          onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
-                        />
-                      )}
                       <th>Password</th>
                       <SortableTh
                         label="Role"
@@ -2504,6 +2516,28 @@ export function AdminBuyersSuppliersPanel({
                           u.name?.trim() ? u.name : '—'
                         )}
                       </td>
+                      {!globalSupplyUsersMode && usersOnlyEmployees ? (
+                        <td>
+                          {editUser?.id === u.id ? (
+                            <select
+                              className="input"
+                              value={
+                                editUser.roleNames[0] ??
+                                (globalSupplyUsersMode ? globalSupplyCreateRoleOptions[0] ?? 'CommodityBuyer' : 'Buyer')
+                              }
+                              onChange={(e) => setEditUser({ ...editUser, roleNames: [e.target.value] })}
+                            >
+                              {roleOptionsForUserTable.map((r) => (
+                                <option key={r} value={r}>
+                                  {formatUserRoleLabel(r)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            u.roleNames.map(formatUserRoleLabel).join(', ')
+                          )}
+                        </td>
+                      ) : null}
                       <td>
                         {editUser?.id === u.id ? (
                           <input className="input" type="email" value={editUser.email} onChange={(e) => setEditUser({ ...editUser, email: e.target.value })} />
@@ -2591,58 +2625,55 @@ export function AdminBuyersSuppliersPanel({
                             )}
                           </td>
                         </>
+                      ) : usersOnlyEmployees ? (
+                        <>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <select
+                                className="input"
+                                value={editUser.employmentStatus ?? 'Active'}
+                                onChange={(e) =>
+                                  setEditUser({ ...editUser, employmentStatus: e.target.value as 'Active' | 'Inactive' })
+                                }
+                              >
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                              </select>
+                            ) : (
+                              u.employmentStatus ?? 'Active'
+                            )}
+                          </td>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <input
+                                className="input"
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={editUser.hourlyRate ?? ''}
+                                onChange={(e) =>
+                                  setEditUser({ ...editUser, hourlyRate: e.target.value === '' ? null : Number(e.target.value) })
+                                }
+                                title="Amount in US dollars per hour"
+                              />
+                            ) : (
+                              formatUsd(u.hourlyRate)
+                            )}
+                          </td>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <input
+                                className="input"
+                                value={editUser.country ?? ''}
+                                onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
+                              />
+                            ) : (
+                              u.country ?? '—'
+                            )}
+                          </td>
+                        </>
                       ) : (
                         <>
-                          {usersOnlyEmployees && (
-                            <td>
-                              {editUser?.id === u.id ? (
-                                <select
-                                  className="input"
-                                  value={editUser.employmentStatus ?? 'Active'}
-                                  onChange={(e) =>
-                                    setEditUser({ ...editUser, employmentStatus: e.target.value as 'Active' | 'Inactive' })
-                                  }
-                                >
-                                  <option value="Active">Active</option>
-                                  <option value="Inactive">Inactive</option>
-                                </select>
-                              ) : (
-                                u.employmentStatus ?? 'Active'
-                              )}
-                            </td>
-                          )}
-                          {usersOnlyEmployees && (
-                            <td>
-                              {editUser?.id === u.id ? (
-                                <input
-                                  className="input"
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={editUser.hourlyRate ?? ''}
-                                  onChange={(e) =>
-                                    setEditUser({ ...editUser, hourlyRate: e.target.value === '' ? null : Number(e.target.value) })
-                                  }
-                                  title="Amount in US dollars per hour"
-                                />
-                              ) : (
-                                formatUsd(u.hourlyRate)
-                              )}
-                            </td>
-                          )}
-                          {usersOnlyEmployees && (
-                            <td>
-                              {editUser?.id === u.id ? (
-                                <input
-                                  className="input"
-                                  value={editUser.country ?? ''}
-                                  onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
-                                />
-                              ) : (
-                                u.country ?? '—'
-                              )}
-                            </td>
-                          )}
                           <td
                             style={{
                               fontFamily:

@@ -22,6 +22,7 @@ import { InternalManagementOrgChart } from './InternalManagementOrgChart';
 import { InternalManagementCalendarView } from './InternalManagementCalendar';
 import type { InternalManagementTab as ImTab } from './internalManagementTabs';
 import { ManagementAssignmentsPanel } from './ManagementAssignmentsPanel';
+import { WorkLogs } from './WorkLogs';
 import {
   formatDisplayCalendarDate,
   formatDisplayCalendarRange,
@@ -984,6 +985,7 @@ export function InternalManagement() {
             ['projectHistory', t('internal.tab.projectHistory')],
             ['profit', t('internal.tab.profit')],
             ['laborCosts', t('internal.tab.laborCosts')],
+            ['workLogs', t('internal.tab.workLogs')],
             ['expenses', t('internal.tab.expenses')],
             ['employeeAssignments', t('internal.tab.employeeAssignments')],
             ['managementAssignments', t('internal.tab.managementAssignments')],
@@ -1898,6 +1900,12 @@ export function InternalManagement() {
       {tab === 'laborCosts' && (
         <div style={{ marginTop: '1rem' }}>
           <AdminLaborCostsPanel token={token} listScope="all" />
+        </div>
+      )}
+
+      {tab === 'workLogs' && (
+        <div style={{ marginTop: '1rem' }}>
+          <WorkLogs variant="embedded" />
         </div>
       )}
 
