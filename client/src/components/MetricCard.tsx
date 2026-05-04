@@ -1,4 +1,26 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
+
+const PO_PLURAL_LABEL = 'POs';
+
+/** Uppercase styling on KPI labels would turn "POs" into "POS"; keep the plural s lowercase. */
+function renderSummaryKpiTitle(title: string): ReactNode {
+  if (!title.includes(PO_PLURAL_LABEL)) {
+    return <span className="summary-kpi-label-upper">{title}</span>;
+  }
+  const parts = title.split(PO_PLURAL_LABEL);
+  return (
+    <>
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          {part ? <span className="summary-kpi-label-upper">{part}</span> : null}
+          {i < parts.length - 1 ? (
+            <span className="summary-kpi-label-pos-plural">{PO_PLURAL_LABEL}</span>
+          ) : null}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /**
  * Compact KPI tile: label, value, optional subtitle; optional shipment-style alert (tooltip-capable).
@@ -49,7 +71,7 @@ export function MetricCard({
             </svg>
           </div>
         ) : null}
-        <div className="summary-kpi-label">{title}</div>
+        <div className="summary-kpi-label">{renderSummaryKpiTitle(title)}</div>
         <div className="summary-kpi-value">{value}</div>
         {subtitle ? <div className="summary-kpi-subtitle">{subtitle}</div> : null}
       </div>

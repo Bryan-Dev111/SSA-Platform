@@ -5,7 +5,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
-import { requirePageAccess } from '../middleware/rbac';
+import { requirePageAccess, requireRole } from '../middleware/rbac';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getNextCode } from '../services/idGenerator';
 import { createRecordDownloadSignedUrl, uploadRecordToStorage } from '../lib/supabaseStorage';
@@ -63,6 +63,7 @@ router.get(
 router.post(
   '/',
   requirePageAccess('GlobalSupplyPurchaseOrders'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const farmIdRaw = req.body?.farmId;
     const farmId =
@@ -170,6 +171,7 @@ router.post(
 router.patch(
   '/:id',
   requirePageAccess('GlobalSupplyPurchaseOrders'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
     if (!id) {
@@ -312,6 +314,7 @@ router.patch(
 router.patch(
   '/:id/close',
   requirePageAccess('GlobalSupplyPurchaseOrders'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
     if (!id) {
@@ -342,6 +345,47 @@ router.patch(
     });
 
     void notifySourcingDirectorsOfPurchaseOrderEvent({ po: updated, event: 'closed' }).catch(() => {});
+
+    res.json(updated);
+  })
+);
+
+router.patch(
+  '/:id/reopen',
+  requirePageAccess('GlobalSupplyPurchaseOrders'),
+  requireRole(['Admin']),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'id is required' });
+      return;
+    }
+
+    const client = ensurePurchaseOrderClient();
+    const existing = await client.purchaseOrder.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+    if (!existing) {
+      res.status(404).json({ error: 'Purchase order not found' });
+      return;
+    }
+
+    const currentStatus = (existing.status ?? 'Open').trim().toLowerCase();
+    if (currentStatus !== 'closed') {
+      res.status(400).json({ error: 'Only closed purchase orders can be reopened' });
+      return;
+    }
+
+    const updated = await client.purchaseOrder.update({
+      where: { id },
+      data: { status: 'Open' },
+      include: purchaseOrderListInclude,
+    });
+
+    void notifySourcingDirectorsOfPurchaseOrderEvent({ po: updated, event: 'reopened' }).catch(
+      () => {}
+    );
 
     res.json(updated);
   })
@@ -381,6 +425,7 @@ router.get(
 router.delete(
   '/:id/attachments/:attachmentId',
   requirePageAccess('GlobalSupplyPurchaseOrders'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
     const attachmentId = String(req.params.attachmentId ?? '').trim();
@@ -404,6 +449,7 @@ router.delete(
 router.post(
   '/:id/attachments',
   requirePageAccess('GlobalSupplyPurchaseOrders'),
+  requireRole(['Admin']),
   upload.single('file'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();

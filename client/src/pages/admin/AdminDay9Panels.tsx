@@ -1456,9 +1456,53 @@ const SENTINEL_SUPPLIER_ASSURANCE_ACCOUNT_ROLES = new Set([
   'Inspector',
 ]);
 
+/** Supplier Assurance seed / demo logins hidden from Global Supply Admin → Users. */
+const GLOBAL_SUPPLY_USERS_HIDDEN_EMAILS = new Set(['buyer@sentinel.local']);
+
+type UserTableSortKey = 'name' | 'email' | 'employee' | 'role' | 'country';
+
+type GlobalSupplyCountryOption = { id: string; name: string };
+
 function isSentinelSupplierAssuranceOnlyAccount(roleNames: string[]): boolean {
   if (roleNames.length === 0) return false;
   return roleNames.every((r) => SENTINEL_SUPPLIER_ASSURANCE_ACCOUNT_ROLES.has(r));
+}
+
+function GsUserCountrySelect({
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  options: GlobalSupplyCountryOption[];
+  disabled?: boolean;
+}) {
+  const trimmed = (value ?? '').trim();
+  const names = new Set(options.map((o) => o.name));
+  const legacy = trimmed.length > 0 && !names.has(trimmed);
+  return (
+    <select
+      className="input"
+      value={trimmed}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      aria-label="Country"
+    >
+      <option value="">Select country</option>
+      {legacy ? (
+        <option value={trimmed}>
+          {trimmed} (not in master list)
+        </option>
+      ) : null}
+      {options.map((o) => (
+        <option key={o.id} value={o.name}>
+          {o.name}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 /** Roles that belong to main SSA workflows — excluded from GS dropdown so GS admins assign GS roles only. */
@@ -1505,10 +1549,18 @@ interface PermissionPageDef {
   path: string;
 }
 
+interface PermissionMatrixRoleRow {
+  id: string;
+  name: string;
+  userCount: number;
+}
+
 interface PermissionMatrixResponse {
   apiPageRoles: Record<string, string[]>;
   pages: PermissionPageDef[];
   roles: string[];
+  /** Stable id per role row (distinguishes e.g. `SourcingDirector` vs `Sourcing Director`). */
+  roleRows: PermissionMatrixRoleRow[];
   matrix: Record<string, Record<string, boolean>>;
   adminOnlyDeletes: Array<{ entity: string; method: string; path: string }>;
 }
@@ -1549,6 +1601,7 @@ export function AdminBuyersSuppliersPanel({
   const [newUserEmploymentStatus, setNewUserEmploymentStatus] = useState<'Active' | 'Inactive'>('Active');
   const [newUserHourlyRate, setNewUserHourlyRate] = useState('');
   const [newUserCountry, setNewUserCountry] = useState('');
+  const [gsUserCountryOptions, setGsUserCountryOptions] = useState<GlobalSupplyCountryOption[]>([]);
   /** Role names from server (includes custom roles); matrix UI lives only on Permissions tab. */
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [newSupName, setNewSupName] = useState('');
@@ -1600,6 +1653,16 @@ export function AdminBuyersSuppliersPanel({
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!token || !globalSupplyUsersMode) {
+      setGsUserCountryOptions([]);
+      return;
+    }
+    apiJson<{ list: GlobalSupplyCountryOption[] }>('/global-supply-options/countries', { token })
+      .then((r) => setGsUserCountryOptions(r.list))
+      .catch(() => setGsUserCountryOptions([]));
+  }, [token, globalSupplyUsersMode]);
+
   const buyers = users.filter((u) => u.roleNames.includes('Buyer'));
   const supplierUsers = users.filter((u) => u.roleNames.includes('Supplier'));
   const availableRoleOptions = availableRoles.length > 0 ? availableRoles : [...USER_ROLE_OPTIONS];
@@ -1614,7 +1677,11 @@ export function AdminBuyersSuppliersPanel({
       ? users.filter((u) => Boolean(u.isEmployee) || Boolean(u.isContractor))
       : users;
     if (globalSupplyUsersMode) {
-      list = list.filter((u) => !isSentinelSupplierAssuranceOnlyAccount(u.roleNames));
+      list = list.filter(
+        (u) =>
+          !isSentinelSupplierAssuranceOnlyAccount(u.roleNames) &&
+          !GLOBAL_SUPPLY_USERS_HIDDEN_EMAILS.has(u.email.trim().toLowerCase())
+      );
     }
     return list;
   }, [users, usersOnlyEmployees, globalSupplyUsersMode]);
@@ -1677,7 +1744,7 @@ export function AdminBuyersSuppliersPanel({
     if (usersOnlyEmployees) return 9;
     return 6;
   }, [globalSupplyUsersMode, usersOnlyEmployees]);
-  const [userSort, setUserSort] = useState<{ key: 'name' | 'email' | 'employee' | 'role' | null; dir: SortDir }>({
+  const [userSort, setUserSort] = useState<{ key: UserTableSortKey | null; dir: SortDir }>({
     key: null,
     dir: 'asc',
   });
@@ -1687,10 +1754,12 @@ export function AdminBuyersSuppliersPanel({
     if (!key) return rows;
     const employeeLabel = (u: UserRow) => (u.isContractor ? 'Contractor' : u.isEmployee ? 'Yes' : 'No');
     const roleLabel = (u: UserRow) => u.roleNames.map(formatUserRoleLabel).join(', ');
+    const countryLabel = (u: UserRow) => (u.country ?? '').trim();
     rows.sort((a, b) => {
       if (key === 'name') return cmpStr(a.name?.trim() || '', b.name?.trim() || '', userSort.dir);
       if (key === 'email') return cmpStr(a.email, b.email, userSort.dir);
       if (key === 'employee') return cmpStr(employeeLabel(a), employeeLabel(b), userSort.dir);
+      if (key === 'country') return cmpStr(countryLabel(a), countryLabel(b), userSort.dir);
       return cmpStr(roleLabel(a), roleLabel(b), userSort.dir);
     });
     return rows;
@@ -2043,7 +2112,16 @@ export function AdminBuyersSuppliersPanel({
               )}
               <div className="input-group">
                 <label className="input-label">Country</label>
-                <input className="input" value={newUserCountry} onChange={(e) => setNewUserCountry(e.target.value)} />
+                {globalSupplyUsersMode ? (
+                  <GsUserCountrySelect
+                    value={newUserCountry}
+                    onChange={setNewUserCountry}
+                    options={gsUserCountryOptions}
+                    disabled={busy}
+                  />
+                ) : (
+                  <input className="input" value={newUserCountry} onChange={(e) => setNewUserCountry(e.target.value)} />
+                )}
               </div>
             </div>
             <button
@@ -2343,31 +2421,37 @@ export function AdminBuyersSuppliersPanel({
                     columnKey="name"
                     activeKey={userSort.key}
                     dir={userSort.dir}
-                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                   />
                   <SortableTh
                     label="Email"
                     columnKey="email"
                     activeKey={userSort.key}
                     dir={userSort.dir}
-                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                   />
                   <SortableTh
                     label="Employee"
                     columnKey="employee"
                     activeKey={userSort.key}
                     dir={userSort.dir}
-                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                    onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                   />
                   {globalSupplyUsersMode ? (
                     <>
-                      <th>Country</th>
+                      <SortableTh
+                        label="Country"
+                        columnKey="country"
+                        activeKey={userSort.key}
+                        dir={userSort.dir}
+                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
+                      />
                       <SortableTh
                         label="Role"
                         columnKey="role"
                         activeKey={userSort.key}
                         dir={userSort.dir}
-                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                       />
                       <th>Password</th>
                     </>
@@ -2375,14 +2459,22 @@ export function AdminBuyersSuppliersPanel({
                     <>
                       {usersOnlyEmployees && <th>Status</th>}
                       {usersOnlyEmployees && <th>Hourly rate (USD)</th>}
-                      {usersOnlyEmployees && <th>Country</th>}
+                      {usersOnlyEmployees && (
+                        <SortableTh
+                          label="Country"
+                          columnKey="country"
+                          activeKey={userSort.key}
+                          dir={userSort.dir}
+                          onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
+                        />
+                      )}
                       <th>Password</th>
                       <SortableTh
                         label="Role"
                         columnKey="role"
                         activeKey={userSort.key}
                         dir={userSort.dir}
-                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as 'name' | 'email' | 'employee' | 'role'))}
+                        onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                       />
                     </>
                   )}
@@ -2443,10 +2535,11 @@ export function AdminBuyersSuppliersPanel({
                         <>
                           <td>
                             {editUser?.id === u.id ? (
-                              <input
-                                className="input"
+                              <GsUserCountrySelect
                                 value={editUser.country ?? ''}
-                                onChange={(e) => setEditUser({ ...editUser, country: e.target.value })}
+                                onChange={(next) => setEditUser({ ...editUser, country: next || null })}
+                                options={gsUserCountryOptions}
+                                disabled={busy}
                               />
                             ) : (
                               u.country ?? '—'
@@ -2872,12 +2965,17 @@ export function AdminPermissionsPanel({
   const [newRoleName, setNewRoleName] = useState('');
   const [busy, setBusy] = useState(false);
   const [matrixError, setMatrixError] = useState<string | null>(null);
+  const [rolePendingDelete, setRolePendingDelete] = useState<PermissionMatrixRoleRow | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     try {
       const d = await apiJson<PermissionMatrixResponse>('/users/permission-matrix', { token });
-      setServerData(d);
+      const roleRows =
+        Array.isArray(d.roleRows) && d.roleRows.length > 0
+          ? d.roleRows
+          : d.roles.map((name) => ({ id: '', name, userCount: 0 }));
+      setServerData({ ...d, roleRows });
       setMatrixError(null);
     } catch (e) {
       setServerData(null);
@@ -2941,6 +3039,32 @@ export function AdminPermissionsPanel({
     }
   };
 
+  const deleteRole = async (row: PermissionMatrixRoleRow) => {
+    if (!token || !row.id) return;
+    setBusy(true);
+    try {
+      const res = await apiFetch(`/users/roles/${encodeURIComponent(row.id)}`, { token, method: 'DELETE' });
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = text || `HTTP ${res.status}`;
+        try {
+          const j = JSON.parse(text) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* keep msg */
+        }
+        throw new Error(msg);
+      }
+      toast.success(`Role “${row.name}” deleted`);
+      setRolePendingDelete(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to delete role');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const filteredPages = useMemo(() => {
     if (!serverData) return [];
     if (scope === 'globalVendors') {
@@ -2952,15 +3076,16 @@ export function AdminPermissionsPanel({
     return serverData.pages;
   }, [serverData, scope]);
 
-  const filteredRoles = useMemo(() => {
+  const filteredRoleRows = useMemo(() => {
     if (!serverData) return [];
+    const rows = serverData.roleRows ?? [];
     if (scope === 'globalVendors') {
-      return serverData.roles.filter((r) => !PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES.has(r));
+      return rows.filter((r) => !PERMISSION_MATRIX_GLOBAL_SUPPLY_HIDE_ROLES.has(r.name));
     }
     if (scope === 'sentinel') {
-      return serverData.roles.filter((r) => !PERMISSION_MATRIX_SENTINEL_HIDE_ROLES.has(r));
+      return rows.filter((r) => !PERMISSION_MATRIX_SENTINEL_HIDE_ROLES.has(r.name));
     }
-    return serverData.roles;
+    return rows;
   }, [serverData, scope]);
 
   return (
@@ -2990,32 +3115,111 @@ export function AdminPermissionsPanel({
             <table className="table">
               <thead>
                 <tr>
-                  <th>Role</th>
+                  <th style={{ minWidth: 200 }}>Role</th>
                   {filteredPages.map((p) => (
                     <th key={p.key}>{p.label}</th>
                   ))}
+                  <th style={{ width: 100 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRoles.map((roleName) => (
-                  <tr key={roleName}>
-                    <td>{formatUserRoleLabel(roleName)}</td>
-                    {filteredPages.map((p) => (
-                      <td key={`${roleName}-${p.key}`}>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(serverData.matrix[roleName]?.[p.key])}
-                          onChange={(e) => togglePermission(roleName, p.key, e.target.checked)}
-                        />
+                {filteredRoleRows.map((roleRow) => {
+                  const roleName = roleRow.name;
+                  const canDelete =
+                    Boolean(roleRow.id) &&
+                    roleRow.name !== 'Admin' &&
+                    roleRow.userCount === 0;
+                  return (
+                    <tr key={roleRow.id || roleName}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{formatUserRoleLabel(roleName)}</div>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-text-muted)',
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          <span title="Stored role name (unique in database)">Key: </span>
+                          <code style={{ fontSize: 'inherit' }}>{roleName}</code>
+                          <span>
+                            {' '}
+                            · {roleRow.userCount} user{roleRow.userCount === 1 ? '' : 's'}
+                          </span>
+                          {roleRow.id ? (
+                            <span title="Use this id if you need to tell roles apart in support tickets">
+                              {' '}
+                              · id {roleRow.id.slice(0, 8)}…
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      {filteredPages.map((p) => (
+                        <td key={`${roleName}-${p.key}`}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(serverData.matrix[roleName]?.[p.key])}
+                            onChange={(e) => togglePermission(roleName, p.key, e.target.checked)}
+                          />
+                        </td>
+                      ))}
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy || !canDelete}
+                          title={
+                            !roleRow.id
+                              ? 'Reload the page to enable delete (older API response).'
+                              : roleRow.name === 'Admin'
+                                ? 'The Admin role cannot be deleted.'
+                                : roleRow.userCount > 0
+                                  ? 'Remove this role from all users before deleting.'
+                                  : 'Delete this role'
+                          }
+                          onClick={() => setRolePendingDelete(roleRow)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
+        <ConfirmDialog
+          open={rolePendingDelete !== null}
+          title="Delete role?"
+          message={
+            rolePendingDelete ? (
+              <p style={{ margin: 0 }}>
+                Permanently delete role <strong>{rolePendingDelete.name}</strong>
+                {rolePendingDelete.id ? (
+                  <>
+                    {' '}
+                    (<code style={{ fontSize: '0.9em' }}>{rolePendingDelete.id}</code>)?
+                  </>
+                ) : (
+                  '?'
+                )}
+                <br />
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                  Page permissions for this role will be removed. This cannot be undone.
+                </span>
+              </p>
+            ) : (
+              ''
+            )
+          }
+          confirmLabel="Delete role"
+          variant="danger"
+          onCancel={() => setRolePendingDelete(null)}
+          onConfirm={() => rolePendingDelete && void deleteRole(rolePendingDelete)}
+        />
       </div>
     </div>
   );

@@ -187,12 +187,10 @@ export function GlobalSupplyProfitTab({ token }: { token: string | null }) {
         <MetricCard
           title="Total Revenue"
           value={loading ? '—' : formatUsd(closedPoWidgets.totalRevenue)}
-          subtitle="Sum of revenue for closed purchase orders only"
         />
         <MetricCard
           title="Total Profit"
           value={loading ? '—' : formatUsd(closedPoWidgets.totalProfit)}
-          subtitle="Closed PO revenue minus linked Global Vendors expenses"
         />
       </div>
 
@@ -213,7 +211,7 @@ export function GlobalSupplyProfitTab({ token }: { token: string | null }) {
             {loading ? (
               <p className="table-empty">Loading…</p>
             ) : tableGroups.length === 0 ? (
-              <p className="table-empty">No purchase orders and no unlinked Global Vendors expenses yet.</p>
+              <p className="table-empty">No purchase orders and no unlinked expenses yet.</p>
             ) : (
               <table
                 className="table"

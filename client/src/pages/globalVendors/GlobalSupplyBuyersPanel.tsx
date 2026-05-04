@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { SortableTh } from '../../components/SortableTh';
+import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
+import { cmpStr, toggleSort, type SortDir } from '../../utils/tableSort';
 
 type ToastApi = {
   success: (message: string) => void;
   error: (message: string) => void;
+  info: (message: string) => void;
 };
 
 type BuyerRow = {
@@ -32,6 +36,8 @@ const EMPTY_DRAFT: BuyerDraft = {
   notes: '',
 };
 
+type BuyerTableSortKey = 'name' | 'country' | 'city' | 'contactEmail' | 'notes';
+
 export function GlobalSupplyBuyersPanel({
   token,
   toast,
@@ -44,6 +50,10 @@ export function GlobalSupplyBuyersPanel({
   const [newDraft, setNewDraft] = useState<BuyerDraft>(EMPTY_DRAFT);
   const [editRow, setEditRow] = useState<BuyerRow | null>(null);
   const [deleteRow, setDeleteRow] = useState<BuyerRow | null>(null);
+  const [sort, setSort] = useState<{ key: BuyerTableSortKey | null; dir: SortDir }>({
+    key: 'name',
+    dir: 'asc',
+  });
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -138,10 +148,77 @@ export function GlobalSupplyBuyersPanel({
     }
   };
 
+  const sortedList = useMemo(() => {
+    const arr = [...list];
+    const { key, dir } = sort;
+    if (!key) return arr;
+    return arr.sort((a, b) => {
+      switch (key) {
+        case 'name':
+          return cmpStr(a.name ?? '', b.name ?? '', dir);
+        case 'country':
+          return cmpStr(a.country ?? '', b.country ?? '', dir);
+        case 'city':
+          return cmpStr(a.city ?? '', b.city ?? '', dir);
+        case 'contactEmail':
+          return cmpStr(a.contactEmail ?? '', b.contactEmail ?? '', dir);
+        case 'notes':
+          return cmpStr(a.notes ?? '', b.notes ?? '', dir);
+        default:
+          return 0;
+      }
+    });
+  }, [list, sort]);
+
+  const onSortColumn = (columnKey: string) => {
+    setSort((prev) => toggleSort(prev, columnKey as BuyerTableSortKey));
+  };
+
+  const exportToExcel = useCallback(() => {
+    if (sortedList.length === 0) {
+      toast.info('No buyers to export yet.');
+      return;
+    }
+    try {
+      const rows: ExportRow[] = sortedList.map((row) => ({
+        'Buyer Name': row.name,
+        Country: row.country ?? '—',
+        City: row.city ?? '—',
+        'Contact Email': row.contactEmail ?? '—',
+        Notes: row.notes ?? '—',
+      }));
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTableXlsx(`Global_Supply_Buyers_${stamp}`, 'Buyers', rows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  }, [sortedList, toast]);
+
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Buyers</h2>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: '0.75rem',
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: 0 }}>Buyers</h2>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={exportToExcel}
+            disabled={busy}
+            title="Download the buyers table as an Excel file"
+          >
+            Export to Excel
+          </button>
+        </div>
         <div
           style={{
             display: 'grid',
@@ -209,11 +286,41 @@ export function GlobalSupplyBuyersPanel({
           <table className="table">
             <thead>
               <tr>
-                <th>Buyer Name</th>
-                <th>Country</th>
-                <th>City</th>
-                <th>Contact Email</th>
-                <th>Notes</th>
+                <SortableTh
+                  label="Buyer Name"
+                  columnKey="name"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Country"
+                  columnKey="country"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="City"
+                  columnKey="city"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Contact Email"
+                  columnKey="contactEmail"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Notes"
+                  columnKey="notes"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
                 <th style={{ width: 170 }}>Actions</th>
               </tr>
             </thead>
@@ -225,7 +332,7 @@ export function GlobalSupplyBuyersPanel({
                   </td>
                 </tr>
               ) : (
-                list.map((row) => (
+                sortedList.map((row) => (
                   <tr key={row.id}>
                     <td>
                       {editRow?.id === row.id ? (

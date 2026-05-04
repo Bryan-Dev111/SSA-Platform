@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { TableWithTopScroll } from '../components/TableWithTopScroll';
 import { downloadWithAuthProgress, parseApiError } from '../utils/apiHelpers';
 import { MAX_RECORD_UPLOAD_BYTES, postRecordWithProgress } from '../utils/recordUpload';
 
@@ -465,7 +466,7 @@ export function Audits() {
       </div>
 
       <div className="card">
-        <div className="table-wrap">
+        <TableWithTopScroll ariaLabel="Audits table">
           <table className="table">
             <thead>
               <tr>
@@ -643,7 +644,7 @@ export function Audits() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableWithTopScroll>
         {audits.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>

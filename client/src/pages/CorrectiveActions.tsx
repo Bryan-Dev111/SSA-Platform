@@ -11,6 +11,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { TableWithTopScroll } from '../components/TableWithTopScroll';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 
 interface Supplier {
@@ -735,7 +736,7 @@ export function CorrectiveActions() {
             Export to Excel
           </button>
         </div>
-        <div className="table-wrap">
+        <TableWithTopScroll ariaLabel="Corrective actions table">
           <table className="table">
             <thead>
               <tr>
@@ -862,7 +863,7 @@ export function CorrectiveActions() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableWithTopScroll>
         {list.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>

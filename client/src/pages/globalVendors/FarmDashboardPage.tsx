@@ -275,16 +275,7 @@ export function FarmDashboardPage() {
         </div>
       ) : null}
 
-      <div
-        className="dashboard-metric-grid"
-        style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          marginBottom: '1rem',
-          width: '100%',
-          maxWidth: '100%',
-          minWidth: 0,
-        }}
-      >
+      <div className="dashboard-metric-grid farm-dashboard-metric-grid">
         <MetricCard title="Total Farms" value={data.kpis.totalFarms} />
         <MetricCard title="Total Employees" value={data.kpis.totalEmployees} />
         <MetricCard title="Open POs" value={data.kpis.openPos} />
@@ -300,30 +291,22 @@ export function FarmDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard
-          title="Farms by Weight"
-          subtitle="Total kg on purchase orders per farm (all statuses)"
-          allowContentOverflow
-        >
+        <ChartCard title="Farms by Weight" allowContentOverflow>
           <VerticalBarChart rows={g.farmsByWeight} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Revenue" subtitle="Closed purchase orders only" allowContentOverflow>
+        <ChartCard title="Farms by Revenue" allowContentOverflow>
           <VerticalBarChart rows={g.farmsByRevenue} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
-        <ChartCard
-          title="Farms by Profit"
-          subtitle="Closed PO revenue − linked Global Vendors expenses"
-          allowContentOverflow
-        >
+        <ChartCard title="Farms by Profit" allowContentOverflow>
           <VerticalBarChart rows={g.farmsByProfit} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by PO" subtitle="Number of purchase orders per farm" allowContentOverflow>
+        <ChartCard title="Farms by PO" allowContentOverflow>
           <VerticalBarChart rows={g.farmsByPoCount} valueFormatter={formatCount} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Sample" subtitle="Sample records linked to each farm" allowContentOverflow>
+        <ChartCard title="Farms by Sample" allowContentOverflow>
           <VerticalBarChart rows={g.farmsBySample} valueFormatter={formatCount} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="PO Placement" subtitle="Purchase orders placed over time (count per day)">
+        <ChartCard title="PO Placement">
           <ContinuousLineChart
             rows={g.poPlacementOverTime}
             ariaLabel="PO placement over time"

@@ -1,6 +1,6 @@
 /**
  * Work Logs — own entries by default; Admin/QM can switch to all entries in the tables.
- * Full name is always taken from the account. Submitting creates a matching Labor Cost row.
+ * Full name is always taken from the account. Submitting still creates a matching labor cost on the server.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -37,21 +37,8 @@ interface WorkLogRow {
   projectHistory: { id: string; projectCode: string } | null;
   description: string | null;
   createdAt: string;
-}
-
-interface LaborCostRow {
-  id: string;
-  code: string;
-  workLogId: string | null;
-  workLog: { id: string; code: string; projectHistoryId: string | null } | null;
-  projectHistoryId: string | null;
-  projectHistory: { id: string; projectCode: string } | null;
-  fullName: string;
-  hours: number;
-  rate: number;
-  totalCost: number;
-  paidStatus: 'Pending' | 'Paid' | 'Rejected';
-  createdAt: string;
+  /** Auto-created labor line when the log is saved (used for Total Amount on Global Supply work logs). */
+  laborCosts?: { totalCost: number }[];
 }
 
 interface SupplierOption {
@@ -79,6 +66,12 @@ interface EmployeeRatePreview {
   currency: string | null;
 }
 
+function formatWorkLogTotalAmount(r: WorkLogRow): string {
+  const raw = r.laborCosts?.[0]?.totalCost;
+  if (raw == null || !Number.isFinite(Number(raw))) return '—';
+  return Number(raw).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export type WorkLogsVariant = 'page' | 'embedded' | 'globalSupplyTopRow';
 
 export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
@@ -87,7 +80,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   const toast = useToast();
   const isGlobalSupplyTopRow = variant === 'globalSupplyTopRow';
   const [workLogs, setWorkLogs] = useState<WorkLogRow[]>([]);
-  const [laborCosts, setLaborCosts] = useState<LaborCostRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [audits, setAudits] = useState<AuditOption[]>([]);
   const [shipments, setShipments] = useState<ShipmentOption[]>([]);
@@ -155,15 +147,13 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     if (isGlobalSupplyTopRow) {
       Promise.all([
         apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
-        apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
         apiJson<EmployeeRatePreview>('/work-logs/preview-rate', { token }).catch(() => ({
           hourlyRate: 0,
           currency: null,
         })),
       ])
-        .then(([logs, costs, ratePreview]) => {
+        .then(([logs, ratePreview]) => {
           setWorkLogs(logs);
-          setLaborCosts(costs);
           setSuppliers([]);
           setAudits([]);
           setShipments([]);
@@ -175,7 +165,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     }
     Promise.all([
       apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
-      apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
       apiJson<SupplierOption[]>('/suppliers', { token }).catch(() => []),
       apiJson<AuditOption[]>('/audits', { token }).catch(() => []),
       apiJson<ShipmentOption[]>('/shipments', { token }).catch(() => []),
@@ -184,9 +173,8 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         currency: null,
       })),
     ])
-      .then(([logs, costs, supplierRows, auditRows, shipmentRows, ratePreview]) => {
+      .then(([logs, supplierRows, auditRows, shipmentRows, ratePreview]) => {
         setWorkLogs(logs);
-        setLaborCosts(costs);
         setSuppliers(supplierRows);
         setAudits(auditRows);
         setShipments(shipmentRows);
@@ -225,15 +213,9 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
       });
       if (!isGlobalSupplyTopRow) {
         setWorkLogs((prev) => [created, ...prev]);
-        const costs = await apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []);
-        setLaborCosts(costs);
       } else {
-        const [logs, costs] = await Promise.all([
-          apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []),
-          apiJson<LaborCostRow[]>(`/labor-costs${qs}`, { token }).catch(() => []),
-        ]);
+        const logs = await apiJson<WorkLogRow[]>(`/work-logs${qs}`, { token }).catch(() => []);
         setWorkLogs(logs);
-        setLaborCosts(costs);
       }
       setForm({
         workDate: '',
@@ -270,14 +252,17 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     if (!token || !editingWorkLogId || !editForm.workDate.trim()) return;
     setSavingEdit(true);
     try {
+      const patchBody = isGlobalSupplyTopRow
+        ? { workDate: editForm.workDate }
+        : {
+            workDate: editForm.workDate,
+            workType: editForm.workType,
+            description: editForm.description.trim() || null,
+          };
       const updated = await apiJson<WorkLogRow>(`/work-logs/${encodeURIComponent(editingWorkLogId)}`, {
         token,
         method: 'PATCH',
-        body: JSON.stringify({
-          workDate: editForm.workDate,
-          workType: editForm.workType,
-          description: editForm.description.trim() || null,
-        }),
+        body: JSON.stringify(patchBody),
       });
       setWorkLogs((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       setEditingWorkLogId(null);
@@ -499,10 +484,10 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>
             {isGlobalSupplyTopRow
-              ? 'My work logs'
+              ? 'My Work Logs'
               : scopeAll && canViewAll
-                ? 'All work logs'
-                : 'My work logs'}
+                ? 'All Work Logs'
+                : 'My Work Logs'}
           </h2>
           <div className="table-wrap">
             {loading ? (
@@ -517,9 +502,14 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                     <th>Full name</th>
                     <th>Date</th>
                     <th>Hours</th>
-                    <th>Type</th>
-                    <th>Project</th>
-                    <th>Description</th>
+                    {!isGlobalSupplyTopRow ? (
+                      <>
+                        <th>Type</th>
+                        <th>Description</th>
+                      </>
+                    ) : (
+                      <th>Total Amount</th>
+                    )}
                     <th>Created</th>
                     {canEditWorkLogs ? <th>Edit</th> : null}
                   </tr>
@@ -542,42 +532,52 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                         )}
                       </td>
                       <td>{r.hoursWorked}</td>
-                      <td>
-                        {editingWorkLogId === r.id ? (
-                          <select
-                            className="input"
-                            value={editForm.workType}
-                            onChange={(e) =>
-                              setEditForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))
-                            }
+                      {!isGlobalSupplyTopRow ? (
+                        <>
+                          <td>
+                            {editingWorkLogId === r.id ? (
+                              <select
+                                className="input"
+                                value={editForm.workType}
+                                onChange={(e) =>
+                                  setEditForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))
+                                }
+                              >
+                                <option value="Audit">Audit</option>
+                                <option value="Inspection">Inspection</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            ) : (
+                              r.workType
+                            )}
+                          </td>
+                          <td
+                            style={{
+                              maxWidth: 220,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={r.description ?? ''}
                           >
-                            <option value="Audit">Audit</option>
-                            <option value="Inspection">Inspection</option>
-                            <option value="Travel">Travel</option>
-                            <option value="Admin">Admin</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        ) : (
-                          r.workType
-                        )}
-                      </td>
-                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
-                      <td
-                        style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        title={r.description ?? ''}
-                      >
-                        {editingWorkLogId === r.id ? (
-                          <input
-                            className="input"
-                            value={editForm.description}
-                            onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
-                          />
-                        ) : r.description?.trim() ? (
-                          r.description
-                        ) : (
-                          '—'
-                        )}
-                      </td>
+                            {editingWorkLogId === r.id ? (
+                              <input
+                                className="input"
+                                value={editForm.description}
+                                onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                              />
+                            ) : r.description?.trim() ? (
+                              r.description
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                        </>
+                      ) : (
+                        <td title="From linked labor cost (hours × rate at save time)">{formatWorkLogTotalAmount(r)}</td>
+                      )}
                       <td>{formatDisplayCalendarDate(r.createdAt)}</td>
                       {canEditWorkLogs ? (
                         <td>
@@ -607,54 +607,6 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                           )}
                         </td>
                       ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>
-            {isGlobalSupplyTopRow
-              ? 'My labor cost lines (from logs)'
-              : scopeAll && canViewAll
-                ? 'All labor cost lines (from logs)'
-                : 'My labor cost lines'}
-          </h2>
-          <div className="table-wrap">
-            {loading ? (
-              <p className="table-empty">Loading…</p>
-            ) : laborCosts.length === 0 ? (
-              <p className="table-empty">No labor cost lines yet.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Cost ID</th>
-                    <th>Log ID</th>
-                    <th>Project</th>
-                    <th>Full name</th>
-                    <th>Hours</th>
-                    <th>Rate</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {laborCosts.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.code}</td>
-                      <td>{r.workLog?.code ?? '—'}</td>
-                      <td>{r.projectHistory?.projectCode ?? '—'}</td>
-                      <td>{r.fullName}</td>
-                      <td>{r.hours}</td>
-                      <td>{r.rate}</td>
-                      <td>{r.totalCost}</td>
-                      <td>{r.paidStatus}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -72,6 +72,7 @@ router.get(
 router.post(
   '/',
   requirePageAccess('GlobalSupplyLogistics'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const client = ensureSupplyLogisticsClient();
     const siteType = typeof req.body?.siteType === 'string' ? req.body.siteType.trim() : '';
@@ -268,6 +269,7 @@ router.get(
 router.delete(
   '/:id/attachments/:attachmentId',
   requirePageAccess('GlobalSupplyLogistics'),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
     const attachmentId = String(req.params.attachmentId ?? '').trim();
@@ -291,6 +293,7 @@ router.delete(
 router.post(
   '/:id/attachments',
   requirePageAccess('GlobalSupplyLogistics'),
+  requireRole(['Admin']),
   upload.single('file'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();

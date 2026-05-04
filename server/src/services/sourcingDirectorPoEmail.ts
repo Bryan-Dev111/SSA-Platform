@@ -46,7 +46,7 @@ export async function notifySourcingDirectorsOfPurchaseOrderEvent(params: {
     destinationCountry: string | null;
     farm: { country: string; farmName?: string } | null;
   };
-  event: 'opened' | 'closed';
+  event: 'opened' | 'closed' | 'reopened';
 }): Promise<void> {
   const { po, event } = params;
   const country = poCountry(po);
@@ -73,7 +73,8 @@ export async function notifySourcingDirectorsOfPurchaseOrderEvent(params: {
   });
   const prefByUser = new Map(prefs.map((p) => [p.userId, p.enabled]));
 
-  const subjectVerb = event === 'opened' ? 'opened' : 'closed';
+  const subjectVerb =
+    event === 'opened' ? 'opened' : event === 'reopened' ? 'reopened' : 'closed';
   const subject = `[Global Supply] PO ${po.code} ${subjectVerb} (${country})`;
 
   for (const d of directors) {

@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { SortableTh } from '../../components/SortableTh';
 import { getDocumentLocale } from '../../i18n/locale';
+import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
+import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../../utils/tableSort';
 
 type BuyerRow = {
   id: string;
@@ -34,12 +38,24 @@ function normalizeText(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
 
+type BuyerRelationshipSortKey =
+  | 'buyerName'
+  | 'buyerCountry'
+  | 'buyerCity'
+  | 'firstPurchaseOrderDate'
+  | 'totalPurchaseOrders';
+
 export function BuyerRelationshipsPage() {
   const { token } = useAuth();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [buyers, setBuyers] = useState<BuyerRow[]>([]);
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
+  const [sort, setSort] = useState<{ key: BuyerRelationshipSortKey | null; dir: SortDir }>({
+    key: 'buyerName',
+    dir: 'asc',
+  });
 
   useEffect(() => {
     if (!token) return;
@@ -92,6 +108,66 @@ export function BuyerRelationshipsPage() {
     });
   }, [buyers, orders]);
 
+  const sortedRows = useMemo(() => {
+    const list = [...rows];
+    const { key, dir } = sort;
+    if (!key) return list;
+    return list.sort((a, b) => {
+      switch (key) {
+        case 'buyerName':
+          return cmpStr(a.buyerName ?? '', b.buyerName ?? '', dir);
+        case 'buyerCountry':
+          return cmpStr(a.buyerCountry ?? '', b.buyerCountry ?? '', dir);
+        case 'buyerCity':
+          return cmpStr(a.buyerCity ?? '', b.buyerCity ?? '', dir);
+        case 'firstPurchaseOrderDate':
+          return cmpNum(
+            dateMs(a.firstPurchaseOrderDate),
+            dateMs(b.firstPurchaseOrderDate),
+            dir
+          );
+        case 'totalPurchaseOrders':
+          return cmpNum(a.totalPurchaseOrders, b.totalPurchaseOrders, dir);
+        default:
+          return 0;
+      }
+    });
+  }, [rows, sort]);
+
+  const onSortColumn = (columnKey: string) => {
+    setSort((prev) => toggleSort(prev, columnKey as BuyerRelationshipSortKey));
+  };
+
+  const exportToExcel = useCallback(() => {
+    if (sortedRows.length === 0) {
+      toast.info('No buyer relationships to export yet.');
+      return;
+    }
+    try {
+      const locale = getDocumentLocale();
+      const exportRows: ExportRow[] = sortedRows.map((row) => ({
+        'Buyer Name': row.buyerName,
+        'Buyer Contact Email': row.buyerContactEmail ?? '—',
+        'Buyer Country': row.buyerCountry ?? '—',
+        'Buyer City': row.buyerCity ?? '—',
+        'First Purchase Order Date': row.firstPurchaseOrderDate
+          ? new Date(row.firstPurchaseOrderDate).toLocaleDateString(locale, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+          : '—',
+        'Total Purchase Orders': row.totalPurchaseOrders,
+        Notes: row.notes?.trim() ? row.notes : '—',
+      }));
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTableXlsx(`Buyer_Relationships_${stamp}`, 'Buyer Relationships', exportRows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  }, [sortedRows, toast]);
+
   if (loading) {
     return (
       <div className="page">
@@ -108,8 +184,28 @@ export function BuyerRelationshipsPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1 className="page-title">Buyer Relationships</h1>
+      <header
+        className="page-header"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Buyer Relationships
+        </h1>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={exportToExcel}
+          disabled={loading}
+          title="Download the table as an Excel file"
+        >
+          Export to Excel
+        </button>
       </header>
 
       {error ? <div className="alert-error">{error}</div> : null}
@@ -119,12 +215,42 @@ export function BuyerRelationshipsPage() {
           <table className="table table--sticky-header">
             <thead>
               <tr>
-                <th>Buyer Name</th>
+                <SortableTh
+                  label="Buyer Name"
+                  columnKey="buyerName"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
                 <th>Buyer Contact Email</th>
-                <th>Buyer Country</th>
-                <th>Buyer City</th>
-                <th>First Purchase Order Date</th>
-                <th>Total Purchase Orders</th>
+                <SortableTh
+                  label="Buyer Country"
+                  columnKey="buyerCountry"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Buyer City"
+                  columnKey="buyerCity"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="First Purchase Order Date"
+                  columnKey="firstPurchaseOrderDate"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
+                <SortableTh
+                  label="Total Purchase Orders"
+                  columnKey="totalPurchaseOrders"
+                  activeKey={sort.key}
+                  dir={sort.dir}
+                  onSort={onSortColumn}
+                />
                 <th>Notes</th>
               </tr>
             </thead>
@@ -136,7 +262,7 @@ export function BuyerRelationshipsPage() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                sortedRows.map((row) => (
                   <tr key={row.id}>
                     <td>{row.buyerName}</td>
                     <td>{row.buyerContactEmail ?? '—'}</td>

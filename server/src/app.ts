@@ -56,6 +56,7 @@ import farmDashboardRoutes from './routes/farm-dashboard';
 import supplyLogisticsRoutes from './routes/supply-logistics';
 import legalRoutes from './routes/legal';
 import employeeProfilesRoutes from './routes/employee-profiles';
+import globalSupplyCalendarEventsRoutes from './routes/global-supply-calendar-events';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLocaleMiddleware } from './middleware/requestLocale';
 
@@ -116,6 +117,7 @@ app.use('/farm-dashboard', farmDashboardRoutes);
 app.use('/supply-logistics', supplyLogisticsRoutes);
 app.use('/legal', legalRoutes);
 app.use('/employee-profiles', employeeProfilesRoutes);
+app.use('/global-supply-calendar-events', globalSupplyCalendarEventsRoutes);
 /** Same router: supports clients whose VITE_API_URL includes /api while hitting Express directly (no Vercel strip). */
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/farms', farmsRoutes);
@@ -128,6 +130,7 @@ app.use('/api/farm-dashboard', farmDashboardRoutes);
 app.use('/api/supply-logistics', supplyLogisticsRoutes);
 app.use('/api/legal', legalRoutes);
 app.use('/api/employee-profiles', employeeProfilesRoutes);
+app.use('/api/global-supply-calendar-events', globalSupplyCalendarEventsRoutes);
 
 app.use(errorHandler);
 

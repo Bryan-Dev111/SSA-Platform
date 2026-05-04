@@ -40,6 +40,14 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   GlobalSupplyLogistics: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyExpenses: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyWorkLogs: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Auditor', 'CommodityBuyer', 'SourcingDirector'],
+  GlobalSupplyInternalManagement: [
+    'Admin',
+    'QualityEngineer',
+    'QualityManager',
+    'Buyer',
+    'CommodityBuyer',
+    'SourcingDirector',
+  ],
   Login: [], // all (no check)
 };
 

@@ -1,6 +1,6 @@
 /**
  * Global Supply — Farm profile photos manager.
- * Processing & quality is accessible from this page via row actions.
+ * Processing & Quality is accessible from this page via row actions.
  */
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -275,16 +275,18 @@ export function GlobalFarmProfilePage() {
   const [contentLoading, setContentLoading] = useState(false);
   const [savingContent, setSavingContent] = useState(false);
   const isAdmin = useMemo(() => Boolean(user?.roleNames?.includes('Admin')), [user?.roleNames]);
-  const canManageProfileMedia = useMemo(
-    () =>
-      Boolean(
-        user?.roleNames?.includes('Admin') ||
-          user?.roleNames?.includes('SourcingDirector')
-      ),
-    [user?.roleNames]
-  );
 
   const selectedFarm = useMemo(() => farms.find((f) => f.id === farmId) || null, [farms, farmId]);
+
+  const headerCropsLabel = useMemo(() => {
+    if (!selectedFarm) return '—';
+    const main = selectedFarm.mainCrop?.trim();
+    const secondary = selectedFarm.secondaryCrop?.trim();
+    if (main && secondary) return `${main} / ${secondary}`;
+    if (main) return main;
+    if (secondary) return secondary;
+    return '—';
+  }, [selectedFarm]);
 
   const loadFarms = useCallback(async () => {
     if (!token) return;
@@ -359,7 +361,7 @@ export function GlobalFarmProfilePage() {
         }
       } catch {
         if (!cancelled) {
-          setContent('');
+          setContent(''); 
           if (section === 'Processing') {
             setProcessingBlocks([newProcessingBlock()]);
           }
@@ -375,7 +377,7 @@ export function GlobalFarmProfilePage() {
   }, [token, farmId, section]);
 
   const saveContent = async () => {
-    if (!token || !farmId || savingContent) return;
+    if (!token || !farmId || !isAdmin || savingContent) return;
     setSavingContent(true);
     try {
       const bodyToSave =
@@ -394,7 +396,7 @@ export function GlobalFarmProfilePage() {
         method: 'PATCH',
         body: JSON.stringify({ section, body: bodyToSave }),
       });
-      toast.success(section === 'Profile' ? 'Farm profile text saved' : 'Processing & quality text saved');
+      toast.success(section === 'Profile' ? 'Farm profile text saved' : 'Processing & Quality text saved');
     } catch (err) {
       let msg = 'Could not save text';
       if (err instanceof Error) {
@@ -417,7 +419,7 @@ export function GlobalFarmProfilePage() {
   };
 
   const uploadFiles = async (files: FileList | File[], blockId?: string) => {
-    if (!token || !farmId) return;
+    if (!token || !farmId || !isAdmin) return;
     const arr = Array.from(files);
     if (arr.length === 0) return;
     setUploadBusy(true);
@@ -472,7 +474,7 @@ export function GlobalFarmProfilePage() {
   };
 
   const confirmDelete = async () => {
-    if (!token || !farmId || !deleteTarget || deleting) return;
+    if (!token || !farmId || !isAdmin || !deleteTarget || deleting) return;
     setDeleting(true);
     try {
       const res = await apiFetch(`/farms/${farmId}/profile-images/${deleteTarget.id}`, {
@@ -511,7 +513,7 @@ export function GlobalFarmProfilePage() {
   };
 
   const confirmRemoveProcessingBlock = () => {
-    if (!blockDeleteTargetId) return;
+    if (!isAdmin || !blockDeleteTargetId) return;
     setProcessingBlocks((prev) =>
       prev.length <= 1
         ? [{ ...prev[0], title: '', text: '', imageIds: [] }]
@@ -568,7 +570,7 @@ export function GlobalFarmProfilePage() {
               <option value="">Select farm</option>
               {farms.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.code} - {f.farmName}
+                  {f.code}
                 </option>
               ))}
             </select>
@@ -589,7 +591,7 @@ export function GlobalFarmProfilePage() {
               }}
             >
               <div>
-                <strong>Crops:</strong> {selectedFarm.mainCrop || '—'} / {selectedFarm.secondaryCrop || '—'}
+                <strong>Crops:</strong> {headerCropsLabel}
               </div>
               <div>
                 <strong>Country:</strong> {selectedFarm.country}
@@ -615,7 +617,7 @@ export function GlobalFarmProfilePage() {
                 className={section === 'Processing' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
                 onClick={() => setSection('Processing')}
               >
-                Processing &amp; quality
+                Processing & Quality
               </button>
             </div>
 
@@ -629,37 +631,37 @@ export function GlobalFarmProfilePage() {
 
             <label className="field" style={{ display: 'block', marginBottom: 12 }}>
               {section === 'Profile' ? (
-                <>
-                  <span className="field-label">Farm profile text</span>
-                  <textarea
-                    className="input"
-                    rows={4}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Add profile narrative for this farm..."
-                    disabled={contentLoading}
-                  />
-                </>
+                <textarea
+                  className="input"
+                  rows={4}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Add profile narrative for this farm..."
+                  disabled={contentLoading || !isAdmin}
+                  aria-label="Farm profile narrative"
+                />
               ) : (
                 <>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary"
-                      onClick={() =>
-                        setProcessingBlocks((prev) => [...prev, newProcessingBlock()])
-                      }
+                  {isAdmin ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        marginBottom: 8,
+                      }}
                     >
-                      Add
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        onClick={() =>
+                          setProcessingBlocks((prev) => [...prev, newProcessingBlock()])
+                        }
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ) : null}
                   <div style={{ display: 'grid', gap: 12 }}>
                     {processingBlocks.map((block, idx) => (
                       <div
@@ -717,9 +719,9 @@ export function GlobalFarmProfilePage() {
                             )
                           }
                           placeholder="Add processing and quality narrative for this block..."
-                          disabled={contentLoading}
+                          disabled={contentLoading || !isAdmin}
                         />
-                        {canManageProfileMedia ? (
+                        {isAdmin ? (
                           <div style={{ marginTop: 8 }}>
                             <input
                               id={`processing-block-upload-${block.id}`}
@@ -794,6 +796,8 @@ export function GlobalFarmProfilePage() {
                                   <button
                                     type="button"
                                     className="btn btn-xs btn-ghost"
+                                    disabled={!isAdmin}
+                                    title={!isAdmin ? 'Only administrators can remove block images' : undefined}
                                     onClick={() =>
                                       setProcessingBlocks((prev) =>
                                         prev.map((b) =>
@@ -820,7 +824,7 @@ export function GlobalFarmProfilePage() {
                 </>
               )}
             </label>
-            {canManageProfileMedia ? (
+            {isAdmin ? (
               <>
                 <button
                   type="button"
@@ -854,7 +858,14 @@ export function GlobalFarmProfilePage() {
                   {uploadBusy ? 'Uploading…' : 'Add photo'}
                 </button>
               </>
-            ) : null}
+            ) : (
+              <p
+                className="table-empty"
+                style={{ marginBottom: 12, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}
+              >
+                View only. Only administrators can edit farm profile text and photos.
+              </p>
+            )}
 
             {imagesLoading ? (
               <p className="table-empty">Loading photos…</p>
@@ -862,7 +873,7 @@ export function GlobalFarmProfilePage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 {images.length === 0 ? (
                   <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-                    {section === 'Profile' ? 'No profile photos yet.' : 'No processing or quality photos yet.'}
+                    {section === 'Profile' ? 'No profile photos yet.' : 'No Processing & Quality photos yet.'}
                   </span>
                 ) : null}
                 {images.map((img) => (
@@ -916,7 +927,8 @@ export function GlobalFarmProfilePage() {
                       type="button"
                       className="btn btn-sm btn-ghost"
                       style={{ marginTop: 6, color: 'var(--color-danger, #b91c1c)', width: '100%' }}
-                      disabled={uploadBusy}
+                      disabled={!isAdmin || uploadBusy}
+                      title={!isAdmin ? 'Only administrators can remove photos' : undefined}
                       onClick={() => setDeleteTarget(img)}
                     >
                       Remove

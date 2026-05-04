@@ -1,13 +1,14 @@
 /**
  * Global Vendors — Purchase Orders list and creation modal.
  */
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { getDocumentLocale } from '../../i18n/locale';
+import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 
 type PurchaseOrderRow = {
   id: string;
@@ -64,11 +65,13 @@ function dateInputFromIso(iso: string | null | undefined): string {
 }
 
 export function PurchaseOrdersPage({
-  canCreatePurchaseOrder = true,
+  /** When false (default), list is read-only: no create/edit/close/attachments/reopen. */
+  canCreatePurchaseOrder = false,
 }: {
   canCreatePurchaseOrder?: boolean;
 }) {
   const { token } = useAuth();
+  const canManagePOs = canCreatePurchaseOrder;
   const toast = useToast();
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
   const [farms, setFarms] = useState<FarmRow[]>([]);
@@ -81,6 +84,7 @@ export function PurchaseOrdersPage({
   const [saving, setSaving] = useState(false);
   const [attachSavingId, setAttachSavingId] = useState<string | null>(null);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [reopeningId, setReopeningId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editOrderId, setEditOrderId] = useState<string | null>(null);
 
@@ -99,6 +103,7 @@ export function PurchaseOrdersPage({
   const [destinationCountry, setDestinationCountry] = useState('');
   const [portOfDischarge, setPortOfDischarge] = useState('');
   const [closeConfirmOrder, setCloseConfirmOrder] = useState<PurchaseOrderRow | null>(null);
+  const [reopenConfirmOrder, setReopenConfirmOrder] = useState<PurchaseOrderRow | null>(null);
   const topScrollRef = useRef<HTMLDivElement | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
@@ -198,6 +203,7 @@ export function PurchaseOrdersPage({
   };
 
   const openCreateModal = () => {
+    if (!canManagePOs) return;
     resetFormFields();
     setFormMode('create');
     setEditOrderId(null);
@@ -205,6 +211,7 @@ export function PurchaseOrdersPage({
   };
 
   const openEditModal = (o: PurchaseOrderRow) => {
+    if (!canManagePOs) return;
     setFormMode('edit');
     setEditOrderId(o.id);
     setFarmId(o.farmId ?? '');
@@ -224,7 +231,7 @@ export function PurchaseOrdersPage({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !canManagePOs) return;
     setSaving(true);
     try {
       const payload = {
@@ -277,7 +284,7 @@ export function PurchaseOrdersPage({
   };
 
   const uploadAttachments = async (orderId: string, files: FileList | File[]) => {
-    if (!token) return;
+    if (!token || !canManagePOs) return;
     const arr = Array.from(files);
     if (arr.length === 0) return;
     setAttachSavingId(orderId);
@@ -348,7 +355,7 @@ export function PurchaseOrdersPage({
   };
 
   const deleteAttachment = async (orderId: string, attachmentId: string) => {
-    if (!token) return;
+    if (!token || !canManagePOs) return;
     setAttachSavingId(orderId);
     try {
       const res = await apiFetch(
@@ -378,7 +385,7 @@ export function PurchaseOrdersPage({
   };
 
   const closePurchaseOrder = async (order: PurchaseOrderRow) => {
-    if (!token) return;
+    if (!token || !canManagePOs) return;
     const currentStatus = (order.status ?? 'Open').trim().toLowerCase();
     if (currentStatus === 'closed') {
       toast.info('Purchase order is already closed');
@@ -408,6 +415,85 @@ export function PurchaseOrdersPage({
       setClosingId(null);
     }
   };
+
+  const reopenPurchaseOrder = async (order: PurchaseOrderRow) => {
+    if (!token || !canManagePOs) return;
+    const currentStatus = (order.status ?? 'Open').trim().toLowerCase();
+    if (currentStatus !== 'closed') {
+      toast.info('Only closed purchase orders can be reopened');
+      return;
+    }
+    setReopeningId(order.id);
+    try {
+      await apiJson(`/purchase-orders/${order.id}/reopen`, {
+        token,
+        method: 'PATCH',
+      });
+      toast.success(`${order.code} reopened`);
+      load({ silent: true });
+      setReopenConfirmOrder(null);
+    } catch (err) {
+      let msg = 'Could not reopen purchase order';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setReopeningId(null);
+    }
+  };
+
+  const exportToExcel = useCallback(() => {
+    if (orders.length === 0) {
+      toast.info('No purchase orders to export yet.');
+      return;
+    }
+    const locale = getDocumentLocale();
+    const isoDay = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : '');
+    try {
+      const rows: ExportRow[] = orders.map((o) => {
+        const isClosed = (o.status ?? 'Open').trim().toLowerCase() === 'closed';
+        const total =
+          o.totalAmount ??
+          (o.quantityKg != null && o.pricePerKg != null ? o.quantityKg * o.pricePerKg : null);
+        return {
+          Status: isClosed ? 'Closed' : 'Open',
+          'PO ID': o.code,
+          Farm: o.farm ? `${o.farm.code} — ${o.farm.farmName}` : '—',
+          'Buyer name': o.buyerName,
+          'Buyer email': o.buyerEmail ?? '—',
+          'Order date': isoDay(o.orderDate) || '—',
+          Crop: o.crop ?? '—',
+          'Qty (kg)': o.quantityKg ?? '—',
+          'Price/kg': o.pricePerKg ?? '—',
+          Total: total != null ? Number(total.toFixed(2)) : '—',
+          'Est. farmer delivery': isoDay(o.estimatedFarmerDeliveryDate) || '—',
+          'Est. arrival at buyer': isoDay(o.estimatedArrivalAtBuyer) || '—',
+          'Destination country': o.destinationCountry ?? '—',
+          'Port of discharge': o.portOfDischarge ?? '—',
+          Created: o.createdAt
+            ? new Date(o.createdAt).toLocaleDateString(locale, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : '—',
+          Attachments: o.attachments.map((a) => a.fileName || a.kind || 'file').join('; ') || '—',
+          Notes: (o.notes ?? '').trim() || '—',
+        };
+      });
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTableXlsx(`Purchase_Orders_${stamp}`, 'Purchase Orders', rows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  }, [orders, toast]);
 
   const syncScrollFromTop = () => {
     if (!topScrollRef.current || !tableScrollRef.current) return;
@@ -456,16 +542,25 @@ export function PurchaseOrdersPage({
           gap: 12,
         }}
       >
-        <h1 className="page-title">Purchase Orders</h1>
-        {canCreatePurchaseOrder ? (
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Purchase Orders
+        </h1>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
-            className="btn btn-primary"
-            onClick={() => openCreateModal()}
+            className="btn btn-ghost"
+            onClick={exportToExcel}
+            disabled={loading}
+            title="Download the purchase orders table as an Excel file"
           >
-            New purchase order
+            Export to Excel
           </button>
-        ) : null}
+          {canManagePOs ? (
+            <button type="button" className="btn btn-primary" onClick={() => openCreateModal()}>
+              New purchase order
+            </button>
+          ) : null}
+        </div>
       </header>
       {error && orders.length > 0 && (
         <div className="alert-error" style={{ marginBottom: 12 }}>
@@ -515,8 +610,13 @@ export function PurchaseOrdersPage({
               {orders.length === 0 ? (
                 <tr>
                   <td colSpan={16} className="table-empty">
-                    No purchase orders yet. Use{' '}
-                    <strong>New purchase order</strong> to create one.
+                    {canManagePOs ? (
+                      <>
+                        No purchase orders yet. Use <strong>New purchase order</strong> to create one.
+                      </>
+                    ) : (
+                      'No purchase orders yet.'
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -528,18 +628,24 @@ export function PurchaseOrdersPage({
                     style={isClosed ? { backgroundColor: 'var(--color-surface-2, #f3f4f6)' } : undefined}
                   >
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-ghost"
-                        onClick={() => setCloseConfirmOrder(o)}
-                        disabled={closingId === o.id || isClosed}
-                      >
-                        {isClosed
-                          ? 'Closed'
-                          : closingId === o.id
-                            ? 'Closing…'
-                            : 'Close PO'}
-                      </button>
+                      {canManagePOs ? (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-ghost"
+                          onClick={() => setCloseConfirmOrder(o)}
+                          disabled={closingId === o.id || reopeningId === o.id || isClosed}
+                        >
+                          {isClosed
+                            ? 'Closed'
+                            : closingId === o.id
+                              ? 'Closing…'
+                              : 'Close PO'}
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                          {isClosed ? 'Closed' : 'Open'}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <strong>{o.code}</strong>
@@ -641,16 +747,18 @@ export function PurchaseOrdersPage({
                           gap: 4,
                         }}
                       >
-                        <label className="btn btn-xs">
-                          Add file…
-                          <input
-                            type="file"
-                            multiple
-                            style={{ display: 'none' }}
-                            onChange={(e) => handleAttachmentFiles(o.id, e)}
-                            disabled={attachSavingId === o.id}
-                          />
-                        </label>
+                        {canManagePOs ? (
+                          <label className="btn btn-xs">
+                            Add file…
+                            <input
+                              type="file"
+                              multiple
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleAttachmentFiles(o.id, e)}
+                              disabled={attachSavingId === o.id}
+                            />
+                          </label>
+                        ) : null}
                         {attachSavingId === o.id ? (
                           <span
                             style={{
@@ -696,16 +804,18 @@ export function PurchaseOrdersPage({
                                     ({a.kind})
                                   </span>
                                 ) : null}
-                                <button
-                                  type="button"
-                                  className="btn btn-xs btn-ghost"
-                                  style={{ marginLeft: 6 }}
-                                  title="Remove attachment"
-                                  disabled={attachSavingId === o.id}
-                                  onClick={() => void deleteAttachment(o.id, a.id)}
-                                >
-                                  Remove
-                                </button>
+                                {canManagePOs ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-xs btn-ghost"
+                                    style={{ marginLeft: 6 }}
+                                    title="Remove attachment"
+                                    disabled={attachSavingId === o.id}
+                                    onClick={() => void deleteAttachment(o.id, a.id)}
+                                  >
+                                    Remove
+                                  </button>
+                                ) : null}
                               </li>
                             ))}
                           </ul>
@@ -713,14 +823,46 @@ export function PurchaseOrdersPage({
                       </div>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-xs btn-ghost"
-                        onClick={() => openEditModal(o)}
-                        disabled={closingId === o.id || attachSavingId === o.id}
-                      >
-                        Edit
-                      </button>
+                      {canManagePOs ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 6,
+                            justifyContent: 'flex-end',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-ghost"
+                            onClick={() => openEditModal(o)}
+                            disabled={
+                              closingId === o.id ||
+                              reopeningId === o.id ||
+                              attachSavingId === o.id
+                            }
+                          >
+                            Edit
+                          </button>
+                          {isClosed ? (
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              onClick={() => setReopenConfirmOrder(o)}
+                              disabled={
+                                closingId === o.id ||
+                                reopeningId === o.id ||
+                                attachSavingId === o.id
+                              }
+                            >
+                              {reopeningId === o.id ? 'Reopening…' : 'Reopen'}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
+                      )}
                     </td>
                   </tr>
                   );
@@ -963,6 +1105,20 @@ export function PurchaseOrdersPage({
         confirmLabel="Close PO"
         onConfirm={() => closeConfirmOrder && void closePurchaseOrder(closeConfirmOrder)}
         onCancel={() => setCloseConfirmOrder(null)}
+      />
+      <ConfirmDialog
+        open={reopenConfirmOrder !== null}
+        title="Reopen purchase order?"
+        message={
+          reopenConfirmOrder
+            ? `This will set the PO back to open status. (${reopenConfirmOrder.code})`
+            : ''
+        }
+        confirmLabel="Reopen PO"
+        onConfirm={() =>
+          reopenConfirmOrder && void reopenPurchaseOrder(reopenConfirmOrder)
+        }
+        onCancel={() => setReopenConfirmOrder(null)}
       />
     </div>
   );

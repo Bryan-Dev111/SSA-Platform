@@ -9,6 +9,9 @@ import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ExpandableTableText } from '../../components/ExpandableTableText';
 import { MetricCard } from '../../components/MetricCard';
+import { SortableTh } from '../../components/SortableTh';
+import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
+import { cmpStr, toggleSort, type SortDir } from '../../utils/tableSort';
 
 export const LOGISTICS_SITE_TYPES = [
   { value: 'Port', label: 'Port', bg: '#171717', fg: '#fafafa' },
@@ -51,6 +54,8 @@ function logisticsDisplayCode(code: string): string {
   return code.startsWith('LOG-') ? `BUS-${code.slice(4)}` : code;
 }
 
+type LogisticsSortKey = 'code' | 'siteType' | 'company' | 'city' | 'country';
+
 function TypeBadge({ siteType }: { siteType: string }) {
   const s = TYPE_STYLE[siteType];
   if (!s) {
@@ -82,7 +87,10 @@ export function LogisticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attachSavingId, setAttachSavingId] = useState<string | null>(null);
-  const [countrySortDir, setCountrySortDir] = useState<'asc' | 'desc'>('asc');
+  const [sort, setSort] = useState<{ key: LogisticsSortKey | null; dir: SortDir }>({
+    key: 'country',
+    dir: 'asc',
+  });
 
   const [siteType, setSiteType] = useState<string>('Port');
   const [company, setCompany] = useState('');
@@ -129,7 +137,7 @@ export function LogisticsPage() {
 
   const submitAdd = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token || !company.trim() || !country.trim()) return;
+    if (!token || !isAdmin || !company.trim() || !country.trim()) return;
     setSaving(true);
     try {
       await apiJson<LogisticsRow>('/supply-logistics', {
@@ -158,7 +166,7 @@ export function LogisticsPage() {
 
   const saveEdit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token || !editRow) return;
+    if (!token || !isAdmin || !editRow) return;
     setSaving(true);
     try {
       await apiJson<LogisticsRow>(`/supply-logistics/${editRow.id}`, {
@@ -186,7 +194,7 @@ export function LogisticsPage() {
   };
 
   const confirmDelete = async () => {
-    if (!token || !deleteRow || deleting) return;
+    if (!token || !isAdmin || !deleteRow || deleting) return;
     setDeleting(true);
     try {
       const res = await apiFetch(`/supply-logistics/${deleteRow.id}`, { token, method: 'DELETE' });
@@ -203,7 +211,7 @@ export function LogisticsPage() {
   };
 
   const uploadAttachments = async (logisticsId: string, files: FileList | File[]) => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     const arr = Array.from(files);
     if (arr.length === 0) return;
     setAttachSavingId(logisticsId);
@@ -269,7 +277,7 @@ export function LogisticsPage() {
   };
 
   const deleteAttachment = async (logisticsId: string, attachmentId: string) => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     setAttachSavingId(logisticsId);
     try {
       const res = await apiFetch(`/supply-logistics/${logisticsId}/attachments/${attachmentId}`, {
@@ -299,28 +307,56 @@ export function LogisticsPage() {
   };
 
   const sortedRows = useMemo(() => {
-    return [...rows].sort((a, b) => {
-      const cmp = (a.country ?? '').localeCompare(b.country ?? '', undefined, { sensitivity: 'base' });
-      return countrySortDir === 'asc' ? cmp : -cmp;
+    const list = [...rows];
+    const { key, dir } = sort;
+    if (!key) return list;
+    return list.sort((a, b) => {
+      switch (key) {
+        case 'code':
+          return cmpStr(logisticsDisplayCode(a.code), logisticsDisplayCode(b.code), dir);
+        case 'siteType':
+          return cmpStr(a.siteType ?? '', b.siteType ?? '', dir);
+        case 'company':
+          return cmpStr(a.company ?? '', b.company ?? '', dir);
+        case 'city':
+          return cmpStr((a.city ?? '').trim(), (b.city ?? '').trim(), dir);
+        case 'country':
+          return cmpStr(a.country ?? '', b.country ?? '', dir);
+        default:
+          return 0;
+      }
     });
-  }, [rows, countrySortDir]);
+  }, [rows, sort]);
 
-  const sitesWithCoordinates = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          typeof r.latitude === 'number' &&
-          Number.isFinite(r.latitude) &&
-          typeof r.longitude === 'number' &&
-          Number.isFinite(r.longitude)
-      ).length,
-    [rows]
-  );
+  const onSortColumn = (columnKey: string) => {
+    setSort((prev) => toggleSort(prev, columnKey as LogisticsSortKey));
+  };
 
-  const sitesWithAttachments = useMemo(
-    () => rows.filter((r) => (r.attachments?.length ?? 0) > 0).length,
-    [rows]
-  );
+  const exportToExcel = useCallback(() => {
+    if (sortedRows.length === 0) {
+      toast.info('No logistics sites to export yet.');
+      return;
+    }
+    try {
+      const exportRows: ExportRow[] = sortedRows.map((r) => ({
+        Code: logisticsDisplayCode(r.code),
+        Type: r.siteType,
+        Company: r.company,
+        Country: r.country,
+        City: (r.city ?? '').trim() || '—',
+        'Registration #': (r.registrationNumber ?? '').trim() || '—',
+        Longitude: r.longitude ?? '—',
+        Latitude: r.latitude ?? '—',
+        Notes: (r.notes ?? '').trim() || '—',
+        Attachments: r.attachments.map((a) => a.fileName || 'file').join('; ') || '—',
+      }));
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTableXlsx(`Logistics_${stamp}`, 'Logistics', exportRows);
+      toast.success('Exported to Excel');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    }
+  }, [sortedRows, toast]);
 
   if (loading && rows.length === 0) {
     return (
@@ -337,8 +373,28 @@ export function LogisticsPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1 className="page-title">Logistics</h1>
+      <header
+        className="page-header"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Logistics
+        </h1>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={exportToExcel}
+          disabled={loading}
+          title="Download the table as an Excel file"
+        >
+          Export to Excel
+        </button>
       </header>
 
       {error && rows.length === 0 ? <div className="alert-error">{error}</div> : null}
@@ -355,107 +411,114 @@ export function LogisticsPage() {
         }}
       >
         <MetricCard title="Total logistics sites" value={rows.length} />
-        <MetricCard title="Sites with coordinates" value={sitesWithCoordinates} />
-        <MetricCard title="Sites with attachments" value={sitesWithAttachments} />
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem', width: '100%', maxWidth: '100%', minWidth: 0 }}>
-        <div className="card-body">
-          <form onSubmit={submitAdd} className="stack" style={{ gap: 12, marginTop: 16 }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))',
-                gap: '0.6rem',
-                alignItems: 'end',
-              }}
-            >
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Type</span>
-                <select className="input" value={siteType} onChange={(e) => setSiteType(e.target.value)}>
-                  {LOGISTICS_SITE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+      {isAdmin ? (
+        <div className="card" style={{ marginBottom: '1rem', width: '100%', maxWidth: '100%', minWidth: 0 }}>
+          <div className="card-body">
+            <form onSubmit={submitAdd} className="stack" style={{ gap: 12, marginTop: 16 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))',
+                  gap: '0.6rem',
+                  alignItems: 'end',
+                }}
+              >
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Type</span>
+                  <select className="input" value={siteType} onChange={(e) => setSiteType(e.target.value)}>
+                    {LOGISTICS_SITE_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Company</span>
+                  <input
+                    className="input"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    required
+                    autoComplete="organization"
+                  />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Country</span>
+                  <input
+                    className="input"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    required
+                    autoComplete="country-name"
+                  />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">City</span>
+                  <input
+                    className="input"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    autoComplete="address-level2"
+                  />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Registration #</span>
+                  <input
+                    className="input"
+                    value={registrationNumber}
+                    onChange={(e) => setRegistrationNumber(e.target.value)}
+                  />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Longitude</span>
+                  <input
+                    className="input"
+                    type="number"
+                    step="any"
+                    min={-180}
+                    max={180}
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="e.g. -74.006"
+                  />
+                </label>
+                <label className="field" style={{ marginBottom: 0 }}>
+                  <span className="field-label">Latitude</span>
+                  <input
+                    className="input"
+                    type="number"
+                    step="any"
+                    min={-90}
+                    max={90}
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="e.g. 40.7128"
+                  />
+                </label>
+              </div>
+              <label className="field">
+                <span className="field-label">Notes</span>
+                <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
               </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Company</span>
-                <input
-                  className="input"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  required
-                  autoComplete="organization"
-                />
-              </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Country</span>
-                <input
-                  className="input"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  required
-                  autoComplete="country-name"
-                />
-              </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">City</span>
-                <input
-                  className="input"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  autoComplete="address-level2"
-                />
-              </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Registration #</span>
-                <input
-                  className="input"
-                  value={registrationNumber}
-                  onChange={(e) => setRegistrationNumber(e.target.value)}
-                />
-              </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Longitude</span>
-                <input
-                  className="input"
-                  type="number"
-                  step="any"
-                  min={-180}
-                  max={180}
-                  value={longitude}
-                  onChange={(e) => setLongitude(e.target.value)}
-                  placeholder="e.g. -74.006"
-                />
-              </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Latitude</span>
-                <input
-                  className="input"
-                  type="number"
-                  step="any"
-                  min={-90}
-                  max={90}
-                  value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
-                  placeholder="e.g. 40.7128"
-                />
-              </label>
-            </div>
-            <label className="field">
-              <span className="field-label">Notes</span>
-              <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </label>
-            <div>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </form>
+              <div>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      ) : (
+        <p
+          className="table-empty"
+          style={{ marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}
+        >
+          View only. Only administrators can add logistics businesses or change attachments.
+        </p>
+      )}
 
       <div className="card" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <div className="card-body" style={{ padding: 0 }}>
@@ -463,17 +526,41 @@ export function LogisticsPage() {
             <table className="table table--prevent-shrink">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Type</th>
-                  <th>Company</th>
-                  <th
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
-                    title="Sort by country"
-                  >
-                    Country {countrySortDir === 'asc' ? '↑' : '↓'}
-                  </th>
-                  <th>City</th>
+                  <SortableTh
+                    label="Code"
+                    columnKey="code"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                  <SortableTh
+                    label="Type"
+                    columnKey="siteType"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                  <SortableTh
+                    label="Company"
+                    columnKey="company"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                  <SortableTh
+                    label="Country"
+                    columnKey="country"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
+                  <SortableTh
+                    label="City"
+                    columnKey="city"
+                    activeKey={sort.key}
+                    dir={sort.dir}
+                    onSort={onSortColumn}
+                  />
                   <th>Registration #</th>
                   <th>Longitude</th>
                   <th>Latitude</th>
@@ -485,8 +572,10 @@ export function LogisticsPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="table-empty">
-                      No logistics sites yet. Use the form above to add one.
+                    <td colSpan={isAdmin ? 11 : 10} className="table-empty">
+                      {isAdmin
+                        ? 'No logistics sites yet. Use the form above to add one.'
+                        : 'No logistics sites yet.'}
                     </td>
                   </tr>
                 ) : (
@@ -521,13 +610,14 @@ export function LogisticsPage() {
                           multiple
                           style={{ display: 'none' }}
                           onChange={(e) => handleAttachmentFiles(r.id, e)}
-                          disabled={attachSavingId === r.id || saving}
+                          disabled={!isAdmin || attachSavingId === r.id || saving}
                         />
                         <button
                           type="button"
                           className="btn btn-xs"
                           onClick={() => document.getElementById(`logistics-file-upload-${r.id}`)?.click()}
-                          disabled={attachSavingId === r.id || saving}
+                          disabled={!isAdmin || attachSavingId === r.id || saving}
+                          title={!isAdmin ? 'Only administrators can add attachments' : undefined}
                         >
                           Add file
                         </button>
@@ -563,8 +653,10 @@ export function LogisticsPage() {
                                     type="button"
                                     className="btn btn-xs btn-ghost"
                                     style={{ marginLeft: 6 }}
-                                    title="Remove attachment"
-                                    disabled={attachSavingId === r.id}
+                                    title={
+                                      !isAdmin ? 'Only administrators can remove attachments' : 'Remove attachment'
+                                    }
+                                    disabled={!isAdmin || attachSavingId === r.id}
                                     onClick={() => void deleteAttachment(r.id, a.id)}
                                   >
                                     Remove

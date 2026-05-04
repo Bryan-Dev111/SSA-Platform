@@ -43,7 +43,8 @@ function isImageAttachment(a: LogisticsAttachment): boolean {
 }
 
 export function LogisticsProfilePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = Boolean(user?.roleNames?.includes('Admin'));
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -143,7 +144,7 @@ export function LogisticsProfilePage() {
   }, [token, selected]);
 
   const saveContent = async () => {
-    if (!token || !selected || savingContent) return;
+    if (!token || !isAdmin || !selected || savingContent) return;
     setSavingContent(true);
     try {
       await apiJson(`/supply-logistics/${selected.id}`, {
@@ -170,7 +171,7 @@ export function LogisticsProfilePage() {
   };
 
   const uploadImages = async (files: FileList | File[]) => {
-    if (!token || !selected) return;
+    if (!token || !isAdmin || !selected) return;
     const arr = Array.from(files);
     if (arr.length === 0) return;
     setUploadBusy(true);
@@ -207,7 +208,7 @@ export function LogisticsProfilePage() {
   };
 
   const confirmDeleteImage = async () => {
-    if (!token || !selected || !deleteTarget || deleting) return;
+    if (!token || !isAdmin || !selected || !deleteTarget || deleting) return;
     setDeleting(true);
     try {
       const res = await apiFetch(`/supply-logistics/${selected.id}/attachments/${deleteTarget.id}`, {
@@ -270,6 +271,14 @@ export function LogisticsProfilePage() {
           Back
         </button>
       </header>
+      {!isAdmin ? (
+        <p
+          className="table-empty"
+          style={{ marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}
+        >
+          View only. Only administrators can edit profile content or photos.
+        </p>
+      ) : null}
 
       <div className="card" style={{ marginBottom: 12, width: '100%', maxWidth: '100%', minWidth: 0 }}>
         <div className="card-body">
@@ -303,7 +312,6 @@ export function LogisticsProfilePage() {
         <>
           <div className="card" style={{ marginBottom: 12, width: '100%', maxWidth: '100%', minWidth: 0 }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Company Information</h2>
               <div
                 style={{
                   display: 'grid',
@@ -341,30 +349,32 @@ export function LogisticsProfilePage() {
 
           <div className="card" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Content and Images</h2>
-
-              <label className="field">
-                <span className="field-label">Content</span>
+              <label className="field" style={{ display: 'block' }}>
                 <textarea
                   className="input"
                   rows={4}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Write profile content for this logistics company..."
+                  aria-label="Profile content for this logistics company"
+                  disabled={!isAdmin}
                 />
               </label>
               <div style={{ marginBottom: 14 }}>
-                <button type="button" className="btn btn-primary" onClick={() => void saveContent()} disabled={savingContent}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void saveContent()}
+                  disabled={!isAdmin || savingContent}
+                  title={!isAdmin ? 'Only administrators can save' : undefined}
+                >
                   {savingContent ? 'Saving...' : 'Save content'}
                 </button>
               </div>
 
-              <p className="field-label" style={{ marginBottom: 10 }}>
-                Images (JPEG, PNG, WebP, or GIF)
-              </p>
               <div style={{ marginBottom: 12 }}>
-                <label className="btn btn-sm btn-ghost">
-                  {uploadBusy ? 'Uploading...' : 'Add image'}
+                <label className="btn btn-sm btn-ghost" style={!isAdmin ? { pointerEvents: 'none', opacity: 0.55 } : undefined}>
+                  {uploadBusy ? 'Uploading...' : 'Add Photo'}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
@@ -375,7 +385,7 @@ export function LogisticsProfilePage() {
                       if (list?.length) void uploadImages(list);
                       e.target.value = '';
                     }}
-                    disabled={uploadBusy || savingContent}
+                    disabled={!isAdmin || uploadBusy || savingContent}
                   />
                 </label>
               </div>
@@ -420,7 +430,8 @@ export function LogisticsProfilePage() {
                       type="button"
                       className="btn btn-sm btn-ghost"
                       style={{ marginTop: 6, color: 'var(--color-danger, #b91c1c)', width: '100%' }}
-                      disabled={uploadBusy || deleting}
+                      disabled={!isAdmin || uploadBusy || deleting}
+                      title={!isAdmin ? 'Only administrators can remove images' : undefined}
                       onClick={() => setDeleteTarget(img)}
                     >
                       Remove

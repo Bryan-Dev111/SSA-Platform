@@ -185,10 +185,8 @@ export function ApprovedFarmersPage() {
                     <td>
                       <Link
                         to={`/global-vendors/farm-profile?farmId=${encodeURIComponent(f.id)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className="finding-code-link"
-                        title="Open farm profile (new tab)"
+                        title="Open farm profile"
                       >
                         <strong>{f.code}</strong>
                       </Link>

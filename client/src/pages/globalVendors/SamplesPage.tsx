@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { ExpandableTableText } from '../../components/ExpandableTableText';
+import { MetricCard } from '../../components/MetricCard';
 import { SortableTh } from '../../components/SortableTh';
 import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
@@ -17,6 +18,7 @@ import {
   dateMs,
   toggleSort,
 } from '../../utils/tableSort';
+import { GLOBAL_VENDORS_PROJECT } from '../../utils/globalSupplyClosedPoMetrics';
 
 type SampleRow = {
   id: string;
@@ -107,6 +109,22 @@ function sampleToExportRow(s: SampleRow): ExportRow {
   };
 }
 
+type GvExpenseRow = {
+  amount: number;
+  type?: string | null;
+  project: string;
+  description?: string | null;
+};
+
+function formatUsd(n: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
 export function SamplesPage() {
   const { token } = useAuth();
   const toast = useToast();
@@ -128,6 +146,8 @@ export function SamplesPage() {
   const [notes, setNotes] = useState('');
   const [notesFile, setNotesFile] = useState<File | null>(null);
   const [sentDate, setSentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [gvExpenses, setGvExpenses] = useState<GvExpenseRow[]>([]);
+  const [sampleExpensesUnavailable, setSampleExpensesUnavailable] = useState(false);
 
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [editNotesFile, setEditNotesFile] = useState<File | null>(null);
@@ -192,6 +212,21 @@ export function SamplesPage() {
     return rows;
   }, [samples, sort]);
 
+  const totalSampleExpenseAmountUsd = useMemo(() => {
+    const sampleCodes = new Set(samples.map((s) => s.code));
+    return gvExpenses
+      .filter(
+        (e) =>
+          (e.type ?? '').trim() === 'Sample' &&
+          (e.project ?? '').trim() === GLOBAL_VENDORS_PROJECT &&
+          sampleCodes.has((e.description ?? '').trim())
+      )
+      .reduce(
+        (sum, e) => sum + (typeof e.amount === 'number' && Number.isFinite(e.amount) ? e.amount : 0),
+        0
+      );
+  }, [gvExpenses, samples]);
+
   const load = (opts?: { silent?: boolean }) => {
     if (!token) return;
     if (!opts?.silent) setLoading(true);
@@ -205,12 +240,17 @@ export function SamplesPage() {
       apiJson<{ list: CountryOption[] }>('/global-supply-options/countries', { token }).catch(
         () => ({ list: [] as CountryOption[] })
       ),
+      apiJson<{ list: GvExpenseRow[] }>('/expenses', { token })
+        .then((r) => ({ list: r.list, ok: true as const }))
+        .catch(() => ({ list: [] as GvExpenseRow[], ok: false as const })),
     ])
-      .then(([samplesRes, farmsRes, cropsRes, countriesRes]) => {
+      .then(([samplesRes, farmsRes, cropsRes, countriesRes, expensesBundle]) => {
         setSamples(samplesRes);
         setFarms(farmsRes);
         setCropOptions(cropsRes.list);
         setCountryOptions(countriesRes.list);
+        setGvExpenses(expensesBundle.list);
+        setSampleExpensesUnavailable(!expensesBundle.ok);
       })
       .catch((e) =>
         setError(e instanceof Error ? e.message : 'Failed to load samples')
@@ -475,6 +515,25 @@ export function SamplesPage() {
           </button>
         </div>
       </header>
+
+      <div
+        className="dashboard-metric-grid"
+        style={{
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          marginBottom: '1rem',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+        }}
+      >
+        <MetricCard title="Total Samples" value={samples.length} />
+        <MetricCard
+          title="Total Samples Value"
+          value={sampleExpensesUnavailable ? '—' : formatUsd(totalSampleExpenseAmountUsd)}
+          subtitle={sampleExpensesUnavailable ? 'Could not load expenses.' : undefined}
+        />
+      </div>
+
       {error && samples.length > 0 && (
         <div className="alert-error" style={{ marginBottom: 12 }}>
           {error}

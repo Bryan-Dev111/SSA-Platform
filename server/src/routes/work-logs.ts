@@ -108,6 +108,11 @@ router.get(
         },
         projectHistory: { select: { id: true, projectCode: true } },
         createdBy: { select: { id: true, name: true, email: true } },
+        laborCosts: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { totalCost: true },
+        },
       },
       orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
       take: 500,
@@ -227,6 +232,11 @@ router.post(
           },
           projectHistory: { select: { id: true, projectCode: true } },
           createdBy: { select: { id: true, name: true, email: true } },
+          laborCosts: {
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+            select: { totalCost: true },
+          },
         },
       });
     });
@@ -327,6 +337,11 @@ router.patch(
         },
         projectHistory: { select: { id: true, projectCode: true } },
         createdBy: { select: { id: true, name: true, email: true } },
+        laborCosts: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { totalCost: true },
+        },
       },
     });
 

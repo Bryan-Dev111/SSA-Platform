@@ -776,8 +776,15 @@ button.shipments-late-alert-btn:focus-visible {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+.summary-kpi-label-upper {
+  text-transform: uppercase;
+}
+
+.summary-kpi-label-pos-plural {
+  text-transform: none;
 }
 
 .summary-kpi-value {
@@ -2085,7 +2092,7 @@ select.input {
 }
 
 .login-language-row {
-  margin-top: 0.5rem;
+  margin-top: 1.125rem;
   display: flex;
   justify-content: flex-end;
 }
@@ -3038,6 +3045,35 @@ body.sidebar-open {
 
 .dashboard-metric-grid > .card {
   min-width: 0;
+}
+
+/* Global Supply Admin → Users overview: compact KPI row, not full viewport width */
+.dashboard-metric-grid.global-supply-admin-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 150px));
+  max-width: 500px;
+  width: auto;
+  justify-content: start;
+}
+
+@media (max-width: 640px) {
+  .dashboard-metric-grid.global-supply-admin-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 140px));
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 400px) {
+  .dashboard-metric-grid.global-supply-admin-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 280px;
+  }
+}
+
+/* Farm Dashboard: keep five KPI tiles on one row (inline grid used to force wide minmax and wrapping). */
+.dashboard-metric-grid.farm-dashboard-metric-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 /* Dashboard: Risk donut + Upcoming + Recent Updates — equal-width columns on large screens */

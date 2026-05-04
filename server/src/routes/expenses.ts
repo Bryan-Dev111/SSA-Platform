@@ -122,6 +122,7 @@ router.get(
 
 router.post(
   '/:id/attachment',
+  requireRole(['Admin']),
   upload.single('file'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
@@ -167,6 +168,7 @@ router.post(
 
 router.delete(
   '/:id/attachment',
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
     if (!id) {
@@ -192,6 +194,7 @@ router.delete(
 
 router.post(
   '/',
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const type = typeof req.body?.type === 'string' ? req.body.type.trim() : '';
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
@@ -242,6 +245,7 @@ router.post(
 
 router.patch(
   '/:id',
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id ?? '').trim();
     if (!id) {

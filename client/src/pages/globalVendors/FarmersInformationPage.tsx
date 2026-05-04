@@ -93,6 +93,29 @@ type FarmInfoSortKey =
   | 'elevationMeters'
   | 'farmCategory';
 
+/** FarmRow keys edited as number inputs in the farm modal — values must be number | null, not strings. */
+const NUMERIC_FARM_EDIT_FIELDS: ReadonlySet<keyof FarmRow> = new Set([
+  'latitude',
+  'longitude',
+  'elevationMeters',
+  'totalFarmSizeHa',
+  'mainCropAreaHa',
+  'mainCropAnnualOutputKg',
+  'secondaryCropAreaHa',
+  'secondaryCropAnnualOutputKg',
+  'mainFermentationDays',
+  'mainQualityScore',
+  'secondaryFermentationDays',
+  'secondaryQualityScore',
+]);
+
+function parseOptionalFarmNumber(raw: string): number | null {
+  const t = raw.trim();
+  if (t === '' || t === '-') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
 function farmRowToExportRow(f: FarmRow): ExportRow {
   const mainHarvest =
     f.harvestStartMonth && f.harvestEndMonth
@@ -365,10 +388,7 @@ export function FarmersInformationPage() {
   const updateEditField = (field: keyof FarmRow, value: string) => {
     setEdit((prev) => ({
       ...prev,
-      [field]:
-        field === 'latitude' || field === 'longitude' || field === 'elevationMeters'
-          ? (value === '' ? null : Number(value))
-          : value,
+      [field]: NUMERIC_FARM_EDIT_FIELDS.has(field) ? parseOptionalFarmNumber(value) : value,
     }));
   };
 

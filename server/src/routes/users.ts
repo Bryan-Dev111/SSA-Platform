@@ -14,6 +14,9 @@ import { isSmtpConfigured } from '../lib/mail';
 
 const router = Router();
 
+/** Supplier Assurance seed users — omit from Global Supply admin dashboard counts. */
+const GLOBAL_SUPPLY_STATS_EXCLUDED_EMAIL = 'buyer@sentinel.local';
+
 const SOURCING_DIRECTOR_PO_EMAIL_CATEGORY: AlertCategory = 'sourcingDirectorPoCountryEmail';
 
 /** In-app / dashboard alerts (email delivery can be wired later); matches `createAlertForRecipients` categories. */
@@ -112,9 +115,17 @@ router.use(requireRole(['Admin']));
 router.get(
   '/global-supply-stats',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
+    const notSupplierAssuranceDemoUser = {
+      NOT: { email: { equals: GLOBAL_SUPPLY_STATS_EXCLUDED_EMAIL, mode: 'insensitive' } },
+    } as const;
+
     const [employees, roles, registeredFarms] = await Promise.all([
       prisma.user.count({
-        where: { isEmployee: true, employmentStatus: 'Active' },
+        where: {
+          isEmployee: true,
+          employmentStatus: 'Active',
+          ...notSupplierAssuranceDemoUser,
+        },
       }),
       prisma.role.findMany({ select: { id: true, name: true } }),
       prisma.farm.count(),
@@ -124,9 +135,21 @@ router.get(
     const farmerRoleId = idByName.get('Farmer');
     const [commodityBuyers, farmerAccounts] = await Promise.all([
       commodityBuyerId
-        ? prisma.userRole.count({ where: { roleId: commodityBuyerId } })
+        ? prisma.userRole.count({
+            where: {
+              roleId: commodityBuyerId,
+              user: notSupplierAssuranceDemoUser,
+            },
+          })
         : 0,
-      farmerRoleId ? prisma.userRole.count({ where: { roleId: farmerRoleId } }) : 0,
+      farmerRoleId
+        ? prisma.userRole.count({
+            where: {
+              roleId: farmerRoleId,
+              user: notSupplierAssuranceDemoUser,
+            },
+          })
+        : 0,
     ]);
     res.json({
       employees,
@@ -143,7 +166,7 @@ router.get(
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const roles = await prisma.role.findMany({
       where: { name: { notIn: [...DEPRECATED_ROLE_NAMES] } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, _count: { select: { userRoles: true } } },
       orderBy: { name: 'asc' },
     });
     const perms = await prisma.rolePagePermission.findMany({
@@ -151,6 +174,11 @@ router.get(
       select: { roleId: true, pageKey: true, canAccess: true },
     });
     const matrix: Record<string, Record<string, boolean>> = {};
+    const roleRows = roles.map((r) => ({
+      id: r.id,
+      name: r.name,
+      userCount: r._count.userRoles,
+    }));
     for (const role of roles) {
       matrix[role.name] = {};
       for (const page of PAGE_DEFINITIONS) {
@@ -166,6 +194,7 @@ router.get(
       apiPageRoles: API_PAGE_ROLES,
       pages: PAGE_DEFINITIONS,
       roles: roles.map((r) => r.name),
+      roleRows,
       matrix,
       adminOnlyDeletes: [
         { entity: 'Finding', method: 'DELETE', path: '/findings/:id' },
@@ -175,6 +204,7 @@ router.get(
         { entity: 'Opportunity', method: 'DELETE', path: '/opportunities/:id' },
         { entity: 'Supplier', method: 'DELETE', path: '/suppliers/:idOrCode' },
         { entity: 'User', method: 'DELETE', path: '/users/:id' },
+        { entity: 'Role', method: 'DELETE', path: '/users/roles/:roleId' },
       ],
     });
   })
@@ -190,6 +220,40 @@ router.post(
     }
     const created = await prisma.role.create({ data: { name } });
     res.status(201).json(created);
+  })
+);
+
+/** Remove a custom / duplicate role when no users are assigned (Admin). Must be registered before `DELETE /:id` (user delete). */
+router.delete(
+  '/roles/:roleId',
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const roleId = String(req.params.roleId ?? '').trim();
+    if (!roleId) {
+      res.status(400).json({ error: 'roleId is required' });
+      return;
+    }
+
+    const role = await prisma.role.findUnique({
+      where: { id: roleId },
+      select: { id: true, name: true, _count: { select: { userRoles: true } } },
+    });
+    if (!role) {
+      res.status(404).json({ error: 'Role not found' });
+      return;
+    }
+    if (role.name === 'Admin') {
+      res.status(400).json({ error: 'Cannot delete the Admin role' });
+      return;
+    }
+    if (role._count.userRoles > 0) {
+      res.status(400).json({
+        error: `Cannot delete this role while ${role._count.userRoles} user(s) still have it. Remove the role from those users first.`,
+      });
+      return;
+    }
+
+    await prisma.role.delete({ where: { id: roleId } });
+    res.status(204).send();
   })
 );
 

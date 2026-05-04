@@ -1,10 +1,12 @@
 /**
  * Calendar view for Internal Management: audits (codes), shipments (SHIP codes),
  * and planned shipment schedule rows on their scheduled dates.
+ * Global Supply variant also shows PO delivery/arrival dates and user-added events (subject + date).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '../api/client';
+import { useToast } from '../context/ToastContext';
 import { getDocumentLocale } from '../i18n/locale';
 
 interface AuditCalendarRow {
@@ -27,11 +29,18 @@ interface PurchaseOrderCalendarRow {
   estimatedArrivalAtBuyer: string | null;
 }
 
+interface GlobalSupplyCalendarEventRow {
+  id: string;
+  subject: string;
+  eventDate: string;
+}
+
 type CalendarItem =
   | { kind: 'audit'; id: string; label: string; dateKey: string }
   | { kind: 'shipment'; id: string; label: string; dateKey: string }
   | { kind: 'poDelivery'; id: string; label: string; dateKey: string }
-  | { kind: 'poArrival'; id: string; label: string; dateKey: string };
+  | { kind: 'poArrival'; id: string; label: string; dateKey: string }
+  | { kind: 'customEvent'; id: string; label: string; dateKey: string };
 
 function isoDateKey(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -67,6 +76,14 @@ function padDateKey(year: number, monthIndex: number, day: number): string {
   return `${year}-${m}-${d}`;
 }
 
+function todayDateInputValue(): string {
+  const n = new Date();
+  const y = n.getFullYear();
+  const m = String(n.getMonth() + 1).padStart(2, '0');
+  const d = String(n.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function useInternalManagementCalendarItems(
   token: string | null,
   variant: 'supplierAssurance' | 'globalSupply'
@@ -89,7 +106,12 @@ function useInternalManagementCalendarItems(
     setError(null);
     const loadPromise =
       variant === 'globalSupply'
-        ? apiJson<PurchaseOrderCalendarRow[]>('/purchase-orders', { token }).then((poList) => {
+        ? Promise.all([
+            apiJson<PurchaseOrderCalendarRow[]>('/purchase-orders', { token }).catch(() => []),
+            apiJson<GlobalSupplyCalendarEventRow[]>('/global-supply-calendar-events', { token }).catch(
+              () => [] as GlobalSupplyCalendarEventRow[]
+            ),
+          ]).then(([poList, eventRows]) => {
             const next: CalendarItem[] = [];
             for (const po of poList) {
               const farmDeliveryKey = isoDateKey(po.estimatedFarmerDeliveryDate);
@@ -110,6 +132,16 @@ function useInternalManagementCalendarItems(
                   dateKey: buyerArrivalKey,
                 });
               }
+            }
+            for (const ev of eventRows) {
+              const dk = isoDateKey(ev.eventDate);
+              if (!dk) continue;
+              next.push({
+                kind: 'customEvent',
+                id: ev.id,
+                label: ev.subject,
+                dateKey: dk,
+              });
             }
             return next;
           })
@@ -162,7 +194,11 @@ export function InternalManagementCalendarView({
   token: string | null;
   variant?: 'supplierAssurance' | 'globalSupply';
 }) {
+  const toast = useToast();
   const { items, loading, error, reload } = useInternalManagementCalendarItems(token, variant);
+  const [newEventSubject, setNewEventSubject] = useState('');
+  const [newEventDate, setNewEventDate] = useState(todayDateInputValue);
+  const [savingEvent, setSavingEvent] = useState(false);
   const [cursor, setCursor] = useState(() => {
     const n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), 1);
@@ -195,6 +231,45 @@ export function InternalManagementCalendarView({
   const goToday = () => {
     const n = new Date();
     setCursor(new Date(n.getFullYear(), n.getMonth(), 1));
+  };
+
+  const submitGlobalSupplyEvent = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!token || variant !== 'globalSupply') return;
+    const subject = newEventSubject.trim();
+    if (!subject) {
+      toast.error('Enter a subject');
+      return;
+    }
+    if (!newEventDate) {
+      toast.error('Choose a date');
+      return;
+    }
+    setSavingEvent(true);
+    try {
+      await apiJson('/global-supply-calendar-events', {
+        token,
+        method: 'POST',
+        body: JSON.stringify({ subject, eventDate: newEventDate }),
+      });
+      toast.success('Event added');
+      setNewEventSubject('');
+      setNewEventDate(todayDateInputValue());
+      reload();
+    } catch (err) {
+      let msg = 'Could not add event';
+      if (err instanceof Error) {
+        try {
+          const j = JSON.parse(err.message) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          msg = err.message || msg;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setSavingEvent(false);
+    }
   };
 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -232,6 +307,59 @@ export function InternalManagementCalendarView({
 
         {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
         {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
+
+        {variant === 'globalSupply' && token ? (
+          <form
+            onSubmit={(ev) => void submitGlobalSupplyEvent(ev)}
+            className="stack"
+            style={{
+              gap: 10,
+              marginBottom: '1rem',
+              padding: '12px 14px',
+              border: '1px solid var(--color-border)',
+              borderRadius: 8,
+              background: 'var(--color-surface-2, #f8fafc)',
+              maxWidth: 520,
+            }}
+          >
+            <strong style={{ fontSize: 'var(--text-sm)' }}>Add calendar event</strong>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 10,
+                alignItems: 'flex-end',
+              }}
+            >
+              <label className="field" style={{ flex: '1 1 180px', marginBottom: 0 }}>
+                <span className="field-label">Subject</span>
+                <input
+                  className="input"
+                  type="text"
+                  value={newEventSubject}
+                  onChange={(ev) => setNewEventSubject(ev.target.value)}
+                  placeholder="e.g. Team sync"
+                  maxLength={500}
+                  disabled={savingEvent}
+                  autoComplete="off"
+                />
+              </label>
+              <label className="field" style={{ width: 160, marginBottom: 0 }}>
+                <span className="field-label">Date</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={newEventDate}
+                  onChange={(ev) => setNewEventDate(ev.target.value)}
+                  disabled={savingEvent}
+                />
+              </label>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={savingEvent}>
+                {savingEvent ? 'Adding…' : 'Add event'}
+              </button>
+            </div>
+          </form>
+        ) : null}
 
         {variant === 'globalSupply' ? (
           <div
@@ -272,6 +400,21 @@ export function InternalManagementCalendarView({
                 }}
               />
               PO arrival at buyer
+            </span>
+            <span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: 'var(--color-warning-bg, #fef3c7)',
+                  marginRight: 6,
+                  verticalAlign: 'middle',
+                  border: '1px solid var(--color-border)',
+                }}
+              />
+              Event
             </span>
           </div>
         ) : (
@@ -342,7 +485,13 @@ export function InternalManagementCalendarView({
                     const visible = dayItems.slice(0, 4);
                     const more = dayItems.length - visible.length;
                     const title =
-                      dayItems.length > 0 ? dayItems.map((x) => `${x.kind}: ${x.label}`).join('\n') : undefined;
+                      dayItems.length > 0
+                        ? dayItems
+                            .map((x) =>
+                              x.kind === 'customEvent' ? `Event: ${x.label}` : `${x.kind}: ${x.label}`
+                            )
+                            .join('\n')
+                        : undefined;
                     return (
                       <td
                         key={di}
@@ -368,7 +517,9 @@ export function InternalManagementCalendarView({
                                   ? 'var(--color-success-bg, #dbeafe)'
                                   : it.kind === 'poDelivery'
                                     ? 'var(--color-info-bg, #dbeafe)'
-                                    : 'var(--color-success-bg, #dcfce7)';
+                                    : it.kind === 'poArrival'
+                                      ? 'var(--color-success-bg, #dcfce7)'
+                                      : 'var(--color-warning-bg, #fef3c7)';
                             const inner =
                               it.kind === 'audit' ? (
                                 <Link
@@ -399,6 +550,18 @@ export function InternalManagementCalendarView({
                                 >
                                   {it.label}
                                 </Link>
+                              ) : it.kind === 'customEvent' ? (
+                                <span
+                                  style={{
+                                    display: 'block',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={it.label}
+                                >
+                                  {it.label}
+                                </span>
                               ) : (
                                 <span
                                   style={{
@@ -445,7 +608,7 @@ export function InternalManagementCalendarView({
         {!loading && items.length === 0 && !error && (
           <p className="table-empty" style={{ marginTop: 16 }}>
             {variant === 'globalSupply'
-              ? 'No purchase orders with farm delivery or buyer arrival dates yet.'
+              ? 'Nothing scheduled yet. Add an event above, or set farm delivery / buyer arrival dates on purchase orders.'
               : 'No audits or shipments with dates in the system yet.'}
           </p>
         )}

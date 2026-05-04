@@ -246,6 +246,7 @@ router.patch(
     'GlobalSupplyFarmProfile',
     'GlobalSupplyProcessingQuality',
   ]),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const farmId = req.params.farmId;
     const section = parseProfileSection(req.body?.section);
@@ -279,6 +280,7 @@ router.post(
     'GlobalSupplyFarmProfile',
     'GlobalSupplyProcessingQuality',
   ]),
+  requireRole(['Admin']),
   profileImageUpload.single('file'),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const farmId = req.params.farmId;
@@ -369,6 +371,7 @@ router.delete(
     'GlobalSupplyFarmProfile',
     'GlobalSupplyProcessingQuality',
   ]),
+  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const farmId = req.params.farmId;
     const imageId = req.params.imageId;
@@ -426,13 +429,20 @@ router.post(
   })
 );
 
-// Relationship & trust + general farm updates
+// Farm updates: general fields for GlobalSupplyFarmers; relationship/trust fields Admin-only.
 router.patch(
   '/:id',
   requirePageAccess('GlobalSupplyFarmers'),
-  requireRole(['Admin']),
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id;
+    const existing = await prisma.farm.findUnique({
+      where: { id },
+      select: { firstContactDate: true },
+    });
+    if (!existing) {
+      res.status(404).json({ error: 'Farm not found' });
+      return;
+    }
     const {
       farmName,
       farmerName,
@@ -614,6 +624,22 @@ router.patch(
       data.firstContactDate = null;
     }
 
+    if (Object.prototype.hasOwnProperty.call(data, 'firstContactDate') && existing.firstContactDate != null) {
+      if (data.firstContactDate === null) {
+        res.status(400).json({ error: 'First contact date cannot be cleared once set.' });
+        return;
+      }
+      const existingDay = existing.firstContactDate.toISOString().slice(0, 10);
+      const newDay =
+        data.firstContactDate instanceof Date
+          ? data.firstContactDate.toISOString().slice(0, 10)
+          : null;
+      if (newDay && newDay !== existingDay) {
+        res.status(400).json({ error: 'First contact date cannot be changed once set.' });
+        return;
+      }
+    }
+
     if (typeof lastVisitDate === 'string' && lastVisitDate.trim()) {
       data.lastVisitDate = new Date(lastVisitDate.slice(0, 10) + 'T12:00:00.000Z');
     } else if (lastVisitDate === null) {
@@ -632,6 +658,18 @@ router.patch(
 
     if (Object.keys(data).length === 0) {
       res.status(400).json({ error: 'No updatable fields provided' });
+      return;
+    }
+
+    const relationshipFieldKeys = new Set([
+      'firstContactDate',
+      'lastVisitDate',
+      'visitCount',
+      'relationshipStatus',
+    ]);
+    const touchesRelationship = Object.keys(data).some((k) => relationshipFieldKeys.has(k));
+    if (touchesRelationship && !req.user?.roleNames.includes('Admin')) {
+      res.status(403).json({ error: 'Only administrators can update relationship fields.' });
       return;
     }
 

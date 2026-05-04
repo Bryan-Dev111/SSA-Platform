@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { TableWithTopScroll } from '../components/TableWithTopScroll';
 import { MAX_RECORD_UPLOAD_BYTES, postRecordWithProgress } from '../utils/recordUpload';
 
 interface Supplier {
@@ -687,12 +688,16 @@ export function Records() {
       <div className="card">
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>All records</h2>
-          <div className="table-wrap">
-            {loading ? (
+          {loading ? (
+            <div className="table-wrap">
               <p className="table-empty">Loading…</p>
-            ) : rows.length === 0 ? (
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="table-wrap">
               <p className="table-empty">No records.</p>
-            ) : (
+            </div>
+          ) : (
+            <TableWithTopScroll ariaLabel="All records">
               <table className="table">
                 <thead>
                   <tr>
@@ -822,8 +827,8 @@ export function Records() {
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
+            </TableWithTopScroll>
+          )}
           {rows.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', paddingTop: '0.75rem' }}>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>

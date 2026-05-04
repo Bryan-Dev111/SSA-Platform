@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
+import { MetricCard } from '../../components/MetricCard';
 import { AdminBuyersSuppliersPanel, AdminPermissionsPanel } from '../admin/AdminDay9Panels';
 import { AdminEmailAlertsPanel } from '../admin/AdminEmailAlertsPanel';
 import { GlobalSupplyMasterDataPanel } from './GlobalSupplyMasterDataPanel';
@@ -97,24 +98,12 @@ export function GlobalVendorsAdmin() {
               {!stats && !statsError && token && <p className="table-empty">Loading…</p>}
               {stats && (
                 <div
-                  className="dashboard-metric-grid"
-                  style={{
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                    marginBottom: '0.75rem',
-                  }}
+                  className="dashboard-metric-grid global-supply-admin-overview-grid"
+                  style={{ marginBottom: '0.75rem' }}
                 >
-                  <div className="card metric-card">
-                    <div className="metric-card-label">Employees</div>
-                    <div className="metric-card-value">{stats.employees}</div>
-                  </div>
-                  <div className="card metric-card">
-                    <div className="metric-card-label">Commodity buyers</div>
-                    <div className="metric-card-value">{stats.commodityBuyers}</div>
-                  </div>
-                  <div className="card metric-card">
-                    <div className="metric-card-label">Farmers</div>
-                    <div className="metric-card-value">{stats.farmerAccounts}</div>
-                  </div>
+                  <MetricCard title="Employees" value={stats.employees} />
+                  <MetricCard title="Commodity buyers" value={stats.commodityBuyers} />
+                  <MetricCard title="Farmers" value={stats.farmerAccounts} />
                 </div>
               )}
             </div>

@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../utils/apiHelpers';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { TableWithTopScroll } from '../components/TableWithTopScroll';
 import { ShipmentMetricAlertIcon } from '../components/ShipmentMetricAlertIcon';
 
 interface Supplier {
@@ -646,10 +647,12 @@ export function Shipments() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>Shipment Inspection Requests</h2>
-          <div className="table-wrap">
-            {shipments.length === 0 ? (
+          {shipments.length === 0 ? (
+            <div className="table-wrap">
               <p className="table-empty">No inspection requests.</p>
-            ) : (
+            </div>
+          ) : (
+            <TableWithTopScroll ariaLabel="Shipment inspection requests">
               <table className="table">
                 <thead>
                   <tr>
@@ -866,8 +869,8 @@ export function Shipments() {
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
+            </TableWithTopScroll>
+          )}
         </div>
       </div>
 
