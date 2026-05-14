@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -13,11 +14,12 @@ type OptionRow = {
   name: string;
 };
 
+export type GlobalSupplyMasterEntity = 'crops' | 'countries' | 'expenseTypes';
+
 interface GlobalSupplyMasterDataPanelProps {
   token: string | null;
   toast: ToastApi;
-  title: string;
-  noun: string;
+  entity: GlobalSupplyMasterEntity;
   endpoint:
     | '/global-supply-options/crops'
     | '/global-supply-options/countries'
@@ -28,10 +30,12 @@ interface GlobalSupplyMasterDataPanelProps {
 export function GlobalSupplyMasterDataPanel({
   token,
   toast,
-  title,
-  noun,
+  entity,
   endpoint,
 }: GlobalSupplyMasterDataPanelProps) {
+  const { t } = useLanguage();
+  const pfx = `gvAdmin.masterData.${entity}` as const;
+
   const [list, setList] = useState<OptionRow[]>([]);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,10 +49,10 @@ export function GlobalSupplyMasterDataPanel({
       const r = await apiJson<{ list: OptionRow[] }>(endpoint, { token });
       setList(r.list);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : `Failed to load ${noun.toLowerCase()}`);
+      toast.error(e instanceof Error ? e.message : t(`${pfx}.loadFailed`));
       setList([]);
     }
-  }, [endpoint, noun, token, toast]);
+  }, [endpoint, token, toast, t, pfx]);
 
   useEffect(() => {
     void load();
@@ -63,7 +67,7 @@ export function GlobalSupplyMasterDataPanel({
     if (!token) return;
     const value = newName.trim();
     if (!value) {
-      toast.error(`${noun} name is required`);
+      toast.error(t(`${pfx}.nameRequired`));
       return;
     }
     setBusy(true);
@@ -74,10 +78,10 @@ export function GlobalSupplyMasterDataPanel({
         body: JSON.stringify({ name: value }),
       });
       setNewName('');
-      toast.success(`${noun} added`);
+      toast.success(t(`${pfx}.added`));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : `Could not add ${noun.toLowerCase()}`);
+      toast.error(e instanceof Error ? e.message : t(`${pfx}.addFailed`));
     } finally {
       setBusy(false);
     }
@@ -87,7 +91,7 @@ export function GlobalSupplyMasterDataPanel({
     if (!token || !editId) return;
     const value = editName.trim();
     if (!value) {
-      toast.error(`${noun} name is required`);
+      toast.error(t(`${pfx}.nameRequired`));
       return;
     }
     setBusy(true);
@@ -99,10 +103,10 @@ export function GlobalSupplyMasterDataPanel({
       });
       setEditId(null);
       setEditName('');
-      toast.success(`${noun} updated`);
+      toast.success(t(`${pfx}.updated`));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : `Could not update ${noun.toLowerCase()}`);
+      toast.error(e instanceof Error ? e.message : t(`${pfx}.updateFailed`));
     } finally {
       setBusy(false);
     }
@@ -113,11 +117,11 @@ export function GlobalSupplyMasterDataPanel({
     setBusy(true);
     try {
       await apiJson(`${endpoint}/${deleteRow.id}`, { token, method: 'DELETE' });
-      toast.success(`${noun} deleted`);
+      toast.success(t(`${pfx}.deleted`));
       setDeleteRow(null);
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : `Could not delete ${noun.toLowerCase()}`);
+      toast.error(e instanceof Error ? e.message : t(`${pfx}.deleteFailed`));
     } finally {
       setBusy(false);
     }
@@ -126,7 +130,7 @@ export function GlobalSupplyMasterDataPanel({
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>{title}</h2>
+        <h2 style={{ marginTop: 0 }}>{t(`${pfx}.title`)}</h2>
         <div
           style={{
             display: 'grid',
@@ -139,11 +143,11 @@ export function GlobalSupplyMasterDataPanel({
             className="input"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder={`Add ${noun.toLowerCase()}...`}
+            placeholder={t(`${pfx}.placeholder`)}
             disabled={busy}
           />
           <button type="button" className="btn btn-primary" onClick={() => void add()} disabled={busy}>
-            Add
+            {t('gvAdmin.masterData.common.add')}
           </button>
         </div>
 
@@ -151,15 +155,15 @@ export function GlobalSupplyMasterDataPanel({
           <table className="table">
             <thead>
               <tr>
-                <th>{noun}</th>
-                <th style={{ width: 220 }}>Actions</th>
+                <th>{t(`${pfx}.column`)}</th>
+                <th style={{ width: 220 }}>{t('gvAdmin.masterData.common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {sortedList.length === 0 ? (
                 <tr>
                   <td colSpan={2} className="table-empty">
-                    No {noun.toLowerCase()} values yet.
+                    {t(`${pfx}.empty`)}
                   </td>
                 </tr>
               ) : (
@@ -187,7 +191,7 @@ export function GlobalSupplyMasterDataPanel({
                             onClick={() => void save()}
                             disabled={busy}
                           >
-                            Save
+                            {t('common.save')}
                           </button>
                           <button
                             type="button"
@@ -198,7 +202,7 @@ export function GlobalSupplyMasterDataPanel({
                             }}
                             disabled={busy}
                           >
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                         </>
                       ) : (
@@ -213,7 +217,7 @@ export function GlobalSupplyMasterDataPanel({
                             }}
                             disabled={busy}
                           >
-                            Edit
+                            {t('common.edit')}
                           </button>
                           <button
                             type="button"
@@ -221,7 +225,7 @@ export function GlobalSupplyMasterDataPanel({
                             onClick={() => setDeleteRow(row)}
                             disabled={busy}
                           >
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </>
                       )}
@@ -236,13 +240,9 @@ export function GlobalSupplyMasterDataPanel({
 
       <ConfirmDialog
         open={!!deleteRow}
-        title={`Delete ${noun.toLowerCase()}?`}
-        message={
-          deleteRow
-            ? `Delete "${deleteRow.name}"? This value will no longer appear in selector lists.`
-            : ''
-        }
-        confirmLabel="Delete"
+        title={t(`${pfx}.deleteTitle`)}
+        message={deleteRow ? t(`${pfx}.deleteMessage`, { name: deleteRow.name }) : ''}
+        confirmLabel={t('common.delete')}
         variant="danger"
         onCancel={() => setDeleteRow(null)}
         onConfirm={() => void remove()}

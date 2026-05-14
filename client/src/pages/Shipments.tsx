@@ -67,19 +67,6 @@ interface Metrics {
   scheduleRowCount?: number;
 }
 
-function openShipmentRequestsSubtitle(m: Metrics): string {
-  const overdue = m.overdueWaiting ?? 0;
-  const waiting = m.waitingInspection ?? 0;
-  const notOverdue = Math.max(0, waiting - overdue);
-  return `${notOverdue} Waiting Inspection*${overdue} Overdue`;
-}
-
-function onTimeDeliverySubtitle(m: Metrics): string {
-  const latePo = m.shortDeliveries ?? 0;
-  if (latePo <= 0) return 'No late POs';
-  return latePo === 1 ? '1 late PO' : `${latePo} late POs`;
-}
-
 function formatShipmentDate(value: string | null | undefined, locale: string): string {
   if (!value) return '—';
   const d = new Date(value);
@@ -248,8 +235,8 @@ export function Shipments() {
       const d = baseDate ? new Date(baseDate) : null;
       if (!d || Number.isNaN(d.getTime())) continue;
       const monthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-      const monthLabel = d.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-      const part = s.partNumber?.trim() || 'Unspecified';
+      const monthLabel = d.toLocaleString(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+      const part = s.partNumber?.trim() || t('shipments.partUnspecified');
       const month = monthMap.get(monthKey) ?? { label: monthLabel, parts: new Map<string, number>() };
       month.parts.set(part, (month.parts.get(part) ?? 0) + qty);
       monthMap.set(monthKey, month);
@@ -273,7 +260,23 @@ export function Shipments() {
       Math.round((maxQty * (yTickSteps - i)) / yTickSteps)
     );
     return { parts, rows, maxQty, yTicks };
-  }, [shipments]);
+  }, [shipments, locale, t]);
+
+  const openRequestsSubtitle = useMemo(() => {
+    if (!metrics) return '';
+    const overdue = metrics.overdueWaiting ?? 0;
+    const waiting = metrics.waitingInspection ?? 0;
+    const notOverdue = Math.max(0, waiting - overdue);
+    return t('shipments.metric.openRequestsSubtitle', { waiting: notOverdue, overdue });
+  }, [metrics, t]);
+
+  const onTimeSubtitle = useMemo(() => {
+    if (!metrics) return '';
+    const latePo = metrics.shortDeliveries ?? 0;
+    if (latePo <= 0) return t('shipments.metric.noLatePos');
+    if (latePo === 1) return t('shipments.metric.latePo_one');
+    return t('shipments.metric.latePo_other', { count: latePo });
+  }, [metrics, t]);
 
   const onSort = (key: typeof sortBy) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -350,7 +353,7 @@ export function Shipments() {
     try {
       setDownloadingRecord((prev) => ({ ...prev, [recordId]: true }));
       await downloadWithAuthProgress(`/records/${recordId}/download`, token, recordName, () => {});
-      toast.success('Record download completed');
+      toast.success(t('shipments.recordDownloaded'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -376,7 +379,7 @@ export function Shipments() {
         method: 'PATCH',
         body: JSON.stringify({ result: 'Passed', inspector }),
       });
-      toast.success('Approved (Passed)');
+      toast.success(t('shipments.approvedPassed'));
       loadData();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -400,7 +403,7 @@ export function Shipments() {
           inspector,
         }),
       });
-      toast.success('Rejected (Failed)');
+      toast.success(t('shipments.rejectedFailed'));
       setRejectDialog(null);
       loadData();
     } catch (e) {
@@ -421,7 +424,7 @@ export function Shipments() {
         method: 'PATCH',
         body: JSON.stringify({ reopen: true }),
       });
-      toast.success('Inspection request reopened (waiting review)');
+      toast.success(t('shipments.reopened'));
       loadData();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -436,7 +439,7 @@ export function Shipments() {
         <header className="page-header">
           <h1 className="page-title">{t('internal.tab.shipments')}</h1>
         </header>
-        <p className="table-empty">Sign in to view shipments.</p>
+        <p className="table-empty">{t('shipments.signInPrompt')}</p>
       </div>
     );
   }
@@ -464,14 +467,14 @@ export function Shipments() {
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <div className="input-group" style={{ maxWidth: 360, marginBottom: 0 }}>
-              <label className="input-label">Filter by supplier</label>
+              <label className="input-label">{t('filters.filterBySupplier')}</label>
               {suppliers.length > 0 ? (
                 <select
                   className="input"
                   value={filterSupplierId}
                   onChange={(e) => setFilterSupplierId(e.target.value)}
                 >
-                  <option value="">All in scope</option>
+                  <option value="">{t('filters.allInScope')}</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.code}: {s.name}
@@ -480,9 +483,7 @@ export function Shipments() {
                 </select>
               ) : (
                 <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                  No suppliers are linked to your account for shipments. An administrator can assign you to suppliers
-                  in Internal Management → Employee Assignments (employee/contractor → supplier), then sign out and
-                  back in if needed.
+                  {t('shipments.noSuppliersHelp')}
                 </p>
               )}
             </div>
@@ -504,19 +505,21 @@ export function Shipments() {
           }}
         >
           <Metric
-            label="Total Requests"
+            label={t('shipments.metric.totalRequests')}
             value={metrics.totalInspectionRequests}
-            subtitle={`FPY ${metrics.fpyPercent != null ? `${metrics.fpyPercent}%` : '—'}`}
+            subtitle={t('shipments.metric.fpySubtitle', {
+              pct: metrics.fpyPercent != null ? `${metrics.fpyPercent}%` : '—',
+            })}
           />
           <Metric
-            label="Open Shipment Requests"
+            label={t('shipments.metric.openRequests')}
             value={metrics.waitingInspection}
-            subtitle={openShipmentRequestsSubtitle(metrics)}
+            subtitle={openRequestsSubtitle}
           />
           <Metric
-            label="On-Time Delivery"
+            label={t('shipments.metric.otd')}
             value={metrics.otdPercent != null ? `${metrics.otdPercent}%` : '—'}
-            subtitle={onTimeDeliverySubtitle(metrics)}
+            subtitle={onTimeSubtitle}
             onTimeDeliveryAlert={onTimeDeliveryAlertProps(metrics)}
           />
         </div>
@@ -524,9 +527,9 @@ export function Shipments() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0, marginBottom: '1rem', textAlign: 'center' }}>Part Quantity by Month</h2>
+          <h2 style={{ marginTop: 0, marginBottom: '1rem', textAlign: 'center' }}>{t('shipments.chart.title')}</h2>
           {partTrend.rows.length === 0 || partTrend.parts.length === 0 ? (
-            <p className="table-empty">No shipment quantity trend data.</p>
+            <p className="table-empty">{t('shipments.chart.empty')}</p>
           ) : (
             <>
               <div
@@ -585,7 +588,7 @@ export function Shipments() {
                         textTransform: 'uppercase',
                       }}
                     >
-                      Quantity
+                      {t('shipments.chart.quantity')}
                     </span>
                   </div>
                   <div
@@ -604,8 +607,8 @@ export function Shipments() {
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    {partTrend.yTicks.map((t, i) => (
-                      <span key={`y-tick-${i}`}>{t}</span>
+                    {partTrend.yTicks.map((tick, i) => (
+                      <span key={`y-tick-${i}`}>{tick}</span>
                     ))}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -676,7 +679,7 @@ export function Shipments() {
                         textTransform: 'uppercase',
                       }}
                     >
-                      Month
+                      {t('shipments.chart.month')}
                     </div>
                   </div>
                 </div>
@@ -688,57 +691,57 @@ export function Shipments() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Shipment Inspection Requests</h2>
+          <h2 style={{ marginTop: 0 }}>{t('shipments.section.requests')}</h2>
           {shipments.length === 0 ? (
             <div className="table-wrap">
-              <p className="table-empty">No inspection requests.</p>
+              <p className="table-empty">{t('shipments.emptyRequests')}</p>
             </div>
           ) : (
-            <TableWithTopScroll ariaLabel="Shipment inspection requests">
+            <TableWithTopScroll ariaLabel={t('shipments.section.requests')}>
               <table className="table">
                 <thead>
                   <tr>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>
-                      Shipment ID {sortIndicator('code')}
+                      {t('shipments.col.shipmentId')} {sortIndicator('code')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
-                      Supplier {sortIndicator('supplier')}
+                      {t('shipments.col.supplier')} {sortIndicator('supplier')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('purchaseOrder')}>
-                      P.O. {sortIndicator('purchaseOrder')}
+                      {t('shipments.col.po')} {sortIndicator('purchaseOrder')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('partNumber')}>
-                      Part Number {sortIndicator('partNumber')}
+                      {t('shipments.col.partNumber')} {sortIndicator('partNumber')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('qty')}>
-                      Quantity {sortIndicator('qty')}
+                      {t('shipments.col.quantity')} {sortIndicator('qty')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('lot')}>
-                      Lot {sortIndicator('lot')}
+                      {t('shipments.col.lot')} {sortIndicator('lot')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('scheduled')}>
-                      Requested Inspection Date {sortIndicator('scheduled')}
+                      {t('shipments.col.requestedDate')} {sortIndicator('scheduled')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('inspector')}>
-                      Inspector {sortIndicator('inspector')}
+                      {t('shipments.col.inspector')} {sortIndicator('inspector')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>
-                      Approval {sortIndicator('status')}
+                      {t('shipments.col.approval')} {sortIndicator('status')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('notes')}>
-                      Notes {sortIndicator('notes')}
+                      {t('shipments.col.notes')} {sortIndicator('notes')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('approvalDate')}>
-                      Approval Date {sortIndicator('approvalDate')}
+                      {t('shipments.col.approvalDate')} {sortIndicator('approvalDate')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>
-                      Records {sortIndicator('records')}
+                      {t('shipments.col.records')} {sortIndicator('records')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>
-                      Created {sortIndicator('created')}
+                      {t('shipments.col.created')} {sortIndicator('created')}
                     </th>
-                    <th>Approve / Reject / Reopen</th>
-                    <th>Create Finding</th>
+                    <th>{t('shipments.col.actions')}</th>
+                    <th>{t('shipments.col.createFinding')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -777,7 +780,7 @@ export function Shipments() {
                                   method: 'PATCH',
                                   body: JSON.stringify({ inspector }),
                                 });
-                                toast.success('Inspector updated');
+                                toast.success(t('shipments.inspectorUpdated'));
                                 loadData();
                               } catch (e) {
                                 toast.error(parseApiError(e));
@@ -787,7 +790,7 @@ export function Shipments() {
                             }}
                             style={{ width: 180 }}
                           >
-                            <option value="">Select inspector</option>
+                            <option value="">{t('shipments.selectInspector')}</option>
                             {(() => {
                               const stored = (r.inspector ?? '').trim();
                               const onRoster =
@@ -814,7 +817,7 @@ export function Shipments() {
                         )}
                       </td>
 
-                      <td>{r.status === 'Passed' ? 'Approved' : r.status === 'Failed' ? 'Rejected' : '—'}</td>
+                      <td>{r.status === 'Passed' ? t('shipments.col.approved') : r.status === 'Failed' ? t('shipments.col.rejected') : '—'}</td>
                       <td
                         style={{
                           maxWidth: 200,
@@ -858,9 +861,9 @@ export function Shipments() {
                                 }}
                                 disabled={!rec.hasFile || Boolean(downloadingRecord[rec.id])}
                                 onClick={() => rec.hasFile && downloadRecord(rec.id, rec.name)}
-                                title={rec.hasFile ? 'Download record file' : 'No file attached'}
+                                title={rec.hasFile ? t('audits.downloadRecord') : t('audits.noFile')}
                               >
-                                {downloadingRecord[rec.id] ? 'Downloading…' : rec.name}
+                                {downloadingRecord[rec.id] ? t('audits.downloading') : rec.name}
                               </button>
                             ))
                           )}
@@ -870,7 +873,7 @@ export function Shipments() {
                               className="btn btn-ghost"
                               style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
                             >
-                              + Add record
+                              {t('shipments.addRecord')}
                             </Link>
                           )}
                         </div>
@@ -891,7 +894,7 @@ export function Shipments() {
                               disabled={savingId === r.id}
                               onClick={() => setApproveConfirmId(r.id)}
                             >
-                              Approve
+                              {t('shipments.btnApprove')}
                             </button>
                             <button
                               type="button"
@@ -900,7 +903,7 @@ export function Shipments() {
                               disabled={savingId === r.id}
                               onClick={() => setRejectDialog({ id: r.id, note: '' })}
                             >
-                              Reject
+                              {t('shipments.btnReject')}
                             </button>
                           </span>
                         ) : isAdmin && (r.status === 'Passed' || r.status === 'Failed') ? (
@@ -911,7 +914,7 @@ export function Shipments() {
                             disabled={savingId === r.id}
                             onClick={() => setReopenConfirmId(r.id)}
                           >
-                            Reopen request
+                            {t('shipments.btnReopen')}
                           </button>
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
@@ -924,7 +927,7 @@ export function Shipments() {
                             className="btn btn-ghost"
                             style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
                           >
-                            + New Finding
+                            {t('shipments.newFinding')}
                           </Link>
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
@@ -941,34 +944,31 @@ export function Shipments() {
 
       <ConfirmDialog
         open={approveConfirmId !== null}
-        title="Approve inspection"
-        message="Mark this shipment inspection as passed?"
-        confirmLabel="Approve"
+        title={t('shipments.approveDialogTitle')}
+        message={t('shipments.approveDialogMessage')}
+        confirmLabel={t('shipments.approveDialogConfirm')}
         onConfirm={recordApprove}
         onCancel={() => setApproveConfirmId(null)}
       />
 
       <ConfirmDialog
         open={reopenConfirmId !== null}
-        title="Reopen inspection request"
-        message="Return this request to Waiting inspection so reviewers can approve or reject again? Only administrators can do this."
-        confirmLabel="Reopen"
+        title={t('shipments.reopenDialogTitle')}
+        message={t('shipments.reopenDialogMessage')}
+        confirmLabel={t('shipments.reopenDialogConfirm')}
         onConfirm={recordReopen}
         onCancel={() => setReopenConfirmId(null)}
       />
 
       <ConfirmDialog
         open={rejectDialog !== null}
-        title="Reject inspection"
+        title={t('shipments.rejectDialogTitle')}
         message={
           rejectDialog ? (
             <div>
-              <p style={{ margin: '0 0 0.75rem' }}>
-                Mark this request as failed (rejected)? Rejection details are saved on the shipment and shown in the
-                table <strong>Notes</strong> column.
-              </p>
+              <p style={{ margin: '0 0 0.75rem' }}>{t('shipments.rejectDialogLead')}</p>
               <label className="input-label" htmlFor="reject-note">
-                Rejection notes
+                {t('shipments.rejectNotesLabel')}
               </label>
               <textarea
                 id="reject-note"
@@ -976,7 +976,7 @@ export function Shipments() {
                 rows={3}
                 value={rejectDialog.note}
                 onChange={(e) => setRejectDialog((d) => (d ? { ...d, note: e.target.value } : null))}
-                placeholder="Reason for rejection (visible to reviewers in Notes)…"
+                placeholder={t('shipments.rejectPlaceholder')}
                 style={{ width: '100%', resize: 'vertical' }}
               />
             </div>
@@ -984,7 +984,7 @@ export function Shipments() {
             ''
           )
         }
-        confirmLabel="Reject"
+        confirmLabel={t('shipments.rejectDialogConfirm')}
         variant="danger"
         onConfirm={recordReject}
         onCancel={() => setRejectDialog(null)}

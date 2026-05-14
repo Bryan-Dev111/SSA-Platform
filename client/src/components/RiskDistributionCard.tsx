@@ -1,17 +1,31 @@
 import { useMemo } from 'react';
 import type { RiskDistribution } from '../utils/riskDistribution';
 import { RISK_DISTRIBUTION_DONUT_PX } from '../utils/riskDistribution';
+import { useLanguage } from '../context/LanguageContext';
 
-const SLICES = [
-  { label: 'Low', key: 'low' as const, color: '#22c55e' },
-  { label: 'Medium', key: 'medium' as const, color: '#eab308' },
-  { label: 'High', key: 'high' as const, color: '#f97316' },
+const SLICE_KEYS = [
+  { key: 'low' as const, color: '#22c55e' },
+  { key: 'medium' as const, color: '#eab308' },
+  { key: 'high' as const, color: '#f97316' },
 ];
 
 export function RiskDistributionCard({ distribution }: { distribution: RiskDistribution }) {
+  const { t } = useLanguage();
+
   const distributionSlices = useMemo(
-    () => SLICES.map((s) => ({ label: s.label, count: distribution[s.key], color: s.color })),
-    [distribution.low, distribution.medium, distribution.high]
+    () =>
+      SLICE_KEYS.map((s) => ({
+        key: s.key,
+        label:
+          s.key === 'low'
+            ? t('risk.distribution.slice.low')
+            : s.key === 'medium'
+              ? t('risk.distribution.slice.medium')
+              : t('risk.distribution.slice.high'),
+        count: distribution[s.key],
+        color: s.color,
+      })),
+    [distribution.low, distribution.medium, distribution.high, t]
   );
 
   const donut = useMemo(() => {
@@ -111,9 +125,9 @@ export function RiskDistributionCard({ distribution }: { distribution: RiskDistr
     <div className="card risk-distribution-card">
       <div className="card-body risk-distribution-card-body">
         <div className="risk-distribution-card-header">
-          <h2 className="risk-distribution-card-title">Risk Distribution</h2>
+          <h2 className="risk-distribution-card-title">{t('risk.distribution.title')}</h2>
         </div>
-        <div className="risk-distribution-donut-wrap" aria-label="Risk distribution donut chart">
+        <div className="risk-distribution-donut-wrap" aria-label={t('risk.distribution.aria')}>
           <svg
             className="risk-distribution-donut-ring"
             width={RISK_DISTRIBUTION_DONUT_PX}
@@ -168,9 +182,11 @@ export function RiskDistributionCard({ distribution }: { distribution: RiskDistr
         <div className="risk-distribution-legend">
           {distributionSlices.map((s) => (
             <div
-              key={s.label}
+              key={s.key}
               className="risk-distribution-legend-item"
-              title={`${s.count} register ${s.count === 1 ? 'risk' : 'risks'}`}
+              title={t(s.count === 1 ? 'risk.distribution.legendTitle_one' : 'risk.distribution.legendTitle_other', {
+                count: s.count,
+              })}
             >
               <span className="risk-distribution-legend-dot" style={{ background: s.color }} />
               <span className="risk-distribution-legend-label">{s.label}</span>

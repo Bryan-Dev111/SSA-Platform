@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { MetricCard } from '../../components/MetricCard';
 import {
   ChartCard,
@@ -53,8 +54,8 @@ function formatKg(value: number): string {
   return `${value.toLocaleString(getDocumentLocale(), { maximumFractionDigits: 2 })} kg`;
 }
 
-function formatSampleCount(value: number): string {
-  return `${Math.round(value).toLocaleString()} samples`;
+function formatSampleCount(value: number, samplesUnit: string): string {
+  return `${Math.round(value).toLocaleString()} ${samplesUnit}`;
 }
 
 function countryRowsToBar(rows: CountryValueRow[]): BarChartRow[] {
@@ -63,6 +64,7 @@ function countryRowsToBar(rows: CountryValueRow[]): BarChartRow[] {
 
 export function GlobalSupplyDashboardPage() {
   const { token, user } = useAuth();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -77,11 +79,11 @@ export function GlobalSupplyDashboardPage() {
     apiJson<DashboardPayload>('/global-supply-dashboard', { token })
       .then((response) => setData(response))
       .catch((e) => {
-        setError(e instanceof Error ? e.message : 'Failed to load Global Supply dashboard');
+        setError(e instanceof Error ? e.message : t('globalDash.loadFailed'));
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     if (!token) {
@@ -119,22 +121,29 @@ export function GlobalSupplyDashboardPage() {
   const topProfit = useMemo(() => countryRowsToBar((data?.profitByCountry ?? []).slice(0, 12)), [data]);
   const coffeeKg = useMemo(() => countryRowsToBar((data?.kgCountryCoffee ?? []).slice(0, 12)), [data]);
   const cocoaKg = useMemo(() => countryRowsToBar((data?.kgCountryCocoa ?? []).slice(0, 12)), [data]);
-  const sampleByCountry = useMemo(() => countryRowsToBar((data?.sampleCountByCountry ?? []).slice(0, 24)), [data]);
+  const sampleByCountry = useMemo(
+    () => countryRowsToBar((data?.sampleCountByCountry ?? []).slice(0, 24)),
+    [data]
+  );
+  const sampleFormatter = useMemo(
+    () => (value: number) => formatSampleCount(value, t('globalDash.samplesUnit')),
+    [t]
+  );
   const openPoTrend = data?.poCreationOverTimeOpen ?? [];
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+    if (hour < 12) return t('dashboard.greeting.morning');
+    if (hour < 18) return t('dashboard.greeting.afternoon');
+    return t('dashboard.greeting.evening');
+  }, [t]);
   const displayName = user?.name?.trim() || 'John T.';
 
   return (
     <div className="page page-dashboard">
       <header className="page-header">
-        <h1 className="page-title">Business Dashboard</h1>
+        <h1 className="page-title">{t('nav.businessDashboard')}</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          {greeting}, {displayName}. Here is what is happening with your business today.
+          {greeting}, {displayName}. {t('globalDash.intro')}
         </p>
       </header>
 
@@ -142,7 +151,7 @@ export function GlobalSupplyDashboardPage() {
       {loading && !data ? (
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading business dashboard…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       ) : null}
 
@@ -157,16 +166,16 @@ export function GlobalSupplyDashboardPage() {
         }}
       >
         <MetricCard
-          title="Total POs"
+          title={t('globalDash.metric.totalPOs')}
           value={poKpiLoading ? '—' : totalPoCount}
           subtitle={
             poKpiLoading
               ? undefined
-              : `${openPoCount} Open PO${openPoCount === 1 ? '' : 's'}`
+              : t('globalDash.metric.openPOSubtitle', { open: openPoCount, total: totalPoCount })
           }
         />
         <MetricCard
-          title="Average Revenue per PO"
+          title={t('globalDash.metric.avgRevenuePo')}
           value={
             poKpiLoading || closedPoKpis.closedCount === 0
               ? '—'
@@ -174,7 +183,7 @@ export function GlobalSupplyDashboardPage() {
           }
         />
         <MetricCard
-          title="Average Profit per PO"
+          title={t('globalDash.metric.avgProfitPo')}
           value={
             poKpiLoading || closedPoKpis.closedCount === 0
               ? '—'
@@ -191,11 +200,11 @@ export function GlobalSupplyDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard title="Revenue by Country" allowContentOverflow>
+        <ChartCard title={t('globalDash.chart.revenueByCountry')} allowContentOverflow>
           <VerticalBarChart rows={topRevenue} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
 
-        <ChartCard title="Profit by Country" allowContentOverflow>
+        <ChartCard title={t('globalDash.chart.profitByCountry')} allowContentOverflow>
           <VerticalBarChart rows={topProfit} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
       </div>
@@ -208,11 +217,11 @@ export function GlobalSupplyDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard title="Weight by Country (Coffee)" allowContentOverflow>
+        <ChartCard title={t('globalDash.chart.weightCoffee')} allowContentOverflow>
           <VerticalBarChart rows={coffeeKg} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
 
-        <ChartCard title="Weight by Country (Cocoa)" allowContentOverflow>
+        <ChartCard title={t('globalDash.chart.weightCocoa')} allowContentOverflow>
           <VerticalBarChart rows={cocoaKg} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
       </div>
@@ -224,15 +233,15 @@ export function GlobalSupplyDashboardPage() {
           gap: '0.9rem',
         }}
       >
-        <ChartCard title="Sample Count by Country" allowContentOverflow>
-          <VerticalBarChart rows={sampleByCountry} valueFormatter={formatSampleCount} slantedValueLabels />
+        <ChartCard title={t('globalDash.chart.sampleCount')} allowContentOverflow>
+          <VerticalBarChart rows={sampleByCountry} valueFormatter={sampleFormatter} slantedValueLabels />
         </ChartCard>
 
-        <ChartCard title="Purchase Order Creation" allowContentOverflow>
+        <ChartCard title={t('globalDash.chart.poCreation')} allowContentOverflow>
           <ContinuousLineChart
             rows={openPoTrend}
-            ariaLabel="Purchase orders created over time by date"
-            valueLabel="PO(s) created"
+            ariaLabel={t('globalDash.chart.poCreationAria')}
+            valueLabel={t('globalDash.chart.poCreationValue')}
           />
         </ChartCard>
       </div>

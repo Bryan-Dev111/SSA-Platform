@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
 import { formatUsd } from '../../utils/formatUsd';
@@ -62,6 +63,7 @@ function LaborCostRateField({
   disabled: boolean;
   onCommit: (id: string, rate: number) => void | Promise<void>;
 }) {
+  const { t } = useLanguage();
   const [val, setVal] = useState(() => String(row.rate));
   useEffect(() => {
     setVal(String(row.rate));
@@ -92,8 +94,8 @@ function LaborCostRateField({
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
       }}
       disabled={disabled}
-      title="USD per hour — blur or Enter to save"
-      aria-label={`Rate USD per hour for ${row.code}`}
+      title={t('laborCosts.titleRateUsdBlur')}
+      aria-label={t('laborCosts.ariaRateUsd', { code: row.code })}
     />
   );
 }
@@ -106,6 +108,9 @@ export function AdminLaborCostsPanel({
   /** Internal Management lists all rows; default API returns only the current user’s rows. */
   listScope?: 'mine' | 'all';
 }) {
+  const { t } = useLanguage();
+  const dash = t('internal.scheduleAudit.dash');
+  const busyLabel = t('documents.btn.submittingShort');
   const [rows, setRows] = useState<LaborCostRow[]>([]);
   const [openSummary, setOpenSummary] = useState<LaborCostOpenSummary | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLogOption[]>([]);
@@ -280,15 +285,15 @@ export function AdminLaborCostsPanel({
     const hours = Number(editForm.hours);
     const rate = Number(editForm.rate);
     if (!editForm.fullName.trim()) {
-      setError('Full Name is required');
+      setError(t('laborCosts.errorFullNameRequired'));
       return;
     }
     if (!Number.isFinite(hours) || hours < 0) {
-      setError('Hours must be a non-negative number');
+      setError(t('laborCosts.errorHoursNonNeg'));
       return;
     }
     if (!Number.isFinite(rate) || rate < 0) {
-      setError('Rate must be a non-negative number');
+      setError(t('laborCosts.errorRateNonNeg'));
       return;
     }
     setPatchingId(id);
@@ -318,7 +323,7 @@ export function AdminLaborCostsPanel({
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Labor Costs</h2>
+        <h2 style={{ marginTop: 0 }}>{t('laborCosts.title')}</h2>
         <div
           className="dashboard-metric-grid"
           style={{
@@ -330,49 +335,49 @@ export function AdminLaborCostsPanel({
           }}
         >
           <MetricCard
-            title="Total Open Costs"
-            value={openSummary == null ? '—' : openSummary.openCount}
+            title={t('laborCosts.metricOpenCount')}
+            value={openSummary == null ? dash : openSummary.openCount}
           />
           <MetricCard
-            title="Open Costs ($ value)"
-            value={openSummary == null ? '—' : formatUsd(openSummary.openTotalUsd)}
+            title={t('laborCosts.metricOpenValue')}
+            value={openSummary == null ? dash : formatUsd(openSummary.openTotalUsd)}
           />
         </div>
         {error && <div className="alert-error">{error}</div>}
         <form onSubmit={createCost} style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Log ID</label>
+              <label className="input-label">{t('laborCosts.labelLogId')}</label>
               <select className="input" value={form.workLogId} onChange={(e) => setForm((p) => ({ ...p, workLogId: e.target.value }))}>
-                <option value="">None</option>
+                <option value="">{t('laborCosts.optionNone')}</option>
                 {workLogs.map((w) => (
                   <option key={w.id} value={w.id}>{w.code}</option>
                 ))}
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Project</label>
+              <label className="input-label">{t('laborCosts.labelProject')}</label>
               <select className="input" value={form.projectHistoryId} onChange={(e) => setForm((p) => ({ ...p, projectHistoryId: e.target.value }))}>
-                <option value="">None</option>
+                <option value="">{t('laborCosts.optionNone')}</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.projectCode} — {p.companyName}</option>
                 ))}
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Full Name</label>
+              <label className="input-label">{t('laborCosts.labelFullName')}</label>
               <input className="input" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} required />
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Hours</label>
+              <label className="input-label">{t('laborCosts.labelHours')}</label>
               <input className="input" type="number" min={0} step="0.01" value={form.hours} onChange={(e) => setForm((p) => ({ ...p, hours: e.target.value }))} required />
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Rate (USD / hr)</label>
+              <label className="input-label">{t('laborCosts.labelRateUsd')}</label>
               <input className="input" type="number" min={0} step="0.01" value={form.rate} onChange={(e) => setForm((p) => ({ ...p, rate: e.target.value }))} required />
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Paid Status</label>
+              <label className="input-label">{t('laborCosts.labelPaidStatus')}</label>
               <select
                 className="input"
                 value={form.paidStatus}
@@ -388,34 +393,36 @@ export function AdminLaborCostsPanel({
                   }))
                 }
               >
-                <option value="Pending">Pending</option>
-                <option value="Paid">Paid</option>
-                <option value="Rejected">Rejected</option>
+                <option value="Pending">{t('laborCosts.paidStatus.Pending')}</option>
+                <option value="Paid">{t('laborCosts.paidStatus.Paid')}</option>
+                <option value="Rejected">{t('laborCosts.paidStatus.Rejected')}</option>
               </select>
             </div>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create Cost'}</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? t('laborCosts.btnCreating') : t('laborCosts.btnCreate')}
+            </button>
           </div>
         </form>
         <div className="table-wrap">
           {loading ? (
-            <p className="table-empty">Loading labor costs…</p>
+            <p className="table-empty">{t('laborCosts.loading')}</p>
           ) : rows.length === 0 ? (
-            <p className="table-empty">No labor costs yet.</p>
+            <p className="table-empty">{t('laborCosts.empty')}</p>
           ) : (
             <table className="table">
               <thead>
                 <tr>
-                  <th>Cost ID</th>
-                  <th>Log ID</th>
-                  <th>Project</th>
-                  <th>Date</th>
-                  <th>Full Name</th>
-                  <th>Hours</th>
-                  <th>Rate (USD)</th>
-                  <th>Total cost (USD)</th>
-                  <th>Paid Status</th>
-                  <th>Actions</th>
-                  <th>Edit</th>
+                  <th>{t('table.col.costId')}</th>
+                  <th>{t('table.col.logId')}</th>
+                  <th>{t('table.col.project')}</th>
+                  <th>{t('table.col.date')}</th>
+                  <th>{t('table.col.fullName')}</th>
+                  <th>{t('table.col.hours')}</th>
+                  <th>{t('table.col.rateUsd')}</th>
+                  <th>{t('table.col.totalCostUsd')}</th>
+                  <th>{t('table.col.paidStatus')}</th>
+                  <th>{t('table.col.actions')}</th>
+                  <th>{t('table.col.edit')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -429,13 +436,13 @@ export function AdminLaborCostsPanel({
                           value={editForm.workLogId}
                           onChange={(e) => setEditForm((p) => ({ ...p, workLogId: e.target.value }))}
                         >
-                          <option value="">None</option>
+                          <option value="">{t('laborCosts.optionNone')}</option>
                           {workLogs.map((w) => (
                             <option key={w.id} value={w.id}>{w.code}</option>
                           ))}
                         </select>
                       ) : (
-                        r.workLog?.code ?? r.workLogId ?? '—'
+                        r.workLog?.code ?? r.workLogId ?? dash
                       )}
                     </td>
                     <td>
@@ -445,16 +452,16 @@ export function AdminLaborCostsPanel({
                           value={editForm.projectHistoryId}
                           onChange={(e) => setEditForm((p) => ({ ...p, projectHistoryId: e.target.value }))}
                         >
-                          <option value="">None</option>
+                          <option value="">{t('laborCosts.optionNone')}</option>
                           {projects.map((p) => (
                             <option key={p.id} value={p.id}>{p.projectCode} — {p.companyName}</option>
                           ))}
                         </select>
                       ) : (
-                        r.projectHistory?.projectCode ?? r.projectHistoryId ?? r.workLog?.projectHistoryId ?? '—'
+                        r.projectHistory?.projectCode ?? r.projectHistoryId ?? r.workLog?.projectHistoryId ?? dash
                       )}
                     </td>
-                    <td title={r.workLog?.workDate ? 'Work log date' : 'Created date'}>{formatLaborCostDate(r)}</td>
+                    <td title={r.workLog?.workDate ? t('laborCosts.titleWorkLogDate') : t('laborCosts.titleCreatedDate')}>{formatLaborCostDate(r)}</td>
                     <td>
                       {editingId === r.id ? (
                         <input
@@ -495,7 +502,13 @@ export function AdminLaborCostsPanel({
                       )}
                     </td>
                     <td>{formatUsd(r.totalCost)}</td>
-                    <td>{r.paidStatus}</td>
+                    <td>
+                      {r.paidStatus === 'Pending'
+                        ? t('laborCosts.paidStatus.Pending')
+                        : r.paidStatus === 'Paid'
+                          ? t('laborCosts.paidStatus.Paid')
+                          : t('laborCosts.paidStatus.Rejected')}
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {r.paidStatus === 'Pending' ? (
                         <>
@@ -505,7 +518,7 @@ export function AdminLaborCostsPanel({
                             disabled={patchingId === r.id}
                             onClick={() => patchPaidStatus(r.id, 'Paid')}
                           >
-                            {patchingId === r.id ? '…' : 'Mark paid'}
+                            {patchingId === r.id ? busyLabel : t('laborCosts.btnMarkPaid')}
                           </button>{' '}
                           <button
                             type="button"
@@ -513,11 +526,11 @@ export function AdminLaborCostsPanel({
                             disabled={patchingId === r.id}
                             onClick={() => patchPaidStatus(r.id, 'Rejected')}
                           >
-                            Reject
+                            {t('laborCosts.btnReject')}
                           </button>
                         </>
                       ) : (
-                        '—'
+                        dash
                       )}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
@@ -530,7 +543,7 @@ export function AdminLaborCostsPanel({
                               disabled={patchingId === r.id}
                               onClick={() => void saveEdit(r.id)}
                             >
-                              {patchingId === r.id ? '…' : 'Save'}
+                              {patchingId === r.id ? busyLabel : t('common.save')}
                             </button>{' '}
                             <button
                               type="button"
@@ -538,7 +551,7 @@ export function AdminLaborCostsPanel({
                               disabled={patchingId === r.id}
                               onClick={cancelEdit}
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                           </>
                         ) : (
@@ -548,11 +561,11 @@ export function AdminLaborCostsPanel({
                             disabled={patchingId !== null}
                             onClick={() => startEdit(r)}
                           >
-                            Edit
+                            {t('common.edit')}
                           </button>
                         )
                       ) : (
-                        '—'
+                        dash
                       )}
                     </td>
                   </tr>

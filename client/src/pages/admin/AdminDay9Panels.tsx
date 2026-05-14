@@ -3,6 +3,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MetricCard } from '../../components/MetricCard';
@@ -32,6 +33,7 @@ interface AuditTypeRow {
 }
 
 export function AdminAuditTypesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const { t } = useLanguage();
   const [list, setList] = useState<AuditTypeRow[]>([]);
   const [newName, setNewName] = useState('');
   const [edit, setEdit] = useState<AuditTypeRow | null>(null);
@@ -45,9 +47,9 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
       setList(r.list);
     } catch {
       setList([]);
-      toast.error('Failed to load audit types');
+      toast.error(t('toast.failedLoadAuditTypes'));
     }
-  }, [token, toast]);
+  }, [token, toast, t]);
 
   useEffect(() => {
     load();
@@ -56,7 +58,7 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
   const add = async () => {
     if (!token) return;
     if (!newName.trim()) {
-      toast.error('Name is required');
+      toast.error(t('toast.nameRequired'));
       return;
     }
     setBusy(true);
@@ -69,10 +71,10 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
         }),
       });
       setNewName('');
-      toast.success('Audit type added');
+      toast.success(t('toast.auditTypeAdded'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Add failed');
+      toast.error(e instanceof Error ? e.message : t('toast.addFailed'));
     } finally {
       setBusy(false);
     }
@@ -88,10 +90,10 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
         body: JSON.stringify({ name: edit.name?.trim() || null }),
       });
       setEdit(null);
-      toast.success('Updated');
+      toast.success(t('toast.updated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -102,11 +104,11 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
     setBusy(true);
     try {
       await apiJson(`/audit-types/${del.id}`, { token, method: 'DELETE' });
-      toast.success('Deleted');
+      toast.success(t('toast.deleted'));
       setDel(null);
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Delete failed');
+      toast.error(e instanceof Error ? e.message : t('toast.deleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -131,8 +133,8 @@ export function AdminAuditTypesPanel({ token, toast }: { token: string | null; t
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th style={{ width: 200 }}>Actions</th>
+                <th>{t('table.col.name')}</th>
+                <th style={{ width: 200 }}>{t('table.col.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -307,6 +309,7 @@ export function AdminExpensesPanel({
   /** Expense type dropdown source: SSA Internal Management vs Global Supply. */
   expenseTypesEndpoint?: string;
 }) {
+  const { t } = useLanguage();
   const [list, setList] = useState<ExpenseRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [type, setType] = useState(() => fixedTypeProject?.type ?? '');
@@ -531,9 +534,9 @@ export function AdminExpensesPanel({
     } catch {
       setList([]);
       setProjectOptions([]);
-      toast.error('Failed to load expenses');
+      toast.error(t('toast.failedLoadExpenses'));
     }
-  }, [token, toast, showPurchaseOrderPicker, expenseTypesEndpoint]);
+  }, [token, toast, showPurchaseOrderPicker, expenseTypesEndpoint, t]);
 
   const countryNameOptions = useMemo(() => {
     const names = new Set<string>();
@@ -580,7 +583,7 @@ export function AdminExpensesPanel({
       const r = await apiJson<{ url: string }>(`/expenses/${id}/attachment-url`, { token });
       window.open(r.url, '_blank', 'noopener,noreferrer');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not download');
+      toast.error(e instanceof Error ? e.message : t('toast.couldNotDownload'));
     }
   };
 
@@ -606,10 +609,10 @@ export function AdminExpensesPanel({
         }
         throw new Error(msg);
       }
-      toast.success('Attachment uploaded');
+      toast.success(t('toast.attachmentUploaded'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload failed');
+      toast.error(e instanceof Error ? e.message : t('toast.uploadFailed'));
     } finally {
       setAttachmentBusyId(null);
     }
@@ -620,10 +623,10 @@ export function AdminExpensesPanel({
     setAttachmentBusyId(id);
     try {
       await apiJson(`/expenses/${id}/attachment`, { token, method: 'DELETE' });
-      toast.success('Attachment removed');
+      toast.success(t('toast.attachmentRemoved'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not remove attachment');
+      toast.error(e instanceof Error ? e.message : t('toast.couldNotRemoveAttachment'));
     } finally {
       setAttachmentBusyId(null);
     }
@@ -638,10 +641,10 @@ export function AdminExpensesPanel({
         method: 'PATCH',
         body: JSON.stringify({ status: 'Closed' }),
       });
-      toast.success('Expense closed');
+      toast.success(t('toast.expenseClosed'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not close expense');
+      toast.error(e instanceof Error ? e.message : t('toast.couldNotCloseExpense'));
     } finally {
       setCloseBusyId(null);
     }
@@ -652,11 +655,11 @@ export function AdminExpensesPanel({
     setDeleteBusyId(id);
     try {
       await apiJson(`/expenses/${id}`, { token, method: 'DELETE' });
-      toast.success('Expense deleted');
+      toast.success(t('toast.expenseDeleted'));
       if (editId === id) setEditId(null);
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not delete expense');
+      toast.error(e instanceof Error ? e.message : t('toast.couldNotDeleteExpense'));
     } finally {
       setDeleteBusyId(null);
     }
@@ -668,7 +671,7 @@ export function AdminExpensesPanel({
     const typeVal = (fixedTypeProject ? fixedTypeProject.type : type).trim();
     const projectVal = (fixedProject ?? (fixedTypeProject ? fixedTypeProject.project : project)).trim();
     if (!typeVal || !description.trim() || !projectVal || !Number.isFinite(amountNum) || !expenseDate.trim()) {
-      toast.error('Type, description, project, expense date, and amount are required');
+      toast.error(t('toast.expenseFieldsRequired'));
       return;
     }
     setBusy(true);
@@ -743,10 +746,10 @@ export function AdminExpensesPanel({
       setCountry('');
       setPurchaseOrderId('');
       setAddAttachmentFile(null);
-      toast.success('Expense added');
+      toast.success(t('toast.expenseAdded'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to add expense');
+      toast.error(e instanceof Error ? e.message : t('toast.failedAddExpense'));
     } finally {
       setBusy(false);
     }
@@ -776,7 +779,7 @@ export function AdminExpensesPanel({
       !Number.isFinite(amountNum) ||
       !editDraft.expenseDate.trim()
     ) {
-      toast.error('Type, description, project, expense date, and amount are required');
+      toast.error(t('toast.expenseFieldsRequired'));
       return;
     }
     setBusy(true);
@@ -796,10 +799,10 @@ export function AdminExpensesPanel({
         }),
       });
       setEditId(null);
-      toast.success('Expense updated');
+      toast.success(t('toast.expenseUpdated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to update expense');
+      toast.error(e instanceof Error ? e.message : t('toast.failedUpdateExpense'));
     } finally {
       setBusy(false);
     }
@@ -807,7 +810,7 @@ export function AdminExpensesPanel({
 
   const exportExcel = () => {
     if (sortedDisplayedList.length === 0) {
-      toast.info('No expenses to export');
+      toast.info(t('toast.noExpensesToExport'));
       return;
     }
     const rows: ExportRow[] = sortedDisplayedList.map((r) => ({
@@ -825,7 +828,7 @@ export function AdminExpensesPanel({
       Recorded: new Date(r.createdAt).toLocaleString(),
     }));
     downloadTableXlsx('expenses', 'Expenses', rows);
-    toast.success('Exported expenses');
+    toast.success(t('toast.exportedExpenses'));
   };
 
   const onSortColumn = (columnKey: string) => {
@@ -1010,7 +1013,7 @@ export function AdminExpensesPanel({
               <tr>
                 {showExpenseIdColumn && (
                   <SortableTh
-                    label="Expense ID"
+                    label={t('table.col.expenseId')}
                     columnKey="code"
                     activeKey={sort.key}
                     dir={sort.dir}
@@ -1018,14 +1021,14 @@ export function AdminExpensesPanel({
                   />
                 )}
                 <SortableTh
-                  label="Type"
+                  label={t('table.col.type')}
                   columnKey="type"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Description"
+                  label={t('table.col.description')}
                   columnKey="description"
                   activeKey={sort.key}
                   dir={sort.dir}
@@ -1033,7 +1036,7 @@ export function AdminExpensesPanel({
                 />
                 {!hideProject && (
                   <SortableTh
-                    label="Project"
+                    label={t('table.col.project')}
                     columnKey="project"
                     activeKey={sort.key}
                     dir={sort.dir}
@@ -1042,7 +1045,7 @@ export function AdminExpensesPanel({
                 )}
                 {showPurchaseOrderPicker && (
                   <SortableTh
-                    label="PO"
+                    label={t('table.col.poShort')}
                     columnKey="po"
                     activeKey={sort.key}
                     dir={sort.dir}
@@ -1050,37 +1053,37 @@ export function AdminExpensesPanel({
                   />
                 )}
                 <SortableTh
-                  label="Amount"
+                  label={t('table.col.amount')}
                   columnKey="amount"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Expense date"
+                  label={t('table.col.expenseDate')}
                   columnKey="expenseDate"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Payment method"
+                  label={t('table.col.paymentMethod')}
                   columnKey="paymentMethod"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Country"
+                  label={t('table.col.country')}
                   columnKey="country"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
-                <th style={{ minWidth: 200 }}>Attachment</th>
-                {openExpenseTracking && <th style={{ width: 120 }}>Close</th>}
-                {canDeleteExpense && <th style={{ width: 100 }}>Delete</th>}
-                <th style={{ width: 170 }}>Actions</th>
+                <th style={{ minWidth: 200 }}>{t('table.col.attachment')}</th>
+                {openExpenseTracking && <th style={{ width: 120 }}>{t('table.col.close')}</th>}
+                {canDeleteExpense && <th style={{ width: 100 }}>{t('table.col.delete')}</th>}
+                <th style={{ width: 170 }}>{t('table.col.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1582,6 +1585,7 @@ export function AdminBuyersSuppliersPanel({
   globalSupplyUsersMode?: boolean;
 }) {
   const { user: authUser } = useAuth();
+  const { t } = useLanguage();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [buyerId, setBuyerId] = useState('');
@@ -1643,9 +1647,9 @@ export function AdminBuyersSuppliersPanel({
         setCommodityTypes([]);
       }
     } catch {
-      toast.error('Failed to load users/suppliers');
+      toast.error(t('admin.users.loadFailed'));
     }
-  }, [token, toast, showBuyerSupplierSections, globalSupplyUsersMode]);
+  }, [token, toast, showBuyerSupplierSections, globalSupplyUsersMode, t]);
 
   useEffect(() => {
     load();
@@ -1750,7 +1754,8 @@ export function AdminBuyersSuppliersPanel({
     const rows = [...visibleUsers];
     const key = userSort.key;
     if (!key) return rows;
-    const employeeLabel = (u: UserRow) => (u.isContractor ? 'Contractor' : u.isEmployee ? 'Yes' : 'No');
+    const employeeLabel = (u: UserRow) =>
+      u.isContractor ? t('admin.users.contractor') : u.isEmployee ? t('common.yes') : t('common.no');
     const roleLabel = (u: UserRow) => u.roleNames.map(formatUserRoleLabel).join(', ');
     const countryLabel = (u: UserRow) => (u.country ?? '').trim();
     rows.sort((a, b) => {
@@ -1761,7 +1766,7 @@ export function AdminBuyersSuppliersPanel({
       return cmpStr(roleLabel(a), roleLabel(b), userSort.dir);
     });
     return rows;
-  }, [visibleUsers, userSort]);
+  }, [visibleUsers, userSort, t]);
 
   const assign = async () => {
     if (!token || !buyerId || !supplierId) return;
@@ -1772,11 +1777,11 @@ export function AdminBuyersSuppliersPanel({
         method: 'POST',
         body: JSON.stringify({ buyerId, supplierId }),
       });
-      toast.success('Assignment created');
+      toast.success(t('admin.users.assignmentCreated'));
       setSupplierId('');
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Assign failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.assignFailed'));
     } finally {
       setBusy(false);
     }
@@ -1787,10 +1792,10 @@ export function AdminBuyersSuppliersPanel({
     setBusy(true);
     try {
       await apiJson(`/buyer-suppliers/${bId}/${sId}`, { token, method: 'DELETE' });
-      toast.info('Unassigned');
+      toast.info(t('admin.users.unassigned'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.operationFailed'));
     } finally {
       setBusy(false);
     }
@@ -1805,12 +1810,12 @@ export function AdminBuyersSuppliersPanel({
         method: 'POST',
         body: JSON.stringify({ userId: supplierLinkUserId }),
       });
-      toast.success('Supplier user linked');
+      toast.success(t('admin.users.supplierUserLinked'));
       setSupplierLinkSupplierId('');
       setSupplierLinkUserId('');
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Link failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.linkFailed'));
     } finally {
       setBusy(false);
     }
@@ -1824,10 +1829,10 @@ export function AdminBuyersSuppliersPanel({
         token,
         method: 'DELETE',
       });
-      toast.info('Supplier user unlinked');
+      toast.info(t('admin.users.supplierUserUnlinked'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Unlink failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.unlinkFailed'));
     } finally {
       setBusy(false);
     }
@@ -1872,10 +1877,10 @@ export function AdminBuyersSuppliersPanel({
       setNewUserEmploymentStatus('Active');
       setNewUserHourlyRate('');
       setNewUserCountry('');
-      toast.success('User created');
+      toast.success(t('admin.users.userCreated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Create user failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.createUserFailed'));
     } finally {
       setBusy(false);
     }
@@ -1907,10 +1912,10 @@ export function AdminBuyersSuppliersPanel({
       setNewSupCommodityTypeId('');
       setNewSupLatitude('');
       setNewSupLongitude('');
-      toast.success('Supplier created');
+      toast.success(t('admin.users.supplierCreated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Create failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.supplierCreateFailed'));
     } finally {
       setBusy(false);
     }
@@ -1941,10 +1946,10 @@ export function AdminBuyersSuppliersPanel({
         }),
       });
       setEditSup(null);
-      toast.success('Supplier updated');
+      toast.success(t('admin.users.supplierUpdated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.supplierUpdateFailed'));
     } finally {
       setBusy(false);
     }
@@ -1979,10 +1984,10 @@ export function AdminBuyersSuppliersPanel({
       });
       setEditUser(null);
       setEditUserPassword('');
-      toast.success('User updated');
+      toast.success(t('admin.users.userUpdated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.userUpdateFailed'));
     } finally {
       setBusy(false);
     }
@@ -1995,11 +2000,11 @@ export function AdminBuyersSuppliersPanel({
     setDelSup(null);
     try {
       await apiJson(`/suppliers/${target.id}`, { token, method: 'DELETE' });
-      toast.success('Supplier deleted');
+      toast.success(t('admin.users.supplierDeleted'));
       await load();
     } catch (e) {
       setDelSup(target);
-      toast.error(e instanceof Error ? e.message : 'Delete failed');
+      toast.error(e instanceof Error ? e.message : t('admin.users.supplierDeleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -2012,7 +2017,7 @@ export function AdminBuyersSuppliersPanel({
     setDelUser(null);
     try {
       await apiJson(`/users/${target.id}`, { token, method: 'DELETE' });
-      toast.success('User deleted');
+      toast.success(t('admin.users.userDeleted'));
       if (editUser?.id === target.id) {
         setEditUser(null);
         setEditUserPassword('');
@@ -2020,7 +2025,7 @@ export function AdminBuyersSuppliersPanel({
       await load();
     } catch (e) {
       setDelUser(target);
-      let msg = 'Delete failed';
+      let msg = t('admin.users.deleteFailed');
       if (e instanceof Error) {
         try {
           const j = JSON.parse(e.message) as { error?: string };
@@ -2041,26 +2046,26 @@ export function AdminBuyersSuppliersPanel({
       {showCreateUser && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Create User</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.users.createUserTitle')}</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
               <div className="input-group">
-                <label className="input-label">First Name</label>
+                <label className="input-label">{t('admin.users.firstName')}</label>
                 <input className="input" value={newUserFirstName} onChange={(e) => setNewUserFirstName(e.target.value)} />
               </div>
               <div className="input-group">
-                <label className="input-label">Last Name</label>
+                <label className="input-label">{t('admin.users.lastName')}</label>
                 <input className="input" value={newUserLastName} onChange={(e) => setNewUserLastName(e.target.value)} />
               </div>
               <div className="input-group">
-                <label className="input-label">Email *</label>
+                <label className="input-label">{t('admin.users.emailLabel')}</label>
                 <input className="input" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
               </div>
               <div className="input-group">
-                <label className="input-label">Password *</label>
+                <label className="input-label">{t('admin.users.passwordLabel')}</label>
                 <input className="input" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} />
               </div>
               <div className="input-group">
-                <label className="input-label">Role</label>
+                <label className="input-label">{t('admin.users.role')}</label>
                 <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
                   {(globalSupplyUsersMode ? globalSupplyCreateRoleOptions : availableRoleOptions).map((r) => (
                     <option key={r} value={r}>
@@ -2070,32 +2075,32 @@ export function AdminBuyersSuppliersPanel({
                 </select>
               </div>
               <div className="input-group">
-                <label className="input-label">Employee</label>
+                <label className="input-label">{t('admin.users.employee')}</label>
                 <select
                   className="input"
                   value={newUserIsEmployee}
                   onChange={(e) => setNewUserIsEmployee(e.target.value as 'Yes' | 'No' | 'Contractor')}
                 >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                  {!globalSupplyUsersMode && <option value="Contractor">Contractor</option>}
+                  <option value="No">{t('common.no')}</option>
+                  <option value="Yes">{t('common.yes')}</option>
+                  {!globalSupplyUsersMode && <option value="Contractor">{t('admin.users.contractor')}</option>}
                 </select>
               </div>
               {!globalSupplyUsersMode && (
                 <>
                   <div className="input-group">
-                    <label className="input-label">Status</label>
+                    <label className="input-label">{t('admin.users.status')}</label>
                     <select
                       className="input"
                       value={newUserEmploymentStatus}
                       onChange={(e) => setNewUserEmploymentStatus(e.target.value as 'Active' | 'Inactive')}
                     >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
+                      <option value="Active">{t('admin.users.active')}</option>
+                      <option value="Inactive">{t('admin.users.inactive')}</option>
                     </select>
                   </div>
                   <div className="input-group">
-                    <label className="input-label">Hourly rate (USD)</label>
+                    <label className="input-label">{t('admin.users.hourlyRate')}</label>
                     <input
                       className="input"
                       type="number"
@@ -2103,13 +2108,13 @@ export function AdminBuyersSuppliersPanel({
                       step="0.01"
                       value={newUserHourlyRate}
                       onChange={(e) => setNewUserHourlyRate(e.target.value)}
-                      placeholder="e.g. 45.00"
+                      placeholder={t('admin.users.hourlyRatePlaceholder')}
                     />
                   </div>
                 </>
               )}
               <div className="input-group">
-                <label className="input-label">Country</label>
+                <label className="input-label">{t('admin.users.country')}</label>
                 {globalSupplyUsersMode ? (
                   <GsUserCountrySelect
                     value={newUserCountry}
@@ -2129,7 +2134,7 @@ export function AdminBuyersSuppliersPanel({
               onClick={createUser}
               disabled={busy}
             >
-              Create user
+              {t('admin.users.createUserButton')}
             </button>
           </div>
         </div>
@@ -2138,22 +2143,22 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Create Supplier</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.users.createSupplierTitle')}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
             <div className="input-group">
-              <label className="input-label">Name *</label>
+              <label className="input-label">{t('admin.users.supplierNameRequired')}</label>
               <input className="input" value={newSupName} onChange={(e) => setNewSupName(e.target.value)} />
             </div>
             <div className="input-group">
-              <label className="input-label">City</label>
+              <label className="input-label">{t('admin.users.city')}</label>
               <input className="input" value={newSupCity} onChange={(e) => setNewSupCity(e.target.value)} />
             </div>
             <div className="input-group">
-              <label className="input-label">Country</label>
+              <label className="input-label">{t('admin.users.country')}</label>
               <input className="input" value={newSupCountry} onChange={(e) => setNewSupCountry(e.target.value)} />
             </div>
             <div className="input-group">
-              <label className="input-label">Latitude</label>
+              <label className="input-label">{t('admin.users.latitude')}</label>
               <input
                 className="input"
                 type="number"
@@ -2165,7 +2170,7 @@ export function AdminBuyersSuppliersPanel({
               />
             </div>
             <div className="input-group">
-              <label className="input-label">Longitude</label>
+              <label className="input-label">{t('admin.users.longitude')}</label>
               <input
                 className="input"
                 type="number"
@@ -2177,10 +2182,10 @@ export function AdminBuyersSuppliersPanel({
               />
             </div>
             <div className="input-group">
-              <label className="input-label">Status</label>
+              <label className="input-label">{t('admin.users.status')}</label>
               <select className="input" value={newSupStatus} onChange={(e) => setNewSupStatus(e.target.value as 'Active' | 'Inactive')}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
+                <option value="Active">{t('admin.users.active')}</option>
+                <option value="Inactive">{t('admin.users.inactive')}</option>
               </select>
             </div>
           </div>
@@ -2195,14 +2200,14 @@ export function AdminBuyersSuppliersPanel({
             }}
           >
             <div className="input-group" style={{ flex: '0 1 220px', minWidth: 200, marginBottom: 0 }}>
-              <label className="input-label">Commodity</label>
+              <label className="input-label">{t('admin.users.commodity')}</label>
               <select
                 className="input"
                 value={newSupCommodityTypeId}
                 onChange={(e) => setNewSupCommodityTypeId(e.target.value)}
                 style={{ width: '100%', minWidth: 0 }}
               >
-                <option value="">— None —</option>
+                <option value="">{t('admin.users.commodityNone')}</option>
                 {commodityTypes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -2211,7 +2216,7 @@ export function AdminBuyersSuppliersPanel({
               </select>
             </div>
             <div className="input-group" style={{ flex: '1 1 320px', minWidth: 220, marginBottom: 0 }}>
-              <label className="input-label">Notes</label>
+              <label className="input-label">{t('admin.users.notes')}</label>
               <input
                 className="input"
                 value={newSupNotes}
@@ -2221,7 +2226,7 @@ export function AdminBuyersSuppliersPanel({
             </div>
           </div>
             <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={createSupplier} disabled={busy}>
-              Create supplier
+              {t('admin.users.createSupplierButton')}
             </button>
           </div>
         </div>
@@ -2230,21 +2235,21 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Suppliers</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.users.suppliersTitle')}</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>City</th>
-                  <th>Country</th>
-                  <th>Latitude</th>
-                  <th>Longitude</th>
-                  <th>Commodity</th>
-                  <th>Status</th>
-                  <th>Notes</th>
-                  <th style={{ width: 220 }}>Actions</th>
+                  <th>{t('admin.users.supplierCode')}</th>
+                  <th>{t('admin.users.supplierName')}</th>
+                  <th>{t('admin.users.city')}</th>
+                  <th>{t('admin.users.country')}</th>
+                  <th>{t('admin.users.latitude')}</th>
+                  <th>{t('admin.users.longitude')}</th>
+                  <th>{t('admin.users.commodity')}</th>
+                  <th>{t('admin.users.status')}</th>
+                  <th>{t('admin.users.notes')}</th>
+                  <th style={{ width: 220 }}>{t('admin.users.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2336,7 +2341,7 @@ export function AdminBuyersSuppliersPanel({
                             });
                           }}
                         >
-                          <option value="">— None —</option>
+                          <option value="">{t('admin.users.commodityNone')}</option>
                           {commodityTypes.map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.name}
@@ -2354,8 +2359,8 @@ export function AdminBuyersSuppliersPanel({
                           value={editSup.status}
                           onChange={(e) => setEditSup({ ...editSup, status: e.target.value as 'Active' | 'Inactive' })}
                         >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
+                          <option value="Active">{t('admin.users.active')}</option>
+                          <option value="Inactive">{t('admin.users.inactive')}</option>
                         </select>
                       ) : (
                         s.status
@@ -2376,19 +2381,19 @@ export function AdminBuyersSuppliersPanel({
                       {editSup?.id === s.id ? (
                         <>
                           <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveSupplierEdit} disabled={busy}>
-                            Save
+                            {t('common.save')}
                           </button>
                           <button type="button" className="btn btn-ghost" onClick={() => setEditSup(null)}>
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                         </>
                       ) : (
                         <>
                           <button type="button" className="btn btn-ghost" style={{ marginRight: 8 }} onClick={() => setEditSup({ ...s })}>
-                            Edit
+                            {t('common.edit')}
                           </button>
                           <button type="button" className="btn btn-ghost" onClick={() => setDelSup(s)}>
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </>
                       )}
@@ -2415,14 +2420,18 @@ export function AdminBuyersSuppliersPanel({
                 }}
               >
                 <MetricCard
-                  title="Total Employees"
+                  title={t('admin.users.metricTotalEmployees')}
                   value={employeeContractorStats.totalEmployees}
-                  subtitle={`Total Active: ${employeeContractorStats.activeEmployees}`}
+                  subtitle={t('admin.users.metricTotalEmployeesSubtitle', {
+                    count: employeeContractorStats.activeEmployees,
+                  })}
                 />
                 <MetricCard
-                  title="Total Contractors"
+                  title={t('admin.users.metricTotalContractors')}
                   value={employeeContractorStats.totalContractors}
-                  subtitle={`Total Active: ${employeeContractorStats.activeContractors}`}
+                  subtitle={t('admin.users.metricTotalContractorsSubtitle', {
+                    count: employeeContractorStats.activeContractors,
+                  })}
                 />
               </div>
             ) : null}
@@ -2431,7 +2440,7 @@ export function AdminBuyersSuppliersPanel({
               <thead>
                 <tr>
                   <SortableTh
-                    label="Name"
+                    label={t('admin.users.colName')}
                     columnKey="name"
                     activeKey={userSort.key}
                     dir={userSort.dir}
@@ -2439,7 +2448,7 @@ export function AdminBuyersSuppliersPanel({
                   />
                   {!globalSupplyUsersMode && usersOnlyEmployees ? (
                     <SortableTh
-                      label="Role"
+                      label={t('admin.users.colRole')}
                       columnKey="role"
                       activeKey={userSort.key}
                       dir={userSort.dir}
@@ -2447,14 +2456,14 @@ export function AdminBuyersSuppliersPanel({
                     />
                   ) : null}
                   <SortableTh
-                    label="Email"
+                    label={t('admin.users.colEmail')}
                     columnKey="email"
                     activeKey={userSort.key}
                     dir={userSort.dir}
                     onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                   />
                   <SortableTh
-                    label="Employee"
+                    label={t('admin.users.colEmployee')}
                     columnKey="employee"
                     activeKey={userSort.key}
                     dir={userSort.dir}
@@ -2463,27 +2472,27 @@ export function AdminBuyersSuppliersPanel({
                   {globalSupplyUsersMode ? (
                     <>
                       <SortableTh
-                        label="Country"
+                        label={t('admin.users.colCountry')}
                         columnKey="country"
                         activeKey={userSort.key}
                         dir={userSort.dir}
                         onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                       />
                       <SortableTh
-                        label="Role"
+                        label={t('admin.users.colRole')}
                         columnKey="role"
                         activeKey={userSort.key}
                         dir={userSort.dir}
                         onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                       />
-                      <th>Password</th>
+                      <th>{t('admin.users.colPassword')}</th>
                     </>
                   ) : usersOnlyEmployees ? (
                     <>
-                      <th>Status</th>
-                      <th>Hourly rate (USD)</th>
+                      <th>{t('admin.users.colStatus')}</th>
+                      <th>{t('admin.users.colHourlyRate')}</th>
                       <SortableTh
-                        label="Country"
+                        label={t('admin.users.colCountry')}
                         columnKey="country"
                         activeKey={userSort.key}
                         dir={userSort.dir}
@@ -2492,9 +2501,9 @@ export function AdminBuyersSuppliersPanel({
                     </>
                   ) : (
                     <>
-                      <th>Password</th>
+                      <th>{t('admin.users.colPassword')}</th>
                       <SortableTh
-                        label="Role"
+                        label={t('admin.users.colRole')}
                         columnKey="role"
                         activeKey={userSort.key}
                         dir={userSort.dir}
@@ -2502,14 +2511,14 @@ export function AdminBuyersSuppliersPanel({
                       />
                     </>
                   )}
-                  <th>Actions</th>
+                  <th>{t('admin.users.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedVisibleUsers.length === 0 ? (
                   <tr>
                     <td colSpan={userTableColSpan} className="table-empty">
-                      No users yet.
+                      {t('admin.users.noUsers')}
                     </td>
                   </tr>
                 ) : (
@@ -2565,16 +2574,16 @@ export function AdminBuyersSuppliersPanel({
                               });
                             }}
                           >
-                            <option value="No">No</option>
-                            <option value="Yes">Yes</option>
-                            <option value="Contractor">Contractor</option>
+                            <option value="No">{t('common.no')}</option>
+                            <option value="Yes">{t('common.yes')}</option>
+                            <option value="Contractor">{t('admin.users.contractor')}</option>
                           </select>
                         ) : u.isContractor ? (
-                          'Contractor'
+                          t('admin.users.contractor')
                         ) : u.isEmployee ? (
-                          'Yes'
+                          t('common.yes')
                         ) : (
-                          'No'
+                          t('common.no')
                         )}
                       </td>
                       {globalSupplyUsersMode ? (
@@ -2622,7 +2631,7 @@ export function AdminBuyersSuppliersPanel({
                               <input
                                 className="input"
                                 type="password"
-                                placeholder="Leave blank to keep current"
+                                placeholder={t('admin.users.passwordPlaceholder')}
                                 value={editUserPassword}
                                 onChange={(e) => setEditUserPassword(e.target.value)}
                               />
@@ -2642,8 +2651,8 @@ export function AdminBuyersSuppliersPanel({
                                   setEditUser({ ...editUser, employmentStatus: e.target.value as 'Active' | 'Inactive' })
                                 }
                               >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
+                                <option value="Active">{t('admin.users.active')}</option>
+                                <option value="Inactive">{t('admin.users.inactive')}</option>
                               </select>
                             ) : (
                               u.employmentStatus ?? 'Active'
@@ -2660,7 +2669,7 @@ export function AdminBuyersSuppliersPanel({
                                 onChange={(e) =>
                                   setEditUser({ ...editUser, hourlyRate: e.target.value === '' ? null : Number(e.target.value) })
                                 }
-                                title="Amount in US dollars per hour"
+                                title={t('admin.users.hourlyAmountTitle')}
                               />
                             ) : (
                               formatUsd(u.hourlyRate)
@@ -2691,7 +2700,7 @@ export function AdminBuyersSuppliersPanel({
                               <input
                                 className="input"
                                 type="password"
-                                placeholder="Leave blank to keep current"
+                                placeholder={t('admin.users.passwordPlaceholder')}
                                 value={editUserPassword}
                                 onChange={(e) => setEditUserPassword(e.target.value)}
                               />
@@ -2725,7 +2734,7 @@ export function AdminBuyersSuppliersPanel({
                         {editUser?.id === u.id ? (
                           <>
                             <button type="button" className="btn btn-primary" style={{ marginRight: 8 }} onClick={saveUserEdit} disabled={busy}>
-                              Save
+                              {t('common.save')}
                             </button>
                             <button
                               type="button"
@@ -2736,7 +2745,7 @@ export function AdminBuyersSuppliersPanel({
                               }}
                               disabled={busy}
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                           </>
                         ) : (
@@ -2756,16 +2765,18 @@ export function AdminBuyersSuppliersPanel({
                               }}
                               disabled={busy}
                             >
-                              Edit
+                              {t('common.edit')}
                             </button>
                             <button
                               type="button"
                               className="btn btn-danger"
                               onClick={() => setDelUser(u)}
                               disabled={busy || authUser?.id === u.id}
-                              title={authUser?.id === u.id ? 'You cannot delete your own account' : 'Delete user permanently'}
+                              title={
+                                authUser?.id === u.id ? t('admin.users.deleteOwnDisabled') : t('admin.users.deleteUserTooltip')
+                              }
                             >
-                              Delete
+                              {t('common.delete')}
                             </button>
                           </>
                         )}
@@ -2783,12 +2794,12 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Assign Supplier → Buyer</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.users.assignTitle')}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Buyer</label>
+              <label className="input-label">{t('admin.users.buyer')}</label>
               <select className="input" value={buyerId} onChange={(e) => setBuyerId(e.target.value)} style={{ minWidth: 200 }}>
-                <option value="">Select buyer</option>
+                <option value="">{t('admin.users.selectBuyer')}</option>
                 {buyers.map((b) => (
                   <option key={b.id} value={b.id}>
                     {formatBuyerDisplayLabel(b)}
@@ -2797,9 +2808,9 @@ export function AdminBuyersSuppliersPanel({
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Supplier</label>
+              <label className="input-label">{t('admin.users.supplier')}</label>
               <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={{ minWidth: 200 }}>
-                <option value="">Select supplier</option>
+                <option value="">{t('admin.users.selectSupplier')}</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code}: {s.name}
@@ -2808,7 +2819,7 @@ export function AdminBuyersSuppliersPanel({
               </select>
             </div>
             <button type="button" className="btn btn-primary" onClick={assign} disabled={busy || !buyerId || !supplierId}>
-              Assign
+              {t('admin.users.assign')}
             </button>
           </div>
           </div>
@@ -2818,21 +2829,21 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Buyer Assignments</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.users.buyerAssignmentsTitle')}</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Buyer</th>
-                  <th>Assigned suppliers</th>
-                  <th style={{ width: 100 }}>Unassign</th>
+                  <th>{t('admin.users.buyer')}</th>
+                  <th>{t('admin.users.buyerAssignmentsColSuppliers')}</th>
+                  <th style={{ width: 100 }}>{t('admin.users.buyerAssignmentsColUnassign')}</th>
                 </tr>
               </thead>
               <tbody>
                 {buyers.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="table-empty">
-                      No buyers. Create a user with Buyer role.
+                      {t('admin.users.noBuyers')}
                     </td>
                   </tr>
                 ) : (
@@ -2845,7 +2856,7 @@ export function AdminBuyersSuppliersPanel({
                               <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{b.email}</div>
                             </td>
                             <td colSpan={2} className="table-empty">
-                              None
+                              {t('admin.users.none')}
                             </td>
                           </tr>,
                         ]
@@ -2860,7 +2871,7 @@ export function AdminBuyersSuppliersPanel({
                               <td>{sup ? `${sup.code}: ${sup.name}` : sid}</td>
                               <td>
                                 <button type="button" className="btn btn-ghost" onClick={() => unassign(b.id, sid)} disabled={busy}>
-                                  Remove
+                                  {t('admin.users.remove')}
                                 </button>
                               </td>
                             </tr>
@@ -2878,20 +2889,20 @@ export function AdminBuyersSuppliersPanel({
       {showBuyerSupplierSections && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Link Supplier User Account</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.users.linkSupplierUserTitle')}</h2>
             <p style={{ marginTop: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-              Linking replaces any existing supplier-user link automatically. Disconnect only removes the link; it does not delete users or suppliers.
+              {t('admin.users.linkSupplierUserIntro')}
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Supplier company</label>
+                <label className="input-label">{t('admin.users.supplierCompany')}</label>
                 <select
                   className="input"
                   value={supplierLinkSupplierId}
                   onChange={(e) => setSupplierLinkSupplierId(e.target.value)}
                   style={{ minWidth: 240 }}
                 >
-                  <option value="">Select supplier</option>
+                  <option value="">{t('admin.users.selectSupplier')}</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.code}: {s.name}
@@ -2900,14 +2911,14 @@ export function AdminBuyersSuppliersPanel({
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Supplier user account</label>
+                <label className="input-label">{t('admin.users.supplierUserAccount')}</label>
                 <select
                   className="input"
                   value={supplierLinkUserId}
                   onChange={(e) => setSupplierLinkUserId(e.target.value)}
                   style={{ minWidth: 300 }}
                 >
-                  <option value="">Select supplier user</option>
+                  <option value="">{t('admin.users.selectSupplierUser')}</option>
                   {supplierUsers.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name?.trim() ? `${u.name} (${u.email})` : u.email}
@@ -2921,7 +2932,7 @@ export function AdminBuyersSuppliersPanel({
                 onClick={linkSupplierUser}
                 disabled={busy || !supplierLinkSupplierId || !supplierLinkUserId}
               >
-                Link
+                {t('admin.users.link')}
               </button>
             </div>
 
@@ -2929,16 +2940,16 @@ export function AdminBuyersSuppliersPanel({
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Supplier</th>
-                    <th>Linked supplier user</th>
-                    <th style={{ width: 100 }}>Action</th>
+                    <th>{t('admin.users.supplier')}</th>
+                    <th>{t('admin.users.linkedSupplierUser')}</th>
+                    <th style={{ width: 100 }}>{t('admin.users.action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {suppliers.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="table-empty">
-                        No suppliers.
+                        {t('admin.users.noSuppliers')}
                       </td>
                     </tr>
                   ) : (
@@ -2949,7 +2960,7 @@ export function AdminBuyersSuppliersPanel({
                         <td>
                           {s.user ? (
                             <button type="button" className="btn btn-ghost" onClick={() => unlinkSupplierUser(s.id)} disabled={busy}>
-                              Disconnect
+                              {t('admin.users.disconnect')}
                             </button>
                           ) : (
                             '—'
@@ -2967,13 +2978,16 @@ export function AdminBuyersSuppliersPanel({
 
       <ConfirmDialog
         open={!!delUser}
-        title="Delete user?"
+        title={t('admin.users.deleteUserTitle')}
         message={
           delUser
-            ? `Permanently delete ${delUser.email}${delUser.name?.trim() ? ` (${delUser.name.trim()})` : ''}? This cannot be undone.`
+            ? t('admin.users.deleteUserMessage', {
+                email: delUser.email,
+                namePart: delUser.name?.trim() ? ` (${delUser.name.trim()})` : '',
+              })
             : ''
         }
-        confirmLabel="Delete user"
+        confirmLabel={t('admin.users.deleteUserConfirm')}
         variant="danger"
         onCancel={() => setDelUser(null)}
         onConfirm={doDeleteUser}
@@ -2981,9 +2995,9 @@ export function AdminBuyersSuppliersPanel({
 
       <ConfirmDialog
         open={!!delSup}
-        title="Delete supplier?"
-        message={delSup ? `Permanently delete ${delSup.code}? Cascades related data.` : ''}
-        confirmLabel="Delete"
+        title={t('admin.users.deleteSupplierTitle')}
+        message={delSup ? t('admin.users.deleteSupplierMessage', { code: delSup.code }) : ''}
+        confirmLabel={t('common.delete')}
         variant="danger"
         onCancel={() => setDelSup(null)}
         onConfirm={doDeleteSupplier}
@@ -3004,6 +3018,7 @@ export function AdminPermissionsPanel({
   toast: ToastApi;
   scope?: 'all' | 'sentinel' | 'globalVendors';
 }) {
+  const { t } = useLanguage();
   const [serverData, setServerData] = useState<PermissionMatrixResponse | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -3026,9 +3041,9 @@ export function AdminPermissionsPanel({
       setMatrixError(null);
     } catch (e) {
       setServerData(null);
-      setMatrixError(e instanceof Error ? e.message : 'Failed to load server permission matrix');
+      setMatrixError(e instanceof Error ? e.message : t('admin.permissions.loadMatrixFailed'));
     }
-  }, [token, scope]);
+  }, [token, scope, t]);
 
   useEffect(() => {
     load();
@@ -3062,7 +3077,7 @@ export function AdminPermissionsPanel({
       setNewRoleName('');
       await load();
     } catch (e) {
-      setMatrixError(e instanceof Error ? e.message : 'Failed to add role');
+      setMatrixError(e instanceof Error ? e.message : t('admin.permissions.addRoleFailed'));
     } finally {
       setBusy(false);
     }
@@ -3078,9 +3093,9 @@ export function AdminPermissionsPanel({
         body: JSON.stringify({ matrix: serverData.matrix }),
       });
       await load();
-      toast.success('Permissions saved');
+      toast.success(t('admin.permissions.saved'));
     } catch (e) {
-      setMatrixError(e instanceof Error ? e.message : 'Failed to save permissions');
+      setMatrixError(e instanceof Error ? e.message : t('admin.permissions.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -3102,11 +3117,11 @@ export function AdminPermissionsPanel({
         }
         throw new Error(msg);
       }
-      toast.success(`Role “${row.name}” deleted`);
+      toast.success(t('admin.permissions.roleDeleted', { name: row.name }));
       setRolePendingDelete(null);
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to delete role');
+      toast.error(e instanceof Error ? e.message : t('admin.permissions.deleteRoleFailed'));
     } finally {
       setBusy(false);
     }
@@ -3118,7 +3133,7 @@ export function AdminPermissionsPanel({
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Permissions</h2>
+        <h2 style={{ marginTop: 0 }}>{t('admin.permissions.title')}</h2>
         {matrixError && (
           <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
             {matrixError}
@@ -3126,27 +3141,27 @@ export function AdminPermissionsPanel({
         )}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">New Role</label>
-            <input className="input" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="Role name" />
+            <label className="input-label">{t('admin.permissions.newRole')}</label>
+            <input className="input" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder={t('admin.permissions.roleNamePlaceholder')} />
           </div>
           <button type="button" className="btn btn-ghost" onClick={addRole} disabled={busy || !newRoleName.trim()}>
-            Add
+            {t('admin.permissions.add')}
           </button>
           <button type="button" className="btn btn-primary" onClick={savePermissions} disabled={busy || !serverData}>
-            Save Permissions
+            {t('admin.permissions.save')}
           </button>
         </div>
-        {!serverData && !matrixError && token && <p>Loading permissions…</p>}
+        {!serverData && !matrixError && token && <p>{t('admin.permissions.loading')}</p>}
         {serverData && (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Role</th>
+                  <th style={{ minWidth: 200 }}>{t('admin.permissions.colRole')}</th>
                   {matrixPages.map((p) => (
                     <th key={p.key}>{p.label}</th>
                   ))}
-                  <th style={{ width: 100 }}>Actions</th>
+                  <th style={{ width: 100 }}>{t('admin.permissions.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -3175,16 +3190,16 @@ export function AdminPermissionsPanel({
                           disabled={busy || !canDelete}
                           title={
                             !roleRow.id
-                              ? 'Reload the page to enable delete (older API response).'
+                              ? t('admin.permissions.deleteRoleHintNoId')
                               : roleRow.name === 'Admin'
-                                ? 'The Admin role cannot be deleted.'
+                                ? t('admin.permissions.deleteRoleHintAdmin')
                                 : roleRow.userCount > 0
-                                  ? 'Remove this role from all users before deleting.'
-                                  : 'Delete this role'
+                                  ? t('admin.permissions.deleteRoleHintInUse')
+                                  : t('admin.permissions.deleteRoleHintOk')
                           }
                           onClick={() => setRolePendingDelete(roleRow)}
                         >
-                          Delete
+                          {t('admin.permissions.deleteRole')}
                         </button>
                       </td>
                     </tr>
@@ -3197,11 +3212,12 @@ export function AdminPermissionsPanel({
 
         <ConfirmDialog
           open={rolePendingDelete !== null}
-          title="Delete role?"
+          title={t('admin.permissions.deleteTitle')}
           message={
             rolePendingDelete ? (
               <p style={{ margin: 0 }}>
-                Permanently delete role <strong>{rolePendingDelete.name}</strong>
+                {t('admin.permissions.deleteLead')}{' '}
+                <strong>{rolePendingDelete.name}</strong>
                 {rolePendingDelete.id ? (
                   <>
                     {' '}
@@ -3212,14 +3228,14 @@ export function AdminPermissionsPanel({
                 )}
                 <br />
                 <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                  Page permissions for this role will be removed. This cannot be undone.
+                  {t('admin.permissions.deleteFoot')}
                 </span>
               </p>
             ) : (
               ''
             )
           }
-          confirmLabel="Delete role"
+          confirmLabel={t('admin.permissions.deleteConfirm')}
           variant="danger"
           onCancel={() => setRolePendingDelete(null)}
           onConfirm={() => rolePendingDelete && void deleteRole(rolePendingDelete)}

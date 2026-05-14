@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { parseApiError, downloadWithAuthProgress } from '../../utils/apiHelpers';
+import { useLanguage } from '../../context/LanguageContext';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { SortableTh } from '../../components/SortableTh';
 import { cmpNum, cmpStr, dateMs, toggleSort, type SortDir } from '../../utils/tableSort';
@@ -45,14 +46,15 @@ interface AdminCommandMediaPanelProps {
   toast: ToastApi;
 }
 
-function formatCommandMediaDate(iso: string | undefined): string {
-  if (!iso) return '—';
+function formatCommandMediaDate(iso: string | undefined, dash: string): string {
+  if (!iso) return dash;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return dash;
   return d.toLocaleDateString(getDocumentLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelProps) {
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     documentNumber: '',
     name: '',
@@ -118,7 +120,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
     e.preventDefault();
     if (!token || !form.documentNumber.trim() || !form.name.trim()) return;
     if (form.file && form.file.size > 150 * 1024 * 1024) {
-      toast.error('File must be 150MB or smaller');
+      toast.error(t('toast.fileTooLarge150mb'));
       return;
     }
     setSubmitting(true);
@@ -159,7 +161,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
       });
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadProgress(null);
-      toast.success('Command media uploaded');
+      toast.success(t('toast.commandMediaUploaded'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -171,7 +173,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
 
   const downloadRow = async (r: CommandMediaRow) => {
     if (!token || !r.filePath) {
-      toast.error('No file attached');
+      toast.error(t('toast.noFileAttached'));
       return;
     }
     try {
@@ -179,7 +181,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
       await downloadWithAuthProgress(`/documents/${r.id}/download`, token, `${r.documentNumber}-${r.name}`, (p) => {
         setDownloading((prev) => ({ ...prev, [r.id]: p }));
       });
-      toast.success('Download completed');
+      toast.success(t('toast.downloadCompleted'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -197,7 +199,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
     setDeletingId(id);
     try {
       await apiJson(`/documents/${id}`, { token, method: 'DELETE' });
-      toast.success('Deleted');
+      toast.success(t('toast.deleted'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -210,7 +212,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
     <>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Add document</h2>
+          <h2 style={{ marginTop: 0 }}>{t('documents.addSection')}</h2>
           <form onSubmit={submit}>
             <div
               style={{
@@ -221,21 +223,21 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
               }}
             >
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Type *</label>
+                <label className="input-label">{t('documents.label.typeRequired')}</label>
                 <select
                   className="input"
                   value={form.documentType}
                   onChange={(e) => setForm((p) => ({ ...p, documentType: e.target.value }))}
                 >
-                  {COMMAND_MEDIA_DOCUMENT_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
+                  {COMMAND_MEDIA_DOCUMENT_TYPES.map((docType) => (
+                    <option key={docType.value} value={docType.value}>
+                      {docType.label}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Document Number *</label>
+                <label className="input-label">{t('documents.label.documentNumber')}</label>
                 <input
                   className="input"
                   value={form.documentNumber}
@@ -244,7 +246,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Name *</label>
+                <label className="input-label">{t('documents.label.nameRequired')}</label>
                 <input
                   className="input"
                   value={form.name}
@@ -253,11 +255,11 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Revision</label>
+                <label className="input-label">{t('documents.label.revision')}</label>
                 <input className="input" value={form.revision} onChange={(e) => setForm((p) => ({ ...p, revision: e.target.value }))} />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">File (optional)</label>
+                <label className="input-label">{t('documents.label.fileOptional')}</label>
                 <input
                   ref={fileInputRef}
                   className="input"
@@ -266,12 +268,12 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                 />
               </div>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Creating…' : 'Create'}
+                {submitting ? t('documents.btn.creating') : t('documents.btn.create')}
               </button>
             </div>
             {uploadProgress !== null && (
               <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                Upload progress: {uploadProgress}%
+                {t('documents.uploadProgress', { percent: `${uploadProgress}%` })}
               </div>
             )}
           </form>
@@ -280,50 +282,50 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Library</h2>
+          <h2 style={{ marginTop: 0 }}>{t('documents.libraryTitle')}</h2>
           <div className="table-wrap">
             {rows.length === 0 ? (
-              <p className="table-empty">No documents.</p>
+              <p className="table-empty">{t('documents.empty')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
                     <SortableTh
-                      label="Type"
+                      label={t('documents.col.type')}
                       columnKey="type"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Number"
+                      label={t('documents.col.number')}
                       columnKey="number"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Name"
+                      label={t('documents.col.name')}
                       columnKey="name"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Revision"
+                      label={t('documents.col.revision')}
                       columnKey="revision"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Created"
+                      label={t('documents.col.created')}
                       columnKey="created"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
-                    <th>View</th>
+                    <th>{t('table.col.view')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -333,8 +335,8 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                       <td>{commandMediaDocumentTypeLabel(r.documentType)}</td>
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
-                      <td>{r.revision ?? '—'}</td>
-                      <td>{formatCommandMediaDate(r.createdAt)}</td>
+                      <td>{r.revision ?? t('internal.scheduleAudit.dash')}</td>
+                      <td>{formatCommandMediaDate(r.createdAt, t('internal.scheduleAudit.dash'))}</td>
                       <td>
                         {r.filePath ? (
                           <button
@@ -350,11 +352,11 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                                 <span>{downloading[r.id]}%</span>
                               </span>
                             ) : (
-                              'Download'
+                              t('common.download')
                             )}
                           </button>
                         ) : (
-                          '—'
+                          t('internal.scheduleAudit.dash')
                         )}
                       </td>
                       <td>
@@ -364,7 +366,7 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
                           disabled={deletingId === r.id}
                           onClick={() => setDeleteConfirmId(r.id)}
                         >
-                          Delete
+                          {t('common.delete')}
                         </button>
                       </td>
                     </tr>
@@ -378,9 +380,9 @@ export function AdminCommandMediaPanel({ token, toast }: AdminCommandMediaPanelP
 
       <ConfirmDialog
         open={deleteConfirmId !== null}
-        title="Delete document"
-        message="Delete this document? This cannot be undone."
-        confirmLabel="Delete"
+        title={t('documents.confirmDeleteTitle')}
+        message={t('documents.confirmDeleteMessage')}
+        confirmLabel={t('common.delete')}
         variant="danger"
         onConfirm={() => {
           if (!deleteConfirmId) return;

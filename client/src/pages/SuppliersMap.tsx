@@ -167,7 +167,7 @@ export function SuppliersMap() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading suppliers map…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -189,14 +189,14 @@ export function SuppliersMap() {
           marginBottom: '1rem',
         }}
       >
-        <Metric title="High (Red)" value={colorCounts.red} color="#ef4444" />
-        <Metric title="Medium (Yellow)" value={colorCounts.yellow} color="#eab308" />
-        <Metric title="Low (Green)" value={colorCounts.green} color="#22c55e" />
+        <Metric title={t('mapSuppliers.highRed')} value={colorCounts.red} color="#ef4444" />
+        <Metric title={t('mapSuppliers.mediumYellow')} value={colorCounts.yellow} color="#eab308" />
+        <Metric title={t('mapSuppliers.lowGreen')} value={colorCounts.green} color="#22c55e" />
       </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Map view</h2>
+          <h2 style={{ marginTop: 0 }}>{t('mapSuppliers.mapView')}</h2>
           <div className="suppliers-map-frame" style={{ border: '1px solid var(--color-border)', borderRadius: 10 }}>
             <MapContainer
               center={mapCenter}

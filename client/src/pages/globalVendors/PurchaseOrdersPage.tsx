@@ -4,10 +4,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { getDocumentLocale } from '../../i18n/locale';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 
 type PurchaseOrderRow = {
@@ -71,6 +71,7 @@ export function PurchaseOrdersPage({
   canCreatePurchaseOrder?: boolean;
 }) {
   const { token } = useAuth();
+  const { t, locale } = useLanguage();
   const canManagePOs = canCreatePurchaseOrder;
   const toast = useToast();
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
@@ -135,7 +136,7 @@ export function PurchaseOrdersPage({
       })
       .catch((e) =>
         setError(
-          e instanceof Error ? e.message : 'Failed to load purchase orders'
+          e instanceof Error ? e.message : t('purchaseOrders.loadFailed')
         )
       )
       .finally(() => {
@@ -256,14 +257,14 @@ export function PurchaseOrdersPage({
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
-        toast.success('Purchase order updated');
+        toast.success(t('toast.purchaseOrderUpdated'));
       } else {
         await apiJson<PurchaseOrderRow>('/purchase-orders', {
           token,
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        toast.success('Purchase order created');
+        toast.success(t('toast.purchaseOrderCreated'));
       }
       closeModal();
       load({ silent: true });
@@ -366,7 +367,7 @@ export function PurchaseOrdersPage({
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
       }
-      toast.success('Attachment removed');
+      toast.success(t('toast.attachmentRemoved'));
       load({ silent: true });
     } catch (err) {
       let msg = 'Could not remove attachment';
@@ -388,7 +389,7 @@ export function PurchaseOrdersPage({
     if (!token || !canManagePOs) return;
     const currentStatus = (order.status ?? 'Open').trim().toLowerCase();
     if (currentStatus === 'closed') {
-      toast.info('Purchase order is already closed');
+      toast.info(t('toast.poAlreadyClosed'));
       return;
     }
     setClosingId(order.id);
@@ -397,7 +398,7 @@ export function PurchaseOrdersPage({
         token,
         method: 'PATCH',
       });
-      toast.success(`${order.code} closed`);
+      toast.success(t('toast.poClosed', { code: order.code }));
       load({ silent: true });
       setCloseConfirmOrder(null);
     } catch (err) {
@@ -420,7 +421,7 @@ export function PurchaseOrdersPage({
     if (!token || !canManagePOs) return;
     const currentStatus = (order.status ?? 'Open').trim().toLowerCase();
     if (currentStatus !== 'closed') {
-      toast.info('Only closed purchase orders can be reopened');
+      toast.info(t('toast.onlyClosedPoCanReopen'));
       return;
     }
     setReopeningId(order.id);
@@ -429,7 +430,7 @@ export function PurchaseOrdersPage({
         token,
         method: 'PATCH',
       });
-      toast.success(`${order.code} reopened`);
+      toast.success(t('toast.poReopened', { code: order.code }));
       load({ silent: true });
       setReopenConfirmOrder(null);
     } catch (err) {
@@ -450,10 +451,9 @@ export function PurchaseOrdersPage({
 
   const exportToExcel = useCallback(() => {
     if (orders.length === 0) {
-      toast.info('No purchase orders to export yet.');
+      toast.info(t('purchaseOrders.nothingToExport'));
       return;
     }
-    const locale = getDocumentLocale();
     const isoDay = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : '');
     try {
       const rows: ExportRow[] = orders.map((o) => {
@@ -462,38 +462,43 @@ export function PurchaseOrdersPage({
           o.totalAmount ??
           (o.quantityKg != null && o.pricePerKg != null ? o.quantityKg * o.pricePerKg : null);
         return {
-          Status: isClosed ? 'Closed' : 'Open',
-          'PO ID': o.code,
-          Farm: o.farm ? `${o.farm.code} — ${o.farm.farmName}` : '—',
-          'Buyer name': o.buyerName,
-          'Buyer email': o.buyerEmail ?? '—',
-          'Order date': isoDay(o.orderDate) || '—',
-          Crop: o.crop ?? '—',
-          'Qty (kg)': o.quantityKg ?? '—',
-          'Price/kg': o.pricePerKg ?? '—',
-          Total: total != null ? Number(total.toFixed(2)) : '—',
-          'Est. farmer delivery': isoDay(o.estimatedFarmerDeliveryDate) || '—',
-          'Est. arrival at buyer': isoDay(o.estimatedArrivalAtBuyer) || '—',
-          'Destination country': o.destinationCountry ?? '—',
-          'Port of discharge': o.portOfDischarge ?? '—',
-          Created: o.createdAt
+          [t('table.col.status')]: isClosed ? t('purchaseOrders.statusClosed') : t('purchaseOrders.statusOpen'),
+          [t('table.col.poId')]: o.code,
+          [t('table.col.farm')]: o.farm ? `${o.farm.code} — ${o.farm.farmName}` : '—',
+          [t('table.col.buyer')]: o.buyerName,
+          [t('samples.col.buyerEmail')]: o.buyerEmail ?? '—',
+          [t('table.col.orderDate')]: isoDay(o.orderDate) || '—',
+          [t('table.col.crop')]: o.crop ?? '—',
+          [t('table.col.qtyKg')]: o.quantityKg ?? '—',
+          [t('table.col.pricePerKg')]: o.pricePerKg ?? '—',
+          [t('table.col.total')]: total != null ? Number(total.toFixed(2)) : '—',
+          [t('table.col.estFarmerDelivery')]: isoDay(o.estimatedFarmerDeliveryDate) || '—',
+          [t('table.col.estArrivalBuyer')]: isoDay(o.estimatedArrivalAtBuyer) || '—',
+          [t('table.col.destinationCountry')]: o.destinationCountry ?? '—',
+          [t('table.col.portOfDischarge')]: o.portOfDischarge ?? '—',
+          [t('table.col.created')]: o.createdAt
             ? new Date(o.createdAt).toLocaleDateString(locale, {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
               })
             : '—',
-          Attachments: o.attachments.map((a) => a.fileName || a.kind || 'file').join('; ') || '—',
-          Notes: (o.notes ?? '').trim() || '—',
+          [t('table.col.attachments')]:
+            o.attachments.map((a) => a.fileName || a.kind || t('common.download')).join('; ') || '—',
+          [t('table.col.notes')]: (o.notes ?? '').trim() || '—',
         };
       });
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Purchase_Orders_${stamp}`, 'Purchase Orders', rows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(
+        `${t('purchaseOrders.exportFilePrefix')}_${stamp}`,
+        t('purchaseOrders.exportSheet'),
+        rows
+      );
+      toast.success(t('findings.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('findings.exportFailed'));
     }
-  }, [orders, toast]);
+  }, [orders, toast, t, locale]);
 
   const syncScrollFromTop = () => {
     if (!topScrollRef.current || !tableScrollRef.current) return;
@@ -509,11 +514,11 @@ export function PurchaseOrdersPage({
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Purchase Orders</h1>
+          <h1 className="page-title">{t('nav.purchaseOrders')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading purchase orders…</p>
+          <p style={{ marginTop: 12 }}>{t('purchaseOrders.loading')}</p>
         </div>
       </div>
     );
@@ -523,7 +528,7 @@ export function PurchaseOrdersPage({
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Purchase Orders</h1>
+          <h1 className="page-title">{t('nav.purchaseOrders')}</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -543,7 +548,7 @@ export function PurchaseOrdersPage({
         }}
       >
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          Purchase Orders
+          {t('nav.purchaseOrders')}
         </h1>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <button
@@ -551,13 +556,13 @@ export function PurchaseOrdersPage({
             className="btn btn-ghost"
             onClick={exportToExcel}
             disabled={loading}
-            title="Download the purchase orders table as an Excel file"
+            title={t('purchaseOrders.exportHint')}
           >
-            Export to Excel
+            {t('common.exportExcel')}
           </button>
           {canManagePOs ? (
             <button type="button" className="btn btn-primary" onClick={() => openCreateModal()}>
-              New purchase order
+              {t('purchaseOrders.newOrder')}
             </button>
           ) : null}
         </div>
@@ -573,7 +578,7 @@ export function PurchaseOrdersPage({
           className="purchase-orders-table-scroll"
           style={{ overflowY: 'hidden', marginBottom: 6 }}
           onScroll={syncScrollFromTop}
-          aria-label="Horizontal scroll purchase orders"
+          aria-label={t('purchaseOrders.scrollAria')}
         >
           <div style={{ height: 1, width: topScrollInnerWidth || '100%' }} />
         </div>
@@ -588,22 +593,22 @@ export function PurchaseOrdersPage({
           >
             <thead>
               <tr>
-                <th>Close PO</th>
-                <th>PO ID</th>
-                <th>Farm</th>
-                <th>Buyer</th>
-                <th>Order date</th>
-                <th>Crop</th>
-                <th>Qty (kg)</th>
-                <th>Price/kg</th>
-                <th>Total</th>
-                <th>Est. farmer delivery</th>
-                <th>Est. arrival at buyer</th>
-                <th>Destination country</th>
-                <th>Port of discharge</th>
-                <th>Created</th>
-                <th>Attachments</th>
-                <th>Edit</th>
+                <th>{t('table.col.closePo')}</th>
+                <th>{t('table.col.poId')}</th>
+                <th>{t('table.col.farm')}</th>
+                <th>{t('table.col.buyer')}</th>
+                <th>{t('table.col.orderDate')}</th>
+                <th>{t('table.col.crop')}</th>
+                <th>{t('table.col.qtyKg')}</th>
+                <th>{t('table.col.pricePerKg')}</th>
+                <th>{t('table.col.total')}</th>
+                <th>{t('table.col.estFarmerDelivery')}</th>
+                <th>{t('table.col.estArrivalBuyer')}</th>
+                <th>{t('table.col.destinationCountry')}</th>
+                <th>{t('table.col.portOfDischarge')}</th>
+                <th>{t('table.col.created')}</th>
+                <th>{t('table.col.attachments')}</th>
+                <th>{t('table.col.edit')}</th>
               </tr>
             </thead>
             <tbody>
@@ -611,11 +616,9 @@ export function PurchaseOrdersPage({
                 <tr>
                   <td colSpan={16} className="table-empty">
                     {canManagePOs ? (
-                      <>
-                        No purchase orders yet. Use <strong>New purchase order</strong> to create one.
-                      </>
+                      <>{t('purchaseOrders.emptyWithHint')}</>
                     ) : (
-                      'No purchase orders yet.'
+                      t('purchaseOrders.empty')
                     )}
                   </td>
                 </tr>
@@ -636,14 +639,14 @@ export function PurchaseOrdersPage({
                           disabled={closingId === o.id || reopeningId === o.id || isClosed}
                         >
                           {isClosed
-                            ? 'Closed'
+                            ? t('purchaseOrders.statusClosed')
                             : closingId === o.id
-                              ? 'Closing…'
-                              : 'Close PO'}
+                              ? t('purchaseOrders.closing')
+                              : t('purchaseOrders.closePo')}
                         </button>
                       ) : (
                         <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                          {isClosed ? 'Closed' : 'Open'}
+                          {isClosed ? t('purchaseOrders.statusClosed') : t('purchaseOrders.statusOpen')}
                         </span>
                       )}
                     </td>
@@ -670,14 +673,11 @@ export function PurchaseOrdersPage({
                     </td>
                     <td>
                       {o.orderDate
-                        ? new Date(o.orderDate).toLocaleDateString(
-                            undefined,
-                            {
+                        ? new Date(o.orderDate).toLocaleDateString(locale, {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
-                            }
-                          )
+                            })
                         : '—'}
                     </td>
                     <td>{o.crop ?? '—'}</td>
@@ -706,7 +706,7 @@ export function PurchaseOrdersPage({
                       {o.estimatedFarmerDeliveryDate
                         ? new Date(
                             o.estimatedFarmerDeliveryDate
-                          ).toLocaleDateString(getDocumentLocale(), {
+                          ).toLocaleDateString(locale, {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -717,7 +717,7 @@ export function PurchaseOrdersPage({
                       {o.estimatedArrivalAtBuyer
                         ? new Date(
                             o.estimatedArrivalAtBuyer
-                          ).toLocaleDateString(getDocumentLocale(), {
+                          ).toLocaleDateString(locale, {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -727,7 +727,7 @@ export function PurchaseOrdersPage({
                     <td>{o.destinationCountry ?? '—'}</td>
                     <td>{o.portOfDischarge ?? '—'}</td>
                     <td>
-                      {new Date(o.createdAt).toLocaleDateString(getDocumentLocale(), {
+                      {new Date(o.createdAt).toLocaleDateString(locale, {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
@@ -884,7 +884,7 @@ export function PurchaseOrdersPage({
         >
           <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-po-title" className="confirm-dialog-title">
-              {formMode === 'edit' ? 'Edit purchase order' : 'New purchase order'}
+              {formMode === 'edit' ? t('purchaseOrders.editOrder') : t('purchaseOrders.newOrder')}
             </h3>
             <form
               onSubmit={submit}

@@ -86,7 +86,7 @@ export function GlobalEmployeeProfilePage() {
         method: 'PUT',
         body: JSON.stringify({ body: bodyDraft }),
       });
-      toast.success('Profile text saved');
+      toast.success(t('gvEmployee.toast.profileSaved'));
       await load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -110,7 +110,7 @@ export function GlobalEmployeeProfilePage() {
         const t = await res.text();
         throw new Error(t || `HTTP ${res.status}`);
       }
-      toast.success('Image uploaded');
+      toast.success(t('gvEmployee.toast.imageUploaded'));
       await load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -131,7 +131,7 @@ export function GlobalEmployeeProfilePage() {
         const t = await res.text();
         throw new Error(t || `HTTP ${res.status}`);
       }
-      toast.success('Image removed');
+      toast.success(t('gvEmployee.toast.imageRemoved'));
       setDeleteTarget(null);
       await load();
     } catch (e) {

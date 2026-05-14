@@ -4,10 +4,11 @@
  * Global Supply variant shows PO delivery/arrival dates and user-added events (subject + date).
  */
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import type { TOptions } from 'i18next';
 import { Link } from 'react-router-dom';
 import { apiJson } from '../api/client';
 import { useToast } from '../context/ToastContext';
-import { getDocumentLocale } from '../i18n/locale';
+import { useLanguage } from '../context/LanguageContext';
 
 interface AuditCalendarRow {
   id: string;
@@ -39,9 +40,37 @@ interface ManualCalendarEventRow {
 type CalendarItem =
   | { kind: 'audit'; id: string; label: string; dateKey: string }
   | { kind: 'shipment'; id: string; label: string; dateKey: string }
-  | { kind: 'poDelivery'; id: string; label: string; dateKey: string }
-  | { kind: 'poArrival'; id: string; label: string; dateKey: string }
+  | { kind: 'poDelivery'; id: string; poCode: string; dateKey: string }
+  | { kind: 'poArrival'; id: string; poCode: string; dateKey: string }
   | { kind: 'customEvent'; id: string; label: string; dateKey: string };
+
+function calendarItemSortKey(it: CalendarItem): string {
+  if (it.kind === 'poDelivery') return `${it.poCode}\0delivery`;
+  if (it.kind === 'poArrival') return `${it.poCode}\0arrival`;
+  return it.label;
+}
+
+type TranslateFn = (key: string, fallbackOrOptions?: string | TOptions) => string;
+
+function calendarItemDisplayLabel(it: CalendarItem, t: TranslateFn): string {
+  if (it.kind === 'poDelivery') return t('internal.calendar.poFarmDelivery', { code: it.poCode });
+  if (it.kind === 'poArrival') return t('internal.calendar.poArrivalBuyer', { code: it.poCode });
+  return it.label;
+}
+
+const CALENDAR_KIND_I18N: Record<Exclude<CalendarItem['kind'], 'customEvent'>, string> = {
+  audit: 'internal.calendar.kind.audit',
+  shipment: 'internal.calendar.kind.shipment',
+  poDelivery: 'internal.calendar.kind.poDelivery',
+  poArrival: 'internal.calendar.kind.poArrival',
+};
+
+function calendarTooltipLine(it: CalendarItem, t: TranslateFn): string {
+  if (it.kind === 'customEvent') {
+    return t('internal.calendar.tooltipCustom', { subject: it.label });
+  }
+  return `${t(CALENDAR_KIND_I18N[it.kind])}: ${calendarItemDisplayLabel(it, t)}`;
+}
 
 /** Real greens for SSA shipment chips; app `--color-success-*` tokens are blue for general UI (see index.css). */
 const SSA_CALENDAR_SHIPMENT_BG = '#dcfce7';
@@ -92,7 +121,8 @@ function todayDateInputValue(): string {
 
 function useInternalManagementCalendarItems(
   token: string | null,
-  variant: 'supplierAssurance' | 'globalSupply'
+  variant: 'supplierAssurance' | 'globalSupply',
+  t: TranslateFn
 ): {
   items: CalendarItem[];
   loading: boolean;
@@ -125,7 +155,7 @@ function useInternalManagementCalendarItems(
                 next.push({
                   kind: 'poDelivery',
                   id: `${po.id}-delivery`,
-                  label: `${po.code} Farm Delivery`,
+                  poCode: po.code,
                   dateKey: farmDeliveryKey,
                 });
               }
@@ -134,7 +164,7 @@ function useInternalManagementCalendarItems(
                 next.push({
                   kind: 'poArrival',
                   id: `${po.id}-arrival`,
-                  label: `${po.code} Arrival at Buyer`,
+                  poCode: po.code,
                   dateKey: buyerArrivalKey,
                 });
               }
@@ -188,16 +218,16 @@ function useInternalManagementCalendarItems(
         nextItems.sort((a, b) => {
           const c = a.dateKey.localeCompare(b.dateKey);
           if (c !== 0) return c;
-          return a.label.localeCompare(b.label);
+          return calendarItemSortKey(a).localeCompare(calendarItemSortKey(b));
         });
         setItems(nextItems);
       })
       .catch(() => {
-        setError('Could not load calendar data');
+        setError(t('internal.calendar.loadFailed'));
         setItems([]);
       })
       .finally(() => setLoading(false));
-  }, [token, variant]);
+  }, [token, variant, t]);
 
   useEffect(() => {
     load();
@@ -214,7 +244,8 @@ export function InternalManagementCalendarView({
   variant?: 'supplierAssurance' | 'globalSupply';
 }) {
   const toast = useToast();
-  const { items, loading, error, reload } = useInternalManagementCalendarItems(token, variant);
+  const { t, locale } = useLanguage();
+  const { items, loading, error, reload } = useInternalManagementCalendarItems(token, variant, t);
   const [newEventSubject, setNewEventSubject] = useState('');
   const [newEventDate, setNewEventDate] = useState(todayDateInputValue);
   const [savingEvent, setSavingEvent] = useState(false);
@@ -239,7 +270,10 @@ export function InternalManagementCalendarView({
     return m;
   }, [items, year, monthIndex]);
 
-  const monthLabel = cursor.toLocaleDateString(getDocumentLocale(), { month: 'long', year: 'numeric' });
+  const monthLabel = useMemo(
+    () => cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+    [cursor, locale]
+  );
 
   const prevMonth = () => {
     setCursor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
@@ -257,11 +291,11 @@ export function InternalManagementCalendarView({
     if (!token) return;
     const subject = newEventSubject.trim();
     if (!subject) {
-      toast.error('Enter a subject');
+      toast.error(t('internal.calendar.enterSubject'));
       return;
     }
     if (!newEventDate) {
-      toast.error('Choose a date');
+      toast.error(t('internal.calendar.chooseDate'));
       return;
     }
     const path =
@@ -275,12 +309,12 @@ export function InternalManagementCalendarView({
         method: 'POST',
         body: JSON.stringify({ subject, eventDate: newEventDate }),
       });
-      toast.success('Event added');
+      toast.success(t('internal.calendar.eventAdded'));
       setNewEventSubject('');
       setNewEventDate(todayDateInputValue());
       reload();
     } catch (err) {
-      let msg = 'Could not add event';
+      let msg = t('internal.calendar.addEventFailed');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -295,7 +329,14 @@ export function InternalManagementCalendarView({
     }
   };
 
-  const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weekdayLabels = useMemo(() => {
+    const anchor = new Date(2024, 0, 7);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(anchor);
+      d.setDate(anchor.getDate() + i);
+      return d.toLocaleDateString(locale, { weekday: 'short' });
+    });
+  }, [locale]);
 
   return (
     <div className="card" style={{ marginBottom: '1rem' }}>
@@ -310,26 +351,36 @@ export function InternalManagementCalendarView({
             marginBottom: '1rem',
           }}
         >
-          <h2 style={{ margin: 0 }}>Calendar</h2>
+          <h2 style={{ margin: 0 }}>{t('internal.calendar.title')}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={prevMonth} aria-label="Previous month">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={prevMonth}
+              aria-label={t('internal.calendar.prevMonth')}
+            >
               ←
             </button>
             <strong style={{ minWidth: 200, textAlign: 'center' }}>{monthLabel}</strong>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={nextMonth} aria-label="Next month">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={nextMonth}
+              aria-label={t('internal.calendar.nextMonth')}
+            >
               →
             </button>
             <button type="button" className="btn btn-sm" onClick={goToday}>
-              Today
+              {t('internal.calendar.today')}
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={reload} disabled={loading}>
-              Refresh
+              {t('internal.calendar.refresh')}
             </button>
           </div>
         </div>
 
         {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
-        {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
+        {loading && <p style={{ color: 'var(--color-text-muted)' }}>{t('common.loading')}</p>}
 
         {token ? (
           <form
@@ -345,7 +396,7 @@ export function InternalManagementCalendarView({
               maxWidth: 520,
             }}
           >
-            <strong style={{ fontSize: 'var(--text-sm)' }}>Add calendar event</strong>
+            <strong style={{ fontSize: 'var(--text-sm)' }}>{t('internal.calendar.addEventHeading')}</strong>
             <div
               style={{
                 display: 'flex',
@@ -355,20 +406,20 @@ export function InternalManagementCalendarView({
               }}
             >
               <label className="field" style={{ flex: '1 1 180px', marginBottom: 0 }}>
-                <span className="field-label">Subject</span>
+                <span className="field-label">{t('internal.calendar.subject')}</span>
                 <input
                   className="input"
                   type="text"
                   value={newEventSubject}
                   onChange={(ev) => setNewEventSubject(ev.target.value)}
-                  placeholder="e.g. Team sync"
+                  placeholder={t('internal.calendar.subjectPlaceholder')}
                   maxLength={500}
                   disabled={savingEvent}
                   autoComplete="off"
                 />
               </label>
               <label className="field" style={{ width: 160, marginBottom: 0 }}>
-                <span className="field-label">Date</span>
+                <span className="field-label">{t('internal.calendar.date')}</span>
                 <input
                   className="input"
                   type="date"
@@ -378,7 +429,7 @@ export function InternalManagementCalendarView({
                 />
               </label>
               <button type="submit" className="btn btn-primary btn-sm" disabled={savingEvent}>
-                {savingEvent ? 'Adding…' : 'Add event'}
+                {savingEvent ? t('internal.calendar.adding') : t('internal.calendar.addEvent')}
               </button>
             </div>
           </form>
@@ -407,7 +458,7 @@ export function InternalManagementCalendarView({
                   border: '1px solid var(--color-border)',
                 }}
               />
-              PO farm delivery
+              {t('internal.calendar.legendPoFarmDelivery')}
             </span>
             <span>
               <span
@@ -422,7 +473,7 @@ export function InternalManagementCalendarView({
                   border: '1px solid var(--color-border)',
                 }}
               />
-              PO arrival at buyer
+              {t('internal.calendar.legendPoArrival')}
             </span>
             <span>
               <span
@@ -437,7 +488,7 @@ export function InternalManagementCalendarView({
                   border: '1px solid var(--color-border)',
                 }}
               />
-              Event
+              {t('internal.calendar.legendEvent')}
             </span>
           </div>
         ) : (
@@ -455,7 +506,7 @@ export function InternalManagementCalendarView({
                   border: '1px solid var(--color-border)',
                 }}
               />
-              Audit
+              {t('internal.calendar.legendAudit')}
             </span>
             <span>
               <span
@@ -470,7 +521,7 @@ export function InternalManagementCalendarView({
                   border: `1px solid ${SSA_CALENDAR_SHIPMENT_BORDER}`,
                 }}
               />
-              Shipment
+              {t('internal.calendar.legendShipment')}
             </span>
             <span>
               <span
@@ -485,7 +536,7 @@ export function InternalManagementCalendarView({
                   border: '1px solid var(--color-border)',
                 }}
               />
-              Event
+              {t('internal.calendar.legendEvent')}
             </span>
           </div>
         )}
@@ -494,8 +545,8 @@ export function InternalManagementCalendarView({
           <table className="table internal-management-calendar-table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
-                {weekdayLabels.map((w) => (
-                  <th key={w} style={{ width: `${100 / 7}%`, textAlign: 'center', fontSize: 'var(--text-sm)' }}>
+                {weekdayLabels.map((w, wi) => (
+                  <th key={`${wi}-${w}`} style={{ width: `${100 / 7}%`, textAlign: 'center', fontSize: 'var(--text-sm)' }}>
                     {w}
                   </th>
                 ))}
@@ -524,11 +575,7 @@ export function InternalManagementCalendarView({
                     const more = dayItems.length - visible.length;
                     const title =
                       dayItems.length > 0
-                        ? dayItems
-                            .map((x) =>
-                              x.kind === 'customEvent' ? `Event: ${x.label}` : `${x.kind}: ${x.label}`
-                            )
-                            .join('\n')
+                        ? dayItems.map((x) => calendarTooltipLine(x, t)).join('\n')
                         : undefined;
                     return (
                       <td
@@ -563,6 +610,7 @@ export function InternalManagementCalendarView({
                                 ? `1px solid ${SSA_CALENDAR_SHIPMENT_BORDER}`
                                 : '1px solid var(--color-border)';
                             const chipColor = it.kind === 'shipment' ? SSA_CALENDAR_SHIPMENT_TEXT : 'inherit';
+                            const chipText = calendarItemDisplayLabel(it, t);
                             const inner =
                               it.kind === 'audit' ? (
                                 <Link
@@ -576,7 +624,7 @@ export function InternalManagementCalendarView({
                                     whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  {it.label}
+                                  {chipText}
                                 </Link>
                               ) : it.kind === 'shipment' ? (
                                 <Link
@@ -589,9 +637,9 @@ export function InternalManagementCalendarView({
                                     textOverflow: 'ellipsis',
                                     whiteSpace: 'nowrap',
                                   }}
-                                  title={`${it.label} — open Shipments`}
+                                  title={t('internal.calendar.openShipmentsTitle', { label: chipText })}
                                 >
-                                  {it.label}
+                                  {chipText}
                                 </Link>
                               ) : it.kind === 'customEvent' ? (
                                 <span
@@ -613,9 +661,9 @@ export function InternalManagementCalendarView({
                                     textOverflow: 'ellipsis',
                                     whiteSpace: 'nowrap',
                                   }}
-                                  title={it.label}
+                                  title={chipText}
                                 >
-                                  {it.label}
+                                  {chipText}
                                 </span>
                               );
                             return (
@@ -637,7 +685,9 @@ export function InternalManagementCalendarView({
                             );
                           })}
                           {more > 0 && (
-                            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>+{more} more</span>
+                            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                              {t('internal.calendar.moreCount', { count: more })}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -652,8 +702,8 @@ export function InternalManagementCalendarView({
         {!loading && items.length === 0 && !error && (
           <p className="table-empty" style={{ marginTop: 16 }}>
             {variant === 'globalSupply'
-              ? 'Nothing scheduled yet. Add an event above, or set farm delivery / buyer arrival dates on purchase orders.'
-              : 'Nothing scheduled yet. Add an event above, or create audits / shipments with dates.'}
+              ? t('internal.calendar.emptyGlobalSupply')
+              : t('internal.calendar.emptySupplierAssurance')}
           </p>
         )}
       </div>

@@ -211,7 +211,7 @@ export function Records() {
     const openRows = rows.filter(isPending);
 
     const pct = (approvedCount: number, base: number): string =>
-      base > 0 ? `${Math.round((approvedCount / base) * 100)}% Approved` : '0% Approved';
+      base > 0 ? t('records.kpi.approvedPct', { pct: Math.round((approvedCount / base) * 100) }) : t('records.kpi.approvedPctZero');
 
     return {
       total,
@@ -222,7 +222,7 @@ export function Records() {
       internalApprovedSubtitle: pct(internalRows.filter(isApproved).length, internalRows.length),
       openTotal: openRows.length,
     };
-  }, [rows]);
+  }, [rows, t]);
 
   const load = () => {
     if (!token) return;
@@ -330,22 +330,22 @@ export function Records() {
     if (!token || !name.trim()) return;
     const effectiveSupplierId = filterSupplierId || supplierSeed || '';
     if (!effectiveSupplierId) {
-      toast.error('Choose a supplier in the filter above. The record will be linked to that supplier.');
+      toast.error(t('records.toast.chooseSupplierFirst'));
       return;
     }
     if (!file) {
-      toast.error('File is required');
+      toast.error(t('toast.fileRequired'));
       return;
     }
     if (file.size > MAX_RECORD_UPLOAD_BYTES) {
-      toast.error('File exceeds current upload limit (75MB)');
+      toast.error(t('toast.fileExceedsUploadLimit75mb'));
       return;
     }
     const auditId = uploadAuditId.trim() || null;
     const shipId = uploadShipmentId.trim() || null;
     const carId = uploadCarId.trim() || null;
     if ([auditId, shipId, carId].filter(Boolean).length > 1) {
-      toast.error('Link this record to one item only (audit, shipment, or CAR).');
+      toast.error(t('records.toast.linkOneItemOnly'));
       return;
     }
     setSubmitting(true);
@@ -369,7 +369,7 @@ export function Records() {
       setUploadCarId('');
       setFile(null);
       setUploadProgress(null);
-      toast.success('Record submitted');
+      toast.success(t('records.toast.recordSubmitted'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -387,7 +387,7 @@ export function Records() {
     if (f.size > MAX_RECORD_UPLOAD_BYTES) {
       setFile(null);
       setUploadProgress(null);
-      toast.error('Selected file is too large. Maximum is 75MB.');
+      toast.error(t('toast.selectedFileTooLarge75mb'));
       return;
     }
     setFile(f);
@@ -404,7 +404,9 @@ export function Records() {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
-      toast.success(`Record ${status.toLowerCase()}`);
+      toast.success(
+        status === 'Approved' ? t('records.toast.recordApproved') : t('records.toast.recordRejected')
+      );
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -420,7 +422,7 @@ export function Records() {
       await downloadWithAuthProgress(`/records/${r.id}/download`, token, `${r.name}-file`, (p) => {
         setDownloading((prev) => ({ ...prev, [r.id]: p }));
       });
-      toast.success('Download completed');
+      toast.success(t('toast.downloadCompleted'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -442,13 +444,13 @@ export function Records() {
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
             <div className="input-group" style={{ maxWidth: 360, marginBottom: 0 }}>
-              <label className="input-label">Filter by supplier</label>
+              <label className="input-label">{t('filters.filterBySupplier')}</label>
               <select
                 className="input"
                 value={filterSupplierId}
                 onChange={(e) => setFilterSupplierId(e.target.value)}
               >
-                <option value="">All in scope</option>
+                <option value="">{t('filters.allInScope')}</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code}: {s.name}
@@ -472,7 +474,7 @@ export function Records() {
       >
         <div className="card">
           <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Records</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.totalRecords')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.total}</div>
             <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
               {recordStats.totalApprovedSubtitle}
@@ -481,7 +483,7 @@ export function Records() {
         </div>
         <div className="card">
           <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Supplier</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.totalSupplier')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.supplierTotal}</div>
             <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
               {recordStats.supplierApprovedSubtitle}
@@ -490,7 +492,7 @@ export function Records() {
         </div>
         <div className="card">
           <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Internal</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.totalInternal')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.internalTotal}</div>
             <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
               {recordStats.internalApprovedSubtitle}
@@ -499,7 +501,7 @@ export function Records() {
         </div>
         <div className="card">
           <div className="card-body" style={{ padding: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open Records</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.openRecords')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.openTotal}</div>
           </div>
         </div>
@@ -508,18 +510,17 @@ export function Records() {
       {canUpload && !isSupplier && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Upload record</h2>
+            <h2 style={{ marginTop: 0 }}>{t('records.upload.title')}</h2>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-              Choose a supplier (filter above). Optionally link this file to <strong>one</strong> audit, shipment, or CAR
-              only.
+              {t('records.upload.intro')}
             </p>
             <form onSubmit={submit}>
               <div className="input-group">
-                <label className="input-label">Name *</label>
+                <label className="input-label">{t('records.field.recordName')}</label>
                 <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="input-group">
-                <label className="input-label">Audit (optional)</label>
+                <label className="input-label">{t('records.field.auditOptional')}</label>
                 <select
                   className="input"
                   style={{ maxWidth: 480 }}
@@ -531,7 +532,7 @@ export function Records() {
                     setUploadCarId('');
                   }}
                 >
-                  <option value="">— None —</option>
+                  <option value="">{t('records.option.noneDash')}</option>
                   {auditOptions.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.code} · {a.auditDate?.slice(0, 10) ?? ''} · {a.derivedStatus}
@@ -540,16 +541,16 @@ export function Records() {
                 </select>
                 {!supplierForLinks ? (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    Select a supplier in the filter to load audits.
+                    {t('records.hint.selectSupplierAudits')}
                   </span>
                 ) : auditOptions.length === 0 ? (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    No audits for this supplier in your scope.
+                    {t('records.hint.noAudits')}
                   </span>
                 ) : null}
               </div>
               <div className="input-group">
-                <label className="input-label">Shipment (optional)</label>
+                <label className="input-label">{t('records.field.shipmentOptional')}</label>
                 <select
                   className="input"
                   style={{ maxWidth: 480 }}
@@ -561,7 +562,7 @@ export function Records() {
                     setUploadCarId('');
                   }}
                 >
-                  <option value="">— None —</option>
+                  <option value="">{t('records.option.noneDash')}</option>
                   {shipmentOptions.map((s) => (
                     <option key={s.id} value={s.id}>
                       {(s.code ?? s.id).slice(0, 32)}
@@ -571,16 +572,16 @@ export function Records() {
                 </select>
                 {!supplierForLinks ? (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    Select a supplier in the filter to load shipments.
+                    {t('records.hint.selectSupplierShipments')}
                   </span>
                 ) : shipmentOptions.length === 0 ? (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    No shipment requests for this supplier in your scope.
+                    {t('records.hint.noShipments')}
                   </span>
                 ) : null}
               </div>
               <div className="input-group">
-                <label className="input-label">CAR (optional)</label>
+                <label className="input-label">{t('records.field.carOptional')}</label>
                 <select
                   className="input"
                   style={{ maxWidth: 480 }}
@@ -592,7 +593,7 @@ export function Records() {
                     setUploadShipmentId('');
                   }}
                 >
-                  <option value="">— None —</option>
+                  <option value="">{t('records.option.noneDash')}</option>
                   {carOptions.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.code} · {formatCarStatusForRecords(c.status)}
@@ -601,20 +602,20 @@ export function Records() {
                 </select>
                 {!supplierForLinks ? (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    Select a supplier in the filter to load corrective actions.
+                    {t('records.hint.selectSupplierCars')}
                   </span>
                 ) : carOptions.length === 0 ? (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    No CARs for this supplier in your scope.
+                    {t('records.hint.noCars')}
                   </span>
                 ) : (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    Opens from CAR Record with supplier and CAR pre-selected when you use Add attachment.
+                    {t('records.hint.carDeepLink')}
                   </span>
                 )}
               </div>
               <div className="input-group" style={{ position: 'relative' }}>
-                <label className="input-label">File *</label>
+                <label className="input-label">{t('records.field.fileRequired')}</label>
                 <input
                   ref={fileInputRef}
                   className="input"
@@ -629,7 +630,7 @@ export function Records() {
                     onClick={() => fileInputRef.current?.click()}
                     style={{ whiteSpace: 'nowrap' }}
                   >
-                    Choose File
+                    {t('records.chooseFile')}
                   </button>
                   <span
                     style={{
@@ -641,9 +642,9 @@ export function Records() {
                       display: 'inline-block',
                       maxWidth: 280,
                     }}
-                    title={file?.name || 'No file chosen'}
+                    title={file?.name || t('records.noFileChosen')}
                   >
-                    {file?.name || 'No file chosen'}
+                    {file?.name || t('records.noFileChosen')}
                   </span>
                 </div>
                 <div
@@ -674,11 +675,11 @@ export function Records() {
                 </div>
               </div>
               <div className="input-group">
-                <label className="input-label">Notes (optional)</label>
+                <label className="input-label">{t('records.field.notesOptional')}</label>
                 <textarea className="input" rows={2} value={uploadNotes} onChange={(e) => setUploadNotes(e.target.value)} />
               </div>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? '…' : 'Submit'}
+                {submitting ? t('records.submitting') : t('records.submit')}
               </button>
             </form>
           </div>
@@ -687,57 +688,57 @@ export function Records() {
 
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>All records</h2>
+          <h2 style={{ marginTop: 0 }}>{t('records.allRecords')}</h2>
           {loading ? (
             <div className="table-wrap">
-              <p className="table-empty">Loading…</p>
+              <p className="table-empty">{t('common.loading')}</p>
             </div>
           ) : rows.length === 0 ? (
             <div className="table-wrap">
-              <p className="table-empty">No records.</p>
+              <p className="table-empty">{t('records.emptyList')}</p>
             </div>
           ) : (
-            <TableWithTopScroll ariaLabel="All records">
+            <TableWithTopScroll ariaLabel={t('records.allRecordsAria')}>
               <table className="table">
                 <thead>
                   <tr>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('name')}>
-                      Name {sortIndicator('name')}
+                      {t('table.col.name')} {sortIndicator('name')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('notes')}>
-                      Notes {sortIndicator('notes')}
+                      {t('table.col.notes')} {sortIndicator('notes')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
-                      Supplier {sortIndicator('supplier')}
+                      {t('findings.col.supplier')} {sortIndicator('supplier')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>
-                      Audit {sortIndicator('audit')}
+                      {t('findings.col.audit')} {sortIndicator('audit')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('shipment')}>
-                      Shipment {sortIndicator('shipment')}
+                      {t('findings.col.shipment')} {sortIndicator('shipment')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('car')}>
-                      CAR {sortIndicator('car')}
+                      {t('findings.col.car')} {sortIndicator('car')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>
-                      Review {sortIndicator('status')}
+                      {t('records.col.reviewStatus')} {sortIndicator('status')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('file')}>
-                      File {sortIndicator('file')}
+                      {t('table.col.file')} {sortIndicator('file')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('uploadedBy')}>
-                      Uploaded by {sortIndicator('uploadedBy')}
+                      {t('records.col.uploadedBy')} {sortIndicator('uploadedBy')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('approvedBy')}>
-                      Approved by {sortIndicator('approvedBy')}
+                      {t('records.col.approvedBy')} {sortIndicator('approvedBy')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('reviewedAt')}>
-                      Reviewed At {sortIndicator('reviewedAt')}
+                      {t('records.col.reviewedAt')} {sortIndicator('reviewedAt')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>
-                      Created {sortIndicator('created')}
+                      {t('table.col.created')} {sortIndicator('created')}
                     </th>
-                    {canReview ? <th>Review</th> : null}
+                    {canReview ? <th>{t('table.col.review')}</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -747,7 +748,7 @@ export function Records() {
                       <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes ?? ''}>
                         {r.notes?.trim() ? r.notes : '—'}
                       </td>
-                      <td>{r.supplier?.code ?? 'None'}</td>
+                      <td>{r.supplier?.code ?? t('common.none')}</td>
                       <td>{r.audit?.code ?? 'None'}</td>
                       <td>{r.shipment?.code ?? 'None'}</td>
                       <td>{r.car?.code ?? 'None'}</td>
@@ -832,10 +833,14 @@ export function Records() {
           {rows.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', paddingTop: '0.75rem' }}>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+                {t('table.paginationRange', {
+                  start: (pageSafe - 1) * pageSize + 1,
+                  end: Math.min(pageSafe * pageSize, totalCount),
+                  total: totalCount,
+                })}
               </span>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
-                Rows per page:
+                {t('table.rowsPerPage')}
                 <select
                   className="input"
                   value={pageSize}
@@ -858,10 +863,10 @@ export function Records() {
                   disabled={pageSafe <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  Previous
+                  {t('table.previous')}
                 </button>
                 <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
-                  Page {pageSafe} of {totalPages}
+                  {t('table.pageOf', { page: pageSafe, pages: totalPages })}
                 </span>
                 <button
                   type="button"
@@ -869,7 +874,7 @@ export function Records() {
                   disabled={pageSafe >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  Next
+                  {t('table.next')}
                 </button>
               </div>
             </div>

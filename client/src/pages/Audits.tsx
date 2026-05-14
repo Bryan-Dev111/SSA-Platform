@@ -63,6 +63,8 @@ export function Audits() {
   const { token, user } = useAuth();
   const toast = useToast();
   const { t, locale } = useLanguage();
+  const trDerived = (s: string) => t(`audits.derived.${s.replace(/\s+/g, '')}`, s);
+  const trResult = (s: string | null) => (s ? t(`audits.result.${s}`, s) : '—');
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [audits, setAudits] = useState<Audit[]>([]);
@@ -173,7 +175,7 @@ export function Audits() {
   const auditsByType = useMemo(() => {
     const map = new Map<string, number>();
     for (const a of audits) {
-      const label = a.auditType?.name?.trim() || a.auditType?.code?.trim() || 'Unspecified';
+      const label = a.auditType?.name?.trim() || a.auditType?.code?.trim() || '';
       map.set(label, (map.get(label) ?? 0) + 1);
     }
     return [...map.entries()]
@@ -197,16 +199,16 @@ export function Audits() {
         setAudits(a);
         setSuppliers(s);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('findings.loadFailed')))
       .finally(() => setLoading(false));
-  }, [token, supplierFilter]);
+  }, [token, supplierFilter, t]);
 
   const refetchAudits = () => {
     if (!token) return;
     const q = supplierFilter ? `?supplierId=${encodeURIComponent(supplierFilter)}` : '';
     apiJson<Audit[]>(`/audits${q}`, { token })
       .then(setAudits)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'));
+      .catch((e) => setError(e instanceof Error ? e.message : t('findings.loadFailed')));
   };
 
   const handleDelete = async (auditId: string) => {
@@ -216,9 +218,9 @@ export function Audits() {
     try {
       await apiJson(`/audits/${auditId}`, { token, method: 'DELETE' });
       refetchAudits();
-      toast.success('Audit deleted');
+      toast.success(t('audits.auditDeleted'));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Delete failed';
+      const msg = e instanceof Error ? e.message : t('audits.deleteFailed');
       setError(msg);
       toast.error(msg);
     } finally {
@@ -236,9 +238,9 @@ export function Audits() {
         body: JSON.stringify({ result }),
       });
       setAudits((prev) => prev.map((a) => (a.id === auditId ? updated : a)));
-      toast.success(`Audit ${updated.code} marked ${result}`);
+      toast.success(t('audits.resultMarked', { code: updated.code, result: trResult(result) }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to update';
+      const msg = e instanceof Error ? e.message : t('audits.updateFailed');
       setError(msg);
       toast.error(msg);
     } finally {
@@ -255,7 +257,7 @@ export function Audits() {
 
   const openRecordUploadModal = (a: Audit) => {
     setRecordUploadAudit(a);
-    setRecordName(`${a.code} attachment`);
+    setRecordName(t('audits.recordDefaultName', { code: a.code }));
     setRecordNotes('');
     setRecordFile(null);
     setRecordUploadProgress(null);
@@ -274,15 +276,15 @@ export function Audits() {
     e.preventDefault();
     if (!token || !recordUploadAudit) return;
     if (!recordName.trim()) {
-      toast.error('Name is required');
+      toast.error(t('audits.nameRequired'));
       return;
     }
     if (!recordFile) {
-      toast.error('File is required');
+      toast.error(t('audits.fileRequired'));
       return;
     }
     if (recordFile.size > MAX_RECORD_UPLOAD_BYTES) {
-      toast.error('File exceeds current upload limit (75MB)');
+      toast.error(t('audits.fileTooLarge'));
       return;
     }
     setSubmittingRecord(true);
@@ -302,7 +304,7 @@ export function Audits() {
         token,
         (p) => setRecordUploadProgress(p)
       );
-      toast.success('Record added');
+      toast.success(t('audits.recordAdded'));
       setRecordUploadAudit(null);
       setRecordName('');
       setRecordNotes('');
@@ -321,7 +323,7 @@ export function Audits() {
     try {
       setDownloadingRecord((prev) => ({ ...prev, [recordId]: true }));
       await downloadWithAuthProgress(`/records/${recordId}/download`, token, recordName, () => {});
-      toast.success('Record download completed');
+      toast.success(t('audits.recordDownloaded'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -361,7 +363,7 @@ export function Audits() {
 
       <div style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>{t('filters.supplierColon')}</span>
           <select
             className="input"
             value={supplierFilter}
@@ -372,7 +374,7 @@ export function Audits() {
             }}
             style={{ width: 'auto', minWidth: 180 }}
           >
-            <option value="">All</option>
+            <option value="">{t('filters.all')}</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.code}: {s.name}
@@ -384,14 +386,14 @@ export function Audits() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Audits</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('audits.totalAudits')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{audits.length}</div>
           <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
-            {passedPercent}% Passed
+            {t('audits.passedPercent', { pct: passedPercent })}
           </div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Scheduled</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('audits.scheduled')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{scheduledCount}</div>
         </div>
       </div>
@@ -406,9 +408,9 @@ export function Audits() {
       >
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Audits by Supplier</h2>
+            <h2 style={{ marginTop: 0 }}>{t('audits.chartBySupplier')}</h2>
             {auditsBySupplier.length === 0 ? (
-              <p className="table-empty">No audits in scope.</p>
+              <p className="table-empty">{t('audits.emptyScope')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 {auditsBySupplier.map((row) => (
@@ -436,15 +438,17 @@ export function Audits() {
 
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Audit by Type</h2>
+            <h2 style={{ marginTop: 0 }}>{t('audits.chartByType')}</h2>
             {auditsByType.length === 0 ? (
-              <p className="table-empty">No audits in scope.</p>
+              <p className="table-empty">{t('audits.emptyScope')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 {auditsByType.map((row) => (
-                  <div key={row.label}>
+                  <div key={row.label || '__unspec__'}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.75rem' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {row.label || t('audits.typeUnspecified')}
+                      </span>
                       <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{row.count}</span>
                     </div>
                     <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
@@ -466,28 +470,28 @@ export function Audits() {
       </div>
 
       <div className="card">
-        <TableWithTopScroll ariaLabel="Audits table">
+        <TableWithTopScroll ariaLabel={t('audits.tableAria')}>
           <table className="table">
             <thead>
               <tr>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('date')}>Date {sortIndicator('date')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('type')}>Type {sortIndicator('type')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('auditor')}>Auditor {sortIndicator('auditor')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('result')}>Result {sortIndicator('result')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('findings')}>Findings {sortIndicator('findings')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>Records {sortIndicator('records')}</th>
-                {isAdmin && <th>Delete</th>}
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>{t('audits.col.code')} {sortIndicator('code')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>{t('audits.col.supplier')} {sortIndicator('supplier')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('date')}>{t('audits.col.date')} {sortIndicator('date')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('type')}>{t('audits.col.type')} {sortIndicator('type')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>{t('audits.col.summary')} {sortIndicator('summary')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('auditor')}>{t('audits.col.auditor')} {sortIndicator('auditor')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>{t('audits.col.status')} {sortIndicator('status')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('result')}>{t('audits.col.result')} {sortIndicator('result')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('findings')}>{t('audits.col.findings')} {sortIndicator('findings')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('records')}>{t('audits.col.records')} {sortIndicator('records')}</th>
+                {isAdmin && <th>{t('audits.col.delete')}</th>}
               </tr>
             </thead>
             <tbody>
               {audits.length === 0 ? (
                 <tr>
                   <td colSpan={10 + (isAdmin ? 1 : 0)} className="table-empty">
-                    No audits in scope.
+                    {t('audits.emptyScope')}
                   </td>
                 </tr>
               ) : (
@@ -503,7 +507,7 @@ export function Audits() {
                     </td>
                     <td>{a.supplier.code}: {a.supplier.name}</td>
                     <td>{formatCalendarDate(a.auditDate, locale)}</td>
-                    <td>{a.auditType?.name?.trim() ? a.auditType.name : '—'}</td>
+                    <td>{a.auditType?.name?.trim() || a.auditType?.code?.trim() || t('audits.typeUnspecified')}</td>
                     <td style={{ maxWidth: 280, whiteSpace: 'normal', verticalAlign: 'top' }}>
                       {(a.summary ?? '').length > 120 ? (
                         <button
@@ -521,7 +525,7 @@ export function Audits() {
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
                           }}
-                          title="Click to view full summary"
+                          title={t('findings.clickFullSummary')}
                         >
                           {a.summary}
                         </button>
@@ -532,7 +536,7 @@ export function Audits() {
                     <td>{a.auditor?.trim() ? a.auditor : '—'}</td>
                     <td>
                       <span className={`audit-status-badge audit-status-badge--${getAuditStatusSlug(a.derivedStatus)}`}>
-                        {a.derivedStatus}
+                        {trDerived(a.derivedStatus)}
                       </span>
                     </td>
                     <td>
@@ -551,12 +555,12 @@ export function Audits() {
                           style={{ width: 'auto', minWidth: 100 }}
                         >
                           <option value="">—</option>
-                          <option value="Passed">Passed</option>
-                          <option value="Failed">Failed</option>
-                          <option value="Cancelled">Cancelled</option>
+                          <option value="Passed">{t('audits.result.Passed')}</option>
+                          <option value="Failed">{t('audits.result.Failed')}</option>
+                          <option value="Cancelled">{t('audits.result.Cancelled')}</option>
                         </select>
                       ) : (
-                        a.result ?? '—'
+                        trResult(a.result)
                       )}
                     </td>
                     <td>
@@ -580,7 +584,7 @@ export function Audits() {
                             className="btn btn-ghost"
                             style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
                           >
-                            + New Finding
+                            {t('audits.newFinding')}
                           </Link>
                         )}
                       </div>
@@ -607,9 +611,9 @@ export function Audits() {
                               }}
                               disabled={!r.hasFile || Boolean(downloadingRecord[r.id])}
                               onClick={() => r.hasFile && downloadRecord(r.id, r.name)}
-                              title={r.hasFile ? 'Download record file' : 'No file attached'}
+                              title={r.hasFile ? t('audits.downloadRecord') : t('audits.noFile')}
                             >
-                              {downloadingRecord[r.id] ? 'Downloading…' : r.name}
+                              {downloadingRecord[r.id] ? t('audits.downloading') : r.name}
                             </button>
                           ))
                         )}
@@ -620,7 +624,7 @@ export function Audits() {
                             style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
                             onClick={() => openRecordUploadModal(a)}
                           >
-                            + Add record
+                            {t('audits.addRecord')}
                           </button>
                         ) : null}
                       </div>
@@ -633,9 +637,9 @@ export function Audits() {
                           style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
                           onClick={() => setDeleteConfirmId(a.id)}
                           disabled={deletingId !== null}
-                          title="Delete audit (Admin only)"
+                          title={t('audits.deleteRowTitle')}
                         >
-                          {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                          {deletingId === a.id ? t('audits.deleting') : t('audits.col.delete')}
                         </button>
                       </td>
                     )}
@@ -648,10 +652,14 @@ export function Audits() {
         {audits.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-              {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+              {t('table.paginationRange', {
+                start: (pageSafe - 1) * pageSize + 1,
+                end: Math.min(pageSafe * pageSize, totalCount),
+                total: totalCount,
+              })}
             </span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
-              Rows per page:
+              {t('table.rowsPerPage')}
               <select
                 className="input"
                 value={pageSize}
@@ -674,10 +682,10 @@ export function Audits() {
                 disabled={pageSafe <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Previous
+                {t('table.previous')}
               </button>
               <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
-                Page {pageSafe} of {totalPages}
+                {t('table.pageOf', { page: pageSafe, pages: totalPages })}
               </span>
               <button
                 type="button"
@@ -685,7 +693,7 @@ export function Audits() {
                 disabled={pageSafe >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                Next
+                {t('table.next')}
               </button>
             </div>
           </div>
@@ -694,9 +702,10 @@ export function Audits() {
 
       <ConfirmDialog
         open={deleteConfirmId !== null}
-        title="Delete audit"
-        message="Delete this audit? This cannot be undone."
-        confirmLabel="Delete"
+        title={t('audits.deleteTitle')}
+        message={t('audits.deleteMessage')}
+        confirmLabel={t('audits.col.delete')}
+        cancelLabel={t('common.cancel')}
         variant="danger"
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
         onCancel={() => setDeleteConfirmId(null)}
@@ -704,13 +713,14 @@ export function Audits() {
 
       <ConfirmDialog
         open={resultConfirm !== null}
-        title="Confirm audit result"
+        title={t('audits.confirmResultTitle')}
         message={
           resultConfirm
-            ? `Are you sure you want to mark this audit as "${resultConfirm.result}"?`
+            ? t('audits.confirmResultMessage', { result: trResult(resultConfirm.result) })
             : ''
         }
-        confirmLabel="Confirm"
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
         variant="default"
         onConfirm={confirmApplyAuditResult}
         onCancel={() => setResultConfirm(null)}
@@ -726,12 +736,12 @@ export function Audits() {
         >
           <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="audit-summary-title" className="confirm-dialog-title">
-              Audit Summary - {summaryModal.code}
+              {t('audits.summaryModalTitle', { code: summaryModal.code })}
             </h3>
             <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{summaryModal.summary}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-primary" onClick={() => setSummaryModal(null)}>
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -748,14 +758,14 @@ export function Audits() {
         >
           <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="audit-add-record-title" className="confirm-dialog-title">
-              Add record — {recordUploadAudit.code}
+              {t('audits.addRecordTitle', { code: recordUploadAudit.code })}
             </h3>
             <p style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
               {recordUploadAudit.supplier.code}: {recordUploadAudit.supplier.name}
             </p>
             <form onSubmit={submitRecordFromAuditRow}>
               <div className="input-group">
-                <label className="input-label">Name *</label>
+                <label className="input-label">{t('audits.recordName')}</label>
                 <input
                   className="input"
                   value={recordName}
@@ -765,7 +775,7 @@ export function Audits() {
                 />
               </div>
               <div className="input-group" style={{ position: 'relative' }}>
-                <label className="input-label">File *</label>
+                <label className="input-label">{t('audits.recordFile')}</label>
                 <input
                   ref={recordFileInputRef}
                   className="input"
@@ -780,7 +790,7 @@ export function Audits() {
                     }
                     if (f.size > MAX_RECORD_UPLOAD_BYTES) {
                       setRecordFile(null);
-                      toast.error('Selected file is too large. Maximum is 75MB.');
+                      toast.error(t('audits.fileTooLargePicker'));
                       return;
                     }
                     setRecordFile(f);
@@ -794,7 +804,7 @@ export function Audits() {
                     disabled={submittingRecord}
                     onClick={() => recordFileInputRef.current?.click()}
                   >
-                    Choose file
+                    {t('audits.chooseFile')}
                   </button>
                   <span
                     style={{
@@ -805,9 +815,9 @@ export function Audits() {
                       whiteSpace: 'nowrap',
                       maxWidth: 260,
                     }}
-                    title={recordFile?.name || 'No file chosen'}
+                    title={recordFile?.name || t('audits.noFileChosen')}
                   >
-                    {recordFile?.name || 'No file chosen'}
+                    {recordFile?.name || t('audits.noFileChosen')}
                   </span>
                 </div>
                 {recordUploadProgress !== null && recordFile ? (
@@ -818,7 +828,7 @@ export function Audits() {
                 ) : null}
               </div>
               <div className="input-group">
-                <label className="input-label">Notes (optional)</label>
+                <label className="input-label">{t('audits.recordNotes')}</label>
                 <textarea
                   className="input"
                   rows={2}
@@ -829,10 +839,10 @@ export function Audits() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                 <button type="button" className="btn btn-ghost" onClick={closeRecordUploadModal} disabled={submittingRecord}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={submittingRecord}>
-                  {submittingRecord ? 'Uploading…' : 'Upload'}
+                  {submittingRecord ? t('audits.uploading') : t('audits.upload')}
                 </button>
               </div>
             </form>

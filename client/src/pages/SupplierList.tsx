@@ -102,14 +102,14 @@ export function SupplierList() {
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>City</th>
-                <th>Country</th>
-                <th>Risk level</th>
-                <th>Commodity</th>
-                <th>Created date</th>
-                <th>Status</th>
+                <th>{t('table.col.code')}</th>
+                <th>{t('table.col.name')}</th>
+                <th>{t('table.col.city')}</th>
+                <th>{t('table.col.country')}</th>
+                <th>{t('table.col.riskLevel')}</th>
+                <th>{t('table.col.commodity')}</th>
+                <th>{t('table.col.createdDate')}</th>
+                <th>{t('table.col.status')}</th>
               </tr>
             </thead>
             <tbody>

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiJson } from '../../api/client';
 import { SortableTh } from '../../components/SortableTh';
 import { type SortDir, cmpNum, cmpStr, toggleSort } from '../../utils/tableSort';
@@ -25,6 +26,7 @@ type ApprovedSortKey =
 
 export function ApprovedFarmersPage() {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const [farms, setFarms] = useState<FarmRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,9 +39,9 @@ export function ApprovedFarmersPage() {
     if (!token) return;
     apiJson<FarmRow[]>('/farms', { token })
       .then(setFarms)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load farms'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('farms.loadFailed')))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, t]);
 
   const sortedFarms = useMemo(() => {
     const rows = [...farms];
@@ -90,11 +92,11 @@ export function ApprovedFarmersPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Farms List</h1>
+          <h1 className="page-title">{t('nav.approvedFarmsList')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -104,7 +106,7 @@ export function ApprovedFarmersPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Approved Farms List</h1>
+          <h1 className="page-title">{t('nav.approvedFarmsList')}</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -114,7 +116,7 @@ export function ApprovedFarmersPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Approved Farms List</h1>
+        <h1 className="page-title">{t('nav.approvedFarmsList')}</h1>
       </header>
       <div className="card">
         <div className="table-wrap">
@@ -122,49 +124,49 @@ export function ApprovedFarmersPage() {
             <thead>
               <tr>
                 <SortableTh
-                  label="Farm ID"
+                  label={t('table.col.farmId')}
                   columnKey="code"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Country"
+                  label={t('table.col.country')}
                   columnKey="country"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Region"
+                  label={t('table.col.region')}
                   columnKey="region"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Elevation"
+                  label={t('table.col.elevation')}
                   columnKey="elevation"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Crops"
+                  label={t('table.col.crops')}
                   columnKey="crops"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Production Style"
+                  label={t('table.col.productionStyle')}
                   columnKey="productionStyle"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Farm Category"
+                  label={t('table.col.farmCategory')}
                   columnKey="farmCategory"
                   activeKey={sort.key}
                   dir={sort.dir}

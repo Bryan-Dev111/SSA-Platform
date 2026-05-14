@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { FarmProfileImageRow, FarmRow } from './FarmersInformationPage';
@@ -256,6 +257,7 @@ function ProcessingQualityCropTable({ farm }: { farm: FarmRow }) {
 export function GlobalFarmProfilePage() {
   const { token, user } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFarmId = searchParams.get('farmId');
@@ -396,9 +398,11 @@ export function GlobalFarmProfilePage() {
         method: 'PATCH',
         body: JSON.stringify({ section, body: bodyToSave }),
       });
-      toast.success(section === 'Profile' ? 'Farm profile text saved' : 'Processing & Quality text saved');
+      toast.success(
+        section === 'Profile' ? t('farmSection.toast.farmProfileTextSaved') : t('farmSection.toast.processingQualityTextSaved')
+      );
     } catch (err) {
-      let msg = 'Could not save text';
+      let msg = t('farmSection.toast.couldNotSaveText');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -443,7 +447,7 @@ export function GlobalFarmProfilePage() {
           }
         }
       }
-      toast.success(arr.length === 1 ? 'Photo added' : `${arr.length} photos added`);
+      toast.success(arr.length === 1 ? t('farmSection.toast.photoAdded') : t('farmSection.toast.photosAdded', { count: arr.length }));
       await loadImages();
       if (section === 'Processing' && blockId && uploadedIds.length > 0) {
         setProcessingBlocks((prev) =>
@@ -485,7 +489,7 @@ export function GlobalFarmProfilePage() {
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
       }
-      toast.success('Photo removed');
+      toast.success(t('farmSection.toast.photoRemoved'));
       setDeleteTarget(null);
       await loadImages();
       if (section === 'Processing') {

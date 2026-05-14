@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useLanguage } from '../../context/LanguageContext';
 import { SortableTh } from '../../components/SortableTh';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { cmpStr, toggleSort, type SortDir } from '../../utils/tableSort';
@@ -45,6 +46,7 @@ export function GlobalSupplyBuyersPanel({
   token: string | null;
   toast: ToastApi;
 }) {
+  const { t } = useLanguage();
   const [list, setList] = useState<BuyerRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [newDraft, setNewDraft] = useState<BuyerDraft>(EMPTY_DRAFT);
@@ -64,9 +66,9 @@ export function GlobalSupplyBuyersPanel({
       setList(r.list);
     } catch {
       setList([]);
-      toast.error('Failed to load buyers');
+      toast.error(t('gvAdmin.buyers.loadFailed'));
     }
-  }, [token, toast]);
+  }, [token, toast, t]);
 
   useEffect(() => {
     void load();
@@ -75,7 +77,7 @@ export function GlobalSupplyBuyersPanel({
   const createBuyer = async () => {
     if (!token) return;
     if (!newDraft.name.trim()) {
-      toast.error('Buyer name is required');
+      toast.error(t('gvAdmin.buyers.nameRequired'));
       return;
     }
     setBusy(true);
@@ -92,10 +94,10 @@ export function GlobalSupplyBuyersPanel({
         }),
       });
       setNewDraft(EMPTY_DRAFT);
-      toast.success('Buyer added');
+      toast.success(t('gvAdmin.buyers.added'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not add buyer');
+      toast.error(e instanceof Error ? e.message : t('gvAdmin.buyers.addFailed'));
     } finally {
       setBusy(false);
     }
@@ -104,7 +106,7 @@ export function GlobalSupplyBuyersPanel({
   const saveEdit = async () => {
     if (!token || !editRow) return;
     if (!editRow.name.trim()) {
-      toast.error('Buyer name is required');
+      toast.error(t('gvAdmin.buyers.nameRequired'));
       return;
     }
     setBusy(true);
@@ -121,10 +123,10 @@ export function GlobalSupplyBuyersPanel({
         }),
       });
       setEditRow(null);
-      toast.success('Buyer updated');
+      toast.success(t('gvAdmin.buyers.updated'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not update buyer');
+      toast.error(e instanceof Error ? e.message : t('gvAdmin.buyers.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -139,10 +141,10 @@ export function GlobalSupplyBuyersPanel({
         method: 'DELETE',
       });
       setDeleteRow(null);
-      toast.success('Buyer deleted');
+      toast.success(t('gvAdmin.buyers.deleted'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not delete buyer');
+      toast.error(e instanceof Error ? e.message : t('gvAdmin.buyers.deleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -176,24 +178,25 @@ export function GlobalSupplyBuyersPanel({
 
   const exportToExcel = useCallback(() => {
     if (sortedList.length === 0) {
-      toast.info('No buyers to export yet.');
+      toast.info(t('gvAdmin.buyers.exportNone'));
       return;
     }
     try {
+      const dash = '—';
       const rows: ExportRow[] = sortedList.map((row) => ({
-        'Buyer Name': row.name,
-        Country: row.country ?? '—',
-        City: row.city ?? '—',
-        'Contact Email': row.contactEmail ?? '—',
-        Notes: row.notes ?? '—',
+        [t('gvAdmin.buyers.col.buyerName')]: row.name,
+        [t('gvAdmin.buyers.col.country')]: row.country ?? dash,
+        [t('gvAdmin.buyers.col.city')]: row.city ?? dash,
+        [t('gvAdmin.buyers.col.contactEmail')]: row.contactEmail ?? dash,
+        [t('gvAdmin.buyers.col.notes')]: row.notes ?? dash,
       }));
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Global_Supply_Buyers_${stamp}`, 'Buyers', rows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(`${t('gvAdmin.buyers.exportFilePrefix')}_${stamp}`, t('gvAdmin.buyers.exportSheet'), rows);
+      toast.success(t('gvAdmin.buyers.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('gvAdmin.buyers.exportFailed'));
     }
-  }, [sortedList, toast]);
+  }, [sortedList, toast, t]);
 
   return (
     <div className="card">
@@ -208,15 +211,15 @@ export function GlobalSupplyBuyersPanel({
             marginBottom: '0.75rem',
           }}
         >
-          <h2 style={{ marginTop: 0, marginBottom: 0 }}>Buyers</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 0 }}>{t('gvAdmin.buyers.title')}</h2>
           <button
             type="button"
             className="btn btn-ghost"
             onClick={exportToExcel}
             disabled={busy}
-            title="Download the buyers table as an Excel file"
+            title={t('gvAdmin.buyers.exportTitle')}
           >
-            Export to Excel
+            {t('common.exportExcel')}
           </button>
         </div>
         <div
@@ -228,7 +231,7 @@ export function GlobalSupplyBuyersPanel({
           }}
         >
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Buyer Name</label>
+            <label className="input-label">{t('gvAdmin.buyers.col.buyerName')}</label>
             <input
               className="input"
               value={newDraft.name}
@@ -236,7 +239,7 @@ export function GlobalSupplyBuyersPanel({
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Country</label>
+            <label className="input-label">{t('gvAdmin.buyers.col.country')}</label>
             <input
               className="input"
               value={newDraft.country}
@@ -244,7 +247,7 @@ export function GlobalSupplyBuyersPanel({
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">City</label>
+            <label className="input-label">{t('gvAdmin.buyers.col.city')}</label>
             <input
               className="input"
               value={newDraft.city}
@@ -252,7 +255,7 @@ export function GlobalSupplyBuyersPanel({
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Contact Email</label>
+            <label className="input-label">{t('gvAdmin.buyers.col.contactEmail')}</label>
             <input
               className="input"
               type="email"
@@ -263,7 +266,7 @@ export function GlobalSupplyBuyersPanel({
             />
           </div>
           <div className="input-group" style={{ marginBottom: 0 }}>
-            <label className="input-label">Notes</label>
+            <label className="input-label">{t('gvAdmin.buyers.col.notes')}</label>
             <input
               className="input"
               value={newDraft.notes}
@@ -277,7 +280,7 @@ export function GlobalSupplyBuyersPanel({
               onClick={() => void createBuyer()}
               disabled={busy}
             >
-              Add
+              {t('common.add')}
             </button>
           </div>
         </div>
@@ -287,48 +290,48 @@ export function GlobalSupplyBuyersPanel({
             <thead>
               <tr>
                 <SortableTh
-                  label="Buyer Name"
+                  label={t('gvAdmin.buyers.col.buyerName')}
                   columnKey="name"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Country"
+                  label={t('gvAdmin.buyers.col.country')}
                   columnKey="country"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="City"
+                  label={t('gvAdmin.buyers.col.city')}
                   columnKey="city"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Contact Email"
+                  label={t('gvAdmin.buyers.col.contactEmail')}
                   columnKey="contactEmail"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Notes"
+                  label={t('gvAdmin.buyers.col.notes')}
                   columnKey="notes"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
-                <th style={{ width: 170 }}>Actions</th>
+                <th style={{ width: 170 }}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="table-empty">
-                    No buyers yet.
+                    {t('gvAdmin.buyers.empty')}
                   </td>
                 </tr>
               ) : (
@@ -418,7 +421,7 @@ export function GlobalSupplyBuyersPanel({
                             onClick={() => void saveEdit()}
                             disabled={busy}
                           >
-                            Save
+                            {t('common.save')}
                           </button>
                           <button
                             type="button"
@@ -426,7 +429,7 @@ export function GlobalSupplyBuyersPanel({
                             onClick={() => setEditRow(null)}
                             disabled={busy}
                           >
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                         </>
                       ) : (
@@ -438,7 +441,7 @@ export function GlobalSupplyBuyersPanel({
                             onClick={() => setEditRow({ ...row })}
                             disabled={busy}
                           >
-                            Edit
+                            {t('common.edit')}
                           </button>
                           <button
                             type="button"
@@ -446,7 +449,7 @@ export function GlobalSupplyBuyersPanel({
                             onClick={() => setDeleteRow(row)}
                             disabled={busy}
                           >
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </>
                       )}
@@ -461,9 +464,9 @@ export function GlobalSupplyBuyersPanel({
 
       <ConfirmDialog
         open={deleteRow !== null}
-        title="Delete buyer?"
-        message={deleteRow ? `Delete ${deleteRow.name}?` : ''}
-        confirmLabel="Delete"
+        title={t('gvAdmin.buyers.deleteTitle')}
+        message={deleteRow ? t('gvAdmin.buyers.deleteMessage', { name: deleteRow.name }) : ''}
+        confirmLabel={t('common.delete')}
         variant="danger"
         onCancel={() => setDeleteRow(null)}
         onConfirm={() => void confirmDelete()}

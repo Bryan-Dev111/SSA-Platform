@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { parseApiError, downloadWithAuthProgress } from '../../utils/apiHelpers';
@@ -26,6 +27,7 @@ export function GlobalSupplyDocumentsPanel({
   toast: ToastApi;
   canDelete?: boolean;
 }) {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<InternalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -62,7 +64,7 @@ export function GlobalSupplyDocumentsPanel({
     e.preventDefault();
     if (!token || !name.trim()) return;
     if (file && file.size > 8 * 1024 * 1024) {
-      toast.error('File must be 8MB or smaller');
+      toast.error(t('toast.fileTooLarge8mb'));
       return;
     }
     setSubmitting(true);
@@ -103,7 +105,7 @@ export function GlobalSupplyDocumentsPanel({
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadProgress(null);
-      toast.success('Saved');
+      toast.success(t('toast.saved'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -119,7 +121,7 @@ export function GlobalSupplyDocumentsPanel({
     setDeletingId(id);
     try {
       await apiJson(`/internal-docs/${id}`, { token, method: 'DELETE' });
-      toast.success('Deleted');
+      toast.success(t('toast.deleted'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -130,7 +132,7 @@ export function GlobalSupplyDocumentsPanel({
 
   const download = async (r: InternalRow) => {
     if (!token || !r.filePath) {
-      toast.error('No file attached');
+      toast.error(t('toast.noFileAttached'));
       return;
     }
     try {
@@ -138,7 +140,7 @@ export function GlobalSupplyDocumentsPanel({
       await downloadWithAuthProgress(`/internal-docs/${r.id}/download`, token, r.name, (p) => {
         setDownloading((prev) => ({ ...prev, [r.id]: p }));
       });
-      toast.success('Download completed');
+      toast.success(t('toast.downloadCompleted'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -154,7 +156,7 @@ export function GlobalSupplyDocumentsPanel({
     <>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Upload</h2>
+          <h2 style={{ marginTop: 0 }}>{t('documents.uploadSection')}</h2>
           <form onSubmit={submit}>
             <div
               style={{
@@ -166,15 +168,15 @@ export function GlobalSupplyDocumentsPanel({
               }}
             >
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Name *</label>
+                <label className="input-label">{t('documents.label.nameRequired')}</label>
                 <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Notes</label>
+                <label className="input-label">{t('documents.label.notes')}</label>
                 <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
               <div className="input-group" style={{ marginBottom: 0, position: 'relative' }}>
-                <label className="input-label">File (optional)</label>
+                <label className="input-label">{t('documents.label.fileOptional')}</label>
                 <input
                   ref={fileInputRef}
                   className="input"
@@ -187,7 +189,7 @@ export function GlobalSupplyDocumentsPanel({
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <button type="button" className="btn file-picker-btn" onClick={() => fileInputRef.current?.click()}>
-                    Choose file
+                    {t('documents.chooseFile')}
                   </button>
                   <span
                     style={{
@@ -199,9 +201,9 @@ export function GlobalSupplyDocumentsPanel({
                       display: 'inline-block',
                       maxWidth: 170,
                     }}
-                    title={file?.name || 'No file chosen'}
+                    title={file?.name || t('documents.noFileChosen')}
                   >
-                    {file?.name || 'No file chosen'}
+                    {file?.name || t('documents.noFileChosen')}
                   </span>
                 </div>
                 <div
@@ -222,9 +224,10 @@ export function GlobalSupplyDocumentsPanel({
                 >
                   <span>
                     {file
-                      ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB · Ext: ${
-                          file.name.includes('.') ? `.${file.name.split('.').pop()}` : '-'
-                        }`
+                      ? t('documents.fileMetaSizeExt', {
+                          sizeMb: (file.size / (1024 * 1024)).toFixed(2),
+                          ext: file.name.includes('.') ? `.${file.name.split('.').pop()}` : '-',
+                        })
                       : ''}
                   </span>
                   {uploadProgress !== null && file ? (
@@ -238,7 +241,7 @@ export function GlobalSupplyDocumentsPanel({
                 </div>
               </div>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? '...' : 'Add'}
+                {submitting ? t('documents.btn.submittingShort') : t('documents.btn.add')}
               </button>
             </div>
           </form>
@@ -247,20 +250,20 @@ export function GlobalSupplyDocumentsPanel({
 
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Library</h2>
+          <h2 style={{ marginTop: 0 }}>{t('documents.libraryTitle')}</h2>
           <div className="table-wrap">
             {loading ? (
-              <p className="table-empty">Loading...</p>
+              <p className="table-empty">{t('common.loading')}</p>
             ) : documentRows.length === 0 ? (
-              <p className="table-empty">No documents.</p>
+              <p className="table-empty">{t('documents.empty')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Notes</th>
-                    <th>View</th>
-                    <th>Updated</th>
+                    <th>{t('table.col.name')}</th>
+                    <th>{t('table.col.notes')}</th>
+                    <th>{t('table.col.view')}</th>
+                    <th>{t('table.col.updated')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -284,7 +287,7 @@ export function GlobalSupplyDocumentsPanel({
                                 <span>{downloading[r.id]}%</span>
                               </span>
                             ) : (
-                              'Download'
+                              t('common.download')
                             )}
                           </button>
                         ) : (
@@ -300,7 +303,7 @@ export function GlobalSupplyDocumentsPanel({
                             disabled={deletingId === r.id}
                             onClick={() => setDeleteConfirmId(r.id)}
                           >
-                            Delete
+                            {t('common.delete')}
                           </button>
                         ) : (
                           <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>—</span>
@@ -317,9 +320,9 @@ export function GlobalSupplyDocumentsPanel({
 
       <ConfirmDialog
         open={canDelete && deleteConfirmId !== null}
-        title="Delete document"
-        message="Delete this document? This cannot be undone."
-        confirmLabel="Delete"
+        title={t('documents.confirmDeleteTitle')}
+        message={t('documents.confirmDeleteMessage')}
+        confirmLabel={t('common.delete')}
         variant="danger"
         onConfirm={() => {
           if (!deleteConfirmId) return;

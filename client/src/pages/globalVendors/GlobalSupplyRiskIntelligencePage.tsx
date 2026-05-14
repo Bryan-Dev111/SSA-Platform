@@ -2,6 +2,7 @@
  * Sentinel Global Supply — Risk Intelligence hub for external risk lenses.
  */
 import { useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { VerticalBarChart } from '../../components/DashboardBarCharts';
 
@@ -83,6 +84,40 @@ const RISK_NEWS_LINKS: { href: string; titleKey: string; titleFallback: string }
   },
 ];
 
+const singleLineHeading: CSSProperties = {
+  marginTop: 0,
+  fontSize: 'var(--text-lg)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  width: '100%',
+  maxWidth: '100%',
+};
+
+const singleLineListItem: CSSProperties = {
+  display: 'block',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  marginBottom: '0.4rem',
+};
+
+/** Centered block for the bar chart card: one row, card limited width, horizontally centered. */
+const chartRowOuter: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+  width: '100%',
+  maxWidth: '100%',
+  marginTop: '1.25rem',
+};
+
+const chartCard: CSSProperties = {
+  margin: 0,
+  minWidth: 0,
+  width: '100%',
+  maxWidth: 'min(56rem, 100%)',
+};
+
 export function GlobalSupplyRiskIntelligencePage() {
   const { t } = useLanguage();
 
@@ -97,82 +132,51 @@ export function GlobalSupplyRiskIntelligencePage() {
   );
 
   return (
-    <div className="global-vendors-main">
+    <div className="global-vendors-main" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <h1 className="page-title">{t('globalRisk.pageTitle', 'Risk Intelligence')}</h1>
-      <p className="global-vendors-lead" style={{ maxWidth: '52rem' }}>
+      <p className="global-vendors-lead" style={{ maxWidth: '80rem' }}>
         {t(
           'globalRisk.lead',
           'A single place to orient sourcing and operations teams on external risks. Use the pillars below as a checklist; links open official reference sources in a new tab.'
         )}
       </p>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
-          gap: '1rem',
-          marginTop: '1.25rem',
-        }}
-      >
-        <div className="card" style={{ margin: 0 }}>
+      <div style={chartRowOuter}>
+        <div className="card" style={chartCard}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0, fontSize: 'var(--text-lg)' }}>
+            <h2 style={{ ...singleLineHeading, textAlign: 'center' }}>
               {t('globalRisk.chartTitle', 'Pillar emphasis (illustrative)')}
             </h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
+            <p
+              style={{
+                color: 'var(--color-text-muted)',
+                fontSize: 'var(--text-sm)',
+                marginBottom: '0.75rem',
+                textAlign: 'center',
+              }}
+            >
               {t(
                 'globalRisk.chartCaption',
                 'Sample scores for layout only — swap in your own indices, scores, or geospatial layers when you connect data.'
               )}
             </p>
-            <VerticalBarChart rows={chartRows} valueFormatter={(v) => String(Math.round(v))} />
-          </div>
-        </div>
-        <div className="card" style={{ margin: 0 }}>
-          <div className="card-body">
-            <h2 style={{ marginTop: 0, fontSize: 'var(--text-lg)' }}>
-              {t('globalRisk.newsTitle', 'News & signals')}
-            </h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
-              {t(
-                'globalRisk.newsLead',
-                'Curated entry points to public sources. RSS, APIs, or paid feeds can be wired here when you are ready to discuss integrations.'
-              )}
-            </p>
-            <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 'var(--text-sm)', lineHeight: 1.55 }}>
-              {RISK_NEWS_LINKS.map((item) => (
-                <li key={item.href} style={{ marginBottom: '0.4rem' }}>
-                  <a href={item.href} target="_blank" rel="noopener noreferrer">
-                    {t(item.titleKey, item.titleFallback)}
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <VerticalBarChart rows={chartRows} valueFormatter={(v) => String(Math.round(v))} axisLabelsNoWrap />
           </div>
         </div>
       </div>
 
-      <div
-        className="dashboard-metric-grid"
-        style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
-          gap: '1rem',
-          marginTop: '1.25rem',
-        }}
-      >
+      <div className="global-risk-pillars-grid">
         {PILLARS.map((pillar) => (
-          <div key={pillar.titleKey} className="card" style={{ margin: 0 }}>
+          <div key={pillar.titleKey} className="card" style={{ margin: 0, minWidth: 0 }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0, fontSize: 'var(--text-lg)' }}>
-                {t(pillar.titleKey, pillar.titleFallback)}
-              </h2>
+              <h2 style={singleLineHeading}>{t(pillar.titleKey, pillar.titleFallback)}</h2>
               <p style={{ color: 'var(--color-text-muted)', lineHeight: 1.55, marginBottom: '1rem' }}>
                 {t(pillar.bodyKey, pillar.bodyFallback)}
               </p>
               <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 'var(--text-sm)' }}>
                 {pillar.links.map((link) => (
-                  <li key={link.href} style={{ marginBottom: '0.35rem' }}>
-                    <a href={link.href} target="_blank" rel="noopener noreferrer">
+                  <li key={link.href} style={{ ...singleLineListItem, marginBottom: '0.35rem' }}>
+                    <a href={link.href} target="_blank" rel="noopener noreferrer" title={link.label}>
                       {link.label}
                     </a>
                   </li>
@@ -183,13 +187,49 @@ export function GlobalSupplyRiskIntelligencePage() {
         ))}
       </div>
 
-      <div className="card" style={{ marginTop: '1.25rem' }}>
-        <div className="card-body">
-          <h2 style={{ marginTop: 0, fontSize: 'var(--text-lg)' }}>{t('globalRisk.howTitle', 'How teams use this page')}</h2>
-          <ul style={{ margin: 0, paddingLeft: '1.25rem', lineHeight: 1.6 }}>
-            <li>{t('globalRisk.how1', 'Commodity buyers: align bids and coverage with weather and policy shocks in origins.')}</li>
-            <li>{t('globalRisk.how2', 'Sourcing directors: prioritize country reviews when multiple pillars flash red.')}</li>
-            <li>{t('globalRisk.how3', 'Logistics: escalate reroutes when infrastructure and market stress overlap.')}</li>
+      <div className="card" style={{ marginTop: '1.25rem', minWidth: 0 }}>
+        <div className="card-body" style={{ textAlign: 'center' }}>
+          <h2 style={singleLineHeading}>{t('globalRisk.newsTitle', 'News & signals')}</h2>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
+            {t(
+              'globalRisk.newsLead',
+              'Curated entry points to public sources. RSS, APIs, or paid feeds can be wired here when you are ready to discuss integrations.'
+            )}
+          </p>
+          <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 'var(--text-sm)', lineHeight: 1.55 }}>
+            {RISK_NEWS_LINKS.map((item) => (
+              <li key={item.href} style={singleLineListItem}>
+                <a href={item.href} target="_blank" rel="noopener noreferrer" title={t(item.titleKey, item.titleFallback)}>
+                  {t(item.titleKey, item.titleFallback)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: '1.25rem', minWidth: 0 }}>
+        <div className="card-body" style={{ textAlign: 'center' }}>
+          <h2 style={{ ...singleLineHeading, textAlign: 'center' }}>{t('globalRisk.howTitle', 'How teams use this page')}</h2>
+          <ul
+            style={{
+              margin: '0.75rem auto 0',
+              paddingLeft: '1.25rem',
+              lineHeight: 1.6,
+              display: 'inline-block',
+              textAlign: 'left',
+              maxWidth: 'min(48rem, 100%)',
+            }}
+          >
+            <li style={singleLineListItem}>
+              {t('globalRisk.how1', 'Commodity buyers: align bids and coverage with weather and policy shocks in origins.')}
+            </li>
+            <li style={singleLineListItem}>
+              {t('globalRisk.how2', 'Sourcing directors: prioritize country reviews when multiple pillars flash red.')}
+            </li>
+            <li style={{ ...singleLineListItem, marginBottom: 0 }}>
+              {t('globalRisk.how3', 'Logistics: escalate reroutes when infrastructure and market stress overlap.')}
+            </li>
           </ul>
         </div>
       </div>

@@ -4,6 +4,7 @@
  */
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiJson } from '../../api/client';
 import { MetricCard } from '../../components/MetricCard';
 import { formatUsd } from '../../utils/formatUsd';
@@ -71,6 +72,7 @@ function sortPurchaseOrdersDesc(orders: PurchaseOrderRow[]): PurchaseOrderRow[] 
 }
 
 export function GlobalSupplyProfitTab({ token }: { token: string | null }) {
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,11 +225,11 @@ export function GlobalSupplyProfitTab({ token }: { token: string | null }) {
               >
                 <thead>
                   <tr>
-                    <th style={cellBorder}>Purchase Order</th>
-                    <th style={cellBorder}>Revenue</th>
-                    <th style={cellBorder}>Expense</th>
-                    <th style={cellBorder}>Amount</th>
-                    <th style={cellBorder}>Profit</th>
+                    <th style={cellBorder}>{t('table.col.purchaseOrder')}</th>
+                    <th style={cellBorder}>{t('table.col.revenue')}</th>
+                    <th style={cellBorder}>{t('table.col.expense')}</th>
+                    <th style={cellBorder}>{t('table.col.amount')}</th>
+                    <th style={cellBorder}>{t('table.col.profit')}</th>
                   </tr>
                 </thead>
                 <tbody>

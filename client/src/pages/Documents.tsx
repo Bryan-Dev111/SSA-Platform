@@ -39,6 +39,13 @@ function formatCommandMediaDate(iso: string | undefined, locale: string): string
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function translatedCommandMediaType(
+  documentType: string,
+  translate: (key: string, defaultValue?: string) => string
+): string {
+  return translate(`commandMedia.type.${documentType}`, commandMediaDocumentTypeLabel(documentType));
+}
+
 export function Documents() {
   const { token, user } = useAuth();
   const { t, locale } = useLanguage();
@@ -62,8 +69,8 @@ export function Documents() {
       switch (k) {
         case 'type':
           return cmpStr(
-            commandMediaDocumentTypeLabel(a.documentType),
-            commandMediaDocumentTypeLabel(b.documentType),
+            translatedCommandMediaType(a.documentType, t),
+            translatedCommandMediaType(b.documentType, t),
             dir
           );
         case 'number':
@@ -79,7 +86,7 @@ export function Documents() {
       }
     });
     return list;
-  }, [rows, tableSort]);
+  }, [rows, tableSort, t]);
 
   const canMutate =
     (user?.roleNames?.includes('Admin') ?? false) ||
@@ -132,7 +139,7 @@ export function Documents() {
     setDeletingId(id);
     try {
       await apiJson(`/documents/${id}`, { token, method: 'DELETE' });
-      toast.success('Deleted');
+      toast.success(t('documents.toastDeleted'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -143,7 +150,7 @@ export function Documents() {
 
   const download = async (r: DocumentRow) => {
     if (!token || !r.filePath) {
-      toast.error('No file attached');
+      toast.error(t('toast.noFileAttached'));
       return;
     }
     try {
@@ -151,7 +158,7 @@ export function Documents() {
       await downloadWithAuthProgress(`/documents/${r.id}/download`, token, `${r.documentNumber}-${r.name}`, (p) => {
         setDownloading((prev) => ({ ...prev, [r.id]: p }));
       });
-      toast.success('Download completed');
+      toast.success(t('toast.downloadCompleted'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -173,59 +180,59 @@ export function Documents() {
 
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Library</h2>
+          <h2 style={{ marginTop: 0 }}>{t('documents.libraryTitle')}</h2>
           <div className="table-wrap">
             {loading ? (
-              <p className="table-empty">Loading…</p>
+              <p className="table-empty">{t('common.loading')}</p>
             ) : rows.length === 0 ? (
-              <p className="table-empty">No documents.</p>
+              <p className="table-empty">{t('documents.empty')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
                     <SortableTh
-                      label="Type"
+                      label={t('documents.col.type')}
                       columnKey="type"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Number"
+                      label={t('documents.col.number')}
                       columnKey="number"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Name"
+                      label={t('documents.col.name')}
                       columnKey="name"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Revision"
+                      label={t('documents.col.revision')}
                       columnKey="revision"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
                     <SortableTh
-                      label="Created"
+                      label={t('documents.col.created')}
                       columnKey="created"
                       activeKey={tableSort.key}
                       dir={tableSort.dir}
                       onSort={(col) => setTableSort((p) => toggleSort(p, col))}
                     />
-                    <th>View</th>
+                    <th>{t('table.col.view')}</th>
                     {canMutate ? <th /> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedRows.map((r) => (
                     <tr key={r.id}>
-                      <td>{commandMediaDocumentTypeLabel(r.documentType)}</td>
+                      <td>{translatedCommandMediaType(r.documentType, t)}</td>
                       <td>{r.documentNumber}</td>
                       <td>{r.name}</td>
                       <td>{r.revision ?? '—'}</td>
@@ -245,7 +252,7 @@ export function Documents() {
                                 <span>{downloading[r.id]}%</span>
                               </span>
                             ) : (
-                              'Download'
+                              t('common.download')
                             )}
                           </button>
                         ) : (
@@ -260,7 +267,7 @@ export function Documents() {
                             disabled={deletingId === r.id}
                             onClick={() => setDeleteConfirmId(r.id)}
                           >
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </td>
                       ) : null}
@@ -273,10 +280,14 @@ export function Documents() {
           {rows.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', paddingTop: '0.75rem' }}>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-                {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+                {t('table.paginationRange', {
+                  start: (pageSafe - 1) * pageSize + 1,
+                  end: Math.min(pageSafe * pageSize, totalCount),
+                  total: totalCount,
+                })}
               </span>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
-                Rows per page:
+                {t('table.rowsPerPage')}
                 <select
                   className="input"
                   value={pageSize}
@@ -299,10 +310,10 @@ export function Documents() {
                   disabled={pageSafe <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  Previous
+                  {t('table.previous')}
                 </button>
                 <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
-                  Page {pageSafe} of {totalPages}
+                  {t('table.pageOf', { page: pageSafe, pages: totalPages })}
                 </span>
                 <button
                   type="button"
@@ -310,7 +321,7 @@ export function Documents() {
                   disabled={pageSafe >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  Next
+                  {t('table.next')}
                 </button>
               </div>
             </div>

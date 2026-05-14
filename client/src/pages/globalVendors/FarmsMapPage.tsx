@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { MapContainer, CircleMarker, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiJson } from '../../api/client';
 import { LOGISTICS_SITE_TYPES } from './LogisticsPage';
 
@@ -78,6 +79,7 @@ function MapFitBounds({ points }: { points: [number, number][] }) {
 
 export function FarmsMapPage() {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const [farms, setFarms] = useState<FarmMapPoint[]>([]);
   const [logistics, setLogistics] = useState<LogisticsMapPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,17 +112,18 @@ export function FarmsMapPage() {
         setLogistics(cleanedLogistics);
       })
       .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Failed to load farms map')
+        setError(e instanceof Error ? e.message : t('farms.mapLoadFailed'))
       )
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, t]);
 
   const displayPoints = useMemo<DisplayPoint[]>(() => {
+    const farmLabel = t('farms.legendFarm');
     const farmPoints: DisplayPoint[] = farms.map((f) => ({
       id: `farm-${f.id}`,
       latitude: f.latitude,
       longitude: f.longitude,
-      legendLabel: 'Farm',
+      legendLabel: farmLabel,
       title: `${f.code} · ${f.farmName}`,
       subtitle: f.farmCategory?.trim() || undefined,
     }));
@@ -133,7 +136,7 @@ export function FarmsMapPage() {
       subtitle: l.siteType,
     }));
     return [...farmPoints, ...logisticsPoints];
-  }, [farms, logistics]);
+  }, [farms, logistics, t]);
 
   const points: [number, number][] = useMemo(
     () => displayPoints.map((p) => [p.latitude, p.longitude]),
@@ -150,30 +153,33 @@ export function FarmsMapPage() {
 
   const legendItems = useMemo(
     () => [
-      { label: 'Farm', ...FARM_MARKER_COLOR },
-      ...LOGISTICS_SITE_TYPES.map((t) => ({
-        label: t.label,
-        stroke: t.bg,
-        fill: t.bg,
+      { label: t('farms.legendFarm'), ...FARM_MARKER_COLOR },
+      ...LOGISTICS_SITE_TYPES.map((ty) => ({
+        label: t(`logistics.siteType.${ty.value}`),
+        stroke: ty.bg,
+        fill: ty.bg,
       })),
     ],
-    []
+    [t]
   );
 
-  const colorForLegend = useCallback((legendLabel: string) => {
-    if (legendLabel === 'Farm') return FARM_MARKER_COLOR;
-    return LOGISTICS_COLOR_BY_TYPE.get(legendLabel) ?? FARM_MARKER_COLOR;
-  }, []);
+  const colorForLegend = useCallback(
+    (legendLabel: string) => {
+      if (legendLabel === t('farms.legendFarm')) return FARM_MARKER_COLOR;
+      return LOGISTICS_COLOR_BY_TYPE.get(legendLabel) ?? FARM_MARKER_COLOR;
+    },
+    [t]
+  );
 
   if (loading) {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Farms Map</h1>
+          <h1 className="page-title">{t('nav.farmsMap')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading farms map…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -182,7 +188,7 @@ export function FarmsMapPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Farms Map</h1>
+        <h1 className="page-title">{t('nav.farmsMap')}</h1>
       </header>
 
       {error && <div className="alert-error">{error}</div>}

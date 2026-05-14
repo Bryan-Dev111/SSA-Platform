@@ -60,6 +60,11 @@ interface RiskActionRow {
 type RiskLikelihood = NonNullable<OpportunityRow['likelihood']>;
 type RiskSeverity = NonNullable<OpportunityRow['severity']>;
 
+function riskMatrixCellLabel(cellLabel: string, t: (key: string, defaultValue?: string) => string): string {
+  const slug = cellLabel.replace(/\s+/g, '');
+  return t(`risk.matrixCell.${slug}`, cellLabel);
+}
+
 /** Matches server risk-actions / opportunities matrix for residual preview. */
 function deriveResidualRiskLevel(likelihood: RiskLikelihood, severity: RiskSeverity): 'Low' | 'Medium' | 'High' {
   const l = ['VeryUnlikely', 'Unlikely', 'Possible', 'Likely', 'VeryLikely'].indexOf(likelihood);
@@ -497,9 +502,9 @@ export function Risk() {
       const supplierSuffix =
         suppliers.find((s) => s.id === filterSupplierId)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
       downloadTableXlsx(`Risk_Table_${supplierSuffix}`, 'Risk Table', rows);
-      toast.success('Exported to Excel');
+      toast.success(t('findings.exportDone'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Export failed');
+      toast.error(err instanceof Error ? err.message : t('findings.exportFailed'));
     }
   };
 
@@ -523,11 +528,11 @@ export function Risk() {
       setNewDescription('');
       setNewLikelihood('Possible');
       setNewSeverity('Moderate');
-      toast.success('Risk/Opportunity item added');
+      toast.success(t('risk.toast.itemAdded'));
       if (matchesActiveFilters(created)) setItems((prev) => [created, ...prev.filter((x) => x.id !== created.id)]);
       else await load(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create item');
+      toast.error(err instanceof Error ? err.message : t('risk.toast.createItemFailed'));
     } finally {
       setSaving(false);
     }
@@ -562,10 +567,10 @@ export function Risk() {
       setNewActionOwner('');
       setNewActionDueDate('');
       setNewActionStatus('Open');
-      toast.success('Action added');
+      toast.success(t('risk.toast.actionAdded'));
       await load(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create action');
+      toast.error(err instanceof Error ? err.message : t('risk.toast.createActionFailed'));
     } finally {
       setSaving(false);
     }
@@ -575,11 +580,11 @@ export function Risk() {
     const d = actionDrafts[row.id];
     if (!token || !d) return;
     if (d.status === 'Closed' && (!d.residualLikelihood || !d.residualSeverity)) {
-      toast.error('Residual likelihood and severity are required to close an action');
+      toast.error(t('risk.toast.closeActionNeedsResidual'));
       return;
     }
     if (!d.description.trim()) {
-      toast.error('Action description cannot be empty');
+      toast.error(t('risk.toast.actionDescriptionEmpty'));
       return;
     }
     setSavingActionId(row.id);
@@ -599,10 +604,10 @@ export function Risk() {
         method: 'PATCH',
         body: JSON.stringify(payload),
       });
-      toast.success('Action updated');
+      toast.success(t('risk.toast.actionUpdated'));
       await load(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update action');
+      toast.error(err instanceof Error ? err.message : t('risk.toast.updateActionFailed'));
     } finally {
       setSavingActionId(null);
     }
@@ -623,11 +628,11 @@ export function Risk() {
         }),
       });
       setEditingId(null);
-      toast.success('Risk/Opportunity item updated');
+      toast.success(t('risk.toast.itemUpdated'));
       if (matchesActiveFilters(updated)) setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       else setItems((prev) => prev.filter((row) => row.id !== updated.id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update item');
+      toast.error(err instanceof Error ? err.message : t('risk.toast.updateItemFailed'));
     } finally {
       setSaving(false);
     }
@@ -643,12 +648,12 @@ export function Risk() {
     setDeletingItem(true);
     try {
       await apiJson(`/opportunities/${deleteTarget.id}`, { token, method: 'DELETE' });
-      toast.success('Risk/Opportunity deleted');
+      toast.success(t('risk.toast.itemDeleted'));
       if (editingId === deleteTarget.id) setEditingId(null);
       setDeleteTarget(null);
       await load(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete item');
+      toast.error(err instanceof Error ? err.message : t('risk.toast.deleteItemFailed'));
     } finally {
       setDeletingItem(false);
     }
@@ -678,9 +683,9 @@ export function Risk() {
 
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>{t('filters.supplierColon')}</span>
           <select className="input" style={{ minWidth: 220, width: 'auto' }} value={filterSupplierId} onChange={(e) => setFilterSupplierId(e.target.value)}>
-            <option value="">All in scope</option>
+            <option value="">{t('filters.allInScope')}</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.code} - {s.name}
@@ -692,37 +697,40 @@ export function Risk() {
 
       <div className="risk-kpi-grid">
         <MetricCard
-          title="Quality Score"
+          title={t('risk.kpi.qualityScore')}
           value={String(stats.avgScore)}
           trend={{ pct: avgTrendPercent }}
         />
         <MetricCard
-          title="Open Risks"
+          title={t('risk.kpi.openRisks')}
           value={String(stats.openRisks)}
           subtitle={
             stats.mitigatedRisks === 0
-              ? 'No Completed Mitigations'
-              : `${stats.mitigatedRisks} Mitigated`
+              ? t('risk.kpi.noCompletedMitigations')
+              : t('risk.kpi.mitigated', { count: stats.mitigatedRisks })
           }
         />
         <MetricCard
-          title="Open Actions"
+          title={t('risk.kpi.openActions')}
           value={String(stats.openActions)}
           subtitle={
             stats.overdueActions === 0
-              ? 'No Overdue Actions'
-              : `${stats.overdueActions} Overdue Action${stats.overdueActions === 1 ? '' : 's'}`
+              ? t('risk.kpi.noOverdueActions')
+              : t(
+                  stats.overdueActions === 1 ? 'risk.kpi.overdueAction_one' : 'risk.kpi.overdueAction_other',
+                  { count: stats.overdueActions }
+                )
           }
         />
         <MetricCard
-          title="Open Opportunities"
+          title={t('risk.kpi.openOpportunities')}
           value={String(stats.openOpportunities)}
           subtitle={
             stats.realizedOpportunities === 0
-              ? '0 Realized Opportunities'
+              ? t('risk.kpi.realizedOpportunitiesZero')
               : stats.realizedOpportunities === 1
-                ? '1 Realized Opportunity'
-                : `${stats.realizedOpportunities} Realized Opportunities`
+                ? t('risk.kpi.realizedOpportunityOne')
+                : t('risk.kpi.realizedOpportunitiesMany', { count: stats.realizedOpportunities })
           }
         />
       </div>
@@ -731,9 +739,9 @@ export function Risk() {
         <RiskDistributionCard distribution={distribution} />
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Top Risk Suppliers</h2>
+            <h2 style={{ marginTop: 0 }}>{t('risk.topRiskSuppliers')}</h2>
             {topRiskSuppliers.length === 0 ? (
-              <p className="table-empty">No data.</p>
+              <p className="table-empty">{t('risk.page.noData')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {topRiskSuppliers.map((r) => (
@@ -757,36 +765,40 @@ export function Risk() {
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Risk Matrix</h2>
+          <h2 style={{ marginTop: 0 }}>{t('risk.matrixTitle')}</h2>
           <div className="table-wrap">
             <table className="table" style={{ minWidth: 840 }}>
               <thead>
                 <tr>
-                  <th>Likelihood \ Impact</th>
+                  <th>{t('risk.register.likelihoodImpact')}</th>
                   {matrixSeverityOrder.map((severity) => (
-                    <th key={severity}>{severity}</th>
+                    <th key={severity}>{t(`risk.matrixSeverity.${severity}`)}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {matrixLikelihoodOrder.map((likelihood, rowIndex) => (
                   <tr key={likelihood}>
-                    <td style={{ whiteSpace: 'nowrap' }}>{likelihood?.replace('Very', 'Very ')}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{t(`risk.matrixLikelihood.${likelihood}`)}</td>
                     {matrixSeverityOrder.map((severity, colIndex) => {
                       const cellLabel = matrixLabelGrid[rowIndex][colIndex];
                       const cellColor = matrixColorByLabel[cellLabel] ?? '#e5e7eb';
                       const cellKey = `${likelihood}|${severity}`;
                       const cellRisks = riskPinsByCell.get(cellKey) ?? [];
                       const riskCodes = cellRisks.slice(0, 8).map((r) => r.code);
-                      const moreSuffix = cellRisks.length > 8 ? ` +${cellRisks.length - 8} more` : '';
-                      const hoverText = riskCodes.length > 0 ? `Risks: ${riskCodes.join(', ')}${moreSuffix}` : '';
+                      const moreSuffix =
+                        cellRisks.length > 8 ? t('risk.matrix.moreSuffix', { count: cellRisks.length - 8 }) : '';
+                      const hoverText =
+                        riskCodes.length > 0
+                          ? t('risk.matrix.hoverTitle', { codes: riskCodes.join(', '), more: moreSuffix })
+                          : '';
                       return (
                         <td
                           key={`${likelihood}-${severity}`}
                           style={{ background: cellColor, color: cellLabel === 'High' ? '#ffffff' : '#111827', fontWeight: 700, minWidth: 120, verticalAlign: 'top' }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                            <span>{cellLabel}</span>
+                            <span>{riskMatrixCellLabel(cellLabel, t)}</span>
                             {cellRisks.length > 0 ? (
                               <span
                                 title={hoverText}
@@ -823,10 +835,10 @@ export function Risk() {
       {canEditRiskItems && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Add Risk/Opportunity</h2>
+            <h2 style={{ marginTop: 0 }}>{t('risk.add.title')}</h2>
             <form onSubmit={createItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr 1fr 1fr auto', gap: '0.75rem' }}>
               <select className="input" value={newSupplierId} onChange={(e) => setNewSupplierId(e.target.value)} required>
-                <option value="">Supplier</option>
+                <option value="">{t('risk.add.supplierOption')}</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} - {s.name}
@@ -834,25 +846,31 @@ export function Risk() {
                 ))}
               </select>
               <select className="input" value={newType} onChange={(e) => setNewType(e.target.value as 'risk' | 'opportunity')}>
-                <option value="risk">Risk</option>
-                <option value="opportunity">Opportunity</option>
+                <option value="risk">{t('risk.add.typeRisk')}</option>
+                <option value="opportunity">{t('risk.add.typeOpportunity')}</option>
               </select>
-              <input className="input" placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} required />
+              <input
+                className="input"
+                placeholder={t('risk.add.descriptionPlaceholder')}
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                required
+              />
               {newType === 'risk' ? (
                 <>
                   <select className="input" value={newLikelihood} onChange={(e) => setNewLikelihood(e.target.value as RiskLikelihood)}>
-                    <option value="VeryUnlikely">Very Unlikely</option>
-                    <option value="Unlikely">Unlikely</option>
-                    <option value="Possible">Possible</option>
-                    <option value="Likely">Likely</option>
-                    <option value="VeryLikely">Very Likely</option>
+                    <option value="VeryUnlikely">{t('risk.matrixLikelihood.VeryUnlikely')}</option>
+                    <option value="Unlikely">{t('risk.matrixLikelihood.Unlikely')}</option>
+                    <option value="Possible">{t('risk.matrixLikelihood.Possible')}</option>
+                    <option value="Likely">{t('risk.matrixLikelihood.Likely')}</option>
+                    <option value="VeryLikely">{t('risk.matrixLikelihood.VeryLikely')}</option>
                   </select>
                   <select className="input" value={newSeverity} onChange={(e) => setNewSeverity(e.target.value as RiskSeverity)}>
-                    <option value="Negligible">Negligible</option>
-                    <option value="Minor">Minor</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Significant">Significant</option>
-                    <option value="Severe">Severe</option>
+                    <option value="Negligible">{t('risk.matrixSeverity.Negligible')}</option>
+                    <option value="Minor">{t('risk.matrixSeverity.Minor')}</option>
+                    <option value="Moderate">{t('risk.matrixSeverity.Moderate')}</option>
+                    <option value="Significant">{t('risk.matrixSeverity.Significant')}</option>
+                    <option value="Severe">{t('risk.matrixSeverity.Severe')}</option>
                   </select>
                 </>
               ) : (
@@ -862,7 +880,7 @@ export function Risk() {
                 </>
               )}
               <button className="btn btn-primary" type="submit" disabled={saving}>
-                {saving ? 'Saving...' : 'Add'}
+                {saving ? t('risk.add.saving') : t('risk.add.button')}
               </button>
             </form>
           </div>
@@ -872,52 +890,52 @@ export function Risk() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <h2 style={{ margin: 0 }}>Risks and Opportunities</h2>
+            <h2 style={{ margin: 0 }}>{t('risk.table.title')}</h2>
             <button type="button" className="btn btn-ghost" onClick={handleExportRiskTable} disabled={items.length === 0}>
-              Export to Excel
+              {t('common.exportExcel')}
             </button>
           </div>
           <div className="table-wrap">
             {items.length === 0 ? (
-              <p className="table-empty">No rows.</p>
+              <p className="table-empty">{t('risk.table.empty')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('code')}>
-                      ID {sortIndicatorItems('code')}
+                      {t('risk.register.col.id')} {sortIndicatorItems('code')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('supplier')}>
-                      Supplier {sortIndicatorItems('supplier')}
+                      {t('risk.register.col.supplier')} {sortIndicatorItems('supplier')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('type')}>
-                      Type {sortIndicatorItems('type')}
+                      {t('risk.register.col.type')} {sortIndicatorItems('type')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('description')}>
-                      Description {sortIndicatorItems('description')}
+                      {t('risk.register.col.description')} {sortIndicatorItems('description')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('likelihood')}>
-                      Likelihood {sortIndicatorItems('likelihood')}
+                      {t('risk.register.col.likelihood')} {sortIndicatorItems('likelihood')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('severity')}>
-                      Severity {sortIndicatorItems('severity')}
+                      {t('risk.register.col.severity')} {sortIndicatorItems('severity')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('riskLevel')}>
-                      Initial Risk Level {sortIndicatorItems('riskLevel')}
+                      {t('risk.register.col.initialRiskLevel')} {sortIndicatorItems('riskLevel')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('status')}>
-                      Status {sortIndicatorItems('status')}
+                      {t('risk.register.col.status')} {sortIndicatorItems('status')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('currentRiskLevel')}>
-                      Current Risk Level {sortIndicatorItems('currentRiskLevel')}
+                      {t('risk.register.col.currentRiskLevel')} {sortIndicatorItems('currentRiskLevel')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('created')}>
-                      Created {sortIndicatorItems('created')}
+                      {t('table.col.created')} {sortIndicatorItems('created')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortItems('currentRiskUpdatedAt')}>
-                      Updated {sortIndicatorItems('currentRiskUpdatedAt')}
+                      {t('risk.register.col.currentRiskUpdated')} {sortIndicatorItems('currentRiskUpdatedAt')}
                     </th>
-                    {canEditRiskItems ? <th>Action</th> : null}
+                    {canEditRiskItems ? <th>{t('table.col.action')}</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -1060,39 +1078,39 @@ export function Risk() {
                 <thead>
                   <tr>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('supplier')}>
-                      Supplier {sortIndicatorActions('supplier')}
+                      {t('risk.actions.col.supplier')} {sortIndicatorActions('supplier')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('riskCode')}>
-                      Risk {sortIndicatorActions('riskCode')}
+                      {t('risk.actions.col.risk')} {sortIndicatorActions('riskCode')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('riskDescription')}>
-                      Description {sortIndicatorActions('riskDescription')}
+                      {t('risk.actions.col.riskDescription')} {sortIndicatorActions('riskDescription')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('riskLevel')}>
-                      Risk Level {sortIndicatorActions('riskLevel')}
+                      {t('risk.actions.col.riskLevel')} {sortIndicatorActions('riskLevel')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('description')}>
-                      Action {sortIndicatorActions('description')}
+                      {t('risk.actions.col.action')} {sortIndicatorActions('description')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('owner')}>
-                      Owner {sortIndicatorActions('owner')}
+                      {t('risk.actions.col.owner')} {sortIndicatorActions('owner')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('dueDate')}>
-                      Due Date {sortIndicatorActions('dueDate')}
+                      {t('risk.actions.col.dueDate')} {sortIndicatorActions('dueDate')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('status')}>
-                      Status {sortIndicatorActions('status')}
+                      {t('risk.actions.col.status')} {sortIndicatorActions('status')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('residualLikelihood')}>
-                      Residual Likelihood {sortIndicatorActions('residualLikelihood')}
+                      {t('risk.actions.col.residualLikelihood')} {sortIndicatorActions('residualLikelihood')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('residualSeverity')}>
-                      Residual Severity {sortIndicatorActions('residualSeverity')}
+                      {t('risk.actions.col.residualSeverity')} {sortIndicatorActions('residualSeverity')}
                     </th>
                     <th style={{ cursor: 'pointer' }} onClick={() => onSortActions('residualRiskLevel')}>
-                      Residual Risk Level {sortIndicatorActions('residualRiskLevel')}
+                      {t('risk.actions.col.residualRiskLevel')} {sortIndicatorActions('residualRiskLevel')}
                     </th>
-                    {canEditRiskItems ? <th>Save</th> : null}
+                    {canEditRiskItems ? <th>{t('table.col.save')}</th> : null}
                   </tr>
                 </thead>
                 <tbody>

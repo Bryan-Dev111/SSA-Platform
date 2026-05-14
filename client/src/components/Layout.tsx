@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import type { TOptions } from 'i18next';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -112,7 +113,7 @@ function SidebarNavLink({
   item: { path: string; labelKey: string; fallback: string };
   /** Desktop collapsed sidebar: icon only + native tooltip */
   railMode?: boolean;
-  translate: (key: string, fallback?: string) => string;
+  translate: (key: string, fallbackOrOptions?: string | TOptions) => string;
 }) {
   const label = translate(item.labelKey, item.fallback);
   return (
@@ -189,10 +190,16 @@ function headerUserInitials(user: { name?: string | null; email?: string | null 
   return 'U';
 }
 
-function formatRoleSummary(roleNames: string[]): string {
+function formatRoleSummary(
+  roleNames: string[],
+  translate: (key: string, fallbackOrOptions?: string | TOptions) => string
+): string {
   if (!roleNames.length) return '';
-  if (roleNames.length <= 2) return roleNames.join(' · ');
-  return `${roleNames.slice(0, 2).join(' · ')} +${roleNames.length - 2}`;
+  const sep = translate('layout.roleSummarySep');
+  if (roleNames.length <= 2) return roleNames.join(sep);
+  return `${roleNames.slice(0, 2).join(sep)} ${translate('layout.roleSummaryMore', {
+    count: roleNames.length - 2,
+  })}`;
 }
 
 export function Layout() {
@@ -282,13 +289,13 @@ export function Layout() {
 
   const headerDisplayName = useMemo(() => headerUserDisplayName(user) || t('layout.user'), [user, t]);
   const headerInitials = useMemo(() => headerUserInitials(user), [user]);
-  const headerRoleSummary = useMemo(() => formatRoleSummary(roleNames), [roleNames]);
+  const headerRoleSummary = useMemo(() => formatRoleSummary(roleNames, t), [roleNames, t]);
   const headerUserTitle = useMemo(() => {
     const parts: string[] = [];
     if (user?.email) parts.push(user.email);
-    if (roleNames.length) parts.push(`Roles: ${roleNames.join(', ')}`);
+    if (roleNames.length) parts.push(t('layout.rolesPrefix', { list: roleNames.join(', ') }));
     return parts.join('\n') || undefined;
-  }, [user?.email, roleNames]);
+  }, [user?.email, roleNames, t]);
 
   if (user) {
     const allowed = canAccessPath(pathname, roleNames);
@@ -316,7 +323,7 @@ export function Layout() {
       <aside
         style={desktopAsideStyle}
         className={`sidebar ${menuOpen ? 'is-open' : ''} ${sidebarRailMode ? 'sidebar--collapsed' : ''} ${isDesktop && isResizingSidebar ? 'sidebar--resizing' : ''}`}
-        aria-label="Main navigation"
+        aria-label={t('layout.mainNavigation')}
       >
         <div className="sidebar-brand-wrap">
           <div className="sidebar-brand">
@@ -383,8 +390,8 @@ export function Layout() {
               className="sidebar-collapse-toggle"
               onClick={() => setSidebarCollapsed((c) => !c)}
               aria-expanded={!sidebarCollapsed}
-              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar to icons'}
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={sidebarCollapsed ? t('layout.expandSidebar') : t('layout.collapseSidebarAria')}
+              title={sidebarCollapsed ? t('layout.expandSidebar') : t('layout.collapseSidebarTooltip')}
             >
               {sidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
             </button>
@@ -395,8 +402,8 @@ export function Layout() {
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Drag to resize sidebar"
-          title="Drag to resize"
+          aria-label={t('layout.resizeSidebarAria')}
+          title={t('layout.resizeSidebarTooltip')}
           className={`sidebar-resize-handle${isResizingSidebar ? ' is-active' : ''}`}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -415,17 +422,17 @@ export function Layout() {
             >
               <MenuIcon />
             </button>
-            <div className="app-header-brand" aria-label="Sentinel Supplier Assurance">
+            <div className="app-header-brand" aria-label={t('layout.headerBrandAria')}>
               <div className="app-header-brand-text">
                 <span className="app-header-brand-name">Sentinel</span>
-                <span className="app-header-brand-tagline">Supplier Assurance</span>
+                <span className="app-header-brand-tagline">{t('layout.headerTagline')}</span>
               </div>
               <span
                 className={`app-header-context${globalVendorsShell ? ' app-header-context--supply' : ''}`}
                 title={
                   globalVendorsShell
-                    ? `${t('layout.globalSupply')} workspace`
-                    : `${t('layout.supplierAssurance')} workspace`
+                    ? t('layout.workspaceContext', { area: t('layout.globalSupply') })
+                    : t('layout.workspaceContext', { area: t('layout.supplierAssurance') })
                 }
               >
                 {globalVendorsShell ? t('layout.globalSupply') : t('layout.supplierAssurance')}
@@ -449,8 +456,8 @@ export function Layout() {
               title={headerUserTitle}
               aria-label={
                 headerRoleSummary
-                  ? `Signed in as ${headerDisplayName}. ${headerRoleSummary}`
-                  : `Signed in as ${headerDisplayName}`
+                  ? t('layout.userChipSignedInRoles', { name: headerDisplayName, roles: headerRoleSummary })
+                  : t('layout.userChipSignedIn', { name: headerDisplayName })
               }
             >
               <span className="app-header-user-avatar" aria-hidden>

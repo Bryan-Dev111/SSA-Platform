@@ -407,7 +407,7 @@ export function FindingsRecord() {
       } else {
         if (!prefillInvalidAuditToastRef.current) {
           prefillInvalidAuditToastRef.current = true;
-          toast.info('Could not find that audit in your scope; choose supplier and audit on the form if needed.');
+          toast.info(t('findings.toast.auditNotInScope'));
         }
         prefillFromAuditDoneRef.current = true;
         if (seedSupplier) {
@@ -490,7 +490,7 @@ export function FindingsRecord() {
       setForm(formStateFromFinding(updated));
       setEditMode(false);
       setError(null);
-      toast.info('Finding saved');
+      toast.info(t('findings.toast.findingSaved'));
       navigate(`/findings-record?id=${encodeURIComponent(updated.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed (check required fields)');
@@ -508,7 +508,7 @@ export function FindingsRecord() {
       setForm(formStateFromFinding(updated));
       setEditMode(false);
       setError(null);
-      toast.info('Process successful');
+      toast.info(t('findings.toast.processSuccessful'));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Process failed');
     } finally {
@@ -525,7 +525,7 @@ export function FindingsRecord() {
       setForm(formStateFromFinding(updated));
       setEditMode(false);
       setError(null);
-      toast.info('Reverse successful');
+      toast.info(t('findings.toast.reverseSuccessful'));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reverse failed');
     } finally {
@@ -547,7 +547,7 @@ export function FindingsRecord() {
       setForm(formStateFromFinding(updated));
       setApprovalComment('');
       setEditMode(false);
-      toast.info(`${label} successful`);
+      toast.info(label === 'Approve' ? t('findings.toast.approveSuccessful') : t('findings.toast.rejectSuccessful'));
     } catch (e) {
       setError(e instanceof Error ? e.message : `${label} failed`);
     } finally {
@@ -558,7 +558,7 @@ export function FindingsRecord() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (createLocked) {
-      toast.info('Click Create finding to enable editing.');
+      toast.info(t('findings.toast.clickCreateToEdit'));
       return;
     }
     if (!token || !form.supplierId || !form.severity || !form.summary.trim() || !form.discrepancy.trim()) return;
@@ -580,7 +580,7 @@ export function FindingsRecord() {
       setFinding(created);
       setForm(formStateFromFinding(created));
       setError(null);
-      toast.success('Finding created');
+      toast.success(t('findings.toast.findingCreated'));
       navigate(`/findings-record?id=${encodeURIComponent(created.id)}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed');
@@ -593,7 +593,7 @@ export function FindingsRecord() {
     e.preventDefault();
     const q = findingQuery.trim();
     if (!q) {
-      toast.info('Enter a Finding id or code to search.');
+      toast.info(t('findings.toast.enterIdToSearch'));
       return;
     }
     if (!token) return;
@@ -644,7 +644,7 @@ export function FindingsRecord() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -955,10 +955,10 @@ export function FindingsRecord() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Comment</th>
-                    <th>Date/Time</th>
+                    <th>{t('table.col.user')}</th>
+                    <th>{t('table.col.action')}</th>
+                    <th>{t('table.col.comment')}</th>
+                    <th>{t('table.col.dateTime')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -983,10 +983,10 @@ export function FindingsRecord() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Status</th>
-                    <th>Note</th>
-                    <th>User</th>
-                    <th>Date/Time</th>
+                    <th>{t('table.col.status')}</th>
+                    <th>{t('table.col.note')}</th>
+                    <th>{t('table.col.user')}</th>
+                    <th>{t('table.col.dateTime')}</th>
                   </tr>
                 </thead>
                 <tbody>

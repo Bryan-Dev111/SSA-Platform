@@ -77,9 +77,9 @@ export function Admin() {
       setCommodities(r.list);
     } catch {
       setCommodities([]);
-      toast.error('Failed to load commodity types');
+      toast.error(t('admin.toast.loadCommodityTypesFailed'));
     }
-  }, [token, toast]);
+  }, [token, toast, t]);
 
   const loadDefects = useCallback(async () => {
     if (!token) return;
@@ -88,9 +88,9 @@ export function Admin() {
       setDefects(r.list);
     } catch {
       setDefects([]);
-      toast.error('Failed to load defect codes');
+      toast.error(t('admin.toast.loadDefectCodesFailed'));
     }
-  }, [token, toast]);
+  }, [token, toast, t]);
 
   const loadCarRootCauses = useCallback(async () => {
     if (!token) return;
@@ -99,9 +99,9 @@ export function Admin() {
       setCarRootCauses(r.list);
     } catch {
       setCarRootCauses([]);
-      toast.error('Failed to load CAR root cause codes');
+      toast.error(t('admin.toast.loadCarRootCauseCodesFailed'));
     }
-  }, [token, toast]);
+  }, [token, toast, t]);
 
   const loadDispositions = useCallback(async () => {
     if (!token) return;
@@ -110,9 +110,9 @@ export function Admin() {
       setDispositions(r.list);
     } catch {
       setDispositions([]);
-      toast.error('Failed to load disposition codes');
+      toast.error(t('admin.toast.loadDispositionCodesFailed'));
     }
-  }, [token, toast]);
+  }, [token, toast, t]);
 
   useEffect(() => {
     if (!token) return;
@@ -132,10 +132,10 @@ export function Admin() {
         body: JSON.stringify({ name: newCommodityName.trim() }),
       });
       setNewCommodityName('');
-      toast.success('Commodity type added');
+      toast.success(t('admin.toast.commodityTypeAdded'));
       await loadCommodities();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Add failed');
+      toast.error(e instanceof Error ? e.message : t('toast.addFailed'));
     } finally {
       setBusy(false);
     }
@@ -151,10 +151,10 @@ export function Admin() {
         body: JSON.stringify({ name: editCommodity.name.trim() }),
       });
       setEditCommodity(null);
-      toast.success('Updated');
+      toast.success(t('toast.updated'));
       await loadCommodities();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -174,14 +174,14 @@ export function Admin() {
               ? `/car-root-cause-codes/${target.id}`
               : `/disposition-codes/${target.id}`;
       await apiJson(path, { token, method: 'DELETE' });
-      toast.success('Deleted');
+      toast.success(t('toast.deleted'));
       setDeleteTarget(null);
       if (target.kind === 'commodity') await loadCommodities();
       if (target.kind === 'defect') await loadDefects();
       if (target.kind === 'carRootCause') await loadCarRootCauses();
       if (target.kind === 'disposition') await loadDispositions();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Delete failed');
+      toast.error(e instanceof Error ? e.message : t('toast.deleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -201,10 +201,10 @@ export function Admin() {
         }),
       });
       setNewDefect({ code: '', name: '' });
-      toast.success('Defect code added');
+      toast.success(t('admin.toast.defectCodeAdded'));
       await loadDefects();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Add failed');
+      toast.error(e instanceof Error ? e.message : t('toast.addFailed'));
     } finally {
       setBusy(false);
     }
@@ -224,10 +224,10 @@ export function Admin() {
         }),
       });
       setEditDefect(null);
-      toast.success('Updated');
+      toast.success(t('toast.updated'));
       await loadDefects();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -247,10 +247,10 @@ export function Admin() {
         }),
       });
       setNewDisposition({ code: '', name: '' });
-      toast.success('Disposition code added');
+      toast.success(t('admin.toast.dispositionCodeAdded'));
       await loadDispositions();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Add failed');
+      toast.error(e instanceof Error ? e.message : t('toast.addFailed'));
     } finally {
       setBusy(false);
     }
@@ -270,10 +270,10 @@ export function Admin() {
         }),
       });
       setEditDisposition(null);
-      toast.success('Updated');
+      toast.success(t('toast.updated'));
       await loadDispositions();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -288,10 +288,10 @@ export function Admin() {
         method: 'PATCH',
         body: JSON.stringify({ active: !row.active }),
       });
-      toast.info(!row.active ? 'Activated' : 'Deactivated');
+      toast.info(!row.active ? t('admin.toast.activated') : t('admin.toast.deactivated'));
       await loadDefects();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -311,10 +311,10 @@ export function Admin() {
         }),
       });
       setNewCarRootCause({ code: '', name: '' });
-      toast.success('Root cause code added');
+      toast.success(t('admin.toast.rootCauseCodeAdded'));
       await loadCarRootCauses();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Add failed');
+      toast.error(e instanceof Error ? e.message : t('toast.addFailed'));
     } finally {
       setBusy(false);
     }
@@ -334,10 +334,10 @@ export function Admin() {
         }),
       });
       setEditCarRootCause(null);
-      toast.success('Updated');
+      toast.success(t('toast.updated'));
       await loadCarRootCauses();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -352,10 +352,10 @@ export function Admin() {
         method: 'PATCH',
         body: JSON.stringify({ active: !row.active }),
       });
-      toast.info(!row.active ? 'Activated' : 'Deactivated');
+      toast.info(!row.active ? t('admin.toast.activated') : t('admin.toast.deactivated'));
       await loadCarRootCauses();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -370,10 +370,10 @@ export function Admin() {
         method: 'PATCH',
         body: JSON.stringify({ active: !row.active }),
       });
-      toast.info(!row.active ? 'Activated' : 'Deactivated');
+      toast.info(!row.active ? t('admin.toast.activated') : t('admin.toast.deactivated'));
       await loadDispositions();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed');
+      toast.error(e instanceof Error ? e.message : t('toast.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -419,8 +419,7 @@ export function Admin() {
         <GlobalSupplyMasterDataPanel
           token={token}
           toast={toast}
-          title="Expense types"
-          noun="Expense Type"
+          entity="expenseTypes"
           endpoint="/supplier-assurance-options/expense-types"
         />
       )}
@@ -433,7 +432,7 @@ export function Admin() {
           showUsersTable
           showBuyerSupplierSections={false}
           usersOnlyEmployees={false}
-          usersTableTitle="Users"
+          usersTableTitle={t('admin.users.pageSectionUsers')}
         />
       )}
       {tab === 'employees' && (
@@ -444,7 +443,7 @@ export function Admin() {
           showUsersTable
           showBuyerSupplierSections={false}
           usersOnlyEmployees
-          usersTableTitle="Employees"
+          usersTableTitle={t('admin.users.pageSectionEmployees')}
         />
       )}
       {tab === 'buyersSuppliers' && (
@@ -461,7 +460,7 @@ export function Admin() {
       {tab === 'legal' && (
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Legal Content</h2>
+            <h2 style={{ marginTop: 0 }}>{t('admin.legal.title')}</h2>
             <LegalAdminEditor token={token} />
           </div>
         </div>
@@ -489,8 +488,8 @@ export function Admin() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th style={{ width: 160 }}>Actions</th>
+                    <th>{t('table.col.name')}</th>
+                    <th style={{ width: 160 }}>{t('table.col.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -580,10 +579,10 @@ export function Admin() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Code</th>
-                    <th>Description</th>
-                    <th>Active</th>
-                    <th style={{ width: 220 }}>Actions</th>
+                    <th>{t('table.col.code')}</th>
+                    <th>{t('table.col.description')}</th>
+                    <th>{t('table.col.active')}</th>
+                    <th style={{ width: 220 }}>{t('table.col.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -697,10 +696,10 @@ export function Admin() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Code</th>
-                    <th>Description</th>
-                    <th>Active</th>
-                    <th style={{ width: 220 }}>Actions</th>
+                    <th>{t('table.col.code')}</th>
+                    <th>{t('table.col.description')}</th>
+                    <th>{t('table.col.active')}</th>
+                    <th style={{ width: 220 }}>{t('table.col.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -813,10 +812,10 @@ export function Admin() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Code</th>
-                    <th>Description</th>
-                    <th>Active</th>
-                    <th style={{ width: 220 }}>Actions</th>
+                    <th>{t('table.col.code')}</th>
+                    <th>{t('table.col.description')}</th>
+                    <th>{t('table.col.active')}</th>
+                    <th style={{ width: 220 }}>{t('table.col.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>

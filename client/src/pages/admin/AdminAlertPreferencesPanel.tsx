@@ -3,6 +3,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { apiJson } from '../../api/client';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -28,6 +29,7 @@ interface MatrixResponse {
 }
 
 export function AdminAlertPreferencesPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const { t } = useLanguage();
   const [data, setData] = useState<MatrixResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,9 +42,9 @@ export function AdminAlertPreferencesPanel({ token, toast }: { token: string | n
       setError(null);
     } catch (e) {
       setData(null);
-      setError(e instanceof Error ? e.message : 'Failed to load alert preferences');
+      setError(e instanceof Error ? e.message : t('admin.alertPrefs.loadFailed'));
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     load();
@@ -73,10 +75,10 @@ export function AdminAlertPreferencesPanel({ token, toast }: { token: string | n
         method: 'PUT',
         body: JSON.stringify({ matrix: data.matrix }),
       });
-      toast.success('Alert preferences saved');
+      toast.success(t('admin.alertPrefs.savedToast'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : t('admin.alertPrefs.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -92,17 +94,17 @@ export function AdminAlertPreferencesPanel({ token, toast }: { token: string | n
         )}
         <div style={{ marginBottom: '0.75rem' }}>
           <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy || !data}>
-            Save alert preferences
+            {t('admin.alertPrefs.saveButton')}
           </button>
         </div>
-        {!data && !error && token && <p>Loading…</p>}
+        {!data && !error && token && <p>{t('common.loading')}</p>}
         {data && (
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>User</th>
-                  <th>Roles</th>
+                  <th>{t('table.col.user')}</th>
+                  <th>{t('table.col.roles')}</th>
                   {data.categories.map((c) => (
                     <th key={c.key} style={{ minWidth: 140 }}>
                       {c.label}
@@ -114,7 +116,7 @@ export function AdminAlertPreferencesPanel({ token, toast }: { token: string | n
                 {data.users.map((u) => (
                   <tr key={u.id}>
                     <td>
-                      <div>{u.name?.trim() || '—'}</div>
+                      <div>{u.name?.trim() || t('internal.scheduleAudit.dash')}</div>
                       <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{u.email}</div>
                     </td>
                     <td style={{ fontSize: 'var(--text-sm)' }}>{u.roleNames.join(', ')}</td>
@@ -131,7 +133,7 @@ export function AdminAlertPreferencesPanel({ token, toast }: { token: string | n
                 ))}
               </tbody>
             </table>
-            {data.users.length === 0 && <p className="table-empty">No users with alert-eligible roles.</p>}
+            {data.users.length === 0 && <p className="table-empty">{t('admin.alertPrefs.emptyUsers')}</p>}
           </div>
         )}
       </div>

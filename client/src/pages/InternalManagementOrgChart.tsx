@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '../api/client';
+import { useLanguage } from '../context/LanguageContext';
 import { parseApiError } from '../utils/apiHelpers';
 
 export type InternalManagementOrgChartVariant = 'supplierAssurance' | 'globalSupply';
@@ -46,6 +47,7 @@ export function InternalManagementOrgChart({
   variant?: InternalManagementOrgChartVariant;
   employeeProfilePathPrefix?: string;
 }) {
+  const { t } = useLanguage();
   const [users, setUsers] = useState<UserRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -95,19 +97,21 @@ export function InternalManagementOrgChart({
   return (
     <div className="card" style={{ marginBottom: '1rem' }}>
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Organization Chart</h2>
+        <h2 style={{ marginTop: 0 }}>{t('internal.orgChart.title')}</h2>
 
         {loadError ? <div className="alert-error">{loadError}</div> : null}
 
         <div className="org-chart-root">
           <div className="org-chart-node org-chart-node--root">
             <span className="org-chart-root-name">{viewerDisplayName}</span>
-            <span className="org-chart-root-sub">You</span>
+            <span className="org-chart-root-sub">{t('internal.orgChart.you')}</span>
           </div>
           <div className="org-chart-connector org-chart-connector--down" aria-hidden />
 
           {loading ? (
-            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Loading team…</p>
+            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              {t('internal.orgChart.loadingTeam')}
+            </p>
           ) : null}
 
           {!loading &&
@@ -116,14 +120,13 @@ export function InternalManagementOrgChart({
           !isGlobalSupply &&
           qualityManagers.length === 0 ? (
             <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
-              No quality managers yet. Assign the Quality Manager role in Admin → Users.
+              {t('internal.orgChart.noQm')}
             </p>
           ) : null}
 
           {!loading && !loadError && users && isGlobalSupply && sourcingDirectors.length === 0 ? (
             <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
-              No sourcing directors yet. Add the Sourcing Director role to a user, then assign staff in Management
-              Assignments.
+              {t('internal.orgChart.noSd')}
             </p>
           ) : null}
 
@@ -138,7 +141,7 @@ export function InternalManagementOrgChart({
 
                 return (
                   <div key={qm.id} className="org-chart-branch org-chart-branch--qm">
-                    <div className="org-chart-role-pill">Quality manager</div>
+                    <div className="org-chart-role-pill">{t('internal.orgChart.qualityManager')}</div>
                     <div className="org-chart-node org-chart-node--qm">
                       <Link className="org-chart-person-name" to={`${employeeProfilePathPrefix}/${qm.id}`}>
                         {displayName(qm)}
@@ -146,9 +149,9 @@ export function InternalManagementOrgChart({
                     </div>
                     <div className="org-chart-connector org-chart-connector--down org-chart-connector--narrow" aria-hidden />
                     <div className="org-chart-qe-block">
-                      <div className="org-chart-qe-heading">Quality Engineers</div>
+                      <div className="org-chart-qe-heading">{t('internal.orgChart.qualityEngineers')}</div>
                       {engineers.length === 0 ? (
-                        <p className="org-chart-qe-empty">No quality engineers assigned.</p>
+                        <p className="org-chart-qe-empty">{t('internal.orgChart.noQeAssigned')}</p>
                       ) : (
                         <ul className="org-chart-qe-list">
                           {engineers.map((qe) => (
@@ -187,9 +190,9 @@ export function InternalManagementOrgChart({
                     </div>
                     <div className="org-chart-connector org-chart-connector--down org-chart-connector--narrow" aria-hidden />
                     <div className="org-chart-qe-block">
-                      <div className="org-chart-qe-heading">Assigned team</div>
+                      <div className="org-chart-qe-heading">{t('internal.orgChart.assignedTeam')}</div>
                       {staffMembers.length === 0 ? (
-                        <p className="org-chart-qe-empty">No employees or contractors assigned.</p>
+                        <p className="org-chart-qe-empty">{t('internal.orgChart.noStaffAssigned')}</p>
                       ) : (
                         <ul className="org-chart-qe-list">
                           {staffMembers.map((member) => (

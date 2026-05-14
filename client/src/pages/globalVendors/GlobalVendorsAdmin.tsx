@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { MetricCard } from '../../components/MetricCard';
@@ -26,6 +27,7 @@ interface GlobalSupplyStats {
 
 export function GlobalVendorsAdmin() {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('users');
   const [stats, setStats] = useState<GlobalSupplyStats | null>(null);
@@ -39,9 +41,9 @@ export function GlobalVendorsAdmin() {
       setStatsError(null);
     } catch (e) {
       setStats(null);
-      setStatsError(e instanceof Error ? e.message : 'Failed to load stats');
+      setStatsError(e instanceof Error ? e.message : t('admin.statsLoadFailed'));
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     void loadStats();
@@ -50,7 +52,7 @@ export function GlobalVendorsAdmin() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Admin</h1>
+        <h1 className="page-title">{t('admin.title')}</h1>
       </header>
 
       <div
@@ -65,13 +67,13 @@ export function GlobalVendorsAdmin() {
       >
         {(
           [
-            ['users', 'Users'],
-            ['buyers', 'Buyers'],
-            ['permissions', 'Permissions'],
-            ['crops', 'Crops'],
-            ['countries', 'Countries'],
-            ['expenseTypes', 'Expense Types'],
-            ['emailAlerts', 'Email Alerts'],
+            ['users', t('gvAdmin.tab.users')],
+            ['buyers', t('gvAdmin.tab.buyers')],
+            ['permissions', t('gvAdmin.tab.permissions')],
+            ['crops', t('gvAdmin.tab.crops')],
+            ['countries', t('gvAdmin.tab.countries')],
+            ['expenseTypes', t('gvAdmin.tab.expenseTypes')],
+            ['emailAlerts', t('gvAdmin.tab.emailAlerts')],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -89,21 +91,21 @@ export function GlobalVendorsAdmin() {
         <>
           <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Overview</h2>
+              <h2 style={{ marginTop: 0 }}>{t('gvAdmin.overview.title')}</h2>
               {statsError && (
                 <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
                   {statsError}
                 </div>
               )}
-              {!stats && !statsError && token && <p className="table-empty">Loading…</p>}
+              {!stats && !statsError && token && <p className="table-empty">{t('common.loading')}</p>}
               {stats && (
                 <div
                   className="dashboard-metric-grid global-supply-admin-overview-grid"
                   style={{ marginBottom: '0.75rem' }}
                 >
-                  <MetricCard title="Employees" value={stats.employees} />
-                  <MetricCard title="Commodity buyers" value={stats.commodityBuyers} />
-                  <MetricCard title="Farmers" value={stats.farmerAccounts} />
+                  <MetricCard title={t('gvAdmin.overview.metric.employees')} value={stats.employees} />
+                  <MetricCard title={t('gvAdmin.overview.metric.commodityBuyers')} value={stats.commodityBuyers} />
+                  <MetricCard title={t('gvAdmin.overview.metric.farmers')} value={stats.farmerAccounts} />
                 </div>
               )}
             </div>
@@ -113,6 +115,7 @@ export function GlobalVendorsAdmin() {
             toast={toast}
             showBuyerSupplierSections={false}
             globalSupplyUsersMode
+            usersTableTitle={t('gvAdmin.tab.users')}
           />
         </>
       )}
@@ -127,8 +130,7 @@ export function GlobalVendorsAdmin() {
         <GlobalSupplyMasterDataPanel
           token={token}
           toast={toast}
-          title="Crops"
-          noun="Crop"
+          entity="crops"
           endpoint="/global-supply-options/crops"
         />
       )}
@@ -137,8 +139,7 @@ export function GlobalVendorsAdmin() {
         <GlobalSupplyMasterDataPanel
           token={token}
           toast={toast}
-          title="Countries"
-          noun="Country"
+          entity="countries"
           endpoint="/global-supply-options/countries"
         />
       )}
@@ -147,8 +148,7 @@ export function GlobalVendorsAdmin() {
         <GlobalSupplyMasterDataPanel
           token={token}
           toast={toast}
-          title="Expense Types"
-          noun="Expense Type"
+          entity="expenseTypes"
           endpoint="/global-supply-options/expense-types"
         />
       )}

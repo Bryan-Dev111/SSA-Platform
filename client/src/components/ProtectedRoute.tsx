@@ -3,6 +3,7 @@
  */
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
 
 interface ProtectedRouteProps {
@@ -12,13 +13,14 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, path: pathProp }: ProtectedRouteProps) {
   const { user, token, loading } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const pathname = pathProp ?? location.pathname;
 
   if (loading) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>Loading...</p>
+        <p>{t('protected.loading')}</p>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { SortableTh } from '../../components/SortableTh';
 import { getDocumentLocale } from '../../i18n/locale';
@@ -47,6 +48,7 @@ type BuyerRelationshipSortKey =
 
 export function BuyerRelationshipsPage() {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +72,10 @@ export function BuyerRelationshipsPage() {
         setOrders(poRes);
       })
       .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Failed to load buyer relationships')
+        setError(e instanceof Error ? e.message : t('buyers.loadFailed'))
       )
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, t]);
 
   const rows = useMemo<BuyerRelationshipRow[]>(() => {
     return buyers.map((buyer) => {
@@ -140,43 +142,43 @@ export function BuyerRelationshipsPage() {
 
   const exportToExcel = useCallback(() => {
     if (sortedRows.length === 0) {
-      toast.info('No buyer relationships to export yet.');
+      toast.info(t('buyers.nothingToExport'));
       return;
     }
     try {
       const locale = getDocumentLocale();
       const exportRows: ExportRow[] = sortedRows.map((row) => ({
-        'Buyer Name': row.buyerName,
-        'Buyer Contact Email': row.buyerContactEmail ?? '—',
-        'Buyer Country': row.buyerCountry ?? '—',
-        'Buyer City': row.buyerCity ?? '—',
-        'First Purchase Order Date': row.firstPurchaseOrderDate
+        [t('buyers.col.buyerName')]: row.buyerName,
+        [t('buyers.col.contactEmail')]: row.buyerContactEmail ?? '—',
+        [t('buyers.col.country')]: row.buyerCountry ?? '—',
+        [t('buyers.col.city')]: row.buyerCity ?? '—',
+        [t('buyers.col.firstPoDate')]: row.firstPurchaseOrderDate
           ? new Date(row.firstPurchaseOrderDate).toLocaleDateString(locale, {
               year: 'numeric',
               month: 'short',
               day: 'numeric',
             })
           : '—',
-        'Total Purchase Orders': row.totalPurchaseOrders,
-        Notes: row.notes?.trim() ? row.notes : '—',
+        [t('buyers.exportColTotalPos')]: row.totalPurchaseOrders,
+        [t('buyers.col.notes')]: row.notes?.trim() ? row.notes : '—',
       }));
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Buyer_Relationships_${stamp}`, 'Buyer Relationships', exportRows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(`Buyer_Relationships_${stamp}`, t('buyers.exportSheetName'), exportRows);
+      toast.success(t('buyers.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('buyers.exportFailed'));
     }
-  }, [sortedRows, toast]);
+  }, [sortedRows, toast, t]);
 
   if (loading) {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Buyer Relationships</h1>
+          <h1 className="page-title">{t('nav.buyerRelationships')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading buyer relationships...</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -195,16 +197,16 @@ export function BuyerRelationshipsPage() {
         }}
       >
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          Buyer Relationships
+          {t('nav.buyerRelationships')}
         </h1>
         <button
           type="button"
           className="btn btn-ghost"
           onClick={exportToExcel}
           disabled={loading}
-          title="Download the table as an Excel file"
+          title={t('common.exportExcelHint')}
         >
-          Export to Excel
+          {t('common.exportExcel')}
         </button>
       </header>
 
@@ -216,42 +218,42 @@ export function BuyerRelationshipsPage() {
             <thead>
               <tr>
                 <SortableTh
-                  label="Buyer Name"
+                  label={t('buyers.col.buyerName')}
                   columnKey="buyerName"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
-                <th>Buyer Contact Email</th>
+                <th>{t('buyers.col.contactEmail')}</th>
                 <SortableTh
-                  label="Buyer Country"
+                  label={t('buyers.col.country')}
                   columnKey="buyerCountry"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Buyer City"
+                  label={t('buyers.col.city')}
                   columnKey="buyerCity"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="First Purchase Order Date"
+                  label={t('buyers.col.firstPoDate')}
                   columnKey="firstPurchaseOrderDate"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Total Purchase Orders"
+                  label={t('buyers.col.totalPos')}
                   columnKey="totalPurchaseOrders"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
-                <th>Notes</th>
+                <th>{t('buyers.col.notes')}</th>
               </tr>
             </thead>
             <tbody>

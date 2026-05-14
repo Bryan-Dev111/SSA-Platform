@@ -42,7 +42,7 @@ function FlagIcon({ code }: { code: AppLanguage }) {
 export function LanguageFlagSelector({ className }: { className?: string }) {
   const { language, setLanguage, t } = useLanguage();
   return (
-    <div className={className ?? ''} role="group" aria-label="Language selector">
+    <div className={className ?? ''} role="group" aria-label={t('language.selectorAria')}>
       {options.map((opt) => (
         <button
           key={opt.code}

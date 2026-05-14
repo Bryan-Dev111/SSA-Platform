@@ -3,6 +3,7 @@
  * Global Supply Internal Management can also show Sourcing Director ↔ employee/contractor assignments.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { apiJson } from '../api/client';
 import { parseApiError } from '../utils/apiHelpers';
 
@@ -47,6 +48,7 @@ export function ManagementAssignmentsPanel({
   /** When true (e.g. Global Supply Internal Management), show Sourcing Director ↔ staff assignments. */
   showSourcingDirectorStaff?: boolean;
 }) {
+  const { t } = useLanguage();
   const [managementAssignments, setManagementAssignments] = useState<ManagementAssignmentRow[]>([]);
   const [managementUsers, setManagementUsers] = useState<ManagementUserRow[]>([]);
   const [selectedQmId, setSelectedQmId] = useState('');
@@ -111,7 +113,7 @@ export function ManagementAssignmentsPanel({
           staffUserId: selectedStaffUserId,
         }),
       });
-      toast.success('Staff assigned to Sourcing Director');
+      toast.success(t('toast.staffAssignedSourcingDirector'));
       setSelectedStaffUserId('');
       loadManagementUsers();
     } catch (e) {
@@ -129,7 +131,7 @@ export function ManagementAssignmentsPanel({
         token,
         method: 'DELETE',
       });
-      toast.info('Staff assignment removed');
+      toast.info(t('toast.staffAssignmentRemoved'));
       loadManagementUsers();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -150,7 +152,7 @@ export function ManagementAssignmentsPanel({
           qualityEngineerId: selectedQeId,
         }),
       });
-      toast.success('QM assigned to QE');
+      toast.success(t('toast.qmAssignedToQe'));
       setSelectedQeId('');
       loadManagementUsers();
     } catch (e) {
@@ -168,7 +170,7 @@ export function ManagementAssignmentsPanel({
         token,
         method: 'DELETE',
       });
-      toast.info('QM to QE assignment removed');
+      toast.info(t('toast.qmQeAssignmentRemoved'));
       loadManagementUsers();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -182,17 +184,17 @@ export function ManagementAssignmentsPanel({
       {showSourcingDirectorStaff ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Sourcing Director staff</h2>
+            <h2 style={{ marginTop: 0 }}>{t('management.section.sdStaff')}</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Sourcing Director</label>
+                <label className="input-label">{t('management.label.sourcingDirector')}</label>
                 <select
                   className="input"
                   value={selectedSdId}
                   onChange={(e) => setSelectedSdId(e.target.value)}
                   style={{ minWidth: 260 }}
                 >
-                  <option value="">Select Sourcing Director</option>
+                  <option value="">{t('management.placeholder.selectSd')}</option>
                   {sourcingDirectors.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name?.trim() ? `${d.name} (${d.email})` : d.email}
@@ -201,14 +203,14 @@ export function ManagementAssignmentsPanel({
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Employee / contractor</label>
+                <label className="input-label">{t('management.label.employeeContractor')}</label>
                 <select
                   className="input"
                   value={selectedStaffUserId}
                   onChange={(e) => setSelectedStaffUserId(e.target.value)}
                   style={{ minWidth: 260 }}
                 >
-                  <option value="">Select staff</option>
+                  <option value="">{t('management.placeholder.selectStaff')}</option>
                   {staffForSourcingDirectorPick.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name?.trim() ? `${u.name} (${u.email})` : u.email}
@@ -222,7 +224,7 @@ export function ManagementAssignmentsPanel({
                 onClick={() => void assignSdStaff()}
                 disabled={sdAssignBusy || !selectedSdId || !selectedStaffUserId}
               >
-                Assign
+                {t('management.btn.assign')}
               </button>
             </div>
 
@@ -230,16 +232,16 @@ export function ManagementAssignmentsPanel({
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Sourcing Director</th>
-                    <th>Assigned staff</th>
-                    <th style={{ width: 100 }}>Action</th>
+                    <th>{t('management.col.sourcingDirector')}</th>
+                    <th>{t('management.col.assignedStaff')}</th>
+                    <th style={{ width: 100 }}>{t('table.col.action')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sourcingDirectors.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="table-empty">
-                        No Sourcing Directors found. Add the Sourcing Director role to a user first.
+                        {t('management.empty.noSourcingDirectors')}
                       </td>
                     </tr>
                   ) : (
@@ -250,7 +252,7 @@ export function ManagementAssignmentsPanel({
                           <tr key={d.id}>
                             <td>{d.name?.trim() ? d.name : d.email}</td>
                             <td colSpan={2} className="table-empty">
-                              None
+                              {t('common.none')}
                             </td>
                           </tr>
                         );
@@ -268,7 +270,7 @@ export function ManagementAssignmentsPanel({
                                 onClick={() => void removeSdStaff(d.id, sid)}
                                 disabled={sdAssignBusy}
                               >
-                                Remove
+                                {t('management.btn.remove')}
                               </button>
                             </td>
                           </tr>
@@ -286,17 +288,17 @@ export function ManagementAssignmentsPanel({
       {!showSourcingDirectorStaff ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>QM to QE Assignments</h2>
+            <h2 style={{ marginTop: 0 }}>{t('management.section.qmToQe')}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Quality Manager</label>
+              <label className="input-label">{t('management.label.qualityManager')}</label>
               <select
                 className="input"
                 value={selectedQmId}
                 onChange={(e) => setSelectedQmId(e.target.value)}
                 style={{ minWidth: 260 }}
               >
-                <option value="">Select Quality Manager</option>
+                <option value="">{t('management.placeholder.selectQm')}</option>
                 {managementQualityManagers.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name?.trim() ? `${m.name} (${m.email})` : m.email}
@@ -305,14 +307,14 @@ export function ManagementAssignmentsPanel({
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Quality Engineer</label>
+              <label className="input-label">{t('management.label.qualityEngineer')}</label>
               <select
                 className="input"
                 value={selectedQeId}
                 onChange={(e) => setSelectedQeId(e.target.value)}
                 style={{ minWidth: 260 }}
               >
-                <option value="">Select Quality Engineer</option>
+                <option value="">{t('management.placeholder.selectQe')}</option>
                 {managementQualityEngineers.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.name?.trim() ? `${q.name} (${q.email})` : q.email}
@@ -326,7 +328,7 @@ export function ManagementAssignmentsPanel({
               onClick={() => void assignQmToQe()}
               disabled={managementAssignBusy || !selectedQmId || !selectedQeId}
             >
-              Assign
+              {t('management.btn.assign')}
             </button>
           </div>
 
@@ -334,16 +336,16 @@ export function ManagementAssignmentsPanel({
             <table className="table">
               <thead>
                 <tr>
-                  <th>Quality Manager</th>
-                  <th>Assigned Quality Engineers</th>
-                  <th style={{ width: 100 }}>Action</th>
+                  <th>{t('management.col.qualityManager')}</th>
+                  <th>{t('management.col.assignedQEs')}</th>
+                  <th style={{ width: 100 }}>{t('table.col.action')}</th>
                 </tr>
               </thead>
               <tbody>
                 {managementQualityManagers.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="table-empty">
-                      No Quality Managers found.
+                      {t('management.empty.noQualityManagers')}
                     </td>
                   </tr>
                 ) : (
@@ -354,7 +356,7 @@ export function ManagementAssignmentsPanel({
                         <tr key={m.id}>
                           <td>{m.name?.trim() ? m.name : m.email}</td>
                           <td colSpan={2} className="table-empty">
-                            None
+                            {t('common.none')}
                           </td>
                         </tr>
                       );
@@ -372,7 +374,7 @@ export function ManagementAssignmentsPanel({
                               onClick={() => void removeQmToQe(m.id, qid)}
                               disabled={managementAssignBusy}
                             >
-                              Remove
+                              {t('management.btn.remove')}
                             </button>
                           </td>
                         </tr>
@@ -390,29 +392,37 @@ export function ManagementAssignmentsPanel({
       {!showSourcingDirectorStaff ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Management Assignments</h2>
+            <h2 style={{ marginTop: 0 }}>{t('management.section.projects')}</h2>
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             {managementAssignments.length === 0 ? (
-              <p className="table-empty">No active projects found.</p>
+              <p className="table-empty">{t('management.empty.noActiveProjects')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Project</th>
-                    <th>Buyer</th>
-                    <th>Supplier</th>
-                    <th>Quality Engineer</th>
-                    <th>Quality Manager</th>
+                    <th>{t('management.col.project')}</th>
+                    <th>{t('management.col.buyer')}</th>
+                    <th>{t('management.col.supplier')}</th>
+                    <th>{t('management.col.qualityEngineer')}</th>
+                    <th>{t('management.col.qualityManager')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {managementAssignments.map((row) => (
                     <tr key={row.id}>
                       <td>{row.projectCode}</td>
-                      <td>{row.buyerName || '—'}</td>
-                      <td>{row.supplierName || '—'}</td>
-                      <td>{row.qualityEngineers.length > 0 ? row.qualityEngineers.join(', ') : '—'}</td>
-                      <td>{row.qualityManagers.length > 0 ? row.qualityManagers.join(', ') : '—'}</td>
+                      <td>{row.buyerName || t('internal.scheduleAudit.dash')}</td>
+                      <td>{row.supplierName || t('internal.scheduleAudit.dash')}</td>
+                      <td>
+                        {row.qualityEngineers.length > 0
+                          ? row.qualityEngineers.join(', ')
+                          : t('internal.scheduleAudit.dash')}
+                      </td>
+                      <td>
+                        {row.qualityManagers.length > 0
+                          ? row.qualityManagers.join(', ')
+                          : t('internal.scheduleAudit.dash')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -151,7 +151,7 @@ export function Dashboard() {
           [...riskActions].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
         );
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load dashboard');
+        setError(t('dashboard.loadFailed'));
         setData(null);
         setRiskRegisterItems([]);
         setRiskRegisterActions([]);
@@ -168,10 +168,10 @@ export function Dashboard() {
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+    if (hour < 12) return t('dashboard.greeting.morning');
+    if (hour < 18) return t('dashboard.greeting.afternoon');
+    return t('dashboard.greeting.evening');
+  }, [t]);
 
   const riskRegisterDistribution = useMemo(
     () => computeRiskRegisterDistribution(riskRegisterItems, riskRegisterActions),
@@ -221,8 +221,7 @@ export function Dashboard() {
         <h1 className="page-title">{t('nav.dashboard')}</h1>
         <p className="page-description">
           {greeting}
-          {user?.name?.trim() ? `, ${user.name.trim()}` : user?.email ? `, ${user.email}` : ''}. Here is what is happening with
-          your suppliers today.
+          {user?.name?.trim() ? `, ${user.name.trim()}` : user?.email ? `, ${user.email}` : ''}. {t('dashboard.intro')}
         </p>
       </header>
 
@@ -230,9 +229,9 @@ export function Dashboard() {
 
       <div className="dashboard-toolbar">
         <label className="dashboard-toolbar-label">
-          <span className="dashboard-toolbar-title">Supplier filter</span>
+          <span className="dashboard-toolbar-title">{t('dashboard.supplierFilter')}</span>
           <select className="input dashboard-toolbar-select" value={filterSupplierId} onChange={(e) => setFilterSupplierId(e.target.value)}>
-            <option value="">All in scope</option>
+            <option value="">{t('dashboard.allInScope')}</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.code}: {s.name}
@@ -244,33 +243,36 @@ export function Dashboard() {
 
       <div className="dashboard-metric-grid">
         <MetricCard
-          title="Total suppliers"
+          title={t('dashboard.metric.totalSuppliers')}
           value={metrics.totalSuppliers}
-          subtitle={`${metrics.highRiskSuppliers} high-risk supplier${metrics.highRiskSuppliers === 1 ? '' : 's'}`}
+          subtitle={t('dashboard.metric.highRisk', { count: metrics.highRiskSuppliers })}
         />
         <MetricCard
-          title="Open CARs"
+          title={t('dashboard.metric.openCars')}
           value={metrics.openCars}
-          subtitle={`${metrics.overdueCars} overdue · ${metrics.openCarsWaitingApproval ?? 0} waiting approval`}
+          subtitle={t('dashboard.metric.carsSubtitle', {
+            overdue: metrics.overdueCars,
+            waiting: metrics.openCarsWaitingApproval ?? 0,
+          })}
         />
         <MetricCard
-          title="Open risks"
+          title={t('dashboard.metric.openRisks')}
           value={metrics.openRisks}
-          subtitle={`${metrics.overdueRisks} overdue risk action${metrics.overdueRisks === 1 ? '' : 's'}`}
+          subtitle={t('dashboard.metric.risksOverdue', { count: metrics.overdueRisks })}
         />
         <MetricCard
-          title="Open findings"
+          title={t('dashboard.metric.openFindings')}
           value={metrics.openFindingsTotal || metrics.openFindingsMajorCritical}
-          subtitle={`${metrics.openFindingsMajorCritical} Major/Critical open`}
+          subtitle={t('dashboard.metric.findingsSubtitle', { count: metrics.openFindingsMajorCritical })}
         />
         {/* Subtitle: late PO only; alert icon + tooltip still detail qty short vs schedule (not inspection requests). */}
         <MetricCard
-          title="Shipments"
+          title={t('dashboard.metric.shipments')}
           value={metrics.shipmentRequests}
           subtitle={(() => {
             const late = metrics.shipmentLate ?? 0;
-            if (late <= 0) return 'No late POs';
-            return late === 1 ? '1 Late PO' : `${late} Late POs`;
+            if (late <= 0) return t('dashboard.metric.noLatePOs');
+            return t('dashboard.metric.latePO', { count: late });
           })()}
           customAlert={
             (metrics.shipmentLate ?? 0) > 0 ? (
@@ -280,7 +282,9 @@ export function Dashboard() {
                 overdueInspectionCount={0}
                 overdueInspectionDetails={[]}
                 includeOverdueInspectionInTooltip={false}
-                summaryFallbackWhenNoTooltipLines={`${metrics.shipmentLate ?? 0} Late PO`}
+                summaryFallbackWhenNoTooltipLines={t('dashboard.metric.latePO', {
+                  count: metrics.shipmentLate ?? 0,
+                })}
               />
             ) : undefined
           }
@@ -292,9 +296,9 @@ export function Dashboard() {
 
         <div className="card dashboard-section-card">
           <div className="card-body">
-            <h2 className="dashboard-section-heading">Upcoming Events</h2>
+            <h2 className="dashboard-section-heading">{t('dashboard.upcomingEvents')}</h2>
             {upcoming.length === 0 ? (
-              <p className="table-empty">No upcoming audits or shipment inspections.</p>
+              <p className="table-empty">{t('dashboard.upcomingEmpty')}</p>
             ) : (
               <div className="dashboard-event-list">
                 {upcoming.map((e) => (
@@ -306,7 +310,7 @@ export function Dashboard() {
                             month: 'short',
                             day: 'numeric',
                           })
-                        : 'N/A'}
+                        : t('dashboard.na')}
                     </span>
                     <span>
                       <strong>{e.type}</strong> {e.code} - {e.supplierCode}: {e.supplierName}
@@ -320,18 +324,18 @@ export function Dashboard() {
 
         <div className="card dashboard-section-card">
           <div className="card-body">
-            <h2 className="dashboard-section-heading">Recent Updates</h2>
+            <h2 className="dashboard-section-heading">{t('dashboard.recentUpdates')}</h2>
             {recentUpdates.length === 0 ? (
-              <p className="table-empty">No updates in last 7 days.</p>
+              <p className="table-empty">{t('dashboard.recentEmpty')}</p>
             ) : (
               <div className="table-wrap dashboard-recent-table-wrap" style={{ maxHeight: 265, overflowY: 'auto' }}>
                 <table className="table dashboard-recent-table" style={{ marginBottom: 0 }}>
                   <thead>
                     <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Code</th>
-                      <th>Supplier</th>
+                      <th>{t('dashboard.colDate')}</th>
+                      <th>{t('dashboard.colType')}</th>
+                      <th>{t('dashboard.colCode')}</th>
+                      <th>{t('dashboard.colSupplier')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -363,9 +367,9 @@ export function Dashboard() {
 
       <div className="card dashboard-section-card dashboard-trends-card">
         <div className="card-body">
-          <h2 className="dashboard-section-heading">Monthly Trends</h2>
+          <h2 className="dashboard-section-heading">{t('dashboard.monthlyTrends')}</h2>
           {monthly.length === 0 ? (
-            <p className="table-empty">No trend data yet.</p>
+            <p className="table-empty">{t('dashboard.trendsEmpty')}</p>
           ) : (
             <MonthlyTrendsLineChart rows={monthly} maxY={trendMax} />
           )}

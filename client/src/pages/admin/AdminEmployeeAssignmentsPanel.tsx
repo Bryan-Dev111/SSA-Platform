@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { parseApiError } from '../../utils/apiHelpers';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -44,21 +45,28 @@ interface UserRow {
   sourcingDirectorAssignedStaffIds?: string[];
 }
 
-function formatRoleLabel(role: string): string {
-  if (role === 'QualityEngineer') return 'Quality Engineer';
-  if (role === 'QualityManager') return 'Quality Manager';
-  if (role === 'CommodityBuyer') return 'Commodity Buyer';
-  if (role === 'SourcingDirector') return 'Sourcing Director';
-  return role;
+type TranslateKey = (key: string) => string;
+
+const ROLE_LABEL_KEYS: Record<string, string> = {
+  QualityEngineer: 'adminEmployees.roles.qualityEngineer',
+  QualityManager: 'adminEmployees.roles.qualityManager',
+  CommodityBuyer: 'adminEmployees.roles.commodityBuyer',
+  SourcingDirector: 'adminEmployees.roles.sourcingDirector',
+  Buyer: 'adminEmployees.roles.buyer',
+};
+
+function formatRoleLabel(t: TranslateKey, role: string): string {
+  const key = ROLE_LABEL_KEYS[role];
+  return key ? t(key) : role;
 }
 
-function formatRolesCell(roleNames: string[]): string {
-  if (!roleNames.length) return '—';
-  return roleNames.map(formatRoleLabel).join(', ');
+function formatRolesCell(t: TranslateKey, dash: string, roleNames: string[]): string {
+  if (!roleNames.length) return dash;
+  return roleNames.map((r) => formatRoleLabel(t, r)).join(', ');
 }
 
-function formatRateCell(hourlyRate: number | null | undefined, currency: string | null | undefined): string {
-  if (hourlyRate == null || !Number.isFinite(hourlyRate)) return '—';
+function formatRateCell(hourlyRate: number | null | undefined, currency: string | null | undefined, dash: string): string {
+  if (hourlyRate == null || !Number.isFinite(hourlyRate)) return dash;
   const cur = (currency ?? 'USD').trim() || 'USD';
   try {
     return new Intl.NumberFormat(undefined, {
@@ -88,10 +96,10 @@ const emptyDraft = (): RosterDraft => ({
   employmentNotes: '',
 });
 
-function formatCountriesCell(u: UserRow): string {
+function formatCountriesCell(u: UserRow, dash: string): string {
   const list = u.assignedCountryNames?.filter(Boolean) ?? [];
   if (list.length) return list.join(', ');
-  return u.country?.trim() || '—';
+  return u.country?.trim() || dash;
 }
 
 export function AdminEmployeeAssignmentsPanel({
@@ -107,6 +115,8 @@ export function AdminEmployeeAssignmentsPanel({
   /** Only Admin may edit Country, Responsibilities, Rate, Notes (server enforces Admin on PATCH). */
   canEditStaffRoster?: boolean;
 }) {
+  const { t } = useLanguage();
+  const dash = t('internal.scheduleAudit.dash');
   const [users, setUsers] = useState<UserRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [loading, setLoading] = useState(!globalSupplyEmployeeRosterMode);
@@ -139,13 +149,13 @@ export function AdminEmployeeAssignmentsPanel({
       setUsers(u);
       setSuppliers(s);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load assignments');
+      setError(e instanceof Error ? e.message : t('adminEmployees.ui.loadAssignmentsFailed'));
       setUsers([]);
       setSuppliers([]);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   const loadRoster = useCallback(async () => {
     if (!token) {
@@ -160,11 +170,11 @@ export function AdminEmployeeAssignmentsPanel({
       setRosterUsers(rows);
     } catch (e) {
       setRosterUsers([]);
-      setRosterError(e instanceof Error ? e.message : 'Failed to load roster');
+      setRosterError(e instanceof Error ? e.message : t('adminEmployees.ui.loadRosterFailed'));
     } finally {
       setRosterLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     if (globalSupplyEmployeeRosterMode) {
@@ -228,11 +238,11 @@ export function AdminEmployeeAssignmentsPanel({
         method: 'POST',
         body: JSON.stringify({ employeeId, supplierId: employeeSupplierId }),
       });
-      toast.success('Employee/contractor assignment created');
+      toast.success(t('adminEmployees.toast.assignmentCreated'));
       setEmployeeSupplierId('');
       await loadDefaultPanel();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Assignment failed');
+      toast.error(e instanceof Error ? e.message : t('adminEmployees.toast.assignmentFailed'));
     } finally {
       setBusy(false);
     }
@@ -243,10 +253,10 @@ export function AdminEmployeeAssignmentsPanel({
     setBusy(true);
     try {
       await apiJson(`/employee-suppliers/${aId}/${sId}`, { token, method: 'DELETE' });
-      toast.info('Employee/contractor assignment removed');
+      toast.info(t('adminEmployees.toast.assignmentRemoved'));
       await loadDefaultPanel();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Remove failed');
+      toast.error(e instanceof Error ? e.message : t('adminEmployees.toast.removeFailed'));
     } finally {
       setBusy(false);
     }
@@ -261,11 +271,11 @@ export function AdminEmployeeAssignmentsPanel({
         method: 'POST',
         body: JSON.stringify({ qualityEngineerId: qeId, buyerId: qeBuyerId }),
       });
-      toast.success('QE → Buyer assignment created');
+      toast.success(t('adminEmployees.toast.qeBuyerCreated'));
       setQeBuyerId('');
       await loadDefaultPanel();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Assignment failed');
+      toast.error(e instanceof Error ? e.message : t('adminEmployees.toast.assignmentFailed'));
     } finally {
       setBusy(false);
     }
@@ -276,10 +286,10 @@ export function AdminEmployeeAssignmentsPanel({
     setBusy(true);
     try {
       await apiJson(`/qe-buyers/${qId}/${bId}`, { token, method: 'DELETE' });
-      toast.info('QE → Buyer assignment removed');
+      toast.info(t('adminEmployees.toast.qeBuyerRemoved'));
       await loadDefaultPanel();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Remove failed');
+      toast.error(e instanceof Error ? e.message : t('adminEmployees.toast.removeFailed'));
     } finally {
       setBusy(false);
     }
@@ -314,7 +324,7 @@ export function AdminEmployeeAssignmentsPanel({
       const hourlyParsed =
         rosterDraft.hourlyRate.trim() === '' ? null : Number(rosterDraft.hourlyRate.replace(/,/g, ''));
       if (hourlyParsed !== null && (!Number.isFinite(hourlyParsed) || hourlyParsed < 0)) {
-        toast.error('Rate must be a non-negative number or empty');
+        toast.error(t('adminEmployees.toast.rateInvalid'));
         return;
       }
       await apiJson(`/users/${userId}`, {
@@ -328,7 +338,7 @@ export function AdminEmployeeAssignmentsPanel({
           currency: hourlyParsed !== null ? rosterDraft.currency.trim() || 'USD' : null,
         }),
       });
-      toast.success('Roster updated');
+      toast.success(t('adminEmployees.toast.rosterUpdated'));
       setEditingStaffId(null);
       setRosterDraft(emptyDraft());
       await loadRoster();
@@ -344,10 +354,10 @@ export function AdminEmployeeAssignmentsPanel({
       return (
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Employee Assignments</h2>
+            <h2 style={{ marginTop: 0 }}>{t('adminEmployees.ui.cardTitleAssignments')}</h2>
             <div className="loading-message" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div className="loading-spinner" />
-              <p style={{ margin: 0 }}>Loading roster…</p>
+              <p style={{ margin: 0 }}>{t('adminEmployees.ui.loadingRoster')}</p>
             </div>
           </div>
         </div>
@@ -357,7 +367,7 @@ export function AdminEmployeeAssignmentsPanel({
       return (
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Employee Assignments</h2>
+            <h2 style={{ marginTop: 0 }}>{t('adminEmployees.ui.cardTitleAssignments')}</h2>
             <div className="alert-error">{rosterError}</div>
           </div>
         </div>
@@ -367,25 +377,25 @@ export function AdminEmployeeAssignmentsPanel({
     return (
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Employees & Contractors</h2>
+          <h2 style={{ marginTop: 0 }}>{t('adminEmployees.ui.sectionEmployeesRoster')}</h2>
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ minWidth: 200 }}>Name</th>
-                  <th style={{ minWidth: 120 }}>Country</th>
-                  <th style={{ minWidth: 160 }}>Role</th>
-                  <th style={{ minWidth: 220 }}>Responsibilities</th>
-                  <th style={{ minWidth: 120 }}>Rate</th>
-                  <th style={{ minWidth: 200 }}>Notes</th>
-                  {canEditStaffRoster ? <th style={{ width: 140 }}>Actions</th> : null}
+                  <th style={{ minWidth: 200 }}>{t('table.col.name')}</th>
+                  <th style={{ minWidth: 120 }}>{t('table.col.country')}</th>
+                  <th style={{ minWidth: 160 }}>{t('table.col.role')}</th>
+                  <th style={{ minWidth: 220 }}>{t('table.col.responsibilities')}</th>
+                  <th style={{ minWidth: 120 }}>{t('table.col.rate')}</th>
+                  <th style={{ minWidth: 200 }}>{t('table.col.notes')}</th>
+                  {canEditStaffRoster ? <th style={{ width: 140 }}>{t('table.col.actions')}</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {employeeContractors.length === 0 ? (
                   <tr>
                     <td colSpan={canEditStaffRoster ? 7 : 6} className="table-empty">
-                      No employees or contractors. Mark users as Employee or Contractor in Admin → Users.
+                      {t('adminEmployees.ui.rosterEmpty')}
                     </td>
                   </tr>
                 ) : (
@@ -401,14 +411,14 @@ export function AdminEmployeeAssignmentsPanel({
                             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{u.email}</div>
                           ) : null}
                           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4 }}>
-                            {u.isContractor ? 'Contractor' : 'Employee'}
+                            {u.isContractor ? t('adminEmployees.ui.typeContractor') : t('adminEmployees.ui.typeEmployee')}
                           </div>
                         </td>
                         <td style={{ minWidth: 200, maxWidth: 320 }}>
                           {isEditing && canEditStaffRoster ? (
                             <div>
                               <label className="input-label" style={{ marginBottom: 6 }}>
-                                Countries
+                                {t('adminEmployees.ui.countriesLabel')}
                               </label>
                               <select
                                 multiple
@@ -419,7 +429,7 @@ export function AdminEmployeeAssignmentsPanel({
                                   const selected = Array.from(e.target.selectedOptions, (o) => o.value);
                                   setRosterDraft((d) => ({ ...d, assignedCountryNames: selected }));
                                 }}
-                                aria-label="Countries"
+                                aria-label={t('adminEmployees.ui.countriesLabel')}
                                 style={{ width: '100%' }}
                               >
                                 {countryOptions.map((c) => (
@@ -435,14 +445,14 @@ export function AdminEmployeeAssignmentsPanel({
                                   color: 'var(--color-text-muted)',
                                 }}
                               >
-                                Hold Ctrl (Windows) or Cmd (Mac) and click to select multiple countries.
+                                {t('adminEmployees.ui.countriesMultiSelectHint')}
                               </p>
                             </div>
                           ) : (
-                            formatCountriesCell(u)
+                            formatCountriesCell(u, dash)
                           )}
                         </td>
-                        <td>{formatRolesCell(u.roleNames)}</td>
+                        <td>{formatRolesCell(t, dash, u.roleNames)}</td>
                         <td>
                           {isEditing && canEditStaffRoster ? (
                             <textarea
@@ -452,11 +462,13 @@ export function AdminEmployeeAssignmentsPanel({
                               onChange={(e) =>
                                 setRosterDraft((d) => ({ ...d, employmentResponsibilities: e.target.value }))
                               }
-                              aria-label="Responsibilities"
+                              aria-label={t('adminEmployees.ui.ariaResponsibilities')}
                               style={{ minWidth: 200, resize: 'vertical' }}
                             />
                           ) : (
-                            <span style={{ whiteSpace: 'pre-wrap' }}>{u.employmentResponsibilities?.trim() || '—'}</span>
+                            <span style={{ whiteSpace: 'pre-wrap' }}>
+                              {u.employmentResponsibilities?.trim() || t('internal.scheduleAudit.dash')}
+                            </span>
                           )}
                         </td>
                         <td>
@@ -469,20 +481,20 @@ export function AdminEmployeeAssignmentsPanel({
                                 step="0.01"
                                 value={rosterDraft.hourlyRate}
                                 onChange={(e) => setRosterDraft((d) => ({ ...d, hourlyRate: e.target.value }))}
-                                placeholder="Hourly rate"
-                                aria-label="Hourly rate"
+                                placeholder={t('adminEmployees.ui.placeholderHourlyRate')}
+                                aria-label={t('adminEmployees.ui.ariaHourlyRate')}
                               />
                               <input
                                 className="input"
                                 value={rosterDraft.currency}
                                 onChange={(e) => setRosterDraft((d) => ({ ...d, currency: e.target.value }))}
-                                placeholder="USD"
+                                placeholder={t('adminEmployees.ui.placeholderCurrency')}
                                 maxLength={8}
-                                aria-label="Currency"
+                                aria-label={t('adminEmployees.ui.ariaCurrency')}
                               />
                             </div>
                           ) : (
-                            formatRateCell(u.hourlyRate, u.currency)
+                            formatRateCell(u.hourlyRate, u.currency, dash)
                           )}
                         </td>
                         <td>
@@ -492,11 +504,13 @@ export function AdminEmployeeAssignmentsPanel({
                               rows={3}
                               value={rosterDraft.employmentNotes}
                               onChange={(e) => setRosterDraft((d) => ({ ...d, employmentNotes: e.target.value }))}
-                              aria-label="Notes"
+                              aria-label={t('adminEmployees.ui.ariaNotes')}
                               style={{ minWidth: 200, resize: 'vertical' }}
                             />
                           ) : (
-                            <span style={{ whiteSpace: 'pre-wrap' }}>{u.employmentNotes?.trim() || '—'}</span>
+                            <span style={{ whiteSpace: 'pre-wrap' }}>
+                              {u.employmentNotes?.trim() || t('internal.scheduleAudit.dash')}
+                            </span>
                           )}
                         </td>
                         {canEditStaffRoster ? (
@@ -509,15 +523,15 @@ export function AdminEmployeeAssignmentsPanel({
                                   disabled={rosterSaveBusy}
                                   onClick={() => void saveStaffRosterRow(u.id)}
                                 >
-                                  Save
+                                  {t('common.save')}
                                 </button>
                                 <button type="button" className="btn btn-ghost" disabled={rosterSaveBusy} onClick={cancelEditStaffRow}>
-                                  Cancel
+                                  {t('common.cancel')}
                                 </button>
                               </div>
                             ) : (
                               <button type="button" className="btn btn-ghost" onClick={() => beginEditStaffRow(u)}>
-                                Edit
+                                {t('common.edit')}
                               </button>
                             )}
                           </td>
@@ -538,7 +552,7 @@ export function AdminEmployeeAssignmentsPanel({
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Employee Assignments</h1>
+          <h1 className="page-title">{t('adminEmployees.ui.pageTitle')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
@@ -552,7 +566,7 @@ export function AdminEmployeeAssignmentsPanel({
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Employee Assignments</h1>
+          <h1 className="page-title">{t('adminEmployees.ui.pageTitle')}</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -562,17 +576,17 @@ export function AdminEmployeeAssignmentsPanel({
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Employee Assignments</h1>
+        <h1 className="page-title">{t('adminEmployees.ui.pageTitle')}</h1>
       </header>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Employee/Contractor → Supplier</h2>
+          <h2 style={{ marginTop: 0 }}>{t('adminEmployees.ui.sectionEmpSupplier')}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Employee / Contractor</label>
+              <label className="input-label">{t('adminEmployees.ui.labelEmployeeContractor')}</label>
               <select className="input" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select Employee/Contractor</option>
+                <option value="">{t('adminEmployees.ui.placeholderSelectEmployee')}</option>
                 {employeeContractors.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name?.trim() ? `${a.name} (${a.email})` : a.email}
@@ -581,9 +595,9 @@ export function AdminEmployeeAssignmentsPanel({
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Supplier</label>
+              <label className="input-label">{t('adminEmployees.ui.labelSupplier')}</label>
               <select className="input" value={employeeSupplierId} onChange={(e) => setEmployeeSupplierId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select Supplier</option>
+                <option value="">{t('adminEmployees.ui.placeholderSelectSupplier')}</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code}: {s.name}
@@ -592,7 +606,7 @@ export function AdminEmployeeAssignmentsPanel({
               </select>
             </div>
             <button type="button" className="btn btn-primary" onClick={() => void assignEmployeeSupplier()} disabled={busy || !employeeId || !employeeSupplierId}>
-              Assign
+              {t('adminEmployees.ui.btnAssign')}
             </button>
           </div>
 
@@ -600,18 +614,18 @@ export function AdminEmployeeAssignmentsPanel({
             <table className="table">
               <thead>
                 <tr>
-                  <th>Employee / contractor</th>
-                  <th>Type</th>
-                  <th>Country</th>
-                  <th>Assigned Suppliers</th>
-                  <th style={{ width: 100 }}>Action</th>
+                  <th>{t('table.col.employeeOrContractor')}</th>
+                  <th>{t('table.col.type')}</th>
+                  <th>{t('table.col.country')}</th>
+                  <th>{t('table.col.assignedSuppliers')}</th>
+                  <th style={{ width: 100 }}>{t('table.col.action')}</th>
                 </tr>
               </thead>
               <tbody>
                 {employeeContractors.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="table-empty">
-                      No employees/contractors found.
+                      {t('adminEmployees.ui.emptyNoStaff')}
                     </td>
                   </tr>
                 ) : (
@@ -623,10 +637,10 @@ export function AdminEmployeeAssignmentsPanel({
                           <td>
                             {a.name?.trim() ? a.name : a.email}
                           </td>
-                          <td>{a.isContractor ? 'Contractor' : 'Employee'}</td>
-                          <td>{formatCountriesCell(a)}</td>
+                          <td>{a.isContractor ? t('adminEmployees.ui.typeContractor') : t('adminEmployees.ui.typeEmployee')}</td>
+                          <td>{formatCountriesCell(a, dash)}</td>
                           <td colSpan={2} className="table-empty">
-                            None
+                            {t('common.none')}
                           </td>
                         </tr>
                       );
@@ -640,14 +654,14 @@ export function AdminEmployeeAssignmentsPanel({
                               <td rowSpan={supplierIds.length}>
                                 {a.name?.trim() ? a.name : a.email}
                               </td>
-                              <td rowSpan={supplierIds.length}>{a.isContractor ? 'Contractor' : 'Employee'}</td>
-                              <td rowSpan={supplierIds.length}>{formatCountriesCell(a)}</td>
+                              <td rowSpan={supplierIds.length}>{a.isContractor ? t('adminEmployees.ui.typeContractor') : t('adminEmployees.ui.typeEmployee')}</td>
+                              <td rowSpan={supplierIds.length}>{formatCountriesCell(a, dash)}</td>
                             </>
                           ) : null}
                           <td>{sup ? `${sup.code}: ${sup.name}` : sid}</td>
                           <td>
                             <button type="button" className="btn btn-ghost" onClick={() => void removeEmployeeSupplier(a.id, sid)} disabled={busy}>
-                              Remove
+                              {t('adminEmployees.ui.btnRemove')}
                             </button>
                           </td>
                         </tr>
@@ -663,12 +677,12 @@ export function AdminEmployeeAssignmentsPanel({
 
       <div className="card">
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Quality Engineer → Buyer</h2>
+          <h2 style={{ marginTop: 0 }}>{t('adminEmployees.ui.sectionQeBuyer')}</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">QE</label>
+              <label className="input-label">{t('adminEmployees.ui.labelQe')}</label>
               <select className="input" value={qeId} onChange={(e) => setQeId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select QE</option>
+                <option value="">{t('adminEmployees.ui.placeholderSelectQe')}</option>
                 {qes.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.name?.trim() ? `${q.name} (${q.email})` : q.email}
@@ -677,9 +691,9 @@ export function AdminEmployeeAssignmentsPanel({
               </select>
             </div>
             <div className="input-group" style={{ marginBottom: 0 }}>
-              <label className="input-label">Buyer</label>
+              <label className="input-label">{t('adminEmployees.ui.labelBuyer')}</label>
               <select className="input" value={qeBuyerId} onChange={(e) => setQeBuyerId(e.target.value)} style={{ minWidth: 260 }}>
-                <option value="">Select Buyer</option>
+                <option value="">{t('adminEmployees.ui.placeholderSelectBuyer')}</option>
                 {buyers.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name?.trim() ? `${b.name} (${b.email})` : b.email}
@@ -688,7 +702,7 @@ export function AdminEmployeeAssignmentsPanel({
               </select>
             </div>
             <button type="button" className="btn btn-primary" onClick={() => void assignQeBuyer()} disabled={busy || !qeId || !qeBuyerId}>
-              Assign
+              {t('adminEmployees.ui.btnAssign')}
             </button>
           </div>
 
@@ -696,17 +710,17 @@ export function AdminEmployeeAssignmentsPanel({
             <table className="table">
               <thead>
                 <tr>
-                  <th>QE</th>
-                  <th>Buyer</th>
-                  <th>Auto-linked Suppliers</th>
-                  <th style={{ width: 100 }}>Action</th>
+                  <th>{t('table.col.qe')}</th>
+                  <th>{t('table.col.buyer')}</th>
+                  <th>{t('table.col.autoLinkedSuppliers')}</th>
+                  <th style={{ width: 100 }}>{t('table.col.action')}</th>
                 </tr>
               </thead>
               <tbody>
                 {qes.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="table-empty">
-                      No Quality Engineers. Create a user with Quality Engineer role.
+                      {t('adminEmployees.ui.emptyNoQes')}
                     </td>
                   </tr>
                 ) : (
@@ -717,7 +731,7 @@ export function AdminEmployeeAssignmentsPanel({
                         <tr key={q.id}>
                           <td>{q.name?.trim() ? q.name : q.email}</td>
                           <td colSpan={3} className="table-empty">
-                            None
+                            {t('common.none')}
                           </td>
                         </tr>
                       );
@@ -727,7 +741,7 @@ export function AdminEmployeeAssignmentsPanel({
                       const supplierIds = buyerSupplierIdsByBuyerId[bid] ?? [];
                       const suppliersText =
                         supplierIds.length === 0
-                          ? '—'
+                          ? dash
                           : supplierIds
                               .map((sid) => {
                                 const sup = supplierById[sid];
@@ -744,7 +758,7 @@ export function AdminEmployeeAssignmentsPanel({
                           </td>
                           <td>
                             <button type="button" className="btn btn-ghost" onClick={() => void removeQeBuyer(q.id, bid)} disabled={busy}>
-                              Remove
+                              {t('adminEmployees.ui.btnRemove')}
                             </button>
                           </td>
                         </tr>

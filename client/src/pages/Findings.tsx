@@ -82,6 +82,8 @@ export function Findings() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const list = data?.list ?? [];
+  const trFindingStatus = (s: string) => t(`findings.status.${s.replace(/\s+/g, '')}`, s);
+  const trFindingSeverity = (s: string) => t(`findings.severity.${s}`, s);
   const statsFromApi = data?.stats;
   const stats = {
     totalAll:
@@ -171,7 +173,7 @@ export function Findings() {
         setData(d);
         setSuppliers(s);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('findings.loadFailed')))
       .finally(() => setLoading(false));
   };
 
@@ -229,24 +231,24 @@ export function Findings() {
   const handleExportFindingsTable = () => {
     try {
       const rows: ExportRow[] = sortedList.map((f) => ({
-        Code: f.code,
-        Supplier: `${f.supplier.code}: ${f.supplier.name}`,
-        Audit: f.audit?.code ?? 'None',
-        Shipment: f.shipment?.code?.trim() || f.shipment?.id || '—',
-        Severity: f.severity,
-        Status: f.status,
-        Summary: f.summary,
-        'Defect Code': f.defectCode?.trim() ? f.defectCode : '—',
-        CARs: (f.correctiveActions ?? []).map((c) => `${c.code} (${c.status})`).join(', ') || '—',
-        'Date Created': formatFindingCreatedAt(f.createdAt, locale),
+        [t('findings.col.code')]: f.code,
+        [t('findings.col.supplier')]: `${f.supplier.code}: ${f.supplier.name}`,
+        [t('findings.col.audit')]: f.audit?.code ?? t('findings.exportColNone'),
+        [t('findings.col.shipment')]: f.shipment?.code?.trim() || f.shipment?.id || '—',
+        [t('findings.col.severity')]: f.severity,
+        [t('findings.col.status')]: f.status,
+        [t('findings.col.summary')]: f.summary,
+        [t('findings.col.defectCode')]: f.defectCode?.trim() ? f.defectCode : '—',
+        [t('findings.exportColCars')]: (f.correctiveActions ?? []).map((c) => `${c.code} (${c.status})`).join(', ') || '—',
+        [t('findings.col.dateCreated')]: formatFindingCreatedAt(f.createdAt, locale),
       }));
       if (rows.length === 0) return;
       const supplierSuffix =
         suppliers.find((s) => s.id === supplierFilter)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
-      downloadTableXlsx(`Findings_${supplierSuffix}`, 'Findings', rows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(`Findings_${supplierSuffix}`, t('findings.exportSheet'), rows);
+      toast.success(t('findings.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('findings.exportFailed'));
     }
   };
 
@@ -257,9 +259,9 @@ export function Findings() {
     try {
       await apiJson(`/findings/${findingId}`, { token, method: 'DELETE' });
       setRefreshKey((k) => k + 1);
-      toast.warning('Finding deleted');
+      toast.warning(t('findings.findingDeleted'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(e instanceof Error ? e.message : t('findings.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -304,11 +306,11 @@ export function Findings() {
       <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         {canCreateFinding && (
           <Link to="/findings-record" className="btn btn-primary">
-            FINDING RECORDS
+            {t('findings.findingRecords')}
           </Link>
         )}
         <label>
-          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+          <span style={{ marginRight: 8, fontSize: 'var(--text-sm)' }}>{t('filters.supplierColon')}</span>
           <select
             className="input"
             value={supplierFilter}
@@ -319,7 +321,7 @@ export function Findings() {
             }}
             style={{ width: 'auto', minWidth: 180 }}
           >
-            <option value="">All</option>
+            <option value="">{t('filters.all')}</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>{s.code}: {s.name}</option>
             ))}
@@ -329,17 +331,17 @@ export function Findings() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(180px, 260px))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total Findings</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('findings.totalFindings')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.totalAll}</div>
           <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.4 }}>
-            {stats.criticalMajor} Critical/Major
+            {t('findings.criticalMajorLine', { count: stats.criticalMajor })}
           </div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open Findings</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('findings.openFindings')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.openAll}</div>
           <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.4 }}>
-            {stats.openCriticalMajor} Critical/Major
+            {t('findings.openCriticalMajorLine', { count: stats.openCriticalMajor })}
           </div>
         </div>
       </div>
@@ -354,10 +356,10 @@ export function Findings() {
       >
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>Audit vs Shipment Findings</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: 'var(--text-lg)' }}>{t('findings.chartAuditVsShipment')}</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <svg
-                aria-label="Audit versus shipment findings donut chart"
+                aria-label={t('findings.chartDonutAria')}
                 width={sourceDonut.size}
                 height={sourceDonut.size}
                 viewBox={`0 0 ${sourceDonut.size} ${sourceDonut.size}`}
@@ -389,21 +391,21 @@ export function Findings() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#2563eb', display: 'inline-block' }} />
-                    Audit Findings
+                    {t('findings.legendAudit')}
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{auditFindingsCount}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#8b5cf6', display: 'inline-block' }} />
-                    Shipment Findings
+                    {t('findings.legendShipment')}
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{shipmentFindingsCount}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#6b7280', display: 'inline-block' }} />
-                    None
+                    {t('findings.legendNone')}
                   </span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{noneFindingsCount}</span>
                 </div>
@@ -414,7 +416,7 @@ export function Findings() {
 
         <div className="card">
           <div className="card-body">
-            <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: 'var(--text-lg)' }}>Top Defect Codes</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: 'var(--text-lg)' }}>{t('findings.topDefectCodes')}</h2>
             <div
               style={{
                 marginBottom: '0.5rem',
@@ -423,13 +425,13 @@ export function Findings() {
                 minHeight: '1.1rem',
               }}
             >
-              {activeDefectCode ? `Selected code: ${activeDefectCode}` : 'Hover or click a code label to read the full value.'}
+              {activeDefectCode ? t('findings.defectSelected', { code: activeDefectCode }) : t('findings.defectHint')}
             </div>
             {topDefectCodes.length === 0 ? (
-              <p className="table-empty">No defect-code data.</p>
+              <p className="table-empty">{t('findings.noDefectCodes')}</p>
             ) : (
               <div
-                aria-label="Top defect codes bar chart"
+                aria-label={t('findings.defectCodesAria')}
                 style={{
                   minHeight: 210,
                   borderLeft: '1px solid var(--color-border)',
@@ -498,33 +500,49 @@ export function Findings() {
             borderBottom: '1px solid var(--color-border)',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Findings Table</h2>
+          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>{t('findings.tableTitle')}</h2>
           <button type="button" className="btn btn-ghost" onClick={handleExportFindingsTable} disabled={sortedList.length === 0}>
-            Export to Excel
+            {t('findings.exportExcel')}
           </button>
         </div>
-        <TableWithTopScroll ariaLabel="Findings table">
+        <TableWithTopScroll ariaLabel={t('findings.tableTitle')}>
                 <table className="table">
                   <thead>
                     <tr>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
-                      <th>Shipment</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>Summary {sortIndicator('summary')}</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('defectCode')}>Defect Code {sortIndicator('defectCode')}</th>
-                      <th>CAR</th>
-                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('createdAt')}>Date created {sortIndicator('createdAt')}</th>
-                      {isAdmin && <th>Delete</th>}
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>
+                        {t('findings.col.code')} {sortIndicator('code')}
+                      </th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>
+                        {t('findings.col.supplier')} {sortIndicator('supplier')}
+                      </th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>
+                        {t('findings.col.audit')} {sortIndicator('audit')}
+                      </th>
+                      <th>{t('findings.col.shipment')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>
+                        {t('findings.col.severity')} {sortIndicator('severity')}
+                      </th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>
+                        {t('findings.col.status')} {sortIndicator('status')}
+                      </th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('summary')}>
+                        {t('findings.col.summary')} {sortIndicator('summary')}
+                      </th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('defectCode')}>
+                        {t('findings.col.defectCode')} {sortIndicator('defectCode')}
+                      </th>
+                      <th>{t('findings.col.car')}</th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => onSort('createdAt')}>
+                        {t('findings.col.dateCreated')} {sortIndicator('createdAt')}
+                      </th>
+                      {isAdmin && <th>{t('findings.col.delete')}</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {list.length === 0 ? (
                       <tr>
                         <td colSpan={10 + (isAdmin ? 1 : 0)} className="table-empty">
-                          No findings in scope (or none past New yet).
+                          {t('findings.empty')}
                         </td>
                       </tr>
                     ) : (
@@ -545,7 +563,7 @@ export function Findings() {
                               <Link
                                 to={`/shipments?supplierId=${encodeURIComponent(f.supplierId)}`}
                                 className="finding-code-link"
-                                title={`Shipment ${f.shipment.code?.trim() || f.shipment.id}`}
+                                title={t('findings.shipmentTitle', { id: f.shipment.code?.trim() || f.shipment.id })}
                               >
                                 {f.shipment.code?.trim() || f.shipment.id}
                               </Link>
@@ -553,10 +571,10 @@ export function Findings() {
                               '—'
                             )}
                           </td>
-                          <td>{f.severity}</td>
+                          <td>{trFindingSeverity(f.severity)}</td>
                           <td>
                             <span className={`findings-status-badge findings-status-badge--${getStatusBadgeSlug(f.status)}`}>
-                              {f.status}
+                              {trFindingStatus(f.status)}
                             </span>
                           </td>
                           <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
@@ -576,7 +594,7 @@ export function Findings() {
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: 'vertical',
                                 }}
-                                title="Click to view full summary"
+                                title={t('findings.clickFullSummary')}
                               >
                                 {f.summary}
                               </button>
@@ -608,7 +626,7 @@ export function Findings() {
                                   className="btn btn-ghost"
                                   style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }}
                                 >
-                                  + New CAR
+                                  {t('findings.newCar')}
                                 </Link>
                               )}
                             </div>
@@ -624,9 +642,9 @@ export function Findings() {
                                 style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
                                 onClick={() => setDeleteConfirmId(f.id)}
                                 disabled={deletingId !== null}
-                                title="Delete finding (Admin only)"
+                                title={t('findings.deleteRowTitle')}
                               >
-                                {deletingId === f.id ? 'Deleting…' : 'Delete'}
+                                {deletingId === f.id ? t('findings.deleting') : t('findings.col.delete')}
                               </button>
                             </td>
                           )}
@@ -639,10 +657,14 @@ export function Findings() {
         {list.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-              {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+              {t('table.paginationRange', {
+                start: (pageSafe - 1) * pageSize + 1,
+                end: Math.min(pageSafe * pageSize, totalCount),
+                total: totalCount,
+              })}
             </span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
-              Rows per page:
+              {t('table.rowsPerPage')}
               <select
                 className="input"
                 value={pageSize}
@@ -665,10 +687,10 @@ export function Findings() {
                 disabled={pageSafe <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Previous
+                {t('table.previous')}
               </button>
               <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
-                Page {pageSafe} of {totalPages}
+                {t('table.pageOf', { page: pageSafe, pages: totalPages })}
               </span>
               <button
                 type="button"
@@ -676,7 +698,7 @@ export function Findings() {
                 disabled={pageSafe >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                Next
+                {t('table.next')}
               </button>
             </div>
           </div>
@@ -685,9 +707,9 @@ export function Findings() {
 
       <ConfirmDialog
         open={deleteConfirmId !== null}
-        title="Delete finding"
-        message="Delete this finding? This cannot be undone."
-        confirmLabel="Delete"
+        title={t('findings.deleteTitle')}
+        message={t('findings.deleteMessage')}
+        confirmLabel={t('findings.col.delete')}
         variant="danger"
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
         onCancel={() => setDeleteConfirmId(null)}
@@ -703,12 +725,12 @@ export function Findings() {
         >
           <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="finding-summary-title" className="confirm-dialog-title">
-              Finding Summary - {summaryModal.code}
+              {t('findings.summaryModalTitle', { code: summaryModal.code })}
             </h3>
             <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{summaryModal.summary}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-primary" onClick={() => setSummaryModal(null)}>
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>

@@ -45,6 +45,8 @@ export function VerticalBarChart({
   slantedXAxisLabels = false,
   /** When true, the numeric value above each bar is rotated (farm names stay horizontal). */
   slantedValueLabels = false,
+  /** When true (and not slanted), category labels stay on one line with ellipsis instead of wrapping. */
+  axisLabelsNoWrap = false,
 }: {
   rows: BarChartRow[];
   valueFormatter: (value: number) => string;
@@ -52,6 +54,7 @@ export function VerticalBarChart({
   negativeColor?: string;
   slantedXAxisLabels?: boolean;
   slantedValueLabels?: boolean;
+  axisLabelsNoWrap?: boolean;
 }) {
   const topRows = rows.slice(0, 10);
   const maxAbs = Math.max(1, ...topRows.map((row) => Math.abs(row.value)));
@@ -125,8 +128,18 @@ export function VerticalBarChart({
               color: 'var(--color-text-muted)',
               textAlign: 'center',
               lineHeight: 1.3,
-              wordBreak: 'break-word',
+              minWidth: 0,
+              width: '100%',
+              maxWidth: '100%',
+              ...(axisLabelsNoWrap
+                ? {
+                    whiteSpace: 'nowrap' as const,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }
+                : { wordBreak: 'break-word' as const }),
             }}
+            title={axisLabelsNoWrap ? row.label : undefined}
           >
             {row.label}
           </span>

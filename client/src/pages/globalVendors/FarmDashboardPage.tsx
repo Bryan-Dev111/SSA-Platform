@@ -5,12 +5,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { MetricCard } from '../../components/MetricCard';
 import { SortableTh } from '../../components/SortableTh';
 import { ChartCard, ContinuousLineChart, VerticalBarChart } from '../../components/DashboardBarCharts';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { type SortDir, cmpNum, cmpStr, toggleSort } from '../../utils/tableSort';
-import { getDocumentLocale } from '../../i18n/locale';
 
 type FarmDashboardPayload = {
   staffRestricted: boolean;
@@ -44,24 +44,9 @@ type FarmDashboardPayload = {
 
 type FarmTableSortKey = 'farmId' | 'country' | 'region' | 'weightKg' | 'revenue' | 'profit' | 'samples';
 
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatKg(value: number): string {
-  return `${value.toLocaleString(getDocumentLocale(), { maximumFractionDigits: 2 })} kg`;
-}
-
-function formatCount(value: number): string {
-  return `${Math.round(value).toLocaleString()}`;
-}
-
 export function FarmDashboardPage() {
   const { token, user } = useAuth();
+  const { t, locale } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<FarmDashboardPayload | null>(null);
@@ -72,12 +57,27 @@ export function FarmDashboardPage() {
     dir: 'asc',
   });
 
+  const formatMoney = useCallback((value: number) => {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(value);
+  }, [locale]);
+
+  const formatKg = useCallback(
+    (value: number) => `${value.toLocaleString(locale, { maximumFractionDigits: 2 })} kg`,
+    [locale]
+  );
+
+  const formatCount = useCallback((value: number) => `${Math.round(value).toLocaleString(locale)}`, [locale]);
+
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+    if (hour < 12) return t('dashboard.greeting.morning');
+    if (hour < 18) return t('dashboard.greeting.afternoon');
+    return t('dashboard.greeting.evening');
+  }, [t]);
   const displayName = user?.name?.trim() || 'John T.';
 
   const fetchDashboard = useCallback(async () => {
@@ -89,12 +89,12 @@ export function FarmDashboardPage() {
       const d = await apiJson<FarmDashboardPayload>(`/farm-dashboard${qs}`, { token });
       setData(d);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load farm dashboard');
+      setError(e instanceof Error ? e.message : t('farmDash.loadFailed'));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [token, countrySelection]);
+  }, [token, countrySelection, t]);
 
   useEffect(() => {
     void fetchDashboard();
@@ -155,34 +155,38 @@ export function FarmDashboardPage() {
     setSort((prev) => toggleSort(prev, columnKey as FarmTableSortKey));
   };
 
-  const exportTable = () => {
+  const exportTable = useCallback(() => {
     if (!sortedTableRows.length || !data) return;
     const stamp = new Date().toISOString().slice(0, 10);
     const scope = data.selectedCountry ? `_${data.selectedCountry.replace(/\s+/g, '_')}` : '_all';
     const rows: ExportRow[] = sortedTableRows.map((r) => ({
-      'Farm ID': r.farmId,
-      Country: r.country,
-      Region: r.region || '—',
-      'Weight (kg)': r.weightKg,
-      Revenue: r.revenue,
-      Profit: r.profit,
-      Samples: r.samples,
+      [t('table.col.farmId')]: r.farmId,
+      [t('table.col.country')]: r.country,
+      [t('table.col.region')]: r.region || '—',
+      [t('farmDash.exportColWeightKg')]: r.weightKg,
+      [t('farmDash.exportColRevenue')]: r.revenue,
+      [t('farmDash.exportColProfit')]: r.profit,
+      [t('farmDash.exportColSamples')]: r.samples,
     }));
-    downloadTableXlsx(`Farm_Dashboard${scope}_${stamp}`, 'Farms', rows);
-  };
+    downloadTableXlsx(
+      `${t('farmDash.exportFilePrefix')}${scope}_${stamp}`,
+      t('farmDash.exportSheet'),
+      rows
+    );
+  }, [sortedTableRows, data, t]);
 
   if (loading && !data) {
     return (
       <div className="page page-dashboard">
         <header className="page-header">
-          <h1 className="page-title">Farm Dashboard</h1>
+          <h1 className="page-title">{t('nav.farmDashboard')}</h1>
           <p className="page-description" style={{ marginTop: '0.35rem' }}>
-            {greeting}, {displayName}. Here is what is happening with your farms today.
+            {greeting}, {displayName}. {t('farmDash.intro')}
           </p>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading farm dashboard…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -192,9 +196,9 @@ export function FarmDashboardPage() {
     return (
       <div className="page page-dashboard">
         <header className="page-header">
-          <h1 className="page-title">Farm Dashboard</h1>
+          <h1 className="page-title">{t('nav.farmDashboard')}</h1>
           <p className="page-description" style={{ marginTop: '0.35rem' }}>
-            {greeting}, {displayName}. Here is what is happening with your farms today.
+            {greeting}, {displayName}. {t('farmDash.intro')}
           </p>
         </header>
         <div className="alert-error">{error}</div>
@@ -206,38 +210,38 @@ export function FarmDashboardPage() {
     return (
       <div className="page page-dashboard">
         <header className="page-header">
-          <h1 className="page-title">Farm Dashboard</h1>
+          <h1 className="page-title">{t('nav.farmDashboard')}</h1>
           <p className="page-description" style={{ marginTop: '0.35rem' }}>
-            {greeting}, {displayName}. Here is what is happening with your farms today.
+            {greeting}, {displayName}. {t('farmDash.intro')}
           </p>
         </header>
-        <p className="table-empty">No data.</p>
+        <p className="table-empty">{t('farmDash.noData')}</p>
       </div>
     );
   }
 
   const g = data.graphs;
   const scopeLabel =
-    !data.staffRestricted && !data.selectedCountry ? 'All countries' : (data.selectedCountry ?? '');
+    !data.staffRestricted && !data.selectedCountry ? t('farmDash.allCountries') : (data.selectedCountry ?? '');
   const openExpenses = typeof data.kpis.openExpenses === 'number' ? data.kpis.openExpenses : 0;
 
   return (
     <div className="page page-dashboard">
       <header className="page-header">
-        <h1 className="page-title">Farm Dashboard</h1>
+        <h1 className="page-title">{t('nav.farmDashboard')}</h1>
         <p className="page-description" style={{ marginTop: '0.35rem' }}>
-          {greeting}, {displayName}. Here is what is happening with your farms today.
+          {greeting}, {displayName}. {t('farmDash.intro')}
         </p>
         {data.staffRestricted ? (
           <p className="page-description" style={{ marginTop: '0.35rem' }}>
             {data.allowedCountries.length > 1
-              ? 'Farms are limited to your assigned countries. Use the menu below to switch between them.'
-              : 'Farms are limited to your assigned country.'}
+              ? t('farmDash.staffLimitedMulti')
+              : t('farmDash.staffLimitedSingle')}
           </p>
         ) : null}
         {data.staffRestricted && data.allowedCountries.length === 1 ? (
           <p className="page-description" style={{ marginTop: '0.25rem' }}>
-            Assigned country: <strong>{data.allowedCountries[0]}</strong>
+            {t('farmDash.assignedCountry', { country: data.allowedCountries[0] })}
           </p>
         ) : null}
       </header>
@@ -247,7 +251,7 @@ export function FarmDashboardPage() {
           <div className="card-body" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
             <div className="input-group" style={{ marginBottom: 0, minWidth: 260 }}>
               <label className="input-label" htmlFor="farm-dashboard-country">
-                {data.staffRestricted ? 'Country' : 'Country filter'}
+                {data.staffRestricted ? t('farmDash.country') : t('farmDash.countryFilter')}
               </label>
               <select
                 id="farm-dashboard-country"
@@ -257,7 +261,7 @@ export function FarmDashboardPage() {
                 style={{ minWidth: 260 }}
               >
                 {!data.staffRestricted ? (
-                  <option value="">All countries</option>
+                  <option value="">{t('farmDash.allCountries')}</option>
                 ) : null}
                 {data.allowedCountries.map((c) => (
                   <option key={c} value={c}>
@@ -268,7 +272,7 @@ export function FarmDashboardPage() {
             </div>
             {scopeLabel ? (
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', alignSelf: 'center' }}>
-                Scope: <strong>{scopeLabel}</strong>
+                {t('farmDash.scope', { label: scopeLabel })}
               </p>
             ) : null}
           </div>
@@ -276,11 +280,11 @@ export function FarmDashboardPage() {
       ) : null}
 
       <div className="dashboard-metric-grid farm-dashboard-metric-grid">
-        <MetricCard title="Total Farms" value={data.kpis.totalFarms} />
-        <MetricCard title="Total Employees" value={data.kpis.totalEmployees} />
-        <MetricCard title="Open POs" value={data.kpis.openPos} />
-        <MetricCard title="Open PO Value" value={formatMoney(data.kpis.openPoValue)} />
-        <MetricCard title="Open Expenses" value={formatMoney(openExpenses)} />
+        <MetricCard title={t('farmDash.metricTotalFarms')} value={data.kpis.totalFarms} />
+        <MetricCard title={t('farmDash.metricTotalEmployees')} value={data.kpis.totalEmployees} />
+        <MetricCard title={t('farmDash.metricOpenPos')} value={data.kpis.openPos} />
+        <MetricCard title={t('farmDash.metricOpenPoValue')} value={formatMoney(data.kpis.openPoValue)} />
+        <MetricCard title={t('farmDash.metricOpenExpenses')} value={formatMoney(openExpenses)} />
       </div>
 
       <div
@@ -291,26 +295,26 @@ export function FarmDashboardPage() {
           marginBottom: '0.9rem',
         }}
       >
-        <ChartCard title="Farms by Weight" allowContentOverflow>
+        <ChartCard title={t('farmDash.chartFarmsByWeight')} allowContentOverflow>
           <VerticalBarChart rows={g.farmsByWeight} valueFormatter={formatKg} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Revenue" allowContentOverflow>
+        <ChartCard title={t('farmDash.chartFarmsByRevenue')} allowContentOverflow>
           <VerticalBarChart rows={g.farmsByRevenue} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Profit" allowContentOverflow>
+        <ChartCard title={t('farmDash.chartFarmsByProfit')} allowContentOverflow>
           <VerticalBarChart rows={g.farmsByProfit} valueFormatter={formatMoney} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by PO" allowContentOverflow>
+        <ChartCard title={t('farmDash.chartFarmsByPo')} allowContentOverflow>
           <VerticalBarChart rows={g.farmsByPoCount} valueFormatter={formatCount} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="Farms by Sample" allowContentOverflow>
+        <ChartCard title={t('farmDash.chartFarmsBySample')} allowContentOverflow>
           <VerticalBarChart rows={g.farmsBySample} valueFormatter={formatCount} slantedValueLabels />
         </ChartCard>
-        <ChartCard title="PO Placement">
+        <ChartCard title={t('farmDash.chartPoPlacement')}>
           <ContinuousLineChart
             rows={g.poPlacementOverTime}
-            ariaLabel="PO placement over time"
-            valueLabel="PO(s) placed"
+            ariaLabel={t('farmDash.poPlacementAria')}
+            valueLabel={t('farmDash.poPlacementValueLabel')}
             strokeColor="#2563eb"
           />
         </ChartCard>
@@ -320,63 +324,63 @@ export function FarmDashboardPage() {
         <div className="card-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '0.75rem', marginBottom: 12 }}>
             <h2 className="dashboard-section-heading" style={{ margin: 0 }}>
-              Farm summary
+              {t('farmDash.farmSummary')}
             </h2>
             <button type="button" className="btn btn-primary" onClick={exportTable} disabled={!sortedTableRows.length}>
-              Export to Excel
+              {t('common.exportExcel')}
             </button>
           </div>
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             {data.tableRows.length === 0 ? (
-              <p className="table-empty">No farms in this scope.</p>
+              <p className="table-empty">{t('farmDash.tableEmpty')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
                     <SortableTh
-                      label="Farm ID"
+                      label={t('table.col.farmId')}
                       columnKey="farmId"
                       activeKey={sort.key}
                       dir={sort.dir}
                       onSort={onSortColumn}
                     />
                     <SortableTh
-                      label="Country"
+                      label={t('table.col.country')}
                       columnKey="country"
                       activeKey={sort.key}
                       dir={sort.dir}
                       onSort={onSortColumn}
                     />
                     <SortableTh
-                      label="Region"
+                      label={t('table.col.region')}
                       columnKey="region"
                       activeKey={sort.key}
                       dir={sort.dir}
                       onSort={onSortColumn}
                     />
                     <SortableTh
-                      label="Weight (kg)"
+                      label={t('farmDash.exportColWeightKg')}
                       columnKey="weightKg"
                       activeKey={sort.key}
                       dir={sort.dir}
                       onSort={onSortColumn}
                     />
                     <SortableTh
-                      label="Revenue"
+                      label={t('farmDash.exportColRevenue')}
                       columnKey="revenue"
                       activeKey={sort.key}
                       dir={sort.dir}
                       onSort={onSortColumn}
                     />
                     <SortableTh
-                      label="Profit"
+                      label={t('farmDash.exportColProfit')}
                       columnKey="profit"
                       activeKey={sort.key}
                       dir={sort.dir}
                       onSort={onSortColumn}
                     />
                     <SortableTh
-                      label="Samples"
+                      label={t('farmDash.exportColSamples')}
                       columnKey="samples"
                       activeKey={sort.key}
                       dir={sort.dir}
@@ -390,7 +394,7 @@ export function FarmDashboardPage() {
                       <td>{r.farmId}</td>
                       <td>{r.country}</td>
                       <td>{r.region?.trim() ? r.region : '—'}</td>
-                      <td>{r.weightKg.toLocaleString(getDocumentLocale(), { maximumFractionDigits: 2 })}</td>
+                      <td>{r.weightKg.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
                       <td>{formatMoney(r.revenue)}</td>
                       <td>{formatMoney(r.profit)}</td>
                       <td>{r.samples}</td>

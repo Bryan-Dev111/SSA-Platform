@@ -46,10 +46,37 @@ interface CARsResponse {
   severityCounts: { severity: string; count: number }[];
 }
 
+/** Map API / display status to i18n key suffix under correctiveActions.status.* */
+function carStatusToI18nKey(status: string): string | null {
+  const s = status.trim().toLowerCase();
+  if (s === 'waitingapproval' || s === 'waiting approval') return 'WaitingApproval';
+  if (s === 'followup' || s === 'follow up') return 'FollowUp';
+  if (s === 'rcca') return 'RCCA';
+  if (s === 'closed') return 'Closed';
+  if (s === 'draft') return 'DRAFT';
+  return null;
+}
+
+/** English fallback label for unknown CAR statuses (used when no i18n key). */
+function formatCarStatusLabel(status: string): string {
+  const s = status.trim().toLowerCase();
+  if (s === 'waitingapproval' || s === 'waiting approval') return 'Waiting Approval';
+  if (s === 'followup' || s === 'follow up') return 'FollowUp';
+  if (s === 'rcca') return 'RCCA';
+  if (s === 'closed') return 'Closed';
+  if (s === 'draft') return 'Draft';
+  return status;
+}
+
 export function CorrectiveActions() {
   const { token, user } = useAuth();
   const { t, locale } = useLanguage();
   const toast = useToast();
+  const trCarStatus = (status: string) => {
+    const k = carStatusToI18nKey(status);
+    return k ? t(`correctiveActions.status.${k}`) : formatCarStatusLabel(status);
+  };
+  const trSeverity = (severity: string) => t(`findings.severity.${severity}`, severity);
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierFilter = searchParams.get('supplierId') ?? '';
   const [data, setData] = useState<CARsResponse | null>(null);
@@ -183,23 +210,31 @@ export function CorrectiveActions() {
     return { size, strokeWidth, cx, cy, radius, separatorWidth, segments, separators };
   }, [statusCounts]);
 
-  const ageBucketDefs = [
-    { label: '0-30 days', min: 0, max: 30 },
-    { label: '31-60 days', min: 31, max: 60 },
-    { label: '61-90 days', min: 61, max: 90 },
-    { label: '90+ days', min: 91, max: Number.POSITIVE_INFINITY },
-  ] as const;
+  const ageBucketDefs = useMemo(
+    () =>
+      [
+        { label: t('correctiveActions.age0_30'), min: 0, max: 30 },
+        { label: t('correctiveActions.age31_60'), min: 31, max: 60 },
+        { label: t('correctiveActions.age61_90'), min: 61, max: 90 },
+        { label: t('correctiveActions.age90Plus'), min: 91, max: Number.POSITIVE_INFINITY },
+      ] as const,
+    [t]
+  );
   const nowMs = Date.now();
   const openCarsForAge = useMemo(() => list.filter((c) => c.status !== 'Closed'), [list]);
-  const ageBuckets = ageBucketDefs.map((bucket) => ({
-    label: bucket.label,
-    count: openCarsForAge.filter((c) => {
-      const createdMs = new Date(c.createdAt).getTime();
-      if (Number.isNaN(createdMs)) return false;
-      const ageDays = Math.floor((nowMs - createdMs) / (1000 * 60 * 60 * 24));
-      return ageDays >= bucket.min && ageDays <= bucket.max;
-    }).length,
-  }));
+  const ageBuckets = useMemo(
+    () =>
+      ageBucketDefs.map((bucket) => ({
+        label: bucket.label,
+        count: openCarsForAge.filter((c) => {
+          const createdMs = new Date(c.createdAt).getTime();
+          if (Number.isNaN(createdMs)) return false;
+          const ageDays = Math.floor((nowMs - createdMs) / (1000 * 60 * 60 * 24));
+          return ageDays >= bucket.min && ageDays <= bucket.max;
+        }).length,
+      })),
+    [ageBucketDefs, openCarsForAge, nowMs]
+  );
   const maxAgeBucketCount = Math.max(1, ...ageBuckets.map((b) => b.count));
 
   /** Open CAR count at sample times: created by end of window, not yet closed (Closed uses updatedAt as close proxy). */
@@ -215,10 +250,10 @@ export function CorrectiveActions() {
     const maxBuckets = 100;
     const stepMs = Math.max(dayMs, Math.ceil(totalSpan / maxBuckets));
     const bucketEnds: number[] = [];
-    let t = rangeStartMs + stepMs;
-    while (t < now) {
-      bucketEnds.push(t);
-      t += stepMs;
+    let bucketEnd = rangeStartMs + stepMs;
+    while (bucketEnd < now) {
+      bucketEnds.push(bucketEnd);
+      bucketEnd += stepMs;
     }
     bucketEnds.push(now);
     return bucketEnds.map((end) => {
@@ -235,7 +270,7 @@ export function CorrectiveActions() {
         label: d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }),
       };
     });
-  }, [list]);
+  }, [list, locale]);
 
   const analyticsRow1Cols = Math.max(
     1,
@@ -289,29 +324,29 @@ export function CorrectiveActions() {
   const handleExportCarsTable = () => {
     try {
       const rows: ExportRow[] = sortedList.map((c) => ({
-        Code: c.code,
-        Supplier: `${c.supplier.code}: ${c.supplier.name}`,
-        Audit: c.audit.code,
-        Finding: c.finding?.code ?? 'None',
-        'Defect code': c.defectCode?.trim() ? c.defectCode : '—',
-        'Root cause code': c.rootCauseCode?.trim() ? c.rootCauseCode : '—',
-        Severity: c.severity,
-        Status: formatCarStatusLabel(c.status),
-        Summary: c.summary,
-        Owner: c.carOwner?.trim() ? c.carOwner : '—',
-        'Target Completion Date': c.targetCompletionDate
+        [t('findings.col.code')]: c.code,
+        [t('findings.col.supplier')]: `${c.supplier.code}: ${c.supplier.name}`,
+        [t('findings.col.audit')]: c.audit.code,
+        [t('correctiveActions.col.finding')]: c.finding?.code ?? t('findings.exportColNone'),
+        [t('correctiveActions.col.defectCode')]: c.defectCode?.trim() ? c.defectCode : '—',
+        [t('correctiveActions.col.rootCauseCode')]: c.rootCauseCode?.trim() ? c.rootCauseCode : '—',
+        [t('findings.col.severity')]: trSeverity(c.severity),
+        [t('findings.col.status')]: trCarStatus(c.status),
+        [t('findings.col.summary')]: c.summary,
+        [t('correctiveActions.col.owner')]: c.carOwner?.trim() ? c.carOwner : '—',
+        [t('correctiveActions.col.targetCompletion')]: c.targetCompletionDate
           ? new Date(c.targetCompletionDate).toLocaleDateString(locale, {
               year: 'numeric',
               month: 'short',
               day: 'numeric',
             })
           : '—',
-        Created: new Date(c.createdAt).toLocaleDateString(locale, {
+        [t('correctiveActions.col.created')]: new Date(c.createdAt).toLocaleDateString(locale, {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
         }),
-        Updated: new Date(c.updatedAt).toLocaleDateString(locale, {
+        [t('correctiveActions.col.updated')]: new Date(c.updatedAt).toLocaleDateString(locale, {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
@@ -320,10 +355,10 @@ export function CorrectiveActions() {
       if (rows.length === 0) return;
       const supplierSuffix =
         suppliers.find((s) => s.id === supplierFilter)?.code?.replace(/[^A-Za-z0-9_-]/g, '_') ?? 'All';
-      downloadTableXlsx(`Corrective_Actions_${supplierSuffix}`, 'Corrective Actions', rows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(`Corrective_Actions_${supplierSuffix}`, t('correctiveActions.exportSheet'), rows);
+      toast.success(t('correctiveActions.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('correctiveActions.exportFailed'));
     }
   };
 
@@ -338,7 +373,7 @@ export function CorrectiveActions() {
         setData(d);
         setSuppliers(s);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('correctiveActions.loadFailed')))
       .finally(() => setLoading(false));
   };
 
@@ -346,7 +381,7 @@ export function CorrectiveActions() {
     if (!token) return;
     setLoading(true);
     fetchData();
-  }, [token, supplierFilter]);
+  }, [token, supplierFilter, t]);
 
   const handleDelete = async (carId: string) => {
     if (!token || !isAdmin) return;
@@ -355,9 +390,9 @@ export function CorrectiveActions() {
     try {
       await apiJson(`/cars/${carId}`, { token, method: 'DELETE' });
       fetchData();
-      toast.success('CAR deleted');
+      toast.success(t('correctiveActions.carDeleted'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(e instanceof Error ? e.message : t('correctiveActions.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -371,7 +406,7 @@ export function CorrectiveActions() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -403,12 +438,12 @@ export function CorrectiveActions() {
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
           {canCreateCAR && (
             <Link to="/car-record" className="btn btn-primary">
-              CAR RECORDS
+              {t('correctiveActions.carRecords')}
             </Link>
           )}
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1 1 220px', justifyContent: 'flex-end', minWidth: 0 }}>
-          <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Supplier filter</span>
+          <span style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{t('filters.filterBySupplier')}</span>
           <select
             className="input"
             value={supplierFilter}
@@ -419,7 +454,7 @@ export function CorrectiveActions() {
             }}
             style={{ width: 'auto', minWidth: 160, maxWidth: 320, flex: '1 1 auto' }}
           >
-            <option value="">All</option>
+            <option value="">{t('filters.all')}</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>{s.code}: {s.name}</option>
             ))}
@@ -429,18 +464,18 @@ export function CorrectiveActions() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Total CARs</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('correctiveActions.totalCars')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{list.length}</div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Open CARs</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('correctiveActions.openCars')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.open}</div>
           <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)', lineHeight: 1.35 }}>
-            {stats.overdue} overdue · {stats.waitingApproval} waiting approval
+            {t('correctiveActions.openCarsSubtitle', { overdue: stats.overdue, waiting: stats.waitingApproval })}
           </div>
         </div>
         <div className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>AVG Closure (days)</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('correctiveActions.avgClosure')}</div>
           <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700 }}>{stats.avgClosureDays}</div>
         </div>
       </div>
@@ -467,13 +502,13 @@ export function CorrectiveActions() {
           {defectCodeCounts.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Defect codes — Pareto</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>{t('correctiveActions.defectPareto')}</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {defectPareto.map(({ code, count, cumulativePercent }) => (
                     <div key={code}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.5rem' }}>
                         <span>{code}</span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>{count} ({cumulativePercent}% cumulative)</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{count} ({t('correctiveActions.cumulative', { pct: cumulativePercent })})</span>
                       </div>
                       <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
                         <div
@@ -495,13 +530,13 @@ export function CorrectiveActions() {
           {rootCauseCodeCounts.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Root cause codes — Pareto</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>{t('correctiveActions.rootCausePareto')}</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {rootCausePareto.map(({ code, count, cumulativePercent }) => (
                     <div key={code}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4, gap: '0.5rem' }}>
                         <span>{code}</span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>{count} ({cumulativePercent}% cumulative)</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{count} ({t('correctiveActions.cumulative', { pct: cumulativePercent })})</span>
                       </div>
                       <div style={{ height: 8, background: 'var(--color-border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
                         <div
@@ -523,12 +558,12 @@ export function CorrectiveActions() {
           {list.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>CARs by severity</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>{t('correctiveActions.carsBySeverity')}</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {severityCounts.map(({ severity, count }) => (
                     <div key={severity}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 4 }}>
-                        <span>{severity}</span>
+                        <span>{trSeverity(severity)}</span>
                         <span style={{ color: 'var(--color-text-muted)' }}>{count}</span>
                       </div>
                       <div
@@ -573,10 +608,10 @@ export function CorrectiveActions() {
             >
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>CARs by status</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>{t('correctiveActions.carsByStatus')}</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                   <svg
-                    aria-label="CAR status distribution donut chart"
+                    aria-label={t('correctiveActions.statusDonutAria')}
                     width={statusDonut.size}
                     height={statusDonut.size}
                     viewBox={`0 0 ${statusDonut.size} ${statusDonut.size}`}
@@ -630,7 +665,7 @@ export function CorrectiveActions() {
                       <div key={s.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', fontSize: 'var(--text-sm)' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
-                          {formatCarStatusLabel(s.status)}
+                          {trCarStatus(s.status)}
                         </span>
                         <span style={{ color: 'var(--color-text-muted)' }}>{s.count}</span>
                       </div>
@@ -641,9 +676,9 @@ export function CorrectiveActions() {
             </div>
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>CAR age distribution (open CARs)</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>{t('correctiveActions.ageDistribution')}</h2>
                 <div
-                  aria-label="CAR age distribution for open CARs only bar chart"
+                  aria-label={t('correctiveActions.ageChartAria')}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '40px 1fr',
@@ -662,7 +697,7 @@ export function CorrectiveActions() {
                       transform: 'rotate(180deg)',
                     }}
                   >
-                    Number of open CARs
+                    {t('correctiveActions.ageAxisLabel')}
                   </div>
                   <div>
                     <div
@@ -712,7 +747,7 @@ export function CorrectiveActions() {
           {list.length > 0 && (
             <div className="card" style={{ minWidth: 0 }}>
               <div className="card-body">
-                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>Open CARs over time</h2>
+                <h2 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: 'var(--text-lg)' }}>{t('correctiveActions.openOverTime')}</h2>
                 <OpenCarsOverTimeChart points={openCarsTimeSeries} />
               </div>
             </div>
@@ -731,35 +766,35 @@ export function CorrectiveActions() {
             borderBottom: '1px solid var(--color-border)',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Corrective Actions Table</h2>
+          <h2 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>{t('correctiveActions.tableTitle')}</h2>
           <button type="button" className="btn btn-ghost" onClick={handleExportCarsTable} disabled={sortedList.length === 0}>
-            Export to Excel
+            {t('correctiveActions.exportExcel')}
           </button>
         </div>
-        <TableWithTopScroll ariaLabel="Corrective actions table">
+        <TableWithTopScroll ariaLabel={t('correctiveActions.tableAria')}>
           <table className="table">
             <thead>
               <tr>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>Code {sortIndicator('code')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>Supplier {sortIndicator('supplier')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>Audit {sortIndicator('audit')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('finding')}>Finding {sortIndicator('finding')}</th>
-                <th>Defect code</th>
-                <th>Root cause code</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>Severity {sortIndicator('severity')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>Status {sortIndicator('status')}</th>
-                <th>Summary</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('owner')}>Owner {sortIndicator('owner')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>Created {sortIndicator('created')}</th>
-                <th style={{ cursor: 'pointer' }} onClick={() => onSort('updated')}>Updated {sortIndicator('updated')}</th>
-                {isAdmin && <th>Delete</th>}
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('code')}>{t('findings.col.code')} {sortIndicator('code')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('supplier')}>{t('findings.col.supplier')} {sortIndicator('supplier')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('audit')}>{t('findings.col.audit')} {sortIndicator('audit')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('finding')}>{t('correctiveActions.col.finding')} {sortIndicator('finding')}</th>
+                <th>{t('correctiveActions.col.defectCode')}</th>
+                <th>{t('correctiveActions.col.rootCauseCode')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('severity')}>{t('findings.col.severity')} {sortIndicator('severity')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('status')}>{t('findings.col.status')} {sortIndicator('status')}</th>
+                <th>{t('findings.col.summary')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('owner')}>{t('correctiveActions.col.owner')} {sortIndicator('owner')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('created')}>{t('correctiveActions.col.created')} {sortIndicator('created')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => onSort('updated')}>{t('correctiveActions.col.updated')} {sortIndicator('updated')}</th>
+                {isAdmin && <th>{t('correctiveActions.col.delete')}</th>}
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr>
                   <td colSpan={12 + (isAdmin ? 1 : 0)} className="table-empty">
-                    No CARs in scope (or none past DRAFT yet).
+                    {t('correctiveActions.empty')}
                   </td>
                 </tr>
               ) : (
@@ -789,17 +824,17 @@ export function CorrectiveActions() {
                           {c.finding.code}
                         </Link>
                       ) : (
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>None</span>
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>{t('correctiveActions.noneFinding')}</span>
                       )}
                     </td>
                     <td style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{c.defectCode?.trim() ? c.defectCode : '—'}</td>
                     <td style={{ fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>{c.rootCauseCode?.trim() ? c.rootCauseCode : '—'}</td>
-                    <td>{c.severity}</td>
+                    <td>{trSeverity(c.severity)}</td>
                     <td>
                       <span
                         className={`finding-status-badge car-table-status-badge car-table-status-badge--${getCarStatusSlug(c.status)}`}
                       >
-                        {formatCarStatusLabel(c.status)}
+                        {trCarStatus(c.status)}
                       </span>
                     </td>
                     <td style={{ maxWidth: 300, whiteSpace: 'normal', verticalAlign: 'top' }}>
@@ -821,7 +856,7 @@ export function CorrectiveActions() {
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
                           }}
-                          title="Click to view full summary"
+                          title={t('findings.clickFullSummary')}
                         >
                           {c.summary}
                         </button>
@@ -852,9 +887,9 @@ export function CorrectiveActions() {
                           style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}
                           onClick={() => setDeleteConfirmId(c.id)}
                           disabled={deletingId !== null}
-                          title="Delete CAR (Admin only)"
+                          title={t('correctiveActions.deleteRowTitle')}
                         >
-                          {deletingId === c.id ? 'Deleting…' : 'Delete'}
+                          {deletingId === c.id ? t('correctiveActions.deleting') : t('correctiveActions.col.delete')}
                         </button>
                       </td>
                     )}
@@ -867,10 +902,14 @@ export function CorrectiveActions() {
         {list.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-              {(pageSafe - 1) * pageSize + 1}–{Math.min(pageSafe * pageSize, totalCount)} of {totalCount}
+              {t('table.paginationRange', {
+                start: (pageSafe - 1) * pageSize + 1,
+                end: Math.min(pageSafe * pageSize, totalCount),
+                total: totalCount,
+              })}
             </span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
-              Rows per page:
+              {t('table.rowsPerPage')}
               <select
                 className="input"
                 value={pageSize}
@@ -893,10 +932,10 @@ export function CorrectiveActions() {
                 disabled={pageSafe <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Previous
+                {t('table.previous')}
               </button>
               <span style={{ alignSelf: 'center', fontSize: 'var(--text-sm)' }}>
-                Page {pageSafe} of {totalPages}
+                {t('table.pageOf', { page: pageSafe, pages: totalPages })}
               </span>
               <button
                 type="button"
@@ -904,7 +943,7 @@ export function CorrectiveActions() {
                 disabled={pageSafe >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                Next
+                {t('table.next')}
               </button>
             </div>
           </div>
@@ -913,9 +952,10 @@ export function CorrectiveActions() {
 
       <ConfirmDialog
         open={deleteConfirmId !== null}
-        title="Delete CAR"
-        message="Delete this CAR? This cannot be undone."
-        confirmLabel="Delete"
+        title={t('correctiveActions.deleteTitle')}
+        message={t('correctiveActions.deleteMessage')}
+        confirmLabel={t('correctiveActions.col.delete')}
+        cancelLabel={t('common.cancel')}
         variant="danger"
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId)}
         onCancel={() => setDeleteConfirmId(null)}
@@ -931,12 +971,12 @@ export function CorrectiveActions() {
         >
           <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="car-summary-title" className="confirm-dialog-title">
-              CAR Summary - {summaryModal.code}
+              {t('correctiveActions.summaryModalTitle', { code: summaryModal.code })}
             </h3>
             <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{summaryModal.summary}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-primary" onClick={() => setSummaryModal(null)}>
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -950,6 +990,7 @@ type OpenCarTimePoint = { t: number; count: number; label: string };
 
 /** Red line + shaded area under: count of CARs still open at each sample (Closed ≈ last updated). */
 function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
+  const { t } = useLanguage();
   const width = 920;
   const height = 220;
   const padL = 44;
@@ -960,7 +1001,7 @@ function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
   const plotH = height - padT - padB;
 
   if (points.length === 0) {
-    return <p className="table-empty" style={{ margin: 0 }}>No CAR data to chart.</p>;
+    return <p className="table-empty" style={{ margin: 0 }}>{t('correctiveActions.chartEmpty')}</p>;
   }
 
   const maxY = Math.max(4, Math.ceil(Math.max(...points.map((p) => p.count)) * 1.08));
@@ -981,7 +1022,7 @@ function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
         <svg
           viewBox={`0 0 ${width} ${height}`}
           style={{ width: '100%', minWidth: 280, maxWidth: '100%', height: 'auto', display: 'block' }}
-          aria-label="Open CARs over time: number of CARs still open at each sample date"
+          aria-label={t('correctiveActions.openOverTimeChartAria')}
         >
           {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
             const y = padT + plotH * f;
@@ -1014,7 +1055,7 @@ function OpenCarsOverTimeChart({ points }: { points: OpenCarTimePoint[] }) {
         </svg>
       </div>
       <p style={{ margin: '0.35rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
-        Open CAR count by sample (last ~365 days; closed time approximated from last update).
+        {t('correctiveActions.chartFootnote')}
       </p>
     </div>
   );
@@ -1028,14 +1069,4 @@ function getCarStatusSlug(status: string): string {
   if (s === 'followup') return 'follow-up';
   if (s === 'closed') return 'closed';
   return s || 'unknown';
-}
-
-function formatCarStatusLabel(status: string): string {
-  const s = status.trim().toLowerCase();
-  if (s === 'waitingapproval' || s === 'waiting approval') return 'Waiting Approval';
-  if (s === 'followup' || s === 'follow up') return 'FollowUp';
-  if (s === 'rcca') return 'RCCA';
-  if (s === 'closed') return 'Closed';
-  if (s === 'draft') return 'Draft';
-  return status;
 }

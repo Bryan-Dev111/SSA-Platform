@@ -89,20 +89,20 @@ const FINDING_NONE_OPTION = '__NONE__';
 const CAR_STATUS_VALUES = new Set(['DRAFT', 'RCCA', 'WaitingApproval', 'FollowUp', 'Closed']);
 
 /** Required on CAR form before Process can move RCCA → Waiting Approval (matches server). */
-function getMissingRccaProcessLabels(f: {
+function getMissingRccaProcessFieldKeys(f: {
   discrepancy: string;
   containment: string | null;
   occurrenceRootCause: string | null;
   escapeRootCause: string | null;
   correctiveAction: string | null;
 }): string[] {
-  const missing: string[] = [];
-  if (!f.discrepancy.trim()) missing.push('Discrepancy');
-  if (!(f.containment ?? '').trim()) missing.push('Containment');
-  if (!(f.occurrenceRootCause ?? '').trim()) missing.push('Occurrence details (narrative)');
-  if (!(f.escapeRootCause ?? '').trim()) missing.push('Escape Root Cause');
-  if (!(f.correctiveAction ?? '').trim()) missing.push('Corrective Action');
-  return missing;
+  const keys: string[] = [];
+  if (!f.discrepancy.trim()) keys.push('carRecord.field.discrepancy');
+  if (!(f.containment ?? '').trim()) keys.push('carRecord.field.containment');
+  if (!(f.occurrenceRootCause ?? '').trim()) keys.push('carRecord.field.occurrenceNarrative');
+  if (!(f.escapeRootCause ?? '').trim()) keys.push('carRecord.field.escapeRootCause');
+  if (!(f.correctiveAction ?? '').trim()) keys.push('carRecord.field.correctiveAction');
+  return keys;
 }
 
 function formatCarStatusForDisplay(status: string): string {
@@ -496,20 +496,21 @@ export function CARRecord() {
       setEditMode(false);
       setError(null);
       if (patched.status === 'RCCA') {
-        const missing = getMissingRccaProcessLabels({
+        const missingKeys = getMissingRccaProcessFieldKeys({
           discrepancy: patched.discrepancy,
           containment: patched.containment,
           occurrenceRootCause: patched.occurrenceRootCause,
           escapeRootCause: patched.escapeRootCause,
           correctiveAction: patched.correctiveAction,
         });
-        if (missing.length > 0) {
-          toast.warning(`CAR updated. To move to Waiting Approval, complete: ${missing.join(', ')}.`);
+        if (missingKeys.length > 0) {
+          const list = missingKeys.map((k) => t(k)).join(', ');
+          toast.warning(t('carRecord.toast.updatedNeedApproval', { list }));
         } else {
-          toast.info('CAR updated');
+          toast.info(t('carRecord.toast.carUpdated'));
         }
       } else {
-        toast.info('CAR updated');
+        toast.info(t('carRecord.toast.carUpdated'));
       }
       navigate(`/car-record?id=${encodeURIComponent(patched.id)}`, { replace: true });
     } catch (e) {
@@ -522,20 +523,21 @@ export function CARRecord() {
   const handleProcessClick = async () => {
     if (!token || !car) return;
     if (car.status === 'RCCA') {
-      const missing = getMissingRccaProcessLabels({
+      const missingKeys = getMissingRccaProcessFieldKeys({
         discrepancy: form.discrepancy,
         containment: form.containment,
         occurrenceRootCause: form.occurrenceRootCause,
         escapeRootCause: form.escapeRootCause,
         correctiveAction: form.correctiveAction,
       });
-      if (missing.length > 0) {
-        toast.warning(`To move to Waiting Approval, complete: ${missing.join(', ')}.`);
+      if (missingKeys.length > 0) {
+        const list = missingKeys.map((k) => t(k)).join(', ');
+        toast.warning(t('carRecord.toast.completeForWaitingApproval', { list }));
         return;
       }
     }
     if (car.status === 'FollowUp' && !form.verificationOfEffectiveness.trim()) {
-      toast.warning('Verification of Effectiveness is required before closing.');
+      toast.warning(t('carRecord.toast.verificationRequiredBeforeClose'));
       return;
     }
     await runAction(`/cars/${car.id}/process`, 'Process');
@@ -551,7 +553,7 @@ export function CARRecord() {
       setCar(fresh);
       syncFormFromCar(fresh);
       setEditMode(false);
-      toast.info('Reverse successful');
+      toast.info(t('carRecord.toast.reverseSuccessful'));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reverse failed');
     } finally {
@@ -567,7 +569,7 @@ export function CARRecord() {
       const updated = await apiJson<CAR>(path, { token, method: 'POST' });
       setCar(updated);
       syncFormFromCar(updated);
-      toast.info(`${label} successful`);
+      toast.info(t('carRecord.toast.processSuccessful'));
     } catch (e) {
       setError(e instanceof Error ? e.message : `${label} failed`);
     } finally {
@@ -588,7 +590,9 @@ export function CARRecord() {
       setCar(updated);
       syncFormFromCar(updated);
       setApprovalComment('');
-      toast.info(`${label} successful`);
+      toast.info(
+        label === 'Approve' ? t('carRecord.toast.approveSuccessful') : t('carRecord.toast.rejectSuccessful')
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : `${label} failed`);
     } finally {
@@ -599,12 +603,12 @@ export function CARRecord() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createEnabled) {
-      toast.info('Click Create CAR to enable editing.');
+      toast.info(t('carRecord.toast.clickCreateToEdit'));
       return;
     }
     if (createFindingChoice === '') {
       setError('Finding # is required');
-      toast.error('Finding # is required');
+      toast.error(t('carRecord.toast.findingNumberRequired'));
       return;
     }
     if (!token) return;
@@ -647,7 +651,7 @@ export function CARRecord() {
       setCar(created);
       setCreateEnabled(false);
       resetCreateForm();
-      toast.success('CAR created');
+      toast.success(t('carRecord.toast.carCreated'));
       navigate(`/car-record?id=${encodeURIComponent(created.id)}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed');
@@ -677,7 +681,7 @@ export function CARRecord() {
     e.preventDefault();
     const q = carQuery.trim();
     if (!q) {
-      toast.info('Enter a CAR id or code to search.');
+      toast.info(t('carRecord.toast.enterIdToSearch'));
       return;
     }
     if (!token) return;
@@ -729,7 +733,7 @@ export function CARRecord() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -1089,10 +1093,10 @@ export function CARRecord() {
                     <table className="table">
                       <thead>
                         <tr>
-                          <th>Name</th>
-                          <th>Notes</th>
-                          <th>Review</th>
-                          <th>Created</th>
+                          <th>{t('table.col.name')}</th>
+                          <th>{t('table.col.notes')}</th>
+                          <th>{t('records.col.reviewStatus')}</th>
+                          <th>{t('table.col.created')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1139,10 +1143,10 @@ export function CARRecord() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Comment</th>
-                    <th>Date/Time</th>
+                    <th>{t('table.col.user')}</th>
+                    <th>{t('table.col.action')}</th>
+                    <th>{t('table.col.comment')}</th>
+                    <th>{t('table.col.dateTime')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1167,10 +1171,10 @@ export function CARRecord() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Status</th>
-                    <th>Note</th>
-                    <th>User</th>
-                    <th>Date/Time</th>
+                    <th>{t('table.col.status')}</th>
+                    <th>{t('table.col.note')}</th>
+                    <th>{t('table.col.user')}</th>
+                    <th>{t('table.col.dateTime')}</th>
                   </tr>
                 </thead>
                 <tbody>

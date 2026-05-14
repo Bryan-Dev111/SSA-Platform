@@ -3,6 +3,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { apiJson } from '../../api/client';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ToastApi {
   success: (message: string) => void;
@@ -23,6 +24,7 @@ interface SdPoEmailResponse {
 }
 
 export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; toast: ToastApi }) {
+  const { t } = useLanguage();
   const [data, setData] = useState<SdPoEmailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,9 +37,9 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
       setError(null);
     } catch (e) {
       setData(null);
-      setError(e instanceof Error ? e.message : 'Failed to load email alert settings');
+      setError(e instanceof Error ? e.message : t('gvAdmin.emailAlerts.loadFailed'));
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     load();
@@ -66,10 +68,10 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
         method: 'PUT',
         body: JSON.stringify({ preferences }),
       });
-      toast.success('Email alert settings saved');
+      toast.success(t('gvAdmin.emailAlerts.saved'));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : t('gvAdmin.emailAlerts.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -78,7 +80,7 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
   return (
     <div className="card">
       <div className="card-body">
-        <h2 style={{ marginTop: 0 }}>Email Alerts</h2>
+        <h2 style={{ marginTop: 0 }}>{t('gvAdmin.emailAlerts.title')}</h2>
         {error && (
           <div className="alert-error" role="alert" style={{ marginBottom: '0.75rem' }}>
             {error}
@@ -86,19 +88,19 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
         )}
         <div style={{ marginBottom: '0.75rem' }}>
           <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy || !data}>
-            Save
+            {t('common.save')}
           </button>
         </div>
-        {!data && !error && token && <p>Loading…</p>}
-        {data && data.directors.length === 0 && <p>No users with the Sourcing Director role.</p>}
+        {!data && !error && token && <p>{t('common.loading')}</p>}
+        {data && data.directors.length === 0 && <p>{t('gvAdmin.emailAlerts.noDirectors')}</p>}
         {data && data.directors.length > 0 && (
           <div className="table-wrap" style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Sourcing Director</th>
-                  <th>Assigned countries</th>
-                  <th style={{ minWidth: 160 }}>PO open/close emails</th>
+                  <th>{t('gvAdmin.emailAlerts.col.director')}</th>
+                  <th>{t('gvAdmin.emailAlerts.col.countries')}</th>
+                  <th style={{ minWidth: 160 }}>{t('gvAdmin.emailAlerts.col.poEmails')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,7 +114,7 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
                     </td>
                     <td>
                       {d.assignedCountryNames.length === 0 ? (
-                        <span style={{ color: 'var(--color-text-muted)' }}>None — assign countries in Employees</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{t('gvAdmin.emailAlerts.assignCountriesHint')}</span>
                       ) : (
                         d.assignedCountryNames.join(', ')
                       )}
@@ -124,7 +126,7 @@ export function AdminEmailAlertsPanel({ token, toast }: { token: string | null; 
                           checked={d.emailEnabled}
                           onChange={(e) => setDirectorEnabled(d.id, e.target.checked)}
                         />
-                        <span>Enabled</span>
+                        <span>{t('gvAdmin.emailAlerts.enabled')}</span>
                       </label>
                     </td>
                   </tr>

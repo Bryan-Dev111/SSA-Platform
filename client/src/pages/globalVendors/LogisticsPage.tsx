@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ExpandableTableText } from '../../components/ExpandableTableText';
@@ -14,18 +15,18 @@ import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
 import { cmpStr, toggleSort, type SortDir } from '../../utils/tableSort';
 
 export const LOGISTICS_SITE_TYPES = [
-  { value: 'Port', label: 'Port', bg: '#171717', fg: '#fafafa' },
-  { value: 'Exporter', label: 'Exporter', bg: '#2563eb', fg: '#ffffff' },
-  { value: 'Mill', label: 'Mill', bg: '#16a34a', fg: '#ffffff' },
-  { value: 'Trucking', label: 'Trucking', bg: '#eab308', fg: '#422006' },
-  { value: 'Warehouse', label: 'Warehouse', bg: '#ea580c', fg: '#ffffff' },
-  { value: 'Inspection', label: 'Inspection', bg: '#8b5a2b', fg: '#ffffff' },
-  { value: 'Shipping', label: 'Shipping', bg: '#808080', fg: '#ffffff' },
+  { value: 'Port', bg: '#171717', fg: '#fafafa' },
+  { value: 'Exporter', bg: '#2563eb', fg: '#ffffff' },
+  { value: 'Mill', bg: '#16a34a', fg: '#ffffff' },
+  { value: 'Trucking', bg: '#eab308', fg: '#422006' },
+  { value: 'Warehouse', bg: '#ea580c', fg: '#ffffff' },
+  { value: 'Inspection', bg: '#8b5a2b', fg: '#ffffff' },
+  { value: 'Shipping', bg: '#808080', fg: '#ffffff' },
 ] as const;
 
-const TYPE_STYLE = Object.fromEntries(LOGISTICS_SITE_TYPES.map((t) => [t.value, t])) as Record<
+const TYPE_STYLE = Object.fromEntries(LOGISTICS_SITE_TYPES.map((ty) => [ty.value, ty])) as Record<
   string,
-  { bg: string; fg: string; label: string }
+  { bg: string; fg: string }
 >;
 
 export interface LogisticsRow {
@@ -58,9 +59,11 @@ function logisticsDisplayCode(code: string): string {
 type LogisticsSortKey = 'code' | 'siteType' | 'company' | 'city' | 'country';
 
 function TypeBadge({ siteType }: { siteType: string }) {
+  const { t } = useLanguage();
   const s = TYPE_STYLE[siteType];
+  const label = t(`logistics.siteType.${siteType}`, siteType);
   if (!s) {
-    return <span>{siteType}</span>;
+    return <span>{label}</span>;
   }
   return (
     <span
@@ -74,13 +77,14 @@ function TypeBadge({ siteType }: { siteType: string }) {
         color: s.fg,
       }}
     >
-      {s.label}
+      {label}
     </span>
   );
 }
 
 export function LogisticsPage() {
   const { token, user } = useAuth();
+  const { t } = useLanguage();
   const isAdmin = !!user?.roleNames?.includes('Admin');
   const toast = useToast();
   const [rows, setRows] = useState<LogisticsRow[]>([]);
@@ -113,12 +117,14 @@ export function LogisticsPage() {
       setError(null);
       apiJson<LogisticsRow[]>('/supply-logistics', { token })
         .then(setRows)
-        .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load logistics'))
+        .catch((e) =>
+          setError(e instanceof Error ? e.message : t('logistics.loadFailed'))
+        )
         .finally(() => {
           if (!opts?.silent) setLoading(false);
         });
     },
-    [token]
+    [token, t]
   );
 
   useEffect(() => {
@@ -155,11 +161,11 @@ export function LogisticsPage() {
           notes: notes.trim() || null,
         }),
       });
-      toast.success('Logistics site saved');
+      toast.success(t('logistics.siteSaved'));
       resetForm();
       load({ silent: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not save');
+      toast.error(err instanceof Error ? err.message : t('logistics.couldNotSave'));
     } finally {
       setSaving(false);
     }
@@ -184,11 +190,11 @@ export function LogisticsPage() {
           notes: editRow.notes,
         }),
       });
-      toast.success('Updated');
+      toast.success(t('logistics.updated'));
       setEditRow(null);
       load({ silent: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not update');
+      toast.error(err instanceof Error ? err.message : t('logistics.couldNotUpdate'));
     } finally {
       setSaving(false);
     }
@@ -200,10 +206,10 @@ export function LogisticsPage() {
     try {
       const res = await apiFetch(`/supply-logistics/${deleteRow.id}`, { token, method: 'DELETE' });
       if (!res.ok) {
-        toast.error('Could not delete');
+        toast.error(t('logistics.couldNotDelete'));
         return;
       }
-      toast.success('Deleted');
+      toast.success(t('logistics.deleted'));
       setDeleteRow(null);
       load({ silent: true });
     } finally {
@@ -230,10 +236,14 @@ export function LogisticsPage() {
           throw new Error(text || `HTTP ${res.status}`);
         }
       }
-      toast.success(arr.length === 1 ? 'Attachment uploaded' : `${arr.length} attachments uploaded`);
+      toast.success(
+        arr.length === 1
+          ? t('logistics.attachmentUploaded')
+          : t('logistics.attachmentsUploaded', { count: arr.length })
+      );
       load({ silent: true });
     } catch (err) {
-      let msg = 'Could not upload attachment';
+      let msg = t('logistics.couldNotUpload');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -264,7 +274,7 @@ export function LogisticsPage() {
       );
       window.open(r.url, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      let msg = 'Could not open attachment';
+      let msg = t('logistics.couldNotOpenAttachment');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -289,10 +299,10 @@ export function LogisticsPage() {
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
       }
-      toast.success('Attachment removed');
+      toast.success(t('logistics.attachmentRemoved'));
       load({ silent: true });
     } catch (err) {
-      let msg = 'Could not remove attachment';
+      let msg = t('logistics.couldNotRemoveAttachment');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -335,38 +345,44 @@ export function LogisticsPage() {
 
   const exportToExcel = useCallback(() => {
     if (sortedRows.length === 0) {
-      toast.info('No logistics sites to export yet.');
+      toast.info(t('logistics.export.nothingYet'));
       return;
     }
     try {
       const exportRows: ExportRow[] = sortedRows.map((r) => ({
-        Code: logisticsDisplayCode(r.code),
-        Type: r.siteType,
-        Company: r.company,
-        Country: r.country,
-        City: (r.city ?? '').trim() || '—',
-        'Registration #': (r.registrationNumber ?? '').trim() || '—',
-        Longitude: r.longitude ?? '—',
-        Latitude: r.latitude ?? '—',
-        Notes: (r.notes ?? '').trim() || '—',
-        Attachments: r.attachments.map((a) => a.fileName || 'file').join('; ') || '—',
+        [t('logistics.export.code')]: logisticsDisplayCode(r.code),
+        [t('logistics.export.type')]: t(`logistics.siteType.${r.siteType}`, r.siteType),
+        [t('logistics.export.company')]: r.company,
+        [t('logistics.export.country')]: r.country,
+        [t('logistics.export.city')]: (r.city ?? '').trim() || '—',
+        [t('logistics.export.registration')]: (r.registrationNumber ?? '').trim() || '—',
+        [t('logistics.export.longitude')]: r.longitude ?? '—',
+        [t('logistics.export.latitude')]: r.latitude ?? '—',
+        [t('logistics.export.notes')]: (r.notes ?? '').trim() || '—',
+        [t('logistics.export.attachments')]:
+          r.attachments.map((a) => a.fileName || t('common.download')).join('; ') || '—',
       }));
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Logistics_${stamp}`, 'Logistics', exportRows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(
+        `${t('logistics.export.filePrefix')}_${stamp}`,
+        t('logistics.export.sheet'),
+        exportRows
+      );
+      toast.success(t('findings.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('findings.exportFailed'));
     }
-  }, [sortedRows, toast]);
+  }, [sortedRows, toast, t]);
 
   if (loading && rows.length === 0) {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Logistics</h1>
+          <h1 className="page-title">{t('nav.logistics')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -385,16 +401,16 @@ export function LogisticsPage() {
         }}
       >
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          Logistics
+          {t('nav.logistics')}
         </h1>
         <button
           type="button"
           className="btn btn-ghost"
           onClick={exportToExcel}
           disabled={loading}
-          title="Download the table as an Excel file"
+          title={t('common.exportExcelHint')}
         >
-          Export to Excel
+          {t('common.exportExcel')}
         </button>
       </header>
 
@@ -411,7 +427,7 @@ export function LogisticsPage() {
           gap: '0.75rem',
         }}
       >
-        <MetricCard title="Total logistics sites" value={rows.length} />
+        <MetricCard title={t('logistics.totalSites')} value={rows.length} />
       </div>
 
       {isAdmin ? (
@@ -427,17 +443,17 @@ export function LogisticsPage() {
                 }}
               >
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">Type</span>
+                  <span className="field-label">{t('table.col.type')}</span>
                   <select className="input" value={siteType} onChange={(e) => setSiteType(e.target.value)}>
-                    {LOGISTICS_SITE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
+                    {LOGISTICS_SITE_TYPES.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {t(`logistics.siteType.${opt.value}`)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">Company</span>
+                  <span className="field-label">{t('table.col.company')}</span>
                   <input
                     className="input"
                     value={company}
@@ -447,7 +463,7 @@ export function LogisticsPage() {
                   />
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">Country</span>
+                  <span className="field-label">{t('table.col.country')}</span>
                   <input
                     className="input"
                     value={country}
@@ -457,7 +473,7 @@ export function LogisticsPage() {
                   />
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">City</span>
+                  <span className="field-label">{t('table.col.city')}</span>
                   <input
                     className="input"
                     value={city}
@@ -466,7 +482,7 @@ export function LogisticsPage() {
                   />
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">Registration #</span>
+                  <span className="field-label">{t('table.col.registration')}</span>
                   <input
                     className="input"
                     value={registrationNumber}
@@ -474,7 +490,7 @@ export function LogisticsPage() {
                   />
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">Longitude</span>
+                  <span className="field-label">{t('table.col.longitude')}</span>
                   <input
                     className="input"
                     type="number"
@@ -483,11 +499,11 @@ export function LogisticsPage() {
                     max={180}
                     value={longitude}
                     onChange={(e) => setLongitude(e.target.value)}
-                    placeholder="e.g. -74.006"
+                    placeholder={t('logistics.placeholder.longitude')}
                   />
                 </label>
                 <label className="field" style={{ marginBottom: 0 }}>
-                  <span className="field-label">Latitude</span>
+                  <span className="field-label">{t('table.col.latitude')}</span>
                   <input
                     className="input"
                     type="number"
@@ -496,17 +512,17 @@ export function LogisticsPage() {
                     max={90}
                     value={latitude}
                     onChange={(e) => setLatitude(e.target.value)}
-                    placeholder="e.g. 40.7128"
+                    placeholder={t('logistics.placeholder.latitude')}
                   />
                 </label>
               </div>
               <label className="field">
-                <span className="field-label">Notes</span>
+                <span className="field-label">{t('table.col.notes')}</span>
                 <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
               </label>
               <div>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save'}
+                  {saving ? t('common.saving') : t('common.save')}
                 </button>
               </div>
             </form>
@@ -517,7 +533,7 @@ export function LogisticsPage() {
           className="table-empty"
           style={{ marginBottom: '1rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}
         >
-          View only. Only administrators can add logistics businesses or change attachments.
+          {t('logistics.viewOnly')}
         </p>
       )}
 
@@ -528,55 +544,53 @@ export function LogisticsPage() {
               <thead>
                 <tr>
                   <SortableTh
-                    label="Code"
+                    label={t('findings.col.code')}
                     columnKey="code"
                     activeKey={sort.key}
                     dir={sort.dir}
                     onSort={onSortColumn}
                   />
                   <SortableTh
-                    label="Type"
+                    label={t('table.col.type')}
                     columnKey="siteType"
                     activeKey={sort.key}
                     dir={sort.dir}
                     onSort={onSortColumn}
                   />
                   <SortableTh
-                    label="Company"
+                    label={t('table.col.company')}
                     columnKey="company"
                     activeKey={sort.key}
                     dir={sort.dir}
                     onSort={onSortColumn}
                   />
                   <SortableTh
-                    label="Country"
+                    label={t('table.col.country')}
                     columnKey="country"
                     activeKey={sort.key}
                     dir={sort.dir}
                     onSort={onSortColumn}
                   />
                   <SortableTh
-                    label="City"
+                    label={t('table.col.city')}
                     columnKey="city"
                     activeKey={sort.key}
                     dir={sort.dir}
                     onSort={onSortColumn}
                   />
-                  <th>Registration #</th>
-                  <th>Longitude</th>
-                  <th>Latitude</th>
-                  <th>Notes</th>
-                  <th style={{ minWidth: 220 }}>Attach files</th>
-                  {isAdmin ? <th style={{ width: 170 }}>Edit/Delete</th> : null}
+                  <th>{t('table.col.registration')}</th>
+                  <th>{t('table.col.longitude')}</th>
+                  <th>{t('table.col.latitude')}</th>
+                  <th>{t('table.col.notes')}</th>
+                  <th style={{ minWidth: 220 }}>{t('table.col.attachFiles')}</th>
+                  {isAdmin ? <th style={{ width: 170 }}>{t('table.col.editDelete')}</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
                     <td colSpan={isAdmin ? 11 : 10} className="table-empty">
-                      {isAdmin
-                        ? 'No logistics sites yet. Use the form above to add one.'
-                        : 'No logistics sites yet.'}
+                      {isAdmin ? t('logistics.emptyAdmin') : t('logistics.empty')}
                     </td>
                   </tr>
                 ) : (
@@ -586,7 +600,7 @@ export function LogisticsPage() {
                         <Link
                           to={`/global-vendors/logistics-profile?logisticsId=${encodeURIComponent(r.id)}`}
                           className="finding-code-link"
-                          title={`Open Logistics profile — ${r.company}`}
+                          title={t('logistics.openProfileTitle', { company: r.company })}
                         >
                           <strong>{logisticsDisplayCode(r.code)}</strong>
                         </Link>
@@ -601,7 +615,10 @@ export function LogisticsPage() {
                       <td>{typeof r.longitude === 'number' ? r.longitude : '—'}</td>
                       <td>{typeof r.latitude === 'number' ? r.latitude : '—'}</td>
                       <td style={{ maxWidth: 260, verticalAlign: 'top' }}>
-                        <ExpandableTableText value={r.notes} modalTitle={`Notes — ${logisticsDisplayCode(r.code)}`} />
+                        <ExpandableTableText
+                          value={r.notes}
+                          modalTitle={t('samples.notesModalTitle', { code: logisticsDisplayCode(r.code) })}
+                        />
                       </td>
                       <td style={{ minWidth: 220, whiteSpace: 'normal', verticalAlign: 'top' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -618,13 +635,13 @@ export function LogisticsPage() {
                           className="btn btn-xs"
                           onClick={() => document.getElementById(`logistics-file-upload-${r.id}`)?.click()}
                           disabled={!isAdmin || attachSavingId === r.id || saving}
-                          title={!isAdmin ? 'Only administrators can add attachments' : undefined}
+                          title={!isAdmin ? t('logistics.addFileTitleAdminOnly') : undefined}
                         >
-                          Add file
+                          {t('logistics.addFile')}
                         </button>
                           {attachSavingId === r.id ? (
                             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                              Uploading...
+                              {t('logistics.uploading')}
                             </span>
                           ) : null}
                           {r.attachments.length > 0 ? (
@@ -648,19 +665,21 @@ export function LogisticsPage() {
                                     }}
                                     onClick={() => void openAttachmentDownload(r.id, a.id)}
                                   >
-                                    {a.fileName || 'Download'}
+                                    {a.fileName || t('logistics.download')}
                                   </button>
                                   <button
                                     type="button"
                                     className="btn btn-xs btn-ghost"
                                     style={{ marginLeft: 6 }}
                                     title={
-                                      !isAdmin ? 'Only administrators can remove attachments' : 'Remove attachment'
+                                      !isAdmin
+                                        ? t('logistics.removeAttachmentTitleAdminOnly')
+                                        : t('logistics.removeAttachmentTitle')
                                     }
                                     disabled={!isAdmin || attachSavingId === r.id}
                                     onClick={() => void deleteAttachment(r.id, a.id)}
                                   >
-                                    Remove
+                                    {t('logistics.remove')}
                                   </button>
                                 </li>
                               ))}
@@ -676,7 +695,7 @@ export function LogisticsPage() {
                           onClick={() => setEditRow({ ...r })}
                           disabled={attachSavingId === r.id}
                         >
-                          Edit
+                          {t('common.edit')}
                         </button>{' '}
                         <button
                           type="button"
@@ -685,7 +704,7 @@ export function LogisticsPage() {
                           onClick={() => setDeleteRow(r)}
                           disabled={attachSavingId === r.id}
                         >
-                          Delete
+                          {t('common.delete')}
                         </button>
                       </td>
                     ) : null}
@@ -709,25 +728,25 @@ export function LogisticsPage() {
         >
           <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="edit-logistics-title" className="confirm-dialog-title">
-              Edit logistics site
+              {t('logistics.editSiteTitle')}
             </h3>
             <form onSubmit={saveEdit} className="stack" style={{ gap: 12, marginTop: 16 }}>
               <label className="field">
-                <span className="field-label">Type</span>
+                <span className="field-label">{t('table.col.type')}</span>
                 <select
                   className="input"
                   value={editRow.siteType}
                   onChange={(e) => setEditRow((p) => (p ? { ...p, siteType: e.target.value } : null))}
                 >
-                  {LOGISTICS_SITE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
+                  {LOGISTICS_SITE_TYPES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {t(`logistics.siteType.${opt.value}`)}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Company</span>
+                <span className="field-label">{t('table.col.company')}</span>
                 <input
                   className="input"
                   value={editRow.company}
@@ -736,7 +755,7 @@ export function LogisticsPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Country</span>
+                <span className="field-label">{t('table.col.country')}</span>
                 <input
                   className="input"
                   value={editRow.country}
@@ -745,7 +764,7 @@ export function LogisticsPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">City</span>
+                <span className="field-label">{t('table.col.city')}</span>
                 <input
                   className="input"
                   value={editRow.city ?? ''}
@@ -753,7 +772,7 @@ export function LogisticsPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Registration #</span>
+                <span className="field-label">{t('table.col.registration')}</span>
                 <input
                   className="input"
                   value={editRow.registrationNumber ?? ''}
@@ -765,7 +784,7 @@ export function LogisticsPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Longitude</span>
+                <span className="field-label">{t('table.col.longitude')}</span>
                 <input
                   className="input"
                   type="number"
@@ -785,7 +804,7 @@ export function LogisticsPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Latitude</span>
+                <span className="field-label">{t('table.col.latitude')}</span>
                 <input
                   className="input"
                   type="number"
@@ -805,7 +824,7 @@ export function LogisticsPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Notes</span>
+                <span className="field-label">{t('table.col.notes')}</span>
                 <textarea
                   className="input"
                   rows={3}
@@ -819,10 +838,10 @@ export function LogisticsPage() {
               </label>
               <div className="confirm-dialog-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setEditRow(null)} disabled={saving}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save changes'}
+                  {saving ? t('common.saving') : t('common.saveChanges')}
                 </button>
               </div>
             </form>
@@ -832,17 +851,20 @@ export function LogisticsPage() {
 
       <ConfirmDialog
         open={deleteRow !== null}
-        title="Delete logistics site"
+        title={t('logistics.deleteSiteTitle')}
         message={
           deleteRow ? (
             <span>
-              Delete <strong>{deleteRow.code}</strong> ({deleteRow.company})? This cannot be undone.
+              {t('logistics.deleteSiteMessage', {
+                code: deleteRow.code,
+                company: deleteRow.company,
+              })}
             </span>
           ) : (
             ''
           )
         }
-        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        confirmLabel={deleting ? t('common.deleting') : t('common.delete')}
         variant="danger"
         onConfirm={() => void confirmDelete()}
         onCancel={() => !deleting && setDeleteRow(null)}

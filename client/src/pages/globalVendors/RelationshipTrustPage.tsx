@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -43,6 +44,7 @@ function isFirstContactLocked(farm: FarmRow): boolean {
 
 export function RelationshipTrustPage() {
   const { token, user } = useAuth();
+  const { t } = useLanguage();
   const isAdmin = Boolean(user?.roleNames?.includes('Admin'));
   const toast = useToast();
   const [farms, setFarms] = useState<FarmRow[]>([]);
@@ -70,9 +72,9 @@ export function RelationshipTrustPage() {
         }
         setEditing(initial);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load farms'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('farms.loadFailed')))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, t]);
 
   const mergeFarmFromServer = useCallback((farmId: string, updated: FarmRow) => {
     setFarms((prev) => prev.map((farm) => (farm.id === farmId ? { ...farm, ...updated } : farm)));
@@ -122,7 +124,7 @@ export function RelationshipTrustPage() {
           }),
         });
         mergeFarmFromServer(farmId, updated);
-        toast.success('Relationship updated');
+        toast.success(t('gvTrust.toast.relationshipUpdated'));
         return true;
       } catch (err) {
         let msg = 'Could not update relationship';
@@ -172,7 +174,7 @@ export function RelationshipTrustPage() {
 
   const exportToExcel = useCallback(() => {
     if (sortedFarms.length === 0) {
-      toast.info('No farms to export yet.');
+      toast.info(t('farms.nothingToExport'));
       return;
     }
     try {
@@ -205,22 +207,22 @@ export function RelationshipTrustPage() {
         };
       });
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Relationship_Trust_${stamp}`, 'Relationship & Trust', rows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(`Relationship_Trust_${stamp}`, t('nav.relationshipTrust'), rows);
+      toast.success(t('buyers.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('buyers.exportFailed'));
     }
-  }, [sortedFarms, editing, toast]);
+  }, [sortedFarms, editing, toast, t]);
 
   if (loading && farms.length === 0) {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Relationship & Trust</h1>
+          <h1 className="page-title">{t('nav.relationshipTrust')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading farms…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -230,7 +232,7 @@ export function RelationshipTrustPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Relationship & Trust</h1>
+          <h1 className="page-title">{t('nav.relationshipTrust')}</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -250,16 +252,16 @@ export function RelationshipTrustPage() {
         }}
       >
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          Relationship & Trust
+          {t('nav.relationshipTrust')}
         </h1>
         <button
           type="button"
           className="btn btn-ghost"
           onClick={exportToExcel}
           disabled={loading}
-          title="Download the table as an Excel file"
+          title={t('common.exportExcelHint')}
         >
-          Export to Excel
+          {t('common.exportExcel')}
         </button>
       </header>
       {!isAdmin ? (
@@ -276,20 +278,20 @@ export function RelationshipTrustPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Farm ID</th>
-                <th>Farm name</th>
-                <th>Contact name</th>
+                <th>{t('table.col.farmId')}</th>
+                <th>{t('table.col.farmName')}</th>
+                <th>{t('table.col.contactName')}</th>
                 <th
                   style={{ cursor: 'pointer', userSelect: 'none' }}
                   onClick={() => setCountrySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
                   title="Sort by country"
                 >
-                  Country {countrySortDir === 'asc' ? '↑' : '↓'}
+                  {t('table.col.country')} {countrySortDir === 'asc' ? '↑' : '↓'}
                 </th>
-                <th>First contact</th>
-                <th>Last visit</th>
-                <th>Visit count</th>
-                <th>Status</th>
+                <th>{t('table.col.firstContact')}</th>
+                <th>{t('table.col.lastVisit')}</th>
+                <th>{t('table.col.visitCount')}</th>
+                <th>{t('table.col.status')}</th>
                 <th />
               </tr>
             </thead>

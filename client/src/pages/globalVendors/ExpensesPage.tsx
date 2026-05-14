@@ -3,6 +3,7 @@
  * Reuses the shared expenses UI from main Admin (same columns and add form), scoped to Global Vendors project.
  */
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { AdminExpensesPanel } from '../admin/AdminDay9Panels';
 
@@ -32,10 +33,11 @@ export function GlobalSupplyExpensesSection() {
 }
 
 export function ExpensesPage() {
+  const { t } = useLanguage();
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Expenses</h1>
+        <h1 className="page-title">{t('internal.tab.expenses')}</h1>
       </header>
       <GlobalSupplyExpensesSection />
     </div>

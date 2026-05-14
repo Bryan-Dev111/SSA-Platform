@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { apiFetch, apiJson } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
@@ -46,6 +47,7 @@ export function LogisticsProfilePage() {
   const { token, user } = useAuth();
   const isAdmin = Boolean(user?.roleNames?.includes('Admin'));
   const toast = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlLogisticsId = searchParams.get('logisticsId');
@@ -152,7 +154,7 @@ export function LogisticsProfilePage() {
         method: 'PATCH',
         body: JSON.stringify({ notes: content.trim() || null }),
       });
-      toast.success('Content saved');
+      toast.success(t('gvLogistics.toast.contentSaved'));
       await loadRows();
     } catch (err) {
       let msg = 'Could not save content';
@@ -189,7 +191,7 @@ export function LogisticsProfilePage() {
           throw new Error(text || `HTTP ${res.status}`);
         }
       }
-      toast.success(arr.length === 1 ? 'Image added' : `${arr.length} images added`);
+      toast.success(arr.length === 1 ? t('gvLogistics.toast.imageAdded') : t('gvLogistics.toast.imagesAdded', { count: arr.length }));
       await loadRows();
     } catch (err) {
       let msg = 'Could not upload image';
@@ -219,7 +221,7 @@ export function LogisticsProfilePage() {
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
       }
-      toast.success('Image removed');
+      toast.success(t('gvLogistics.toast.imageRemoved'));
       setDeleteTarget(null);
       await loadRows();
     } catch (err) {
@@ -330,7 +332,7 @@ export function LogisticsProfilePage() {
                   <strong>City:</strong> {selected.city?.trim() ? selected.city : '—'}
                 </div>
                 <div>
-                  <strong>Registration #:</strong> {selected.registrationNumber || '—'}
+                  <strong>Registration:</strong> {selected.registrationNumber || '—'}
                 </div>
                 <div>
                   <strong>Latitude:</strong> {typeof selected.latitude === 'number' ? selected.latitude : '—'}

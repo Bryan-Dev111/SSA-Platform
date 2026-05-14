@@ -10,7 +10,7 @@ import { SortableTh } from '../../components/SortableTh';
 import { apiFetch, apiJson } from '../../api/client';
 import type { FarmRow } from './FarmersInformationPage';
 import { downloadTableXlsx, type ExportRow } from '../../utils/exportExcel';
-import { getDocumentLocale } from '../../i18n/locale';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   type SortDir,
   cmpNum,
@@ -77,38 +77,6 @@ type SampleSortKey =
   | 'notes'
   | 'notesFileName';
 
-function sampleToExportRow(s: SampleRow): ExportRow {
-  const sent =
-    s.sentDate != null
-      ? new Date(s.sentDate).toLocaleDateString(getDocumentLocale(), {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        })
-      : '';
-  const created = new Date(s.createdAt).toLocaleString(getDocumentLocale(), {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  return {
-    'Sample ID': s.code,
-    Buyer: s.buyerName,
-    'Buyer email': s.buyerEmail ?? '',
-    'Date sent': sent,
-    'Farm ID': s.farm?.code ?? '',
-    'Farm name': s.farm?.farmName ?? '',
-    Country: s.farm?.country ?? '',
-    Crop: s.crop ?? '',
-    'Delivery address': s.shipmentAddress ?? '',
-    Notes: s.notes ?? '',
-    'Notes file': s.notesFileName ?? '',
-    Created: created,
-  };
-}
-
 type GvExpenseRow = {
   amount: number;
   type?: string | null;
@@ -128,6 +96,7 @@ function formatUsd(n: number): string {
 export function SamplesPage() {
   const { token } = useAuth();
   const toast = useToast();
+  const { t, locale } = useLanguage();
   const [samples, setSamples] = useState<SampleRow[]>([]);
   const [farms, setFarms] = useState<FarmRow[]>([]);
   const [cropOptions, setCropOptions] = useState<CropOption[]>([]);
@@ -212,6 +181,41 @@ export function SamplesPage() {
     return rows;
   }, [samples, sort]);
 
+  const sampleToExportRow = useCallback(
+    (s: SampleRow): ExportRow => {
+      const sent =
+        s.sentDate != null
+          ? new Date(s.sentDate).toLocaleDateString(locale, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+          : '';
+      const created = new Date(s.createdAt).toLocaleString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return {
+        [t('samples.col.sampleId')]: s.code,
+        [t('samples.col.buyer')]: s.buyerName,
+        [t('samples.col.buyerEmail')]: s.buyerEmail ?? '',
+        [t('samples.col.dateSent')]: sent,
+        [t('samples.col.farmId')]: s.farm?.code ?? '',
+        [t('samples.col.farmName')]: s.farm?.farmName ?? '',
+        [t('samples.col.country')]: s.farm?.country ?? '',
+        [t('samples.col.crop')]: s.crop ?? '',
+        [t('samples.col.deliveryAddress')]: s.shipmentAddress ?? '',
+        [t('samples.col.notes')]: s.notes ?? '',
+        [t('samples.col.notesFile')]: s.notesFileName ?? '',
+        [t('samples.col.created')]: created,
+      };
+    },
+    [locale, t]
+  );
+
   const totalSampleExpenseAmountUsd = useMemo(() => {
     const sampleCodes = new Set(samples.map((s) => s.code));
     return gvExpenses
@@ -253,7 +257,7 @@ export function SamplesPage() {
         setSampleExpensesUnavailable(!expensesBundle.ok);
       })
       .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Failed to load samples')
+        setError(e instanceof Error ? e.message : t('samples.loadFailed'))
       )
       .finally(() => {
         if (!opts?.silent) setLoading(false);
@@ -337,11 +341,11 @@ export function SamplesPage() {
         method: 'POST',
         body: form,
       });
-      toast.success('Sample created');
+      toast.success(t('samples.toast.created'));
       closeModal();
       load({ silent: true });
     } catch (err) {
-      let msg = 'Could not create sample';
+      let msg = t('samples.toast.createFailed');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -360,11 +364,11 @@ export function SamplesPage() {
     e.preventDefault();
     if (!token || !editDraft) return;
     if (!editDraft.buyerName.trim()) {
-      toast.error('Buyer name is required');
+      toast.error(t('samples.toast.buyerNameRequired'));
       return;
     }
     if (!editDraft.sentDate || !/^\d{4}-\d{2}-\d{2}$/.test(editDraft.sentDate)) {
-      toast.error('Date sample was sent is required');
+      toast.error(t('samples.toast.dateSentRequired'));
       return;
     }
     setEditSaving(true);
@@ -385,7 +389,7 @@ export function SamplesPage() {
           body: form,
         });
         if (!res.ok) {
-          let msg = 'Could not update sample';
+          let msg = t('samples.toast.updateFailed');
           try {
             const j = (await res.json()) as { error?: string };
             if (j.error) msg = j.error;
@@ -410,11 +414,11 @@ export function SamplesPage() {
           }),
         });
       }
-      toast.success('Sample updated');
+      toast.success(t('samples.toast.updated'));
       closeEdit();
       load({ silent: true });
     } catch (err) {
-      let msg = 'Could not update sample';
+      let msg = t('samples.toast.updateFailed');
       if (err instanceof Error) {
         try {
           const j = JSON.parse(err.message) as { error?: string };
@@ -431,18 +435,22 @@ export function SamplesPage() {
 
   const exportToExcel = useCallback(() => {
     if (sortedSamples.length === 0) {
-      toast.info('No samples to export yet.');
+      toast.info(t('samples.toast.nothingToExport'));
       return;
     }
     try {
       const rows = sortedSamples.map(sampleToExportRow);
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadTableXlsx(`Samples_${stamp}`, 'Samples', rows);
-      toast.success('Exported to Excel');
+      downloadTableXlsx(
+        `${t('samples.exportFilePrefix')}_${stamp}`,
+        t('samples.exportSheet'),
+        rows
+      );
+      toast.success(t('findings.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('findings.exportFailed'));
     }
-  }, [sortedSamples, toast]);
+  }, [sortedSamples, toast, t, sampleToExportRow]);
 
   const onSortColumn = (columnKey: string) => {
     setSort((prev) => toggleSort(prev, columnKey as SampleSortKey));
@@ -462,11 +470,11 @@ export function SamplesPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Samples</h1>
+          <h1 className="page-title">{t('nav.samples')}</h1>
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading samples…</p>
+          <p style={{ marginTop: 12 }}>{t('samples.loadingSamples')}</p>
         </div>
       </div>
     );
@@ -476,7 +484,7 @@ export function SamplesPage() {
     return (
       <div className="page">
         <header className="page-header">
-          <h1 className="page-title">Samples</h1>
+          <h1 className="page-title">{t('nav.samples')}</h1>
         </header>
         <div className="alert-error">{error}</div>
       </div>
@@ -495,23 +503,23 @@ export function SamplesPage() {
           gap: 12,
         }}
       >
-        <h1 className="page-title">Samples</h1>
+        <h1 className="page-title">{t('nav.samples')}</h1>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
             className="btn btn-ghost"
             onClick={exportToExcel}
             disabled={loading}
-            title="Download the table as an Excel file"
+            title={t('common.exportExcelHint')}
           >
-            Export to Excel
+            {t('common.exportExcel')}
           </button>
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => setModalOpen(true)}
           >
-            Add sample
+            {t('samples.addSample')}
           </button>
         </div>
       </header>
@@ -526,11 +534,11 @@ export function SamplesPage() {
           minWidth: 0,
         }}
       >
-        <MetricCard title="Total Samples" value={samples.length} />
+        <MetricCard title={t('samples.totalSamples')} value={samples.length} />
         <MetricCard
-          title="Total Samples Value"
+          title={t('samples.totalSamplesValue')}
           value={sampleExpensesUnavailable ? '—' : formatUsd(totalSampleExpenseAmountUsd)}
-          subtitle={sampleExpensesUnavailable ? 'Could not load expenses.' : undefined}
+          subtitle={sampleExpensesUnavailable ? t('samples.expensesUnavailable') : undefined}
         />
       </div>
 
@@ -545,7 +553,7 @@ export function SamplesPage() {
           className="purchase-orders-table-scroll"
           style={{ overflowY: 'hidden', marginBottom: 6 }}
           onScroll={syncScrollFromTop}
-          aria-label="Horizontal scroll samples table (top)"
+          aria-label={t('samples.scrollTopAria')}
         >
           <div style={{ height: 1, width: topScrollInnerWidth || '100%' }} />
         </div>
@@ -561,7 +569,7 @@ export function SamplesPage() {
             <thead>
               <tr>
                 <SortableTh
-                  label="Sample ID"
+                  label={t('samples.col.sampleId')}
                   columnKey="code"
                   activeKey={sort.key}
                   dir={sort.dir}
@@ -569,7 +577,7 @@ export function SamplesPage() {
                   style={{ minWidth: 140 }}
                 />
                 <SortableTh
-                  label="Buyer"
+                  label={t('samples.col.buyer')}
                   columnKey="buyerName"
                   activeKey={sort.key}
                   dir={sort.dir}
@@ -577,63 +585,63 @@ export function SamplesPage() {
                   style={{ minWidth: 220 }}
                 />
                 <SortableTh
-                  label="Buyer email"
+                  label={t('samples.col.buyerEmail')}
                   columnKey="buyerEmail"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Date sent"
+                  label={t('samples.col.dateSent')}
                   columnKey="sentDate"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Farm ID"
+                  label={t('samples.col.farmId')}
                   columnKey="farmCode"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Farm name"
+                  label={t('samples.col.farmName')}
                   columnKey="farmName"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Country"
+                  label={t('samples.col.country')}
                   columnKey="country"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Crop"
+                  label={t('samples.col.crop')}
                   columnKey="crop"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Delivery address"
+                  label={t('samples.col.deliveryAddress')}
                   columnKey="shipmentAddress"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Notes"
+                  label={t('samples.col.notes')}
                   columnKey="notes"
                   activeKey={sort.key}
                   dir={sort.dir}
                   onSort={onSortColumn}
                 />
                 <SortableTh
-                  label="Notes file"
+                  label={t('samples.col.notesFile')}
                   columnKey="notesFileName"
                   activeKey={sort.key}
                   dir={sort.dir}
@@ -646,8 +654,7 @@ export function SamplesPage() {
               {sortedSamples.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="table-empty">
-                    No samples yet. Use <strong>Add sample</strong> to create
-                    one.
+                    {t('samples.emptyList')}
                   </td>
                 </tr>
               ) : (
@@ -660,7 +667,7 @@ export function SamplesPage() {
                     <td>{s.buyerEmail ?? '—'}</td>
                     <td>
                       {s.sentDate
-                        ? new Date(s.sentDate).toLocaleDateString(getDocumentLocale(), {
+                        ? new Date(s.sentDate).toLocaleDateString(locale, {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -673,20 +680,23 @@ export function SamplesPage() {
                     <td>{s.crop ?? '—'}</td>
                     <td>{s.shipmentAddress ?? '—'}</td>
                     <td style={{ maxWidth: 280, verticalAlign: 'top' }}>
-                      <ExpandableTableText value={s.notes} modalTitle={`Notes — ${s.code}`} />
+                      <ExpandableTableText
+                        value={s.notes}
+                        modalTitle={t('samples.notesModalTitle', { code: s.code })}
+                      />
                     </td>
                     <td>
                       {s.notesFileName ? (
                         <span>{s.notesFileName}</span>
                       ) : (
                         <span style={{ color: 'var(--color-text-muted)' }}>
-                          None
+                          {t('common.none')}
                         </span>
                       )}
                     </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button type="button" className="btn btn-sm" onClick={() => openEdit(s)}>
-                        Edit
+                        {t('common.edit')}
                       </button>
                     </td>
                   </tr>
@@ -708,7 +718,7 @@ export function SamplesPage() {
         >
           <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="add-sample-title" className="confirm-dialog-title">
-              Add sample
+              {t('samples.modalTitle')}
             </h3>
             <form
               onSubmit={submit}
@@ -716,7 +726,7 @@ export function SamplesPage() {
               style={{ gap: 12, marginTop: 16 }}
             >
               <label className="field">
-                <span className="field-label">Buyer name</span>
+                <span className="field-label">{t('samples.field.buyerName')}</span>
                 <input
                   className="input"
                   value={buyerName}
@@ -725,7 +735,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Buyer email</span>
+                <span className="field-label">{t('samples.field.buyerEmail')}</span>
                 <input
                   className="input"
                   type="email"
@@ -734,7 +744,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Date sample was sent</span>
+                <span className="field-label">{t('samples.field.dateSent')}</span>
                 <input
                   className="input"
                   type="date"
@@ -744,7 +754,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Country</span>
+                <span className="field-label">{t('samples.field.country')}</span>
                 <select
                   className="input"
                   value={country}
@@ -758,7 +768,7 @@ export function SamplesPage() {
                     }
                   }}
                 >
-                  <option value="">Select country</option>
+                  <option value="">{t('samples.selectCountry')}</option>
                   {countryOptions.map((option) => (
                     <option key={option.id} value={option.name}>
                       {option.name}
@@ -767,7 +777,7 @@ export function SamplesPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Farm (optional)</span>
+                <span className="field-label">{t('samples.field.farmOptional')}</span>
                 <select
                   className="input"
                   value={farmId}
@@ -780,7 +790,7 @@ export function SamplesPage() {
                     }
                   }}
                 >
-                  <option value="">No farm selected</option>
+                  <option value="">{t('samples.noFarmSelected')}</option>
                   {addFarmOptions.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.code} — {f.farmName} ({f.country})
@@ -789,13 +799,13 @@ export function SamplesPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Crop</span>
+                <span className="field-label">{t('samples.field.crop')}</span>
                 <select
                   className="input"
                   value={crop}
                   onChange={(e) => setCrop(e.target.value)}
                 >
-                  <option value="">Select crop</option>
+                  <option value="">{t('samples.selectCrop')}</option>
                   {cropOptions.map((option) => (
                     <option key={option.id} value={option.name}>
                       {option.name}
@@ -804,7 +814,7 @@ export function SamplesPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Shipping address</span>
+                <span className="field-label">{t('samples.field.shippingAddress')}</span>
                 <textarea
                   className="input"
                   rows={2}
@@ -813,7 +823,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Notes</span>
+                <span className="field-label">{t('samples.field.notes')}</span>
                 <textarea
                   className="input"
                   rows={3}
@@ -822,7 +832,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Notes file (optional)</span>
+                <span className="field-label">{t('samples.field.notesFileOptional')}</span>
                 <input
                   className="input"
                   type="file"
@@ -839,14 +849,14 @@ export function SamplesPage() {
                   onClick={closeModal}
                   disabled={saving}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
                   disabled={saving}
                 >
-                  {saving ? 'Saving…' : 'Create sample'}
+                  {saving ? t('common.saving') : t('samples.createSample')}
                 </button>
               </div>
             </form>
@@ -865,7 +875,9 @@ export function SamplesPage() {
         >
           <div className="confirm-dialog confirm-dialog--medium-form" onClick={(e) => e.stopPropagation()}>
             <h3 id="edit-sample-title" className="confirm-dialog-title">
-              Edit sample <strong>{samples.find((x) => x.id === editDraft.id)?.code ?? ''}</strong>
+              {t('samples.modalEditTitle', {
+                code: samples.find((x) => x.id === editDraft.id)?.code ?? '',
+              })}
             </h3>
             <form
               onSubmit={submitEdit}
@@ -873,7 +885,7 @@ export function SamplesPage() {
               style={{ gap: 12, marginTop: 16 }}
             >
               <label className="field">
-                <span className="field-label">Buyer name</span>
+                <span className="field-label">{t('samples.field.buyerName')}</span>
                 <input
                   className="input"
                   value={editDraft.buyerName}
@@ -884,7 +896,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Buyer email</span>
+                <span className="field-label">{t('samples.field.buyerEmail')}</span>
                 <input
                   className="input"
                   type="email"
@@ -895,7 +907,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Date sample was sent</span>
+                <span className="field-label">{t('samples.field.dateSent')}</span>
                 <input
                   className="input"
                   type="date"
@@ -907,7 +919,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Country</span>
+                <span className="field-label">{t('samples.field.country')}</span>
                 <select
                   className="input"
                   value={editDraft.country}
@@ -925,7 +937,7 @@ export function SamplesPage() {
                     })
                   }
                 >
-                  <option value="">Select country</option>
+                  <option value="">{t('samples.selectCountry')}</option>
                   {countryOptions.map((option) => (
                     <option key={option.id} value={option.name}>
                       {option.name}
@@ -934,7 +946,7 @@ export function SamplesPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Farm (optional)</span>
+                <span className="field-label">{t('samples.field.farmOptional')}</span>
                 <select
                   className="input"
                   value={editDraft.farmId}
@@ -951,7 +963,7 @@ export function SamplesPage() {
                     })
                   }
                 >
-                  <option value="">No farm selected</option>
+                  <option value="">{t('samples.noFarmSelected')}</option>
                   {editFarmOptions.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.code} — {f.farmName} ({f.country})
@@ -960,7 +972,7 @@ export function SamplesPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Crop</span>
+                <span className="field-label">{t('samples.field.crop')}</span>
                 <select
                   className="input"
                   value={editDraft.crop}
@@ -968,7 +980,7 @@ export function SamplesPage() {
                     setEditDraft((d) => (d ? { ...d, crop: e.target.value } : null))
                   }
                 >
-                  <option value="">Select crop</option>
+                  <option value="">{t('samples.selectCrop')}</option>
                   {cropOptions.map((option) => (
                     <option key={option.id} value={option.name}>
                       {option.name}
@@ -977,7 +989,7 @@ export function SamplesPage() {
                 </select>
               </label>
               <label className="field">
-                <span className="field-label">Shipping address</span>
+                <span className="field-label">{t('samples.field.shippingAddress')}</span>
                 <textarea
                   className="input"
                   rows={2}
@@ -990,7 +1002,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Notes</span>
+                <span className="field-label">{t('samples.field.notes')}</span>
                 <textarea
                   className="input"
                   rows={3}
@@ -1001,7 +1013,7 @@ export function SamplesPage() {
                 />
               </label>
               <label className="field">
-                <span className="field-label">Replace notes file (optional)</span>
+                <span className="field-label">{t('samples.field.replaceNotesFileOptional')}</span>
                 <input
                   className="input"
                   type="file"
@@ -1012,7 +1024,7 @@ export function SamplesPage() {
                 />
                 {editNotesFile ? (
                   <p style={{ margin: '0.35rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    New file will be uploaded on save. Leave empty to keep the current file.
+                    {t('samples.replaceNotesHint')}
                   </p>
                 ) : null}
               </label>
@@ -1023,14 +1035,14 @@ export function SamplesPage() {
                   onClick={closeEdit}
                   disabled={editSaving}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
                   disabled={editSaving}
                 >
-                  {editSaving ? 'Saving…' : 'Save changes'}
+                  {editSaving ? t('common.saving') : t('common.saveChanges')}
                 </button>
               </div>
             </form>

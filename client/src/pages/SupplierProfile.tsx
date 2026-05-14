@@ -289,11 +289,11 @@ export function SupplierProfile() {
     e.preventDefault();
     if (!token || !data || !recordName.trim()) return;
     if (!recordFile) {
-      toast.error('File is required');
+      toast.error(t('toast.fileRequired'));
       return;
     }
     if (recordFile.size > MAX_RECORD_UPLOAD_BYTES) {
-      toast.error('File exceeds current upload limit (75MB)');
+      toast.error(t('toast.fileExceedsUploadLimit75mb'));
       return;
     }
     setSubmitting(true);
@@ -323,7 +323,7 @@ export function SupplierProfile() {
       setRecordName('');
       setRecordNotes('');
       setRecordFile(null);
-      toast.success('Record submitted (pending review)');
+      toast.success(t('supplierProfile.toast.recordSubmittedPending'));
       refresh();
     } catch (err) {
       toast.error(parseApiError(err));
@@ -336,12 +336,12 @@ export function SupplierProfile() {
     e.preventDefault();
     if (!token || !data) return;
     if (!shipPo.trim() || !shipPart.trim() || !shipLot.trim() || !shipQty.trim() || !shipDate.trim()) {
-      toast.error('Purchase order, part number, lot, quantity, and inspection date are required');
+      toast.error(t('supplierProfile.toast.inspectionFieldsRequired'));
       return;
     }
     const qtyNum = Number(shipQty);
     if (Number.isNaN(qtyNum) || qtyNum < 0) {
-      toast.error('Quantity must be a valid non-negative number');
+      toast.error(t('supplierProfile.toast.quantityInvalid'));
       return;
     }
     setSubmitting(true);
@@ -364,7 +364,7 @@ export function SupplierProfile() {
       setShipLot('');
       setShipQty('');
       setShipDate('');
-      toast.success('Inspection request submitted');
+      toast.success(t('supplierProfile.toast.inspectionSubmitted'));
       refresh();
     } catch (err) {
       toast.error(parseApiError(err));
@@ -394,7 +394,7 @@ export function SupplierProfile() {
         </header>
         <div className="loading-message">
           <div className="loading-spinner" />
-          <p style={{ marginTop: 12 }}>Loading…</p>
+          <p style={{ marginTop: 12 }}>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -407,9 +407,9 @@ export function SupplierProfile() {
           <h1 className="page-title">{t('nav.supplierProfile')}</h1>
           {canSelectSupplier && (
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+              <span style={{ fontSize: 'var(--text-sm)' }}>{t('filters.supplierColon')}</span>
               <select className="input" style={{ width: 'auto', minWidth: 260 }} value={selectedSupplierId} onChange={(e) => setSelectedSupplierId(e.target.value)}>
-                <option value="">Select supplier</option>
+                <option value="">{t('supplierProfile.selectSupplier')}</option>
                 {supplierOptions.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} - {s.name}
@@ -440,15 +440,13 @@ export function SupplierProfile() {
       <header className="page-header">
         <h1 className="page-title">{t('nav.supplierProfile')}</h1>
         <p className="page-description">
-          {isSupplier
-            ? 'Your portal: assigned buyers, quality data, records, and shipment inspection requests.'
-            : 'Select a supplier to view profile details and related quality records.'}
+          {isSupplier ? t('supplierProfile.introSupplierPortal') : t('supplierProfile.introStaff')}
         </p>
         {canSelectSupplier && (
           <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ fontSize: 'var(--text-sm)' }}>Supplier filter:</span>
+            <span style={{ fontSize: 'var(--text-sm)' }}>{t('filters.supplierColon')}</span>
             <select className="input" style={{ width: 'auto', minWidth: 280 }} value={selectedSupplierId} onChange={(e) => setSelectedSupplierId(e.target.value)}>
-              <option value="">Select supplier</option>
+              <option value="">{t('supplierProfile.selectSupplier')}</option>
               {supplierOptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.code} - {s.name}
@@ -461,8 +459,8 @@ export function SupplierProfile() {
 
       {!data && canSelectSupplier ? (
         <div className="placeholder-empty">
-          <strong>No supplier selected</strong>
-          <div style={{ marginTop: '0.5rem' }}>Choose a supplier from the filter to load profile data.</div>
+          <strong>{t('supplierProfile.emptyTitle')}</strong>
+          <div style={{ marginTop: '0.5rem' }}>{t('supplierProfile.emptyHint')}</div>
         </div>
       ) : null}
 
@@ -632,17 +630,17 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr style={{ verticalAlign: 'bottom' }}>
-              <th>Shipment ID</th>
-              <th>Supplier</th>
-              <th>P.O.</th>
-              <th>Part Number</th>
-              <th>Quantity</th>
-              <th>Lot</th>
-              <th style={{ whiteSpace: 'nowrap' }}>Requested inspection date</th>
-              <th>User</th>
-              <th>Date Created</th>
-              <th>NOTES</th>
-              <th>Status</th>
+              <th>{t('shipments.col.shipmentId')}</th>
+              <th>{t('findings.col.supplier')}</th>
+              <th>{t('shipments.col.po')}</th>
+              <th>{t('shipments.col.partNumber')}</th>
+              <th>{t('shipments.col.quantity')}</th>
+              <th>{t('shipments.col.lot')}</th>
+              <th style={{ whiteSpace: 'nowrap' }}>{t('shipments.col.requestedDate')}</th>
+              <th>{t('table.col.user')}</th>
+              <th>{t('shipments.col.created')}</th>
+              <th>{t('shipments.col.notes')}</th>
+              <th>{t('table.col.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -701,12 +699,12 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Notes</th>
-              <th>File</th>
-              <th>Source</th>
-              <th>Status</th>
-              <th>Created</th>
+              <th>{t('table.col.name')}</th>
+              <th>{t('table.col.notes')}</th>
+              <th>{t('table.col.file')}</th>
+              <th>{t('table.col.source')}</th>
+              <th>{t('table.col.status')}</th>
+              <th>{t('table.col.created')}</th>
             </tr>
           </thead>
           <tbody>
@@ -734,10 +732,10 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Result</th>
+              <th>{t('findings.col.code')}</th>
+              <th>{t('audits.col.date')}</th>
+              <th>{t('audits.col.type')}</th>
+              <th>{t('audits.col.result')}</th>
             </tr>
           </thead>
           <tbody>
@@ -761,10 +759,10 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Status</th>
-              <th>Severity</th>
-              <th>Summary</th>
+              <th>{t('findings.col.code')}</th>
+              <th>{t('findings.col.status')}</th>
+              <th>{t('findings.col.severity')}</th>
+              <th>{t('findings.col.summary')}</th>
             </tr>
           </thead>
           <tbody>
@@ -790,10 +788,10 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Status</th>
-              <th>Severity</th>
-              <th>Summary</th>
+              <th>{t('findings.col.code')}</th>
+              <th>{t('findings.col.status')}</th>
+              <th>{t('findings.col.severity')}</th>
+              <th>{t('findings.col.summary')}</th>
             </tr>
           </thead>
           <tbody>
@@ -973,23 +971,24 @@ function SectionTable({
   excelExport?: { filename: string; sheetName: string; getRows: () => ExportRow[] };
 }) {
   const toast = useToast();
+  const { t } = useLanguage();
 
   const handleExportExcel = () => {
     if (!excelExport) return;
     if (rowCount === 0) {
-      toast.info('No data to export');
+      toast.info(t('toast.noDataToExport'));
       return;
     }
     try {
       const rows = excelExport.getRows();
       if (rows.length === 0) {
-        toast.info('No data to export');
+        toast.info(t('toast.noDataToExport'));
         return;
       }
       downloadTableXlsx(excelExport.filename, excelExport.sheetName, rows);
-      toast.success('Exported to Excel');
+      toast.success(t('findings.exportDone'));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
+      toast.error(e instanceof Error ? e.message : t('findings.exportFailed'));
     }
   };
 

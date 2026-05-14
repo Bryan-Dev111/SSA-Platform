@@ -69,14 +69,15 @@ interface EmployeeRatePreview {
   currency: string | null;
 }
 
+const WORK_LOG_TYPES: WorkLogRow['workType'][] = ['Audit', 'Inspection', 'Travel', 'Admin', 'Other'];
+
+function workLogTypeLabel(type: WorkLogRow['workType'], t: (key: string) => string): string {
+  return t(`workLogs.type.${type}`);
+}
+
 function formatWorkLogTotalAmount(r: WorkLogRow): string {
   const raw = r.laborCosts?.[0]?.totalCost;
   return formatUsd(raw, '—');
-}
-
-function workLogsTableTitle(scopeAll: boolean, canViewAll: boolean): string {
-  const raw = scopeAll && canViewAll ? 'all work logs' : 'my work logs';
-  return raw.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatWorkLogSupplierCell(s: WorkLogRow['supplier']): string {
@@ -88,7 +89,7 @@ export type WorkLogsVariant = 'page' | 'embedded' | 'globalSupplyTopRow';
 
 export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
   const { token, user } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const toast = useToast();
   const isGlobalSupplyTopRow = variant === 'globalSupplyTopRow';
   const [workLogs, setWorkLogs] = useState<WorkLogRow[]>([]);
@@ -204,7 +205,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     e.preventDefault();
     if (!token || !form.workDate.trim() || !form.hoursWorked.trim()) return;
     if (!selfLabel.trim()) {
-      toast.error('Your account has no name or email; add a name in your profile.');
+      toast.error(t('workLogs.toast.accountNoName'));
       return;
     }
     setSubmitting(true);
@@ -236,7 +237,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
         auditId: '',
         shipmentId: '',
       });
-      toast.success('Work log saved — a labor cost line was added automatically.');
+      toast.success(t('workLogs.toast.savedWithLabor'));
     } catch (err) {
       setError(parseApiError(err));
     } finally {
@@ -274,7 +275,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
       });
       setWorkLogs((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       setEditingWorkLogId(null);
-      toast.success('Work log updated');
+      toast.success(t('workLogs.toastUpdated'));
     } catch (err) {
       setError(parseApiError(err));
     } finally {
@@ -286,11 +287,11 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
     <>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Log Time</h2>
+          <h2 style={{ marginTop: 0 }}>{t('workLogs.logTime')}</h2>
           {canViewAll && !isGlobalSupplyTopRow && (
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: 'var(--text-sm)' }}>
               <input type="checkbox" checked={scopeAll} onChange={(e) => setScopeAll(e.target.checked)} />
-              Show all users&apos; entries (Admin / Quality Manager)
+              {t('workLogs.scopeAllLabel')}
             </label>
           )}
           {error && <div className="alert-error">{error}</div>}
@@ -305,11 +306,11 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 }}
               >
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Full name</label>
-                  <input className="input" value={selfLabel || '—'} readOnly title="Taken from your account" />
+                  <label className="input-label">{t('workLogs.fullName')}</label>
+                  <input className="input" value={selfLabel || '—'} readOnly title={t('workLogs.takenFromAccount')} />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Date</label>
+                  <label className="input-label">{t('workLogs.date')}</label>
                   <input
                     className="input"
                     type="date"
@@ -319,7 +320,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                   />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Hours worked</label>
+                  <label className="input-label">{t('workLogs.hoursWorked')}</label>
                   <input
                     className="input"
                     type="number"
@@ -331,48 +332,48 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                   />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Rate</label>
+                  <label className="input-label">{t('workLogs.rate')}</label>
                   <input
                     className="input"
                     readOnly
                     value={
                       employeeRatePreview === null
-                        ? 'Loading…'
+                        ? t('common.loading')
                         : `${employeeRatePreview.hourlyRate.toFixed(2)}${
                             employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : ''
                           }`
                     }
-                    title="Matched by your account name or email to an employee user’s hourly rate"
+                    title={t('workLogs.rateMatchTitle')}
                   />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Total Amount</label>
+                  <label className="input-label">{t('workLogs.totalAmount')}</label>
                   <input
                     className="input"
                     readOnly
                     value={
                       employeeRatePreview === null
-                        ? 'Loading…'
+                        ? t('common.loading')
                         : previewTotalCost !== null
                           ? previewTotalCost.toFixed(2) +
                             (employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : '')
                           : '—'
                     }
-                    title="Hours × rate (same calculation as the labor cost row when you save)"
+                    title={t('workLogs.totalCalcTitle')}
                   />
                 </div>
                 <button type="submit" className="btn btn-primary" disabled={submitting || !selfLabel.trim()}>
-                  {submitting ? 'Saving…' : 'Save work log'}
+                  {submitting ? t('common.saving') : t('workLogs.save')}
                 </button>
               </div>
             ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem', alignItems: 'end' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Full name</label>
-                <input className="input" value={selfLabel || '—'} readOnly title="Taken from your account" />
+                <label className="input-label">{t('workLogs.fullName')}</label>
+                <input className="input" value={selfLabel || '—'} readOnly title={t('workLogs.takenFromAccount')} />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Date</label>
+                <label className="input-label">{t('workLogs.date')}</label>
                 <input
                   className="input"
                   type="date"
@@ -382,7 +383,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Hours worked</label>
+                <label className="input-label">{t('workLogs.hoursWorked')}</label>
                 <input
                   className="input"
                   type="number"
@@ -394,52 +395,52 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Rate</label>
+                <label className="input-label">{t('workLogs.rate')}</label>
                 <input
                   className="input"
                   readOnly
                   value={
                     employeeRatePreview === null
-                      ? 'Loading…'
+                      ? t('common.loading')
                       : `${employeeRatePreview.hourlyRate.toFixed(2)}${
                           employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : ''
                         }`
                   }
-                  title="Matched by your account name or email to an employee user’s hourly rate"
+                  title={t('workLogs.rateMatchTitle')}
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Total Amount</label>
+                <label className="input-label">{t('workLogs.totalAmount')}</label>
                 <input
                   className="input"
                   readOnly
                   value={
                     employeeRatePreview === null
-                      ? 'Loading…'
+                      ? t('common.loading')
                       : previewTotalCost !== null
                         ? previewTotalCost.toFixed(2) +
                           (employeeRatePreview.currency ? ` ${employeeRatePreview.currency}` : '')
                         : '—'
                   }
-                  title="Hours × rate (same calculation as the labor cost row when you save)"
+                  title={t('workLogs.totalCalcTitle')}
                 />
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Work type</label>
+                <label className="input-label">{t('workLogs.workType')}</label>
                 <select
                   className="input"
                   value={form.workType}
                   onChange={(e) => setForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))}
                 >
-                  <option value="Audit">Audit</option>
-                  <option value="Inspection">Inspection</option>
-                  <option value="Travel">Travel</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Other">Other</option>
+                  {WORK_LOG_TYPES.map((wt) => (
+                    <option key={wt} value={wt}>
+                      {workLogTypeLabel(wt, t)}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Supplier</label>
+                <label className="input-label">{t('workLogs.fieldSupplier')}</label>
                 <select
                   className="input"
                   value={form.supplierId}
@@ -448,7 +449,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                     setForm((p) => ({ ...p, supplierId, auditId: '', shipmentId: '' }));
                   }}
                 >
-                  <option value="">None</option>
+                  <option value="">{t('workLogs.optionNone')}</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.code}: {s.name}
@@ -457,14 +458,18 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Audit</label>
+                <label className="input-label">{t('workLogs.fieldAudit')}</label>
                 <select
                   className="input"
                   value={form.auditId}
                   onChange={(e) => setForm((p) => ({ ...p, auditId: e.target.value }))}
-                  title={form.supplierId.trim() ? 'Audits for the selected supplier' : 'Select a supplier to narrow audits'}
+                  title={
+                    form.supplierId.trim()
+                      ? t('workLogs.auditsForSupplierTitle')
+                      : t('workLogs.selectSupplierAudits')
+                  }
                 >
-                  <option value="">None</option>
+                  <option value="">{t('workLogs.optionNone')}</option>
                   {audits.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.code}
@@ -473,14 +478,18 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 </select>
               </div>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <label className="input-label">Shipment</label>
+                <label className="input-label">{t('workLogs.fieldShipment')}</label>
                 <select
                   className="input"
                   value={form.shipmentId}
                   onChange={(e) => setForm((p) => ({ ...p, shipmentId: e.target.value }))}
-                  title={form.supplierId.trim() ? 'Shipments for the selected supplier' : 'Select a supplier to narrow shipments'}
+                  title={
+                    form.supplierId.trim()
+                      ? t('workLogs.shipmentsForSupplierTitle')
+                      : t('workLogs.selectSupplierShipments')
+                  }
                 >
-                  <option value="">None</option>
+                  <option value="">{t('workLogs.optionNone')}</option>
                   {shipments.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.code ?? s.id}
@@ -489,7 +498,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                 </select>
               </div>
               <button type="submit" className="btn btn-primary" disabled={submitting || !selfLabel.trim()}>
-                {submitting ? 'Saving…' : 'Save work log'}
+                {submitting ? t('common.saving') : t('workLogs.save')}
               </button>
             </div>
             )}
@@ -500,34 +509,40 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
           <h2 style={{ marginTop: 0 }}>
-            {isGlobalSupplyTopRow ? 'My Work Logs' : workLogsTableTitle(scopeAll, canViewAll)}
+            {isGlobalSupplyTopRow ? (
+              t('workLogs.myWorkLogs')
+            ) : scopeAll && canViewAll ? (
+              t('workLogs.allWorkLogs')
+            ) : (
+              t('workLogs.myWorkLogs')
+            )}
           </h2>
           <div className="table-wrap">
             {loading ? (
-              <p className="table-empty">Loading…</p>
+              <p className="table-empty">{t('common.loading')}</p>
             ) : workLogs.length === 0 ? (
-              <p className="table-empty">No work logs yet.</p>
+              <p className="table-empty">{t('workLogs.empty')}</p>
             ) : (
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Log ID</th>
-                    <th>Full Name</th>
-                    <th>Date</th>
-                    <th>Hours</th>
+                    <th>{t('table.col.logId')}</th>
+                    <th>{t('table.col.fullName')}</th>
+                    <th>{t('table.col.date')}</th>
+                    <th>{t('table.col.hours')}</th>
                     {!isGlobalSupplyTopRow ? (
                       <>
-                        <th>Type</th>
-                        <th>Total Amount</th>
-                        <th>Supplier</th>
-                        <th>Audit ID</th>
-                        <th>Shipment ID</th>
+                        <th>{t('table.col.type')}</th>
+                        <th>{t('table.col.totalAmount')}</th>
+                        <th>{t('findings.col.supplier')}</th>
+                        <th>{t('table.col.auditId')}</th>
+                        <th>{t('table.col.shipmentId')}</th>
                       </>
                     ) : (
-                      <th>Total Amount</th>
+                      <th>{t('table.col.totalAmount')}</th>
                     )}
-                    <th>Created</th>
-                    {canEditWorkLogs ? <th>Edit</th> : null}
+                    <th>{t('table.col.created')}</th>
+                    {canEditWorkLogs ? <th>{t('table.col.edit')}</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -544,7 +559,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                             onChange={(e) => setEditForm((p) => ({ ...p, workDate: e.target.value }))}
                           />
                         ) : (
-                          formatDisplayCalendarDate(r.workDate)
+                          formatDisplayCalendarDate(r.workDate, locale)
                         )}
                       </td>
                       <td>{r.hoursWorked}</td>
@@ -559,25 +574,25 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                                   setEditForm((p) => ({ ...p, workType: e.target.value as WorkLogRow['workType'] }))
                                 }
                               >
-                                <option value="Audit">Audit</option>
-                                <option value="Inspection">Inspection</option>
-                                <option value="Travel">Travel</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Other">Other</option>
+                                {WORK_LOG_TYPES.map((wt) => (
+                                  <option key={wt} value={wt}>
+                                    {workLogTypeLabel(wt, t)}
+                                  </option>
+                                ))}
                               </select>
                             ) : (
-                              r.workType
+                              workLogTypeLabel(r.workType, t)
                             )}
                           </td>
-                          <td title="From linked labor cost (hours × rate at save time)">{formatWorkLogTotalAmount(r)}</td>
+                          <td title={t('workLogs.totalFromLaborTitle')}>{formatWorkLogTotalAmount(r)}</td>
                           <td>{formatWorkLogSupplierCell(r.supplier)}</td>
                           <td>{r.audit?.code ?? r.auditId ?? '—'}</td>
                           <td>{r.shipment?.code ?? r.shipmentId ?? '—'}</td>
                         </>
                       ) : (
-                        <td title="From linked labor cost (hours × rate at save time)">{formatWorkLogTotalAmount(r)}</td>
+                        <td title={t('workLogs.totalFromLaborTitle')}>{formatWorkLogTotalAmount(r)}</td>
                       )}
-                      <td>{formatDisplayCalendarDate(r.createdAt)}</td>
+                      <td>{formatDisplayCalendarDate(r.createdAt, locale)}</td>
                       {canEditWorkLogs ? (
                         <td>
                           {editingWorkLogId === r.id ? (
@@ -588,7 +603,7 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                                 onClick={() => void saveEditWorkLog()}
                                 disabled={savingEdit}
                               >
-                                {savingEdit ? 'Saving…' : 'Save'}
+                                {savingEdit ? t('common.saving') : t('common.save')}
                               </button>
                               <button
                                 type="button"
@@ -596,12 +611,12 @@ export function WorkLogs({ variant = 'page' }: { variant?: WorkLogsVariant }) {
                                 onClick={cancelEditWorkLog}
                                 disabled={savingEdit}
                               >
-                                Cancel
+                                {t('common.cancel')}
                               </button>
                             </span>
                           ) : (
                             <button type="button" className="btn btn-ghost" onClick={() => startEditWorkLog(r)}>
-                              Edit
+                              {t('table.col.edit')}
                             </button>
                           )}
                         </td>

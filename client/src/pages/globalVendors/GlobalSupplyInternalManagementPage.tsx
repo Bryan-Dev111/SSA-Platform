@@ -124,7 +124,7 @@ export function GlobalSupplyInternalManagementPage() {
 
   const tabButtons = useMemo(() => {
     const rows: { id: GlobalInternalTab; label: string }[] = [
-      { id: 'purchaseOrders', label: 'Purchase Orders' },
+      { id: 'purchaseOrders', label: t('nav.purchaseOrders') },
       { id: 'expenses', label: t('internal.tab.expenses') },
     ];
     if (isAdmin) {
@@ -144,6 +144,11 @@ export function GlobalSupplyInternalManagementPage() {
     }
     return rows;
   }, [canStaffHub, isAdmin, t]);
+
+  const openExpenseZeroHint =
+    openExpenseZeroAmountCount > 0
+      ? t('internal.globalSupply.expensesZeroAmountHint', { count: openExpenseZeroAmountCount })
+      : '';
 
   return (
     <div className="page">
@@ -165,8 +170,8 @@ export function GlobalSupplyInternalManagementPage() {
             {label}
             {id === 'expenses' && openExpenseZeroAmountCount > 0 ? (
               <span
-                aria-label={`${openExpenseZeroAmountCount} Expenses have zero amount`}
-                title={`${openExpenseZeroAmountCount} Expenses have zero amount`}
+                aria-label={openExpenseZeroHint}
+                title={openExpenseZeroHint}
                 style={{
                   marginLeft: 8,
                   display: 'inline-flex',
@@ -212,11 +217,11 @@ export function GlobalSupplyInternalManagementPage() {
             }}
           >
             <MetricCard
-              title="Open POs"
+              title={t('internal.kpi.openPos')}
               value={openPoCount == null ? '—' : openPoCount}
             />
             <MetricCard
-              title="Open PO Value"
+              title={t('internal.kpi.openPoValue')}
               value={
                 openPoValue == null
                   ? '—'
@@ -252,7 +257,7 @@ export function GlobalSupplyInternalManagementPage() {
       {tab === 'orgChart' && canStaffHub && (
         <InternalManagementOrgChart
           token={token}
-          viewerDisplayName={user?.name?.trim() || user?.email || 'You'}
+          viewerDisplayName={user?.name?.trim() || user?.email || t('internal.orgChart.you')}
           variant="globalSupply"
           employeeProfilePathPrefix="/global-vendors/employee-profile"
         />

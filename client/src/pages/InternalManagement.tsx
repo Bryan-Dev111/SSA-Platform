@@ -556,7 +556,7 @@ export function InternalManagement() {
     e.preventDefault();
     if (!token || !name.trim()) return;
     if (file && file.size > 8 * 1024 * 1024) {
-      toast.error('File must be 8MB or smaller');
+      toast.error(t('toast.fileTooLarge8mb'));
       return;
     }
     setSubmitting(true);
@@ -609,7 +609,7 @@ export function InternalManagement() {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadProgress(null);
-      toast.success('Saved');
+      toast.success(t('toast.saved'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -622,14 +622,14 @@ export function InternalManagement() {
   const submitSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !scheduleForm.supplierId.trim() || !scheduleForm.scheduledDate.trim()) {
-      toast.error('Supplier and scheduled date are required');
+      toast.error(t('internal.toast.supplierAndDateRequired'));
       return;
     }
     let qty: number | null = null;
     if (scheduleForm.qty.trim() !== '') {
       const n = Number(scheduleForm.qty);
       if (!Number.isFinite(n) || n < 0) {
-        toast.error('Qty must be a non-negative number');
+        toast.error(t('internal.toast.qtyNonNegative'));
         return;
       }
       qty = Math.floor(n);
@@ -648,7 +648,7 @@ export function InternalManagement() {
           notes: scheduleForm.notes.trim() || null,
         }),
       });
-      toast.success('Schedule row added');
+      toast.success(t('internal.toast.scheduleRowAdded'));
       setScheduleForm({
         supplierId: '',
         purchaseOrder: '',
@@ -671,7 +671,7 @@ export function InternalManagement() {
     setScheduleBusyId(id);
     try {
       await apiJson(`/shipment-schedule/${id}`, { token, method: 'DELETE' });
-      toast.success('Removed');
+      toast.success(t('toast.removed'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -686,7 +686,7 @@ export function InternalManagement() {
     setDeletingId(id);
     try {
       await apiJson(`/internal-docs/${id}`, { token, method: 'DELETE' });
-      toast.success('Deleted');
+      toast.success(t('toast.deleted'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -697,7 +697,7 @@ export function InternalManagement() {
 
   const download = async (r: InternalRow) => {
     if (!token || !r.filePath) {
-      toast.error('No file attached');
+      toast.error(t('toast.noFileAttached'));
       return;
     }
     try {
@@ -705,7 +705,7 @@ export function InternalManagement() {
       await downloadWithAuthProgress(`/internal-docs/${r.id}/download`, token, r.name, (p) => {
         setDownloading((prev) => ({ ...prev, [r.id]: p }));
       });
-      toast.success('Download completed');
+      toast.success(t('toast.downloadCompleted'));
     } catch (e) {
       toast.error(parseApiError(e));
     } finally {
@@ -735,7 +735,7 @@ export function InternalManagement() {
           projectHistoryId: newAudit.projectHistoryId.trim() || null,
         }),
       });
-      toast.success(`Audit ${created.code} created`);
+      toast.success(t('internal.toast.auditCreated', { code: created.code }));
       setNewAudit({
         supplierId: '',
         auditDate: '',
@@ -773,7 +773,7 @@ export function InternalManagement() {
   const submitProjectHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !clientForm.clientName.trim() || !clientForm.companyName.trim()) {
-      toast.error('Client name and company name are required');
+      toast.error(t('internal.toast.clientAndCompanyRequired'));
       return;
     }
     setProjectSubmitting(true);
@@ -797,7 +797,7 @@ export function InternalManagement() {
             supplierId: clientForm.supplierId.trim() || null,
           }),
         });
-        toast.success('Project history updated');
+        toast.success(t('internal.toast.projectHistoryUpdated'));
       } else {
         await apiJson('/project-history', {
           token,
@@ -817,7 +817,7 @@ export function InternalManagement() {
             supplierId: clientForm.supplierId.trim() || null,
           }),
         });
-        toast.success('Project history added');
+        toast.success(t('internal.toast.projectHistoryAdded'));
       }
       resetProjectForm();
       loadProjectHistories();
@@ -852,7 +852,7 @@ export function InternalManagement() {
     setProjectBusyId(id);
     try {
       await apiJson(`/project-history/${id}`, { token, method: 'DELETE' });
-      toast.success('Removed');
+      toast.success(t('toast.removed'));
       if (projectEditingId === id) resetProjectForm();
       loadProjectHistories();
       loadProfit();
@@ -866,7 +866,7 @@ export function InternalManagement() {
   const uploadProjectAttachment = async (projectHistoryId: string, fileToUpload: File | null) => {
     if (!token || !fileToUpload) return;
     if (fileToUpload.size > 8 * 1024 * 1024) {
-      toast.error('File must be 8MB or smaller');
+      toast.error(t('toast.fileTooLarge8mb'));
       return;
     }
     setProjectAttachmentBusyId(projectHistoryId);
@@ -893,7 +893,7 @@ export function InternalManagement() {
           projectHistoryId,
         }),
       });
-      toast.success('Attachment added');
+      toast.success(t('internal.toast.attachmentAdded'));
       load();
     } catch (e) {
       toast.error(parseApiError(e));
@@ -910,12 +910,12 @@ export function InternalManagement() {
         <table className="table">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Company</th>
-              <th>Revenue</th>
-              <th>Deduction</th>
-              <th>Amount</th>
-              <th>Profit</th>
+              <th>{t('table.col.project')}</th>
+              <th>{t('table.col.company')}</th>
+              <th>{t('table.col.revenue')}</th>
+              <th>{t('table.col.deduction')}</th>
+              <th>{t('table.col.amount')}</th>
+              <th>{t('table.col.profit')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1010,7 +1010,7 @@ export function InternalManagement() {
       {tab === 'orgChart' && (
         <InternalManagementOrgChart
           token={token}
-          viewerDisplayName={user?.name?.trim() || user?.email || 'You'}
+          viewerDisplayName={user?.name?.trim() || user?.email || t('internal.orgChart.you')}
           employeeProfilePathPrefix="/internal-management/employee-profile"
         />
       )}
@@ -1020,7 +1020,7 @@ export function InternalManagement() {
       {tab === 'audits' && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div className="card-body">
-            <h2 style={{ marginTop: 0 }}>Schedule new audit</h2>
+            <h2 style={{ marginTop: 0 }}>{t('internal.scheduleAudit.title')}</h2>
             <form onSubmit={submitAudit}>
               <div
                 style={{
@@ -1031,7 +1031,7 @@ export function InternalManagement() {
                 }}
               >
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Supplier *</label>
+                  <label className="input-label">{t('internal.scheduleAudit.supplier')}</label>
                   <select
                     className="input"
                     value={newAudit.supplierId}
@@ -1044,7 +1044,7 @@ export function InternalManagement() {
                     }
                     required
                   >
-                    <option value="">Select</option>
+                    <option value="">{t('internal.scheduleAudit.select')}</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.code}: {s.name}
@@ -1053,7 +1053,7 @@ export function InternalManagement() {
                   </select>
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Audit date *</label>
+                  <label className="input-label">{t('internal.scheduleAudit.date')}</label>
                   <input
                     type="date"
                     className="input"
@@ -1063,29 +1063,29 @@ export function InternalManagement() {
                   />
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Audit type</label>
+                  <label className="input-label">{t('internal.scheduleAudit.auditType')}</label>
                   <select
                     className="input"
                     value={newAudit.auditTypeId}
                     onChange={(e) => setNewAudit((p) => ({ ...p, auditTypeId: e.target.value }))}
                   >
-                    <option value="">—</option>
-                    {auditTypes.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.code}
-                        {t.name ? ` — ${t.name}` : ''}
+                    <option value="">{t('internal.scheduleAudit.dash')}</option>
+                    {auditTypes.map((at) => (
+                      <option key={at.id} value={at.id}>
+                        {at.code}
+                        {at.name ? ` — ${at.name}` : ''}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Project</label>
+                  <label className="input-label">{t('internal.scheduleAudit.project')}</label>
                   <select
                     className="input"
                     value={newAudit.projectHistoryId}
                     onChange={(e) => setNewAudit((p) => ({ ...p, projectHistoryId: e.target.value }))}
                   >
-                    <option value="">None</option>
+                    <option value="">{t('internal.scheduleAudit.none')}</option>
                     {projectsForNewAudit.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.projectCode} — {p.companyName}
@@ -1094,13 +1094,13 @@ export function InternalManagement() {
                   </select>
                 </div>
                 <div className="input-group" style={{ marginBottom: 0 }}>
-                  <label className="input-label">Auditor</label>
+                  <label className="input-label">{t('internal.scheduleAudit.auditor')}</label>
                   <select
                     className="input"
                     value={newAudit.auditor}
                     onChange={(e) => setNewAudit((p) => ({ ...p, auditor: e.target.value }))}
                   >
-                    <option value="">—</option>
+                    <option value="">{t('internal.scheduleAudit.dash')}</option>
                     {auditAuditors.map((a) => (
                       <option key={a.id} value={a.name}>
                         {a.name}
@@ -1110,25 +1110,25 @@ export function InternalManagement() {
                 </div>
               </div>
               <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                <label className="input-label">Summary</label>
+                <label className="input-label">{t('internal.scheduleAudit.summary')}</label>
                 <input
                   className="input"
                   value={newAudit.summary}
                   onChange={(e) => setNewAudit((p) => ({ ...p, summary: e.target.value }))}
-                  placeholder="Optional"
+                  placeholder={t('internal.scheduleAudit.optionalPlaceholder')}
                 />
               </div>
               <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                <label className="input-label">Scope</label>
+                <label className="input-label">{t('internal.scheduleAudit.scope')}</label>
                 <input
                   className="input"
                   value={newAudit.scope}
                   onChange={(e) => setNewAudit((p) => ({ ...p, scope: e.target.value }))}
-                  placeholder="Optional"
+                  placeholder={t('internal.scheduleAudit.optionalPlaceholder')}
                 />
               </div>
               <button type="submit" className="btn btn-primary" disabled={submittingAudit}>
-                {submittingAudit ? 'Creating…' : 'Create audit'}
+                {submittingAudit ? t('internal.scheduleAudit.creating') : t('internal.scheduleAudit.create')}
               </button>
             </form>
           </div>
@@ -1232,42 +1232,42 @@ export function InternalManagement() {
                     <thead>
                       <tr>
                         <SortableTh
-                          label="Supplier"
+                          label={t('findings.col.supplier')}
                           columnKey="supplier"
                           activeKey={shipmentSort.key}
                           dir={shipmentSort.dir}
                           onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
-                          label="PO"
+                          label={t('shipments.col.po')}
                           columnKey="po"
                           activeKey={shipmentSort.key}
                           dir={shipmentSort.dir}
                           onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
-                          label="Part #"
+                          label={t('shipments.col.partNumber')}
                           columnKey="part"
                           activeKey={shipmentSort.key}
                           dir={shipmentSort.dir}
                           onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
-                          label="Qty"
+                          label={t('shipments.col.quantity')}
                           columnKey="qty"
                           activeKey={shipmentSort.key}
                           dir={shipmentSort.dir}
                           onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
-                          label="Scheduled"
+                          label={t('internal.scheduleCol.scheduled')}
                           columnKey="scheduled"
                           activeKey={shipmentSort.key}
                           dir={shipmentSort.dir}
                           onSort={(col) => setShipmentSort((p) => toggleSort(p, col))}
                         />
                         <SortableTh
-                          label="Notes"
+                          label={t('shipments.col.notes')}
                           columnKey="notes"
                           activeKey={shipmentSort.key}
                           dir={shipmentSort.dir}
@@ -1417,20 +1417,20 @@ export function InternalManagement() {
 
           <div className="card">
             <div className="card-body">
-              <h2 style={{ marginTop: 0 }}>Library</h2>
+              <h2 style={{ marginTop: 0 }}>{t('documents.libraryTitle')}</h2>
               <div className="table-wrap">
                 {loading ? (
-                  <p className="table-empty">Loading…</p>
+                  <p className="table-empty">{t('common.loading')}</p>
                 ) : rows.length === 0 ? (
-                  <p className="table-empty">No internal documents.</p>
+                  <p className="table-empty">{t('internal.documents.empty')}</p>
                 ) : (
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Note</th>
-                        <th>View</th>
-                        <th>Updated</th>
+                        <th>{t('table.col.name')}</th>
+                        <th>{t('table.col.note')}</th>
+                        <th>{t('table.col.view')}</th>
+                        <th>{t('table.col.updated')}</th>
                         <th />
                       </tr>
                     </thead>
@@ -1781,7 +1781,7 @@ export function InternalManagement() {
                           dir={projectTableSort.dir}
                           onSort={(col) => setProjectTableSort((p) => toggleSort(p, col))}
                         />
-                        <th>Attachments</th>
+                        <th>{t('table.col.attachments')}</th>
                         <th />
                       </tr>
                     </thead>
