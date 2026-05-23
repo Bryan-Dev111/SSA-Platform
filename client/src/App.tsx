@@ -5,6 +5,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DatabaseConnectionProvider } from './context/DatabaseConnectionContext';
+import { DatabaseDisconnectedGate } from './components/DatabaseDisconnectedGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { getDefaultPath } from './config/rolePageAccess';
@@ -36,7 +38,6 @@ import { FarmersInformationPage } from './pages/globalVendors/FarmersInformation
 import { ApprovedFarmersPage } from './pages/globalVendors/ApprovedFarmersPage';
 import { GlobalVendorsAdmin } from './pages/globalVendors/GlobalVendorsAdmin';
 import { FarmsMapPage } from './pages/globalVendors/FarmsMapPage';
-import { GlobalSupplyRiskIntelligencePage } from './pages/globalVendors/GlobalSupplyRiskIntelligencePage';
 import { RelationshipTrustPage } from './pages/globalVendors/RelationshipTrustPage';
 import { SamplesPage } from './pages/globalVendors/SamplesPage';
 import { LogisticsPage } from './pages/globalVendors/LogisticsPage';
@@ -47,6 +48,7 @@ import { GlobalFarmProfilePage } from './pages/globalVendors/FarmSectionMediaPag
 import { GlobalSupplyInternalManagementPage } from './pages/globalVendors/GlobalSupplyInternalManagementPage';
 import { GlobalEmployeeProfilePage } from './pages/globalVendors/GlobalEmployeeProfilePage';
 import { BuyerRelationshipsPage } from './pages/globalVendors/BuyerRelationshipsPage';
+import { DatabaseConnectionPage } from './pages/globalVendors/DatabaseConnectionPage';
 
 function RedirectToDefault() {
   const { user } = useAuth();
@@ -59,6 +61,7 @@ function App() {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
+          <DatabaseConnectionProvider>
           <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/request-access" element={<RequestAccess />} />
@@ -80,6 +83,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route element={<DatabaseDisconnectedGate />}>
             <Route index element={<RedirectToDefault />} />
             <Route path="dashboard" element={<ProtectedRoute path="/dashboard"><Dashboard /></ProtectedRoute>} />
             <Route path="risk" element={<ProtectedRoute path="/risk"><Risk /></ProtectedRoute>} />
@@ -134,10 +138,10 @@ function App() {
                 }
               />
               <Route
-                path="risk-intelligence"
+                path="database"
                 element={
-                  <ProtectedRoute path="/global-vendors/risk-intelligence">
-                    <GlobalSupplyRiskIntelligencePage />
+                  <ProtectedRoute path="/global-vendors/database">
+                    <DatabaseConnectionPage />
                   </ProtectedRoute>
                 }
               />
@@ -262,9 +266,11 @@ function App() {
                 }
               />
             </Route>
+            </Route>
           </Route>
           <Route path="*" element={<RedirectToDefault />} />
         </Routes>
+          </DatabaseConnectionProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

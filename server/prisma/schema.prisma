@@ -50,6 +50,8 @@ model User {
   /// Global Supply Internal Management — Employee Assignments roster (editable by Admin).
   employmentResponsibilities String?
   employmentNotes            String?
+  commodityTypeId            String?
+  commodityType              CommodityType? @relation(fields: [commodityTypeId], references: [id])
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   userRoles    UserRole[]
@@ -150,6 +152,7 @@ model CommodityType {
   id        String    @id @default(cuid())
   name      String
   suppliers Supplier[]
+  users     User[]
 }
 
 // Admin-managed list; Finding.defectCode / CAR.defectCode store the chosen code string.

@@ -27,7 +27,7 @@ interface GlobalSupplyStats {
 
 export function GlobalVendorsAdmin() {
   const { token } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('users');
   const [stats, setStats] = useState<GlobalSupplyStats | null>(null);
@@ -50,7 +50,7 @@ export function GlobalVendorsAdmin() {
   }, [loadStats]);
 
   return (
-    <div className="page">
+    <div className="page" key={language}>
       <header className="page-header">
         <h1 className="page-title">{t('admin.title')}</h1>
       </header>

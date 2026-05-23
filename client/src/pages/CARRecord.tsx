@@ -1048,14 +1048,13 @@ export function CARRecord() {
                 disabled={!canEdit}
               />
               <div className="input-group">
-                <label className="input-label">Occurrence details (narrative)</label>
+                <label className="input-label">Occurrence Root Cause</label>
                 <textarea
                   className="input"
                   rows={2}
                   value={form.occurrenceRootCause}
                   onChange={(e) => setForm((p) => ({ ...p, occurrenceRootCause: e.target.value }))}
                   disabled={!canEdit}
-                  placeholder="Why it occurred — free text; use Root cause code above for trending."
                 />
               </div>
               <div className="input-group">
@@ -1071,7 +1070,7 @@ export function CARRecord() {
                 <textarea className="input" rows={2} value={form.verificationOfEffectiveness} onChange={(e) => setForm((p) => ({ ...p, verificationOfEffectiveness: e.target.value }))} disabled={!canEdit} />
               </div>
               <div className="input-group">
-                <label className="input-label">Disposition Comments</label>
+                <label className="input-label">Closing Comments</label>
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
               </div>
               <div style={{ marginTop: '1rem' }}>

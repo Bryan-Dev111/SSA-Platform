@@ -417,16 +417,17 @@ export function Findings() {
         <div className="card">
           <div className="card-body">
             <h2 style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: 'var(--text-lg)' }}>{t('findings.topDefectCodes')}</h2>
-            <div
-              style={{
-                marginBottom: '0.5rem',
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-text-muted)',
-                minHeight: '1.1rem',
-              }}
-            >
-              {activeDefectCode ? t('findings.defectSelected', { code: activeDefectCode }) : t('findings.defectHint')}
-            </div>
+            {activeDefectCode ? (
+              <div
+                style={{
+                  marginBottom: '0.5rem',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                {t('findings.defectSelected', { code: activeDefectCode })}
+              </div>
+            ) : null}
             {topDefectCodes.length === 0 ? (
               <p className="table-empty">{t('findings.noDefectCodes')}</p>
             ) : (

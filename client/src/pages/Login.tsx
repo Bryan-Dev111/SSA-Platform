@@ -9,9 +9,12 @@ import { useLanguage } from '../context/LanguageContext';
 import { LoginBrandedShell } from '../components/LoginBrandedShell';
 import { LanguageFlagSelector } from '../components/LanguageFlagSelector';
 import { apiJson } from '../api/client';
+import { isSuperUserEmail } from '../config/superUser';
+import { useDatabaseConnection } from '../context/DatabaseConnectionContext';
 
 export function Login() {
   const { user, token, login, loading } = useAuth();
+  const { connected: dbConnected, loading: dbLoading } = useDatabaseConnection();
   const toast = useToast();
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
@@ -38,6 +41,9 @@ export function Login() {
   }
 
   if (token && user) {
+    if (isSuperUserEmail(user.email) && !dbLoading && !dbConnected) {
+      return <Navigate to="/global-vendors/database" replace />;
+    }
     return <Navigate to="/product-hub" replace />;
   }
 

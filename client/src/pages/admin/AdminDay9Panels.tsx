@@ -1414,6 +1414,9 @@ interface UserRow {
   hourlyRate?: number | null;
   currency?: string | null;
   country?: string | null;
+  employmentNotes?: string | null;
+  commodityTypeId?: string | null;
+  commodityType?: { id: string; name: string } | null;
   roleNames: string[];
   passwordPlain: string | null;
   assignedSupplierIds: string[];
@@ -1526,13 +1529,24 @@ const ROLES_EXCLUDED_FROM_GLOBAL_SUPPLY_DROPDOWN = new Set([
   'QualityManager',
 ]);
 
-function formatUserRoleLabel(roleName: string): string {
-  if (roleName === 'QualityEngineer') return 'Quality Engineer';
-  if (roleName === 'QualityManager') return 'Quality Manager';
-  if (roleName === 'CommodityBuyer') return 'Commodity Buyer';
-  if (roleName === 'SourcingDirector') return 'Sourcing Director';
-  if (roleName === 'Farmer') return 'Farmer';
-  return roleName;
+function formatUserRoleLabel(
+  roleName: string,
+  t: (key: string, fallbackOrOptions?: string) => string
+): string {
+  const keyByRole: Record<string, string> = {
+    QualityEngineer: 'admin.roles.qualityEngineer',
+    QualityManager: 'admin.roles.qualityManager',
+    CommodityBuyer: 'admin.roles.commodityBuyer',
+    SourcingDirector: 'admin.roles.sourcingDirector',
+    Farmer: 'admin.roles.farmer',
+    Admin: 'admin.roles.admin',
+    Buyer: 'admin.roles.buyer',
+    Supplier: 'admin.roles.supplier',
+    Auditor: 'admin.roles.auditor',
+    Inspector: 'admin.roles.inspector',
+  };
+  const key = keyByRole[roleName];
+  return key ? t(key) : roleName;
 }
 
 /** Buyer dropdown / tables: show profile name and login email (username). */
@@ -1619,37 +1633,45 @@ export function AdminBuyersSuppliersPanel({
   const [delSup, setDelSup] = useState<SupplierRow | null>(null);
   const [delUser, setDelUser] = useState<UserRow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [usersLoadError, setUsersLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
+    setUsersLoadError(null);
     try {
       const usersUrl = globalSupplyUsersMode ? '/users' : '/users?scope=sentinel';
-      const matrixUrl = globalSupplyUsersMode ? '/users/permission-matrix' : '/users/permission-matrix?scope=sentinel';
-      const [u, pm] = await Promise.all([
-        apiJson<UserRow[]>(usersUrl, { token }),
-        apiJson<PermissionMatrixResponse>(matrixUrl, { token }).catch(() => null),
-      ]);
+      const matrixUrl = globalSupplyUsersMode
+        ? '/users/permission-matrix?scope=globalVendors'
+        : '/users/permission-matrix?scope=sentinel';
+      const u = await apiJson<UserRow[]>(usersUrl, { token });
       setUsers(u);
+      const pm = await apiJson<PermissionMatrixResponse>(matrixUrl, { token }).catch(() => null);
       if (pm) {
         setAvailableRoles(pm.roles ?? []);
       } else {
         setAvailableRoles([...USER_ROLE_OPTIONS]);
       }
-      if (showBuyerSupplierSections) {
-        const [s, ct] = await Promise.all([
-          apiJson<SupplierRow[]>('/suppliers?includeInactive=true', { token }),
-          apiJson<{ list: CommodityTypeRow[] }>('/commodity-types', { token }).catch(() => ({ list: [] as CommodityTypeRow[] })),
-        ]);
-        setSuppliers(s);
+      if (showBuyerSupplierSections || usersOnlyEmployees) {
+        const ct = await apiJson<{ list: CommodityTypeRow[] }>('/commodity-types', { token }).catch(() => ({
+          list: [] as CommodityTypeRow[],
+        }));
         setCommodityTypes(ct.list);
       } else {
-        setSuppliers([]);
         setCommodityTypes([]);
       }
-    } catch {
-      toast.error(t('admin.users.loadFailed'));
+      if (showBuyerSupplierSections) {
+        const s = await apiJson<SupplierRow[]>('/suppliers?includeInactive=true', { token });
+        setSuppliers(s);
+      } else {
+        setSuppliers([]);
+      }
+    } catch (e) {
+      setUsers([]);
+      const detail = e instanceof Error ? e.message.trim() : '';
+      setUsersLoadError(detail || t('admin.users.loadFailed'));
+      toast.error(detail || t('admin.users.loadFailed'));
     }
-  }, [token, toast, showBuyerSupplierSections, globalSupplyUsersMode, t]);
+  }, [token, toast, showBuyerSupplierSections, usersOnlyEmployees, globalSupplyUsersMode, t]);
 
   useEffect(() => {
     load();
@@ -1743,7 +1765,7 @@ export function AdminBuyersSuppliersPanel({
 
   const userTableColSpan = useMemo(() => {
     if (globalSupplyUsersMode) return 7;
-    if (usersOnlyEmployees) return 8;
+    if (usersOnlyEmployees) return 10;
     return 6;
   }, [globalSupplyUsersMode, usersOnlyEmployees]);
   const [userSort, setUserSort] = useState<{ key: UserTableSortKey | null; dir: SortDir }>({
@@ -1756,7 +1778,7 @@ export function AdminBuyersSuppliersPanel({
     if (!key) return rows;
     const employeeLabel = (u: UserRow) =>
       u.isContractor ? t('admin.users.contractor') : u.isEmployee ? t('common.yes') : t('common.no');
-    const roleLabel = (u: UserRow) => u.roleNames.map(formatUserRoleLabel).join(', ');
+    const roleLabel = (u: UserRow) => u.roleNames.map((r) => formatUserRoleLabel(r, t)).join(', ');
     const countryLabel = (u: UserRow) => (u.country ?? '').trim();
     rows.sort((a, b) => {
       if (key === 'name') return cmpStr(a.name?.trim() || '', b.name?.trim() || '', userSort.dir);
@@ -1978,6 +2000,8 @@ export function AdminBuyersSuppliersPanel({
               ? 'USD'
               : null,
           country: editUser.country?.trim() || null,
+          employmentNotes: editUser.employmentNotes?.trim() || null,
+          commodityTypeId: editUser.commodityTypeId?.trim() || null,
           roleNames: editUser.roleNames,
           ...(editUserPassword.trim() ? { password: editUserPassword } : {}),
         }),
@@ -2069,7 +2093,7 @@ export function AdminBuyersSuppliersPanel({
                 <select className="input" value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}>
                   {(globalSupplyUsersMode ? globalSupplyCreateRoleOptions : availableRoleOptions).map((r) => (
                     <option key={r} value={r}>
-                      {formatUserRoleLabel(r)}
+                      {formatUserRoleLabel(r, t)}
                     </option>
                   ))}
                 </select>
@@ -2498,6 +2522,8 @@ export function AdminBuyersSuppliersPanel({
                         dir={userSort.dir}
                         onSort={(col) => setUserSort((prev) => toggleSort(prev, col as UserTableSortKey))}
                       />
+                      <th>{t('admin.users.colNotes')}</th>
+                      <th>{t('admin.users.colCommodity')}</th>
                     </>
                   ) : (
                     <>
@@ -2515,7 +2541,15 @@ export function AdminBuyersSuppliersPanel({
                 </tr>
               </thead>
               <tbody>
-                {sortedVisibleUsers.length === 0 ? (
+                {usersLoadError ? (
+                  <tr>
+                    <td colSpan={userTableColSpan}>
+                      <div className="alert-error" role="alert" style={{ margin: 0 }}>
+                        {usersLoadError}
+                      </div>
+                    </td>
+                  </tr>
+                ) : sortedVisibleUsers.length === 0 ? (
                   <tr>
                     <td colSpan={userTableColSpan} className="table-empty">
                       {t('admin.users.noUsers')}
@@ -2544,12 +2578,12 @@ export function AdminBuyersSuppliersPanel({
                             >
                               {roleOptionsForUserTable.map((r) => (
                                 <option key={r} value={r}>
-                                  {formatUserRoleLabel(r)}
+                                  {formatUserRoleLabel(r, t)}
                                 </option>
                               ))}
                             </select>
                           ) : (
-                            u.roleNames.map(formatUserRoleLabel).join(', ')
+                            u.roleNames.map((r) => formatUserRoleLabel(r, t)).join(', ')
                           )}
                         </td>
                       ) : null}
@@ -2612,12 +2646,12 @@ export function AdminBuyersSuppliersPanel({
                               >
                                 {roleOptionsForUserTable.map((r) => (
                                   <option key={r} value={r}>
-                                    {formatUserRoleLabel(r)}
+                                    {formatUserRoleLabel(r, t)}
                                   </option>
                                 ))}
                               </select>
                             ) : (
-                              u.roleNames.map(formatUserRoleLabel).join(', ')
+                              u.roleNames.map((r) => formatUserRoleLabel(r, t)).join(', ')
                             )}
                           </td>
                           <td
@@ -2686,6 +2720,38 @@ export function AdminBuyersSuppliersPanel({
                               u.country ?? '—'
                             )}
                           </td>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <textarea
+                                className="input"
+                                rows={2}
+                                value={editUser.employmentNotes ?? ''}
+                                onChange={(e) => setEditUser({ ...editUser, employmentNotes: e.target.value })}
+                              />
+                            ) : (
+                              u.employmentNotes?.trim() || '—'
+                            )}
+                          </td>
+                          <td>
+                            {editUser?.id === u.id ? (
+                              <select
+                                className="input"
+                                value={editUser.commodityTypeId ?? ''}
+                                onChange={(e) =>
+                                  setEditUser({ ...editUser, commodityTypeId: e.target.value || null })
+                                }
+                              >
+                                <option value="">{t('admin.users.commodityNone')}</option>
+                                {commodityTypes.map((ct) => (
+                                  <option key={ct.id} value={ct.id}>
+                                    {ct.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              u.commodityType?.name ?? '—'
+                            )}
+                          </td>
                         </>
                       ) : (
                         <>
@@ -2720,12 +2786,12 @@ export function AdminBuyersSuppliersPanel({
                               >
                                 {roleOptionsForUserTable.map((r) => (
                                   <option key={r} value={r}>
-                                    {formatUserRoleLabel(r)}
+                                    {formatUserRoleLabel(r, t)}
                                   </option>
                                 ))}
                               </select>
                             ) : (
-                              u.roleNames.map(formatUserRoleLabel).join(', ')
+                              u.roleNames.map((r) => formatUserRoleLabel(r, t)).join(', ')
                             )}
                           </td>
                         </>
@@ -3173,7 +3239,7 @@ export function AdminPermissionsPanel({
                     roleRow.userCount === 0;
                   return (
                     <tr key={roleRow.id || roleName}>
-                      <td style={{ fontWeight: 600 }}>{formatUserRoleLabel(roleName)}</td>
+                      <td style={{ fontWeight: 600 }}>{formatUserRoleLabel(roleName, t)}</td>
                       {matrixPages.map((p) => (
                         <td key={`${roleName}-${p.key}`}>
                           <input

@@ -12,6 +12,8 @@ export interface AuthUser {
   pathRoles?: Record<string, string[]>;
   supplierId?: string;
   buyerId?: string;
+  /** Static Super account (not in database). */
+  isSuper?: boolean;
 }
 
 interface AuthState {

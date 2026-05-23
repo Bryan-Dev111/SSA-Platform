@@ -24,6 +24,12 @@ export function errorHandler(
     message = 'Database is temporarily unavailable. Please try again shortly.';
   }
 
+  if (errObj.code === 'P2022' || /column.*does not exist/i.test(message)) {
+    status = 500;
+    message =
+      'Database schema is out of date. Run `npx prisma migrate deploy` in the server folder, then restart the API.';
+  }
+
   // Avoid noisy stack traces when DB is temporarily unreachable.
   if (status >= 500 && status !== 503) {
     console.error('API error:', err);

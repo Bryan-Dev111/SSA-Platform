@@ -10,7 +10,7 @@ export const PATH_ROLES: Record<string, string[]> = {
   '/global-vendors': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/dashboard': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/farm-dashboard': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  '/global-vendors/risk-intelligence': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
+  '/global-vendors/database': ['Super'],
   '/global-vendors/farmers': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/farm-profile': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   '/global-vendors/approved': ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
@@ -80,7 +80,6 @@ const SIDEBAR_PATH_ORDER = [
   '/suppliers-map',
   '/global-vendors/dashboard',
   '/global-vendors/farm-dashboard',
-  '/global-vendors/risk-intelligence',
   '/global-vendors/farmers',
   '/global-vendors/approved',
   '/global-vendors/map',
@@ -122,6 +121,9 @@ export function getDefaultPath(roleNames: string[]): string {
 export function canAccessPath(pathname: string, roleNames: string[]): boolean {
   const path = pathname.replace(/\/$/, '') || '/';
   if (path === NO_ACCESS_PATH) return true;
+  if (roleNames.includes('Super') && path !== '/global-vendors/database') {
+    return true;
+  }
   if (path.startsWith('/global-vendors/employee-profile/')) {
     const allowed = runtimePathRoles['/global-vendors/employee-profile'];
     if (!allowed?.length) return false;

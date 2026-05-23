@@ -1,6 +1,8 @@
 /**
  * API client: base URL, attach Bearer token, handle 401
  */
+import { handleApiResponseDisconnected, parseApiErrorBody } from './databaseDisconnected';
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 function resolveClientLocale(): string {
@@ -29,12 +31,24 @@ export async function apiFetch(
   if (res.status === 401 && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('auth:logout'));
   }
+  if (typeof window !== 'undefined') {
+    void handleApiResponseDisconnected(res);
+  }
   return res;
 }
 
 export async function apiJson<T>(path: string, options?: RequestInit & { token?: string | null }): Promise<T> {
   const res = await apiFetch(path, options);
   const text = await res.text();
-  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const parsed = parseApiErrorBody(text);
+    if (parsed?.error) throw new Error(parsed.error);
+    if (text.includes('Cannot POST') || text.includes('Cannot GET') || text.includes('<!DOCTYPE')) {
+      throw new Error(
+        `API route not found (${path}). Restart the API server (npm run dev in the server folder) and try again.`
+      );
+    }
+    throw new Error(text || `HTTP ${res.status}`);
+  }
   return text ? (JSON.parse(text) as T) : ({} as T);
 }

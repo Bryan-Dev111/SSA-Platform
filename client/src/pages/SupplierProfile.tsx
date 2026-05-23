@@ -11,13 +11,15 @@ import { parseApiError } from '../utils/apiHelpers';
 import { downloadTableXlsx, type ExportRow } from '../utils/exportExcel';
 import { MetricCard } from '../components/MetricCard';
 import { MonthlyTrendsLineChart, type MonthlyTrendRow } from '../components/MonthlyTrendsLineChart';
+import { SortableTh } from '../components/SortableTh';
 import { Link, useSearchParams } from 'react-router-dom';
+import { formatProfileTableDate } from '../utils/formatDisplayDates';
+import { cmpNum, cmpStr, toggleSort, type SortDir } from '../utils/tableSort';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const MAX_RECORD_UPLOAD_BYTES = 75 * 1024 * 1024;
 
 /** Shipment row status for supplier-facing table (matches Records-style labels). */
-/** Replace demo seed names like "Buyer User" in UI labels. */
 function normalizeUserDisplayText(s: string): string {
   return s.replace(/\bBuyer User\b/g, 'Buyer').trim();
 }
@@ -120,7 +122,7 @@ interface WeeklyRiskPoint {
 
 export function SupplierProfile() {
   const { token, user } = useAuth();
-  const { t, locale } = useLanguage();
+  const { t, language } = useLanguage();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const supplierIdFromUrl = searchParams.get('supplierId');
@@ -142,6 +144,11 @@ export function SupplierProfile() {
   const [shipDate, setShipDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [carSummaryModal, setCarSummaryModal] = useState<{ code: string; summary: string } | null>(null);
+  const [shipmentSort, setShipmentSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [recordSort, setRecordSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [auditSort, setAuditSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [findingSort, setFindingSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  const [carSort, setCarSort] = useState<{ key: string | null; dir: SortDir }>({ key: null, dir: 'asc' });
 
   const isSupplier = user?.roleNames?.includes('Supplier');
   const roleNames = user?.roleNames ?? [];
@@ -221,7 +228,7 @@ export function SupplierProfile() {
       return;
     }
     const supplierId = data.supplier.id;
-    const t = window.setTimeout(() => {
+    const debounceId = window.setTimeout(() => {
       setShipPartLoading(true);
       const q = new URLSearchParams({ supplierId, purchaseOrder: po });
       apiJson<string[]>(`/shipments/schedule-parts?${q.toString()}`, { token })
@@ -235,7 +242,7 @@ export function SupplierProfile() {
         })
         .finally(() => setShipPartLoading(false));
     }, 400);
-    return () => window.clearTimeout(t);
+    return () => window.clearTimeout(debounceId);
   }, [isSupplier, isAdmin, data?.supplier?.id, shipPo, token]);
 
   const refresh = () => {
@@ -267,17 +274,143 @@ export function SupplierProfile() {
     return buildWeeklyRiskSeries(data.riskSnapshots);
   }, [data?.riskSnapshots]);
 
+  const sortedShipments = useMemo(() => {
+    const rows = data?.shipments ?? [];
+    const key = shipmentSort.key;
+    if (!key) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      switch (key) {
+        case 'code':
+          return cmpStr(a.code ?? '', b.code ?? '', shipmentSort.dir);
+        case 'po':
+          return cmpStr(a.purchaseOrder ?? '', b.purchaseOrder ?? '', shipmentSort.dir);
+        case 'partNumber':
+          return cmpStr(a.partNumber ?? '', b.partNumber ?? '', shipmentSort.dir);
+        case 'qty':
+          return cmpNum(a.qty ?? 0, b.qty ?? 0, shipmentSort.dir);
+        case 'lot':
+          return cmpStr(a.lot ?? '', b.lot ?? '', shipmentSort.dir);
+        case 'inspectionDate':
+          return cmpStr(a.inspectionDate ?? '', b.inspectionDate ?? '', shipmentSort.dir);
+        case 'createdBy':
+          return cmpStr(a.createdBy ?? '', b.createdBy ?? '', shipmentSort.dir);
+        case 'createdAt':
+          return cmpStr(a.createdAt, b.createdAt, shipmentSort.dir);
+        case 'status':
+          return cmpStr(a.status, b.status, shipmentSort.dir);
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [data?.shipments, shipmentSort]);
+
+  const sortedRecords = useMemo(() => {
+    const rows = data?.records ?? [];
+    const key = recordSort.key;
+    if (!key) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      switch (key) {
+        case 'name':
+          return cmpStr(a.name, b.name, recordSort.dir);
+        case 'notes':
+          return cmpStr(a.notes ?? '', b.notes ?? '', recordSort.dir);
+        case 'source':
+          return cmpStr(a.internalOrSupplier, b.internalOrSupplier, recordSort.dir);
+        case 'status':
+          return cmpStr(a.status, b.status, recordSort.dir);
+        case 'createdAt':
+          return cmpStr(a.createdAt, b.createdAt, recordSort.dir);
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [data?.records, recordSort]);
+
+  const sortedAudits = useMemo(() => {
+    const rows = data?.audits ?? [];
+    const key = auditSort.key;
+    if (!key) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      switch (key) {
+        case 'code':
+          return cmpStr(a.code, b.code, auditSort.dir);
+        case 'date':
+          return cmpStr(a.auditDate ?? '', b.auditDate ?? '', auditSort.dir);
+        case 'type':
+          return cmpStr(
+            a.auditType?.name ?? a.auditType?.code ?? '',
+            b.auditType?.name ?? b.auditType?.code ?? '',
+            auditSort.dir
+          );
+        case 'result':
+          return cmpStr(a.result ?? '', b.result ?? '', auditSort.dir);
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [data?.audits, auditSort]);
+
+  const sortedFindings = useMemo(() => {
+    const rows = data?.findings ?? [];
+    const key = findingSort.key;
+    if (!key) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      switch (key) {
+        case 'code':
+          return cmpStr(a.code, b.code, findingSort.dir);
+        case 'status':
+          return cmpStr(a.status, b.status, findingSort.dir);
+        case 'severity':
+          return cmpStr(a.severity, b.severity, findingSort.dir);
+        case 'summary':
+          return cmpStr(a.summary, b.summary, findingSort.dir);
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [data?.findings, findingSort]);
+
+  const sortedCars = useMemo(() => {
+    const rows = data?.cars ?? [];
+    const key = carSort.key;
+    if (!key) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      switch (key) {
+        case 'code':
+          return cmpStr(a.code, b.code, carSort.dir);
+        case 'status':
+          return cmpStr(a.status, b.status, carSort.dir);
+        case 'severity':
+          return cmpStr(a.severity, b.severity, carSort.dir);
+        case 'summary':
+          return cmpStr(a.summary, b.summary, carSort.dir);
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [data?.cars, carSort]);
+
   const monthlyTrends = data?.charts?.monthlyTrends ?? [];
   const profileTrendMax = useMemo(
     () => Math.max(1, ...monthlyTrends.map((r) => Math.max(r.findings, r.cars, r.audits, r.shipments))),
     [monthlyTrends]
   );
 
-  const passPercent = useMemo(() => {
+  const auditPassPercent = useMemo(() => {
     const audits = data?.audits ?? [];
-    if (audits.length === 0) return '0% Pass';
+    if (audits.length === 0) return 0;
     const passed = audits.filter((a) => a.result === 'Passed').length;
-    return `${Math.round((passed / audits.length) * 100)}% Pass`;
+    return Math.round((passed / audits.length) * 100);
   }, [data?.audits]);
 
   const criticalMajorCount = useMemo(() => {
@@ -423,7 +556,7 @@ export function SupplierProfile() {
           {error}
           {error?.includes('No supplier linked') ? (
             <p style={{ marginTop: '0.75rem', marginBottom: 0, fontWeight: 400 }}>
-              Ask an administrator to link your user account to a supplier record.
+              {t('supplierProfile.noSupplierLinkedHint')}
             </p>
           ) : null}
         </div>
@@ -434,6 +567,23 @@ export function SupplierProfile() {
   const supplier = data?.supplier;
   const metrics = data?.metrics;
   const latePoCount = shipmentKpis?.shortDeliveries ?? 0;
+  const latePoLabel =
+    latePoCount === 1
+      ? t('dashboard.metric.latePO_one', { count: latePoCount })
+      : t('dashboard.metric.latePO_other', { count: latePoCount });
+  const fpySubtitle =
+    shipmentKpis?.fpyPercent != null
+      ? t('shipments.metric.fpySubtitle', { pct: shipmentKpis.fpyPercent })
+      : '—';
+
+  const partNumberHint = !shipPo.trim()
+    ? t('supplierProfile.shipmentRequest.poFirst')
+    : shipPartLoading
+      ? t('supplierProfile.shipmentRequest.loadingParts')
+      : shipPartOptions.length === 0
+        ? t('supplierProfile.shipmentRequest.noParts')
+        : '';
+  const partSelectRequired = Boolean(shipPo.trim() && shipPartOptions.length > 0);
 
   return (
     <div className="page">
@@ -479,44 +629,44 @@ export function SupplierProfile() {
           gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
         }}
       >
-        <MetricCard title="Assigned Buyers" value={metrics.assignedBuyerCount} />
+        <MetricCard title={t('supplierProfile.metric.assignedBuyers')} value={metrics.assignedBuyerCount} />
         <MetricCard
-          title="Total CARs"
+          title={t('supplierProfile.metric.totalCars')}
           value={data.cars.length}
-          subtitle={`${metrics.openCarCount} open`}
+          subtitle={t('supplierProfile.metric.openCars', { count: metrics.openCarCount })}
         />
         <MetricCard
-          title="Total Audits"
+          title={t('supplierProfile.metric.totalAudits')}
           value={metrics.auditCount}
-          subtitle={passPercent}
+          subtitle={t('supplierProfile.metric.passPercent', { percent: auditPassPercent })}
         />
         <MetricCard
-          title="Total Findings"
+          title={t('supplierProfile.metric.totalFindings')}
           value={metrics.findingCount}
-          subtitle={`${criticalMajorCount} Critical/Major`}
+          subtitle={t('supplierProfile.metric.criticalMajor', { count: criticalMajorCount })}
         />
         <MetricCard
-          title="Total Shipments"
+          title={t('supplierProfile.metric.totalShipments')}
           value={metrics.shipmentCount}
-          subtitle={`FPY ${shipmentKpis?.fpyPercent != null ? `${shipmentKpis.fpyPercent}%` : '—'}`}
+          subtitle={fpySubtitle}
         />
         <MetricCard
-          title="OTD%"
+          title={t('supplierProfile.metric.otd')}
           value={shipmentKpis?.otdPercent != null ? `${shipmentKpis.otdPercent}%` : '—'}
-          subtitle={`${latePoCount} late PO${latePoCount === 1 ? '' : 's'}`}
+          subtitle={latePoLabel}
           showAlert={latePoCount > 0}
-          alertLabel={`${latePoCount} late PO${latePoCount === 1 ? '' : 's'}`}
+          alertLabel={latePoLabel}
         />
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Monthly Trends</h2>
+          <h2 style={{ marginTop: 0 }}>{t('dashboard.monthlyTrends')}</h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 0 }}>
-            New items by month for this supplier (same view as the main dashboard).
+            {t('supplierProfile.monthlyTrendsIntro')}
           </p>
           {monthlyTrends.length === 0 ? (
-            <p className="table-empty">No trend data yet.</p>
+            <p className="table-empty">{t('dashboard.trendsEmpty')}</p>
           ) : (
             <MonthlyTrendsLineChart rows={monthlyTrends} maxY={profileTrendMax} />
           )}
@@ -524,67 +674,67 @@ export function SupplierProfile() {
       </div>
 
       <SectionTable
-        title="Quality Score history"
-        empty="No Quality Score snapshots."
+        title={t('supplierProfile.qualityScoreHistory')}
+        empty={t('supplierProfile.noQualitySnapshots')}
         rowCount={data.riskSnapshots.length}
       >
         {weeklyRiskSeries.length === 0 ? (
-          <p className="table-empty">No numeric Quality Scores yet.</p>
-        ) : (
+          <p className="table-empty">{t('supplierProfile.noNumericQualityScores')}</p>
+          ) : (
           <RiskHistoryLineChart points={weeklyRiskSeries} />
         )}
       </SectionTable>
 
       {canShowSupplierRequestAndRecord ? (
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      <div className="card" style={{ marginBottom: '1rem' }} key={`shipment-request-${language}`}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Shipment request</h2>
+          <h2 style={{ marginTop: 0 }}>{t('supplierProfile.shipmentRequest')}</h2>
           <form onSubmit={submitShipment}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
               <div className="input-group">
-                <label className="input-label">Purchase order *</label>
+                <label className="input-label">{t('supplierProfile.shipmentRequest.po')}</label>
                 <input className="input" value={shipPo} onChange={(e) => setShipPo(e.target.value)} required />
               </div>
               <div className="input-group">
-                <label className="input-label">Part number *</label>
+                <label className="input-label">{t('supplierProfile.shipmentRequest.partNumber')}</label>
                 <select
-                  className="input"
+                  className="input supplier-profile-part-select"
                   value={shipPart}
                   onChange={(e) => setShipPart(e.target.value)}
-                  required
-                  disabled={!shipPo.trim() || shipPartLoading || shipPartOptions.length === 0}
+                  required={partSelectRequired}
+                  disabled={shipPartLoading}
+                  aria-describedby="supplier-profile-part-hint"
                 >
-                  <option value="">
-                    {!shipPo.trim()
-                      ? 'Enter purchase order first'
-                      : shipPartLoading
-                        ? 'Loading parts…'
-                        : shipPartOptions.length === 0
-                          ? 'No parts on schedule for this PO'
-                          : 'Select part number'}
-                  </option>
+                  <option value="">{t('supplierProfile.shipmentRequest.selectPartPlaceholder')}</option>
                   {shipPartOptions.map((p) => (
                     <option key={p} value={p}>
                       {p}
                     </option>
                   ))}
                 </select>
+                {partNumberHint ? (
+                  <p id="supplier-profile-part-hint" className="input-hint">
+                    {partNumberHint}
+                  </p>
+                ) : null}
               </div>
               <div className="input-group">
-                <label className="input-label">Quantity *</label>
+                <label className="input-label">{t('supplierProfile.shipmentRequest.quantity')}</label>
                 <input className="input" type="number" min={0} step="1" value={shipQty} onChange={(e) => setShipQty(e.target.value)} required />
               </div>
               <div className="input-group">
-                <label className="input-label">Lot *</label>
+                <label className="input-label">{t('supplierProfile.shipmentRequest.lot')}</label>
                 <input className="input" value={shipLot} onChange={(e) => setShipLot(e.target.value)} required />
               </div>
               <div className="input-group">
-                <label className="input-label" style={{ whiteSpace: 'nowrap' }}>Requested Inspection Date *</label>
+                <label className="input-label" style={{ whiteSpace: 'nowrap' }}>
+                  {t('supplierProfile.shipmentRequest.inspectionDate')}
+                </label>
                 <input className="input" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} required />
               </div>
             </div>
             <button type="submit" className="btn btn-primary" style={{ marginTop: '0.75rem' }} disabled={submitting}>
-              {submitting ? '…' : 'Submit'}
+              {submitting ? t('records.submitting') : t('records.submit')}
             </button>
           </form>
         </div>
@@ -594,19 +744,19 @@ export function SupplierProfile() {
       {canShowSupplierRequestAndRecord ? (
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-body">
-          <h2 style={{ marginTop: 0 }}>Record upload</h2>
+          <h2 style={{ marginTop: 0 }}>{t('records.upload.title')}</h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
             {isAdmin && !isSupplier
-              ? 'Upload a file for the supplier selected above. It is submitted for review like supplier uploads.'
-              : 'Submit a document for review. Your organization is linked automatically (no supplier picker).'}
+              ? t('supplierProfile.uploadIntroAdmin')
+              : t('supplierProfile.uploadIntroSupplier')}
           </p>
           <form onSubmit={submitRecord}>
             <div className="input-group">
-              <label className="input-label">Name *</label>
+              <label className="input-label">{t('records.field.recordName')}</label>
               <input className="input" value={recordName} onChange={(e) => setRecordName(e.target.value)} required />
             </div>
             <div className="input-group">
-              <label className="input-label">File *</label>
+              <label className="input-label">{t('records.field.fileRequired')}</label>
               <input
                 className="input"
                 type="file"
@@ -615,36 +765,40 @@ export function SupplierProfile() {
               />
             </div>
             <div className="input-group">
-              <label className="input-label">Notes (optional)</label>
+              <label className="input-label">{t('records.field.notesOptional')}</label>
               <textarea className="input" rows={2} value={recordNotes} onChange={(e) => setRecordNotes(e.target.value)} />
             </div>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? '…' : 'Upload'}
+              {submitting ? t('records.submitting') : t('common.upload')}
             </button>
           </form>
         </div>
       </div>
       ) : null}
 
-      <SectionTable title="Shipment Inspection Requests" empty="No requests." rowCount={data.shipments.length}>
+      <SectionTable
+        title={t('shipments.section.requests')}
+        empty={t('shipments.emptyRequests')}
+        rowCount={data.shipments.length}
+      >
         <table className="table">
           <thead>
             <tr style={{ verticalAlign: 'bottom' }}>
-              <th>{t('shipments.col.shipmentId')}</th>
+              <SortableTh label={t('shipments.col.shipmentId')} columnKey="code" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
               <th>{t('findings.col.supplier')}</th>
-              <th>{t('shipments.col.po')}</th>
-              <th>{t('shipments.col.partNumber')}</th>
-              <th>{t('shipments.col.quantity')}</th>
-              <th>{t('shipments.col.lot')}</th>
-              <th style={{ whiteSpace: 'nowrap' }}>{t('shipments.col.requestedDate')}</th>
-              <th>{t('table.col.user')}</th>
-              <th>{t('shipments.col.created')}</th>
+              <SortableTh label={t('shipments.col.po')} columnKey="po" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('shipments.col.partNumber')} columnKey="partNumber" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('shipments.col.quantity')} columnKey="qty" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('shipments.col.lot')} columnKey="lot" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('shipments.col.requestedDate')} columnKey="inspectionDate" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} style={{ whiteSpace: 'nowrap' }} />
+              <SortableTh label={t('table.col.user')} columnKey="createdBy" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('shipments.col.created')} columnKey="createdAt" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
               <th>{t('shipments.col.notes')}</th>
-              <th>{t('table.col.status')}</th>
+              <SortableTh label={t('table.col.status')} columnKey="status" activeKey={shipmentSort.key} dir={shipmentSort.dir} onSort={(k) => setShipmentSort((p) => toggleSort(p, k))} />
             </tr>
           </thead>
           <tbody>
-            {data.shipments.map((s) => (
+            {sortedShipments.map((s) => (
               <tr key={s.id}>
                 <td>{s.code ?? '—'}</td>
                 <td>
@@ -654,15 +808,9 @@ export function SupplierProfile() {
                 <td>{s.partNumber ?? '—'}</td>
                 <td>{s.qty ?? '—'}</td>
                 <td>{s.lot ?? '—'}</td>
-                <td>{s.inspectionDate?.slice(0, 10) ?? '—'}</td>
+                <td>{formatProfileTableDate(s.inspectionDate)}</td>
                 <td>{formatShipmentCreatedByLabel(s.createdBy)}</td>
-                <td>
-                  {new Date(s.createdAt).toLocaleDateString(locale, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </td>
+                <td>{formatProfileTableDate(s.createdAt)}</td>
                 <td
                   style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                   title={s.notes ?? ''}
@@ -677,8 +825,8 @@ export function SupplierProfile() {
       </SectionTable>
 
       <SectionTable
-        title="Records"
-        empty="No records."
+        title={t('nav.records')}
+        empty={t('records.emptyList')}
         rowCount={data.records.length}
         excelExport={{
           filename: `${safeExportFilePart(supplier.code)}_Records`,
@@ -699,25 +847,25 @@ export function SupplierProfile() {
         <table className="table">
           <thead>
             <tr>
-              <th>{t('table.col.name')}</th>
-              <th>{t('table.col.notes')}</th>
+              <SortableTh label={t('table.col.name')} columnKey="name" activeKey={recordSort.key} dir={recordSort.dir} onSort={(k) => setRecordSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('table.col.notes')} columnKey="notes" activeKey={recordSort.key} dir={recordSort.dir} onSort={(k) => setRecordSort((p) => toggleSort(p, k))} />
               <th>{t('table.col.file')}</th>
-              <th>{t('table.col.source')}</th>
-              <th>{t('table.col.status')}</th>
-              <th>{t('table.col.created')}</th>
+              <SortableTh label={t('table.col.source')} columnKey="source" activeKey={recordSort.key} dir={recordSort.dir} onSort={(k) => setRecordSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('table.col.status')} columnKey="status" activeKey={recordSort.key} dir={recordSort.dir} onSort={(k) => setRecordSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('table.col.created')} columnKey="createdAt" activeKey={recordSort.key} dir={recordSort.dir} onSort={(k) => setRecordSort((p) => toggleSort(p, k))} />
             </tr>
           </thead>
           <tbody>
-            {data.records.map((r) => (
+            {sortedRecords.map((r) => (
               <tr key={r.id}>
                 <td>{r.name}</td>
                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes ?? ''}>
                   {r.notes?.trim() ? r.notes : '—'}
                 </td>
-                <td>{r.filePath ? 'Yes' : '—'}</td>
+                <td>{r.filePath ? t('common.yes') : '—'}</td>
                 <td>{r.internalOrSupplier}</td>
                 <td>{r.status}</td>
-                <td>{new Date(r.createdAt).toLocaleString()}</td>
+                <td>{formatProfileTableDate(r.createdAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -725,26 +873,28 @@ export function SupplierProfile() {
       </SectionTable>
 
       <SectionTable
-        title="Audits"
-        empty="No audits."
+        title={t('nav.audits')}
+        empty={t('supplierProfile.noAudits')}
         rowCount={data.audits.length}
       >
         <table className="table">
           <thead>
             <tr>
-              <th>{t('findings.col.code')}</th>
-              <th>{t('audits.col.date')}</th>
-              <th>{t('audits.col.type')}</th>
-              <th>{t('audits.col.result')}</th>
+              <SortableTh label={t('findings.col.code')} columnKey="code" activeKey={auditSort.key} dir={auditSort.dir} onSort={(k) => setAuditSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('audits.col.date')} columnKey="date" activeKey={auditSort.key} dir={auditSort.dir} onSort={(k) => setAuditSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('audits.col.type')} columnKey="type" activeKey={auditSort.key} dir={auditSort.dir} onSort={(k) => setAuditSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('audits.col.result')} columnKey="result" activeKey={auditSort.key} dir={auditSort.dir} onSort={(k) => setAuditSort((p) => toggleSort(p, k))} />
             </tr>
           </thead>
           <tbody>
-            {data.audits.map((a) => (
+            {sortedAudits.map((a) => (
               <tr key={a.id}>
                 <td>{a.code}</td>
-                <td>{a.auditDate?.slice(0, 10)}</td>
-                <td>{a.auditType ? `${a.auditType.code}` : '—'}</td>
-                <td>{a.result ?? '—'}</td>
+                <td>{formatProfileTableDate(a.auditDate)}</td>
+                <td>{a.auditType?.name?.trim() || a.auditType?.code || '—'}</td>
+                <td style={{ color: auditResultColor(a.result), fontWeight: auditResultColor(a.result) ? 600 : undefined }}>
+                  {a.result ?? '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -752,21 +902,21 @@ export function SupplierProfile() {
       </SectionTable>
 
       <SectionTable
-        title="Findings"
-        empty="No findings."
+        title={t('nav.findings')}
+        empty={t('supplierProfile.noFindings')}
         rowCount={data.findings.length}
       >
         <table className="table">
           <thead>
             <tr>
-              <th>{t('findings.col.code')}</th>
-              <th>{t('findings.col.status')}</th>
-              <th>{t('findings.col.severity')}</th>
-              <th>{t('findings.col.summary')}</th>
+              <SortableTh label={t('findings.col.code')} columnKey="code" activeKey={findingSort.key} dir={findingSort.dir} onSort={(k) => setFindingSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('findings.col.status')} columnKey="status" activeKey={findingSort.key} dir={findingSort.dir} onSort={(k) => setFindingSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('findings.col.severity')} columnKey="severity" activeKey={findingSort.key} dir={findingSort.dir} onSort={(k) => setFindingSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('findings.col.summary')} columnKey="summary" activeKey={findingSort.key} dir={findingSort.dir} onSort={(k) => setFindingSort((p) => toggleSort(p, k))} />
             </tr>
           </thead>
           <tbody>
-            {data.findings.map((f) => (
+            {sortedFindings.map((f) => (
               <tr key={f.id}>
                 <td>
                   <Link to={`/findings-record?id=${f.id}`}>{f.code}</Link>
@@ -781,22 +931,25 @@ export function SupplierProfile() {
       </SectionTable>
 
       <SectionTable
-        title="Corrective actions (CARs)"
-        empty="No CARs."
+        title={t('nav.correctiveActions')}
+        empty={t('supplierProfile.noCorrectiveActions')}
         rowCount={data.cars.length}
       >
         <table className="table">
           <thead>
             <tr>
-              <th>{t('findings.col.code')}</th>
-              <th>{t('findings.col.status')}</th>
-              <th>{t('findings.col.severity')}</th>
-              <th>{t('findings.col.summary')}</th>
+              <SortableTh label={t('findings.col.code')} columnKey="code" activeKey={carSort.key} dir={carSort.dir} onSort={(k) => setCarSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('findings.col.status')} columnKey="status" activeKey={carSort.key} dir={carSort.dir} onSort={(k) => setCarSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('findings.col.severity')} columnKey="severity" activeKey={carSort.key} dir={carSort.dir} onSort={(k) => setCarSort((p) => toggleSort(p, k))} />
+              <SortableTh label={t('findings.col.summary')} columnKey="summary" activeKey={carSort.key} dir={carSort.dir} onSort={(k) => setCarSort((p) => toggleSort(p, k))} />
             </tr>
           </thead>
           <tbody>
-            {data.cars.map((c) => (
-              <tr key={c.id}>
+            {sortedCars.map((c) => (
+              <tr
+                key={c.id}
+                style={isCarClosed(c.status) ? { opacity: 0.55, color: 'var(--color-text-muted)' } : undefined}
+              >
                 <td>
                   <Link to={`/car-record?id=${c.id}`}>{c.code}</Link>
                 </td>
@@ -821,7 +974,7 @@ export function SupplierProfile() {
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                       }}
-                      title="Click to view full summary"
+                      title={t('supplierProfile.viewFullSummary')}
                     >
                       {c.summary}
                     </button>
@@ -847,12 +1000,12 @@ export function SupplierProfile() {
         >
           <div className="confirm-dialog confirm-dialog--wide" onClick={(e) => e.stopPropagation()}>
             <h3 id="supplier-profile-car-summary-title" className="confirm-dialog-title">
-              CAR Summary — {carSummaryModal.code}
+              {t('supplierProfile.carSummaryTitle', { code: carSummaryModal.code })}
             </h3>
             <p style={{ marginBottom: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>{carSummaryModal.summary}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-primary" onClick={() => setCarSummaryModal(null)}>
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -878,20 +1031,45 @@ function buildWeeklyRiskSeries(
   const sortedAsc = [...snapshots]
     .filter((s): s is { id: string; score: number; level: string; createdAt: string } => typeof s.score === 'number')
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  if (sortedAsc.length === 0) return [];
 
-  const byWeek = new Map<string, WeeklyRiskPoint>();
+  const byWeek = new Map<string, number>();
   for (const snap of sortedAsc) {
     const created = new Date(snap.createdAt);
     if (Number.isNaN(created.getTime())) continue;
-    const weekStart = toUtcWeekStart(created);
-    const iso = weekStart.toISOString().slice(0, 10);
-    byWeek.set(iso, {
-      weekStartIso: iso,
-      label: `${weekStart.toLocaleString('en-US', { month: 'short' })} ${weekStart.getUTCDate()}`,
-      score: Math.round(snap.score * 100) / 100,
-    });
+    const iso = toUtcWeekStart(created).toISOString().slice(0, 10);
+    byWeek.set(iso, Math.round(snap.score * 100) / 100);
   }
-  return [...byWeek.values()].sort((a, b) => a.weekStartIso.localeCompare(b.weekStartIso));
+
+  const weekKeys = [...byWeek.keys()].sort();
+  const firstWeek = new Date(`${weekKeys[0]}T12:00:00.000Z`);
+  const lastWeek = toUtcWeekStart(new Date());
+  const filled: WeeklyRiskPoint[] = [];
+  let lastScore = byWeek.get(weekKeys[0]) ?? 0;
+  const cursor = new Date(firstWeek);
+
+  while (cursor.getTime() <= lastWeek.getTime()) {
+    const iso = cursor.toISOString().slice(0, 10);
+    if (byWeek.has(iso)) lastScore = byWeek.get(iso)!;
+    filled.push({
+      weekStartIso: iso,
+      label: `${cursor.toLocaleString('en-US', { month: 'short' })} ${cursor.getUTCDate()}`,
+      score: lastScore,
+    });
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return filled;
+}
+
+function auditResultColor(result: string | null | undefined): string | undefined {
+  const r = (result ?? '').trim().toLowerCase();
+  if (r === 'failed') return 'var(--color-danger, #dc2626)';
+  if (r === 'passed') return 'var(--color-success, #16a34a)';
+  return undefined;
+}
+
+function isCarClosed(status: string): boolean {
+  return status.trim().toLowerCase() === 'closed';
 }
 
 function toUtcWeekStart(d: Date): Date {
@@ -903,6 +1081,7 @@ function toUtcWeekStart(d: Date): Date {
 }
 
 function RiskHistoryLineChart({ points }: { points: WeeklyRiskPoint[] }) {
+  const { t } = useLanguage();
   const width = 960;
   const height = 280;
   const padLeft = 48;
@@ -921,7 +1100,7 @@ function RiskHistoryLineChart({ points }: { points: WeeklyRiskPoint[] }) {
   return (
     <div>
       <div style={{ marginBottom: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
-        Weekly Quality Score trend
+        {t('supplierProfile.weeklyQualityTrend')}
       </div>
       <div className="table-wrap" style={{ overflowX: 'auto' }}>
         <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', minWidth: 680, height: 'auto', display: 'block' }}>
@@ -1008,7 +1187,7 @@ function SectionTable({
           <h2 style={{ marginTop: 0, marginBottom: 0 }}>{title}</h2>
           {excelExport ? (
             <button type="button" className="btn btn-ghost" onClick={handleExportExcel} disabled={rowCount === 0}>
-              Export to Excel
+              {t('common.exportExcel')}
             </button>
           ) : null}
         </div>

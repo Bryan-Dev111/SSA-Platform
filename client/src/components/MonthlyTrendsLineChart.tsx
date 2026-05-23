@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 
 export type MonthlyTrendRow = {
   month: string;
@@ -25,6 +26,7 @@ export function MonthlyTrendsLineChart({
   /** Optional heading (omit when the parent card already provides a title). */
   title?: string;
 }) {
+  const { t } = useLanguage();
   const width = 960;
   const height = 320;
   const padLeft = 52;
@@ -69,10 +71,10 @@ export function MonthlyTrendsLineChart({
         <h2 style={{ marginTop: 0, marginBottom: '0.65rem', fontSize: 'var(--text-lg)' }}>{title}</h2>
       ) : null}
       <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.5rem', fontSize: 'var(--text-sm)' }}>
-        <LegendItem color={TREND.findings.stroke} label="Findings" />
-        <LegendItem color={TREND.cars.stroke} label="CARs" />
-        <LegendItem color={TREND.audits.stroke} label="Audits" />
-        <LegendItem color={TREND.shipments.stroke} label="Shipments" />
+        <LegendItem color={TREND.findings.stroke} label={t('dashboard.trend.findings')} />
+        <LegendItem color={TREND.cars.stroke} label={t('dashboard.trend.cars')} />
+        <LegendItem color={TREND.audits.stroke} label={t('dashboard.trend.audits')} />
+        <LegendItem color={TREND.shipments.stroke} label={t('dashboard.trend.shipments')} />
       </div>
       <div className="table-wrap" style={{ overflowX: 'auto' }}>
         <svg
@@ -80,7 +82,7 @@ export function MonthlyTrendsLineChart({
           style={{ width: '100%', minWidth: 680, height: 'auto', display: 'block' }}
           onMouseLeave={() => setHoverIndex(null)}
           role="img"
-          aria-label="Monthly trends line chart for Findings, CARs, Audits, and Shipments"
+          aria-label={t('dashboard.trend.chartAria')}
         >
           {[0, 0.25, 0.5, 0.75, 1].map((f, idx) => {
             const y = padTop + plotH * f;
@@ -157,16 +159,16 @@ export function MonthlyTrendsLineChart({
                   {hovered.month}
                 </text>
                 <text x="10" y="36" fill={TREND.findings.stroke} fontSize="12">
-                  Findings: {hovered.findings}
+                  {t('dashboard.trend.tooltipFindings', { count: hovered.findings })}
                 </text>
                 <text x="10" y="52" fill={TREND.cars.stroke} fontSize="12">
-                  CARs: {hovered.cars}
+                  {t('dashboard.trend.tooltipCars', { count: hovered.cars })}
                 </text>
                 <text x="10" y="68" fill={TREND.audits.stroke} fontSize="12">
-                  Audits: {hovered.audits}
+                  {t('dashboard.trend.tooltipAudits', { count: hovered.audits })}
                 </text>
                 <text x="10" y="84" fill={TREND.shipments.stroke} fontSize="12">
-                  Shipments: {hovered.shipments}
+                  {t('dashboard.trend.tooltipShipments', { count: hovered.shipments })}
                 </text>
               </g>
             </>

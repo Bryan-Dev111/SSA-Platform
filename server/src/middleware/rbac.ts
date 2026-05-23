@@ -22,7 +22,6 @@ export const API_PAGE_ROLES: Record<string, string[]> = {
   SuppliersMap: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer'],
   GlobalSupplyDashboard: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyFarmDashboard: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyRiskIntelligence: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   Records: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor', 'Buyer', 'Supplier'],
   Shipments: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'Supplier', 'Auditor', 'Inspector'],
   Documents: ['Admin', 'QualityEngineer', 'QualityManager', 'Auditor'],
@@ -58,7 +57,9 @@ export function requireRole(allowedRoles: string[]) {
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const hasRole = req.user.roleNames.some((r) => allowedRoles.includes(r));
+    const hasRole =
+      req.user.roleNames.includes('Super') ||
+      req.user.roleNames.some((r) => allowedRoles.includes(r));
     if (!hasRole) {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
@@ -88,7 +89,9 @@ export function requirePageAccess(pageName: string) {
         res.status(403).json({ error: 'Insufficient permissions' });
         return;
       }
-      const hasRole = req.user.roleNames.some((r) => allowedRoles.includes(r));
+      const hasRole =
+        req.user.roleNames.includes('Super') ||
+        req.user.roleNames.some((r) => allowedRoles.includes(r));
       if (!hasRole) {
         res.status(403).json({ error: 'Insufficient permissions' });
         return;
@@ -119,7 +122,9 @@ export function requirePageAccessAny(pageNames: string[]) {
         let allowedRoles = liveMap[pageName] ?? [];
         if (allowedRoles.length === 0) allowedRoles = API_PAGE_ROLES[pageName] ?? [];
         return (
-          allowedRoles.length > 0 && req.user!.roleNames.some((r) => allowedRoles.includes(r))
+          allowedRoles.length > 0 &&
+          (req.user!.roleNames.includes('Super') ||
+            req.user!.roleNames.some((r) => allowedRoles.includes(r)))
         );
       });
       if (!ok) {

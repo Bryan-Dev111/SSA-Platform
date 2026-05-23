@@ -25,3 +25,17 @@ export function formatDisplayCalendarRange(popStart: string | null, popEnd: stri
   if (!popStart || !popEnd) return '—';
   return `${formatDisplayCalendarDate(popStart, locale)} – ${formatDisplayCalendarDate(popEnd, locale)}`;
 }
+
+/** Supplier Profile tables: MMM DD, YYYY (e.g. Jan 01, 2024). */
+export function formatProfileTableDate(value: string | null | undefined): string {
+  if (value == null || typeof value !== 'string') return '—';
+  const cal = value.trim().slice(0, 10);
+  let parsed: Date;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cal)) {
+    parsed = new Date(`${cal}T12:00:00.000Z`);
+  } else {
+    parsed = new Date(value);
+  }
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+}

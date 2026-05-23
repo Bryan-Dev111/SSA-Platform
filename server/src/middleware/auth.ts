@@ -4,6 +4,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { buildSuperAuthUser, isSuperUserId } from '../lib/superUser';
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 
 export interface JwtPayload {
@@ -20,6 +21,18 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (isSuperUserId(decoded.userId)) {
+      const superUser = buildSuperAuthUser();
+      (req as Request).user = {
+        id: superUser.id,
+        email: superUser.email,
+        name: superUser.name,
+        roleNames: superUser.roleNames,
+        roleIds: [],
+      };
+      next();
+      return;
+    }
     loadUser(decoded.userId)
       .then((user) => {
         (req as Request).user = user;
@@ -43,6 +56,18 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    if (isSuperUserId(decoded.userId)) {
+      const superUser = buildSuperAuthUser();
+      (req as Request).user = {
+        id: superUser.id,
+        email: superUser.email,
+        name: superUser.name,
+        roleNames: superUser.roleNames,
+        roleIds: [],
+      };
+      next();
+      return;
+    }
     loadUser(decoded.userId)
       .then((user) => {
         (req as Request).user = user;

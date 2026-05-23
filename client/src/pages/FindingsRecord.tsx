@@ -911,7 +911,7 @@ export function FindingsRecord() {
                 disabled={!canEdit}
               />
               <div className="input-group">
-                <label className="input-label">Closing Comments</label>
+                <label className="input-label">Disposition Comments</label>
                 <textarea className="input" rows={2} value={form.closingComments} onChange={(e) => setForm((p) => ({ ...p, closingComments: e.target.value }))} disabled={!canEdit} />
               </div>
             </div>

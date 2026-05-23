@@ -9,6 +9,7 @@ import { getPathRolesMatrix } from '../lib/permissions';
 import { getNextCode } from '../services/idGenerator';
 import { buildSupplierMonthlyTrends } from '../services/supplierMonthlyTrends';
 import { computeAndStoreRiskSnapshot } from '../services/riskScoring';
+import { buildSuperAuthUser, isSuperUserId } from '../lib/superUser';
 
 const router = Router();
 
@@ -179,6 +180,19 @@ router.get(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    if (isSuperUserId(req.user.id)) {
+      const superUser = buildSuperAuthUser();
+      res.json({
+        pathRoles: superUser.pathRoles,
+        id: superUser.id,
+        email: superUser.email,
+        name: superUser.name,
+        isEmployee: false,
+        roleNames: superUser.roleNames,
+        isSuper: true,
+      });
       return;
     }
     const user = await prisma.user.findUnique({

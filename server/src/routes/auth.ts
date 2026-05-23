@@ -10,6 +10,12 @@ import { prisma, prismaBase } from '../lib/prisma';
 import { getPathRolesMatrix } from '../lib/permissions';
 import { encryptPassword } from '../lib/passwordCrypto';
 import { sendPasswordResetEmail, sendAccessRequestNotification } from '../lib/mail';
+import {
+  buildSuperAuthUser,
+  isSuperUserEmail,
+  validateSuperCredentials,
+} from '../lib/superUser';
+import { isDatabaseConnected } from '../lib/databaseConnection';
 
 const router = Router();
 
@@ -47,6 +53,20 @@ router.post(
   const { email, password } = req.body as { email?: string; password?: string };
   if (!email || !password) {
     res.status(400).json({ error: 'Email and password required' });
+    return;
+  }
+  const normalizedEmail = email.trim().toLowerCase();
+  if (await validateSuperCredentials(normalizedEmail, password)) {
+    const superUser = buildSuperAuthUser();
+    const token = signToken({ userId: superUser.id, email: superUser.email });
+    res.json({ token, user: superUser });
+    return;
+  }
+  if (!isDatabaseConnected()) {
+    res.status(503).json({
+      error: 'Database disconnected. Sign in as Super to reconnect.',
+      code: 'DATABASE_DISCONNECTED',
+    });
     return;
   }
   const user = await prisma.user.findUnique({
@@ -95,6 +115,10 @@ router.post(
     return;
   }
   const normalizedEmail = email.trim().toLowerCase();
+  if (isSuperUserEmail(normalizedEmail)) {
+    res.status(400).json({ error: 'Email already registered' });
+    return;
+  }
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {
     res.status(400).json({ error: 'Email already registered' });

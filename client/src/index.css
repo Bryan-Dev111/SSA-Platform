@@ -712,7 +712,6 @@ body {
 }
 
 .app-main .dashboard-metric-grid > .card:hover,
-.app-main .global-risk-pillars-grid > .card:hover,
 .app-main .risk-kpi-grid > .card:hover,
 .app-main .shipments-metrics-kpi-grid > .card:hover {
   transform: translateY(-2px);
@@ -948,6 +947,17 @@ textarea.input {
 
 select.input {
   cursor: pointer;
+}
+
+.input-hint {
+  margin: 0.35rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.supplier-profile-part-select {
+  min-width: 12rem;
 }
 
 .app-main select.input:focus,
@@ -3091,36 +3101,6 @@ body.sidebar-open {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow-x: auto;
   overflow-y: visible;
-}
-
-/* Global Supply Risk Intelligence: four pillar cards share the row evenly at any zoom (no auto-fill empty tracks). */
-.global-risk-pillars-grid {
-  display: grid;
-  width: 100%;
-  gap: 1rem;
-  margin-top: 1.25rem;
-  margin-bottom: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  position: relative;
-  z-index: 1;
-  overflow: visible;
-}
-
-.global-risk-pillars-grid > .card {
-  min-width: 0;
-}
-
-@media (max-width: 960px) {
-  .global-risk-pillars-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 520px) {
-  .global-risk-pillars-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Dashboard: Risk donut + Upcoming + Recent Updates — equal-width columns on large screens */

@@ -60,8 +60,10 @@ import employeeProfilesRoutes from './routes/employee-profiles';
 import globalSupplyCalendarEventsRoutes from './routes/global-supply-calendar-events';
 import internalManagementCalendarEventsRoutes from './routes/internal-management-calendar-events';
 import bankingSettingsRoutes from './routes/banking-settings';
+import superDatabaseRoutes from './routes/super-database';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLocaleMiddleware } from './middleware/requestLocale';
+import { databaseGateMiddleware } from './middleware/databaseGate';
 
 const app = express();
 
@@ -75,6 +77,10 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/auth', authRoutes);
+app.use('/super/database', superDatabaseRoutes);
+/** Clients with VITE_API_URL=/api hit the server with the /api prefix (no Vite proxy). */
+app.use('/api/super/database', superDatabaseRoutes);
+app.use(databaseGateMiddleware);
 app.use('/me', meRoutes);
 app.use('/users', usersRoutes);
 app.use('/suppliers', suppliersRoutes);

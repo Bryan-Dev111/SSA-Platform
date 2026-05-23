@@ -12,6 +12,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { SidebarNavIcon } from './SidebarNavIcons';
 import { LanguageFlagSelector } from './LanguageFlagSelector';
 import { canAccessPath, getDefaultPath } from '../config/rolePageAccess';
+import { isSuperUserEmail } from '../config/superUser';
 
 const STORAGE_SIDEBAR_COLLAPSED = 'sentinel.sidebarCollapsed';
 const STORAGE_SIDEBAR_WIDTH = 'sentinel.sidebarWidthPx';
@@ -67,7 +68,7 @@ const MENU_ITEMS: { path: string; labelKey: string; fallback: string }[] = [
 const GLOBAL_VENDOR_ITEMS: { path: string; labelKey: string; fallback: string }[] = [
   { path: '/global-vendors/dashboard', labelKey: 'nav.businessDashboard', fallback: 'Business Dashboard' },
   { path: '/global-vendors/farm-dashboard', labelKey: 'nav.farmDashboard', fallback: 'Farm Dashboard' },
-  { path: '/global-vendors/risk-intelligence', labelKey: 'nav.riskIntelligence', fallback: 'Risk Intelligence' },
+  { path: '/global-vendors/database', labelKey: 'nav.databaseConnection', fallback: 'Database' },
   { path: '/global-vendors/farmers', labelKey: 'nav.farmInformation', fallback: 'Farm Information' },
   { path: '/global-vendors/approved', labelKey: 'nav.approvedFarmsList', fallback: 'Approved Farms List' },
   { path: '/global-vendors/map', labelKey: 'nav.farmsMap', fallback: 'Farms Map' },
@@ -303,7 +304,12 @@ export function Layout() {
   }
 
   const visibleItems = MENU_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
-  const visibleGlobalVendor = GLOBAL_VENDOR_ITEMS.filter((item) => canAccessPath(item.path, roleNames));
+  const visibleGlobalVendor = GLOBAL_VENDOR_ITEMS.filter((item) => {
+    if (item.path === '/global-vendors/database') {
+      return isSuperUserEmail(user?.email);
+    }
+    return canAccessPath(item.path, roleNames);
+  });
 
   const showDualNavSections =
     !roleNames.includes('Admin') && visibleItems.length > 0 && visibleGlobalVendor.length > 0;

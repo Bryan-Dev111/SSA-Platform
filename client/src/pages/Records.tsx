@@ -201,7 +201,6 @@ export function Records() {
   const pageSafe = Math.min(page, totalPages) || 1;
   const paginatedRows = sortedRows.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
   const recordStats = useMemo(() => {
-    const isApproved = (r: RecordRow) => getRecordReviewLabel(r.status) === 'Approved';
     const isPending = (r: RecordRow) => getRecordReviewLabel(r.status) === 'Pending';
     const source = (r: RecordRow) => (r.internalOrSupplier ?? '').trim().toLowerCase();
 
@@ -210,19 +209,13 @@ export function Records() {
     const internalRows = rows.filter((r) => source(r) === 'internal');
     const openRows = rows.filter(isPending);
 
-    const pct = (approvedCount: number, base: number): string =>
-      base > 0 ? t('records.kpi.approvedPct', { pct: Math.round((approvedCount / base) * 100) }) : t('records.kpi.approvedPctZero');
-
     return {
       total,
-      totalApprovedSubtitle: pct(rows.filter(isApproved).length, total),
       supplierTotal: supplierRows.length,
-      supplierApprovedSubtitle: pct(supplierRows.filter(isApproved).length, supplierRows.length),
       internalTotal: internalRows.length,
-      internalApprovedSubtitle: pct(internalRows.filter(isApproved).length, internalRows.length),
       openTotal: openRows.length,
     };
-  }, [rows, t]);
+  }, [rows]);
 
   const load = () => {
     if (!token) return;
@@ -476,27 +469,18 @@ export function Records() {
           <div className="card-body" style={{ padding: '0.75rem' }}>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.totalRecords')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.total}</div>
-            <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
-              {recordStats.totalApprovedSubtitle}
-            </div>
           </div>
         </div>
         <div className="card">
           <div className="card-body" style={{ padding: '0.75rem' }}>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.totalSupplier')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.supplierTotal}</div>
-            <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
-              {recordStats.supplierApprovedSubtitle}
-            </div>
           </div>
         </div>
         <div className="card">
           <div className="card-body" style={{ padding: '0.75rem' }}>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{t('records.kpi.totalInternal')}</div>
             <div style={{ fontSize: 'var(--text-xl)', fontWeight: 600 }}>{recordStats.internalTotal}</div>
-            <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>
-              {recordStats.internalApprovedSubtitle}
-            </div>
           </div>
         </div>
         <div className="card">

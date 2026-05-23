@@ -22,11 +22,6 @@ export const PAGE_DEFINITIONS = [
   { key: 'SuppliersMap', label: 'Suppliers Map', path: '/suppliers-map' },
   { key: 'GlobalSupplyDashboard', label: 'Business Dashboard', path: '/global-vendors/dashboard' },
   { key: 'GlobalSupplyFarmDashboard', label: 'Farm Dashboard', path: '/global-vendors/farm-dashboard' },
-  {
-    key: 'GlobalSupplyRiskIntelligence',
-    label: 'Risk Intelligence',
-    path: '/global-vendors/risk-intelligence',
-  },
   { key: 'GlobalSupplyFarmers', label: 'Farmer Information', path: '/global-vendors/farmers' },
   { key: 'GlobalSupplyFarmProfile', label: 'Farm profile', path: '/global-vendors/farm-profile' },
   {
@@ -86,7 +81,6 @@ export const DEFAULT_API_PAGE_ROLES: Record<string, string[]> = {
   GlobalSupplyProcessingQuality: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyApproved: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyMap: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
-  GlobalSupplyRiskIntelligence: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyRelationship: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyBuyerRelationships: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
   GlobalSupplyPurchaseOrders: ['Admin', 'QualityEngineer', 'QualityManager', 'Buyer', 'CommodityBuyer', 'SourcingDirector'],
@@ -191,7 +185,6 @@ export const DEFAULT_PATH_ROLES: Record<string, string[]> = {
   '/suppliers-map': DEFAULT_API_PAGE_ROLES.SuppliersMap,
   '/global-vendors/dashboard': DEFAULT_API_PAGE_ROLES.GlobalSupplyDashboard,
   '/global-vendors/farm-dashboard': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmDashboard,
-  '/global-vendors/risk-intelligence': DEFAULT_API_PAGE_ROLES.GlobalSupplyRiskIntelligence,
   '/global-vendors': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
   '/global-vendors/farmers': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmers,
   '/global-vendors/farm-profile': DEFAULT_API_PAGE_ROLES.GlobalSupplyFarmProfile,
