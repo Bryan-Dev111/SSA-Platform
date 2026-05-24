@@ -409,7 +409,7 @@ export function SupplierProfile() {
   const auditPassPercent = useMemo(() => {
     const audits = data?.audits ?? [];
     if (audits.length === 0) return 0;
-    const passed = audits.filter((a) => a.result === 'Passed').length;
+    const passed = audits.filter((a) => normalizeAuditResult(a.result) === 'passed').length;
     return Math.round((passed / audits.length) * 100);
   }, [data?.audits]);
 
@@ -888,12 +888,14 @@ export function SupplierProfile() {
           </thead>
           <tbody>
             {sortedAudits.map((a) => (
-              <tr key={a.id}>
+              <tr key={a.id} className={auditResultRowClass(a.result)}>
                 <td>{a.code}</td>
                 <td>{formatProfileTableDate(a.auditDate)}</td>
                 <td>{a.auditType?.name?.trim() || a.auditType?.code || '—'}</td>
-                <td style={{ color: auditResultColor(a.result), fontWeight: auditResultColor(a.result) ? 600 : undefined }}>
-                  {a.result ?? '—'}
+                <td>
+                  <span className={auditResultBadgeClass(a.result)}>
+                    {formatAuditResultLabel(a.result, t)}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -1061,11 +1063,45 @@ function buildWeeklyRiskSeries(
   return filled;
 }
 
-function auditResultColor(result: string | null | undefined): string | undefined {
+type NormalizedAuditResult = 'passed' | 'failed' | 'cancelled';
+
+/** Normalize API / legacy audit result strings for styling and counts. */
+function normalizeAuditResult(result: string | null | undefined): NormalizedAuditResult | null {
   const r = (result ?? '').trim().toLowerCase();
-  if (r === 'failed') return 'var(--color-danger, #dc2626)';
-  if (r === 'passed') return 'var(--color-success, #16a34a)';
-  return undefined;
+  if (r === 'passed' || r === 'pass') return 'passed';
+  if (r === 'failed' || r === 'fail') return 'failed';
+  if (r === 'cancelled' || r === 'canceled') return 'cancelled';
+  return null;
+}
+
+function formatAuditResultLabel(
+  result: string | null | undefined,
+  t: (key: string, fallbackOrOptions?: string) => string
+): string {
+  const normalized = normalizeAuditResult(result);
+  if (normalized === 'passed') return t('audits.result.Passed');
+  if (normalized === 'failed') return t('audits.result.Failed');
+  if (normalized === 'cancelled') return t('audits.result.Cancelled');
+  const raw = result?.trim();
+  return raw || '—';
+}
+
+function auditResultRowClass(result: string | null | undefined): string {
+  const normalized = normalizeAuditResult(result);
+  if (normalized === 'passed') return 'supplier-profile-audit-row supplier-profile-audit-row--passed';
+  if (normalized === 'failed') return 'supplier-profile-audit-row supplier-profile-audit-row--failed';
+  return 'supplier-profile-audit-row';
+}
+
+function auditResultBadgeClass(result: string | null | undefined): string {
+  const normalized = normalizeAuditResult(result);
+  if (normalized === 'passed') {
+    return 'supplier-profile-audit-result-badge supplier-profile-audit-result-badge--passed';
+  }
+  if (normalized === 'failed') {
+    return 'supplier-profile-audit-result-badge supplier-profile-audit-result-badge--failed';
+  }
+  return 'supplier-profile-audit-result-badge supplier-profile-audit-result-badge--neutral';
 }
 
 function isCarClosed(status: string): boolean {

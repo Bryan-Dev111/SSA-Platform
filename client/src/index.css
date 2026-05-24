@@ -1685,6 +1685,57 @@ select.input {
   background: var(--color-border-subtle);
 }
 
+/* Supplier Profile — Audits table: Passed = green, Failed = red (row + result badge) */
+.supplier-profile-audit-result-badge {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: 1.25;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.supplier-profile-audit-result-badge--passed {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.supplier-profile-audit-result-badge--failed {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.supplier-profile-audit-result-badge--neutral {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  border-color: var(--color-border-subtle);
+}
+
+.table tbody tr.supplier-profile-audit-row--passed {
+  background: #ecfdf5;
+}
+
+.table tbody tr.supplier-profile-audit-row--passed:hover {
+  background: #d1fae5;
+}
+
+.table tbody tr.supplier-profile-audit-row--failed {
+  background: #fef2f2;
+}
+
+.table tbody tr.supplier-profile-audit-row--failed:hover {
+  background: #fecaca;
+}
+
+.app-main .table tbody tr.supplier-profile-audit-row--passed:hover td,
+.app-main .table tbody tr.supplier-profile-audit-row--failed:hover td {
+  background: transparent;
+}
+
 /* Audits table: row background by derived status */
 .audit-row--scheduled {
   background: #eff6ff;
